@@ -1,7 +1,32 @@
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Bell, Search } from "lucide-react"
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const session = await auth()
+  if (!session) redirect('/login')
+
+  const initials = session.user.name
+    ? session.user.name
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '?'
+
+  const roleLabel =
+    session.user.role === 'ADMIN'
+      ? 'Administrator'
+      : session.user.role === 'INSTRUCTOR'
+      ? 'Instructor'
+      : 'Learner'
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar />
@@ -22,18 +47,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white">IA</span>
+                <span className="text-[10px] font-bold text-white">{initials}</span>
               </div>
               <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-700 leading-none">IFPI Admin</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Administrator</p>
+                <p className="text-xs font-semibold text-slate-700 leading-none">
+                  {session.user.name}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{roleLabel}</p>
               </div>
             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   )
