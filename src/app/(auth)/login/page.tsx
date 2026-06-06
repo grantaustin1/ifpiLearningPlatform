@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
 import { GraduationCap, Eye, EyeOff, ArrowRight, BookOpen, Award, Users } from "lucide-react"
 
 export default function LoginPage() {
@@ -23,7 +23,12 @@ export default function LoginPage() {
       setError("Invalid email or password")
       setLoading(false)
     } else {
-      router.push("/dashboard")
+      const session = await getSession()
+      if (session?.user?.role === "ADMIN") {
+        router.push("/dashboard")
+      } else {
+        router.push("/learn")
+      }
     }
   }
 
