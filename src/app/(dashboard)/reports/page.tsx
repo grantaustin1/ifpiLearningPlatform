@@ -1,172 +1,281 @@
-import { BarChart3, TrendingUp, Users, BookOpen, Award, ClipboardList, Download } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+"use client"
 
-const topCourses = [
-  { name: "IFPI Fundamentals", enrolled: 89, completed: 71, rate: 80 },
-  { name: "Compliance Training 2024", enrolled: 124, completed: 98, rate: 79 },
-  { name: "Music Copyright Law", enrolled: 67, completed: 51, rate: 76 },
-  { name: "Digital Distribution", enrolled: 55, completed: 38, rate: 69 },
-  { name: "Financial Reporting Basics", enrolled: 41, completed: 22, rate: 54 },
-]
+import { useState, useEffect } from "react"
+import {
+  Users, BookOpen, Award, BarChart3, TrendingUp,
+  CheckCircle, ClipboardList, RefreshCw,
+} from "lucide-react"
 
-const examStats = [
-  { name: "IFPI Fundamentals Exam", attempts: 89, passed: 74, avgScore: 82, passRate: 83 },
-  { name: "Copyright Law Assessment", attempts: 67, passed: 52, avgScore: 76, passRate: 78 },
-  { name: "Compliance Quiz", attempts: 124, passed: 109, avgScore: 88, passRate: 88 },
-]
+interface Overview {
+  totalLearners: number; totalInstructors: number; totalAdmins: number
+  totalCourses: number; totalEnrollments: number; completionRate: number
+  avgExamScore: number; totalExamAttempts: number; totalCertificates: number
+}
+interface MonthBucket { month: string; count: number }
+interface TopCourse { id: string; title: string; total: number; completed: number; rate: number }
+interface Activity { userName: string; courseTitle: string; status: string; progress: number; enrolledAt: string }
 
-const monthlyData = [
-  { month: "Jan", enrollments: 42, completions: 28 },
-  { month: "Feb", enrollments: 58, completions: 35 },
-  { month: "Mar", enrollments: 65, completions: 48 },
-  { month: "Apr", enrollments: 71, completions: 55 },
-  { month: "May", enrollments: 88, completions: 67 },
-  { month: "Jun", enrollments: 95, completions: 74 },
-]
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
-const maxVal = Math.max(...monthlyData.map(d => d.enrollments))
+function timeAgo(iso: string) {
+  const d = new Date(iso)
+  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+  if (s < 60) return "just now"
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+function StatCard({ label, value, sub, icon: Icon, color, bg }: {
+  label: string; value: string | number; sub?: string
+  icon: React.ElementType; color: string; bg: string
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-start gap-4">
+      <div className={`${bg} p-2.5 rounded-xl flex-shrink-0`}>
+        <Icon className={`h-5 w-5 ${color}`} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-slate-900 leading-none">{value}</p>
+        <p className="text-sm text-slate-500 mt-1 leading-tight">{label}</p>
+        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
+function BarChart({ data }: { data: MonthBucket[] }) {
+  const max = Math.max(...data.map(d => d.count), 1)
+  return (
+    <div className="flex items-end gap-2 h-32 w-full">
+      {data.map((d, i) => {
+        const label = MONTH_NAMES[new Date(d.month).getUTCMonth()] ?? ""
+        const pct = Math.max((d.count / max) * 100, 2)
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+            <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+              {d.count}
+            </span>
+            <div
+              className="w-full bg-indigo-500 rounded-t-md transition-all duration-500 hover:bg-indigo-600"
+              style={{ height: `${pct}%` }}
+              title={`${label}: ${d.count}`}
+            />
+            <span className="text-[10px] text-slate-400">{label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function DonutRing({ pct, color, label }: { pct: number; color: string; label: string }) {
+  const r = 40
+  const circ = 2 * Math.PI * r
+  const dash = (pct / 100) * circ
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="#e5e7eb" strokeWidth="12" />
+        <circle
+          cx="50" cy="50" r={r} fill="none"
+          stroke={color} strokeWidth="12"
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          transform="rotate(-90 50 50)"
+        />
+        <text x="50" y="50" textAnchor="middle" dominantBaseline="central"
+          className="text-lg font-bold" fill="#0f172a" fontSize="18" fontWeight="700">
+          {pct}%
+        </text>
+      </svg>
+      <span className="text-xs text-slate-500">{label}</span>
+    </div>
+  )
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  COMPLETED: "bg-emerald-100 text-emerald-700",
+  IN_PROGRESS: "bg-indigo-100 text-indigo-700",
+  NOT_STARTED: "bg-slate-100 text-slate-500",
+}
 
 export default function ReportsPage() {
+  const [overview, setOverview] = useState<Overview | null>(null)
+  const [monthly, setMonthly] = useState<MonthBucket[]>([])
+  const [topCourses, setTopCourses] = useState<TopCourse[]>([])
+  const [activity, setActivity] = useState<Activity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const res = await fetch("/api/admin/analytics")
+      if (!res.ok) throw new Error("Failed")
+      const d = await res.json()
+      setOverview(d.overview)
+      setMonthly(d.monthlyEnrollments ?? [])
+      setTopCourses(d.topCourses ?? [])
+      setActivity(d.recentActivity ?? [])
+    } catch {}
+    setLoading(false)
+    setRefreshing(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  if (!overview) return (
+    <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
+      Failed to load analytics.
+    </div>
+  )
+
+  const totalUsers = overview.totalLearners + overview.totalInstructors + overview.totalAdmins
+
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-500 mt-1">Track training performance and learner progress</p>
+    <div className="p-6 lg:p-8 space-y-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+            <BarChart3 className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Analytics</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Platform overview and learner progress</p>
+          </div>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" /> Export CSV
-        </Button>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[
-          { label: "Total Learners", value: "248", sub: "+18 this week", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Courses Completed", value: "1,024", sub: "across all courses", icon: BookOpen, color: "text-green-600", bg: "bg-green-50" },
-          { label: "Avg. Pass Rate", value: "78%", sub: "+5% from last month", icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-50" },
-          { label: "Certificates Issued", value: "189", sub: "+12 this month", icon: Award, color: "text-yellow-600", bg: "bg-yellow-50" },
-        ].map(stat => (
-          <Card key={stat.label} className="border-0 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{stat.sub}</p>
-                </div>
-                <div className={`p-3 rounded-xl ${stat.bg}`}>
-                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total Learners" value={overview.totalLearners.toLocaleString()} icon={Users} color="text-indigo-600" bg="bg-indigo-50" />
+        <StatCard label="Courses" value={overview.totalCourses.toLocaleString()} icon={BookOpen} color="text-violet-600" bg="bg-violet-50" />
+        <StatCard label="Certificates Issued" value={overview.totalCertificates.toLocaleString()} icon={Award} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard label="Exam Attempts" value={overview.totalExamAttempts.toLocaleString()} sub={`Avg score: ${overview.avgExamScore}%`} icon={ClipboardList} color="text-emerald-600" bg="bg-emerald-50" />
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6 mb-8">
-        {/* Monthly Chart */}
-        <Card className="lg:col-span-3 border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Enrollments vs. Completions</CardTitle>
-            <CardDescription>Last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3 h-48">
-              {monthlyData.map(d => (
-                <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="flex items-end gap-0.5 w-full">
-                    <div
-                      className="flex-1 bg-indigo-500 rounded-t-sm"
-                      style={{ height: `${(d.enrollments / maxVal) * 160}px` }}
-                      title={`Enrollments: ${d.enrollments}`}
-                    />
-                    <div
-                      className="flex-1 bg-green-400 rounded-t-sm"
-                      style={{ height: `${(d.completions / maxVal) * 160}px` }}
-                      title={`Completions: ${d.completions}`}
-                    />
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Monthly enrollments bar */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Monthly Enrollments</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Last 6 months</p>
+            </div>
+            <TrendingUp className="h-4 w-4 text-slate-300" />
+          </div>
+          {monthly.length > 0
+            ? <BarChart data={monthly} />
+            : <div className="h-32 flex items-center justify-center text-sm text-slate-300">No enrollment data yet</div>
+          }
+        </div>
+
+        {/* Donut stats */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-4">Completion & Score</h2>
+          <div className="flex justify-around items-center h-32">
+            <DonutRing pct={overview.completionRate} color="#6366f1" label="Completion rate" />
+            <DonutRing pct={overview.avgExamScore} color="#10b981" label="Avg exam score" />
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Top courses */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-50">
+            <h2 className="text-sm font-semibold text-slate-800">Top Courses by Enrollment</h2>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {topCourses.length === 0 ? (
+              <div className="py-10 text-center text-sm text-slate-300">No courses yet</div>
+            ) : topCourses.map(c => (
+              <div key={c.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{c.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{c.total} enrolled · {c.completed} completed</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${c.rate}%` }} />
                   </div>
-                  <span className="text-xs text-gray-400">{d.month}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-indigo-500 rounded-sm" /><span className="text-xs text-gray-500">Enrollments</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-400 rounded-sm" /><span className="text-xs text-gray-500">Completions</span></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Completion Rates */}
-        <Card className="lg:col-span-2 border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Completion Rates</CardTitle>
-            <CardDescription>By course</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {topCourses.map(c => (
-              <div key={c.name}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-700 truncate max-w-[70%]">{c.name}</span>
-                  <span className="text-xs font-semibold text-gray-900">{c.rate}%</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full">
-                  <div
-                    className="h-1.5 bg-indigo-600 rounded-full"
-                    style={{ width: `${c.rate}%` }}
-                  />
+                  <span className="text-xs font-semibold text-slate-700 w-9 text-right">{c.rate}%</span>
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
 
-      {/* Exam Stats Table */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Exam Performance</CardTitle>
-              <CardDescription>Pass rates and average scores</CardDescription>
+        {/* User breakdown + recent activity */}
+        <div className="space-y-4">
+          {/* User breakdown */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-slate-800 mb-3">Users</h2>
+            <div className="space-y-2">
+              {[
+                { label: "Learners", count: overview.totalLearners, color: "bg-indigo-500" },
+                { label: "Instructors", count: overview.totalInstructors, color: "bg-violet-500" },
+                { label: "Admins", count: overview.totalAdmins, color: "bg-slate-400" },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-20 flex-shrink-0">{item.label}</span>
+                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${item.color} rounded-full`}
+                      style={{ width: totalUsers > 0 ? `${(item.count / totalUsers) * 100}%` : "0%" }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 w-6 text-right">{item.count}</span>
+                </div>
+              ))}
             </div>
-            <ClipboardList className="h-5 w-5 text-gray-400" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 font-medium text-gray-500">Exam</th>
-                  <th className="text-right py-2 font-medium text-gray-500">Attempts</th>
-                  <th className="text-right py-2 font-medium text-gray-500">Passed</th>
-                  <th className="text-right py-2 font-medium text-gray-500">Avg. Score</th>
-                  <th className="text-right py-2 font-medium text-gray-500">Pass Rate</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {examStats.map(e => (
-                  <tr key={e.name} className="hover:bg-gray-50">
-                    <td className="py-3 font-medium text-gray-900">{e.name}</td>
-                    <td className="py-3 text-right text-gray-600">{e.attempts}</td>
-                    <td className="py-3 text-right text-gray-600">{e.passed}</td>
-                    <td className="py-3 text-right text-gray-600">{e.avgScore}%</td>
-                    <td className="py-3 text-right">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        e.passRate >= 80 ? "bg-green-100 text-green-700" :
-                        e.passRate >= 60 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
-                      }`}>{e.passRate}%</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          {/* Recent activity */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-50">
+              <h2 className="text-sm font-semibold text-slate-800">Recent Enrollments</h2>
+            </div>
+            <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+              {activity.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-300">No activity yet</div>
+              ) : activity.map((a, i) => (
+                <div key={i} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 truncate">{a.userName}</p>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{a.courseTitle}</p>
+                    </div>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLOR[a.status] ?? "bg-slate-100 text-slate-500"}`}>
+                      {a.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-300 mt-1">{timeAgo(a.enrolledAt)}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
