@@ -2,23 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, CheckCircle, BookOpen, Menu, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, CheckCircle, BookOpen, Menu, X, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Slide {
-  id: string
-  title: string
-  content: string
-  slideType: string
-  mediaUrl?: string
-  order: number
+  id: string; title: string; content: string
+  slideType: string; mediaUrl?: string; order: number
 }
-
 interface Course {
-  id: string
-  title: string
-  description?: string
-  slides: Slide[]
+  id: string; title: string; description?: string; slides: Slide[]
+}
+interface CompletionResult {
+  xpEarned: number; badgesEarned: string[]; alreadyCompleted?: boolean
 }
 
 export default function LearnPage() {
@@ -29,6 +24,8 @@ export default function LearnPage() {
   const [completed, setCompleted] = useState<Set<number>>(new Set())
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [finishing, setFinishing] = useState(false)
+  const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
 
   useEffect(() => {
     fetch(`/api/courses/${params.courseId}`)
@@ -45,25 +42,30 @@ export default function LearnPage() {
       </div>
     </div>
   )
-
-  if (!course) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-500">Course not found.</p>
-    </div>
-  )
+  if (!course) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Course not found.</p></div>
 
   const slide = course.slides[current]
   const progress = course.slides.length > 0 ? (completed.size / course.slides.length) * 100 : 0
 
-  const markComplete = () => {
+  const markCompleteAndNext = async () => {
     const next = new Set(completed).add(current)
     setCompleted(next)
-    if (current < course.slides.length - 1) setCurrent(current + 1)
+    const isLastSlide = current === course.slides.length - 1
+    if (isLastSlide || next.size === course.slides.length) {
+      setFinishing(true)
+      try {
+        const res = await fetch(`/api/courses/${course.id}/complete`, { method: "POST" })
+        if (res.ok) setCompletionResult(await res.json())
+      } catch {}
+      setFinishing(false)
+      setCurrent(course.slides.length)
+    } else {
+      setCurrent(current + 1)
+    }
   }
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
       <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r bg-white flex-shrink-0 overflow-hidden transition-all duration-200`}>
         <div className="p-4 border-b">
           <h2 className="font-semibold text-gray-900 text-sm truncate">{course.title}</h2>
@@ -74,9 +76,7 @@ export default function LearnPage() {
         </div>
         <nav className="p-2 overflow-y-auto max-h-[calc(100vh-120px)]">
           {course.slides.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => setCurrent(i)}
+            <button key={s.id} onClick={() => setCurrent(i)}
               className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-colors mb-0.5 ${
                 i === current ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50"
               }`}
@@ -90,9 +90,7 @@ export default function LearnPage() {
         </nav>
       </div>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <div className="bg-white border-b px-6 py-3 flex items-center gap-4">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-gray-900">
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -100,48 +98,58 @@ export default function LearnPage() {
           <BookOpen className="h-5 w-5 text-indigo-600" />
           <span className="text-sm font-medium text-gray-700 truncate">{course.title}</span>
           <div className="ml-auto flex items-center gap-2 text-sm text-gray-500">
-            <span>{current + 1} / {course.slides.length}</span>
+            <span>{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span>
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {slide ? (
             <div className="max-w-3xl mx-auto px-6 py-10">
               <h1 className="text-2xl font-bold text-gray-900 mb-6">{slide.title}</h1>
-              
               {slide.slideType === "VIDEO" && slide.mediaUrl && (
                 <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video">
                   <iframe src={slide.mediaUrl} className="w-full h-full" allowFullScreen />
                 </div>
               )}
-
               {slide.slideType === "IMAGE" && slide.mediaUrl && (
                 <img src={slide.mediaUrl} alt={slide.title} className="mb-6 rounded-xl w-full" />
               )}
-
               {slide.content && (
-                <div
-                  className="prose prose-indigo max-w-none text-gray-700 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: slide.content }}
-                />
+                <div className="prose prose-indigo max-w-none text-gray-700 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: slide.content }} />
               )}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center">
+              <div className="text-center max-w-sm">
                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                 <h2 className="text-xl font-semibold text-gray-900">Course Complete!</h2>
-                <p className="text-gray-500 mt-2">You've finished all slides.</p>
-                <Button className="mt-6 bg-indigo-600 hover:bg-indigo-700" onClick={() => router.push("/dashboard")}>
-                  Back to Dashboard
+                <p className="text-gray-500 mt-2">You have finished all slides.</p>
+                {completionResult && completionResult.xpEarned > 0 && (
+                  <div className="mt-4 inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold px-3 py-1.5 rounded-full">
+                    <Star className="h-4 w-4" /> +{completionResult.xpEarned} XP earned
+                  </div>
+                )}
+                {completionResult && completionResult.badgesEarned.length > 0 && (
+                  <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-indigo-700 mb-2">
+                      Badge{completionResult.badgesEarned.length > 1 ? "s" : ""} unlocked!
+                    </p>
+                    <div className="flex gap-2 justify-center text-2xl">
+                      {completionResult.badgesEarned.map(b => (
+                        <span key={b}>{b === "FIRST_COURSE" ? "🎓" : b === "COURSE_MASTER" ? "🏆" : "🏅"}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button className="mt-6 bg-indigo-600 hover:bg-indigo-700" onClick={() => router.push("/courses")}>
+                  Back to Courses
                 </Button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer nav */}
         {slide && (
           <div className="bg-white border-t px-6 py-4 flex items-center justify-between">
             <Button
@@ -152,12 +160,14 @@ export default function LearnPage() {
             >
               <ChevronLeft className="h-4 w-4" /> Previous
             </Button>
-
             <Button
               className="bg-indigo-600 hover:bg-indigo-700 gap-2"
-              onClick={markComplete}
+              onClick={markCompleteAndNext}
+              disabled={finishing}
             >
-              {current < course.slides.length - 1 ? (
+              {finishing ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : current < course.slides.length - 1 ? (
                 <>Next <ChevronRight className="h-4 w-4" /></>
               ) : (
                 <><CheckCircle className="h-4 w-4" /> Complete</>

@@ -20,6 +20,7 @@ model User {
   image         String?
   password      String?
   role          String    @default("LEARNER") // SUPER_ADMIN | ADMIN | INSTRUCTOR | LEARNER
+  points        Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -31,6 +32,8 @@ model User {
   createdExams       Exam[]          @relation("ExamCreator")
   accounts           Account[]
   sessions           Session[]
+  badges             UserBadge[]
+  notifications      Notification[]
 }
 
 model Account {
@@ -272,16 +275,46 @@ model LearningPath {
 }
 
 model LearningPathItem {
-  id             String  @id @default(cuid())
+  id             String   @id @default(cuid())
   learningPathId String
   courseId       String?
   examId         String?
   order          Int
-  isRequired     Boolean @default(true)
+  isRequired     Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   learningPath LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
   course       Course?      @relation(fields: [courseId], references: [id])
   exam         Exam?        @relation(fields: [examId], references: [id])
+}
 
-  @@index([learningPathId, order])
+// ─── Gamification ──────────────────────────────────────────────────────────────
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badge    String   // FIRST_ENROLLMENT | FIRST_COURSE | EXAM_PASSER | PERFECT_SCORE | COURSE_MASTER
+  earnedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badge])
+  @@index([userId])
+}
+
+// ─── Notifications ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // EXAM_RESULT | COURSE_COMPLETE | BADGE_EARNED | CERTIFICATE_ISSUED | ENROLLMENT
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
 }
