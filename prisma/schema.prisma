@@ -1,0 +1,287 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ──────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("LEARNER") // SUPER_ADMIN | ADMIN | INSTRUCTOR | LEARNER
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  academyMemberships AcademyMember[]
+  enrollments        Enrollment[]
+  examAttempts       ExamAttempt[]
+  certificates       Certificate[]
+  createdCourses     Course[]        @relation("CourseCreator")
+  createdExams       Exam[]          @relation("ExamCreator")
+  accounts           Account[]
+  sessions           Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Academy ───────────────────────────────────────────────────────────────────
+
+model Academy {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  description  String?
+  logoUrl      String?
+  primaryColor String   @default("#6366f1")
+  accentColor  String   @default("#8b5cf6")
+  fontFamily   String   @default("Inter")
+  customDomain String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members       AcademyMember[]
+  learningPaths LearningPath[]
+}
+
+model AcademyMember {
+  id        String   @id @default(cuid())
+  userId    String
+  academyId String
+  role      String   @default("LEARNER") // ADMIN | INSTRUCTOR | LEARNER
+  joinedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, academyId])
+}
+
+// ─── Courses ───────────────────────────────────────────────────────────────────
+
+model Course {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  coverImage   String?
+  coverColor   String   @default("bg-indigo-500")
+  category     String?
+  tags         String? // JSON array stored as string
+  isPublished  Boolean  @default(false)
+  passingScore Int      @default(70)
+  duration     Int? // estimated minutes
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy     User               @relation("CourseCreator", fields: [createdById], references: [id])
+  slides        CourseSlide[]
+  enrollments   Enrollment[]
+  learningPaths LearningPathItem[]
+  certificates  Certificate[]      @relation("CourseCertificate")
+}
+
+model CourseSlide {
+  id        String   @id @default(cuid())
+  courseId  String
+  title     String
+  content   String? // Rich text / HTML
+  slideType String   @default("TEXT") // TEXT | VIDEO | AUDIO | IMAGE | PDF | SCORM
+  mediaUrl  String?
+  mediaType String?
+  order     Int
+  duration  Int? // seconds to read
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, order])
+}
+
+// ─── Exams ─────────────────────────────────────────────────────────────────────
+
+model Exam {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  instructions String?
+  passingScore Int      @default(70)
+  timeLimit    Int? // minutes, null = no limit
+  maxAttempts  Int      @default(3)
+  isRandomized Boolean  @default(false)
+  showResults  Boolean  @default(true)
+  isPublished  Boolean  @default(false)
+  category     String?
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy     User               @relation("ExamCreator", fields: [createdById], references: [id])
+  questions     ExamQuestion[]
+  attempts      ExamAttempt[]
+  learningPaths LearningPathItem[]
+  certificates  Certificate[]      @relation("ExamCertificate")
+}
+
+model ExamQuestion {
+  id            String   @id @default(cuid())
+  examId        String
+  text          String
+  questionType  String   @default("MULTIPLE_CHOICE") // MULTIPLE_CHOICE | MULTIPLE_SELECT | TRUE_FALSE | FILL_IN_BLANK | SHORT_ANSWER
+  options       String? // JSON array
+  correctAnswer String? // JSON: index or text
+  explanation   String?
+  points        Int      @default(1)
+  category      String?
+  imageUrl      String?
+  order         Int
+  createdAt     DateTime @default(now())
+
+  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers ExamAnswers[]
+
+  @@index([examId, order])
+}
+
+model ExamAttempt {
+  id          String    @id @default(cuid())
+  examId      String
+  userId      String
+  score       Float?
+  passed      Boolean?
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  timeTaken   Int? // seconds
+
+  exam    Exam          @relation(fields: [examId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+  answers ExamAnswers[]
+
+  @@index([examId, userId])
+}
+
+model ExamAnswers {
+  id         String   @id @default(cuid())
+  attemptId  String
+  questionId String
+  answer     String? // JSON
+  isCorrect  Boolean?
+  points     Float?
+
+  attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id])
+}
+
+// ─── Enrollments ───────────────────────────────────────────────────────────────
+
+model Enrollment {
+  id          String    @id @default(cuid())
+  userId      String
+  courseId    String
+  status      String    @default("ENROLLED") // ENROLLED | IN_PROGRESS | COMPLETED | DROPPED
+  progress    Float     @default(0)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  lastSlideId String?
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+// ─── Certificates ──────────────────────────────────────────────────────────────
+
+model Certificate {
+  id         String    @id @default(cuid())
+  userId     String
+  courseId   String?
+  examId     String?
+  type       String    @default("COURSE_COMPLETION") // COURSE_COMPLETION | EXAM_PASS | LEARNING_PATH
+  templateId String?
+  issuedAt   DateTime  @default(now())
+  expiresAt  DateTime?
+  verifyCode String    @unique @default(cuid())
+  score      Float?
+  metadata   String? // JSON extra data
+
+  user   User    @relation(fields: [userId], references: [id])
+  course Course? @relation("CourseCertificate", fields: [courseId], references: [id])
+  exam   Exam?   @relation("ExamCertificate", fields: [examId], references: [id])
+}
+
+// ─── Learning Paths ────────────────────────────────────────────────────────────
+
+model LearningPath {
+  id          String   @id @default(cuid())
+  academyId   String
+  title       String
+  description String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  academy Academy            @relation(fields: [academyId], references: [id])
+  items   LearningPathItem[]
+}
+
+model LearningPathItem {
+  id             String  @id @default(cuid())
+  learningPathId String
+  courseId       String?
+  examId         String?
+  order          Int
+  isRequired     Boolean @default(true)
+
+  learningPath LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  course       Course?      @relation(fields: [courseId], references: [id])
+  exam         Exam?        @relation(fields: [examId], references: [id])
+
+  @@index([learningPathId, order])
+}
