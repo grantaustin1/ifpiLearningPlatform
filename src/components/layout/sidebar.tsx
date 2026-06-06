@@ -87,15 +87,26 @@ export function Sidebar() {
 
       {/* User + Sign out */}
       <div className="px-3 pb-4 border-t border-white/5 pt-3 space-y-1">
-        <div className="flex items-center gap-2.5 px-3 py-2">
+        {/* Clicking the user card navigates to /profile */}
+        <Link
+          href="/profile"
+          className={cn(
+            "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group",
+            pathname === "/profile"
+              ? "bg-indigo-500/10"
+              : "hover:bg-white/5"
+          )}
+        >
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
             <span className="text-[10px] font-bold text-white">{userInitials}</span>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-300 leading-none truncate">{session?.user?.name ?? "…"}</p>
+            <p className="text-xs font-semibold text-slate-300 leading-none truncate group-hover:text-slate-100 transition-colors">
+              {session?.user?.name ?? "\u2026"}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">{userRole}</p>
           </div>
-        </div>
+        </Link>
         <button
           onClick={() => signOut({ redirectTo: "/login" })}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
