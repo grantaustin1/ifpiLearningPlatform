@@ -2,22 +2,18 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Plus, Search, BookOpen, Clock, Users, MoreVertical, Sparkles, Eye, Edit } from "lucide-react"
+import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AIBuilderModal } from "@/components/course/ai-builder-modal"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 
 interface Course {
   id: string; title: string; category: string | null; coverColor: string
   isPublished: boolean; duration: number | null; createdAt: string
   _count: { slides: number; enrollments: number }
 }
-
-const COVER_COLORS = [
-  "bg-indigo-500","bg-violet-500","bg-blue-500","bg-emerald-500",
-  "bg-amber-500","bg-rose-500","bg-pink-500","bg-teal-500",
-]
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
@@ -26,15 +22,14 @@ export default function CoursesPage() {
   const [showAI, setShowAI] = useState(false)
   const [creating, setCreating] = useState(false)
   const router = useRouter()
+  const { data: session } = useSession()
+
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR'].includes(session?.user?.role ?? '')
 
   const load = async () => {
     try {
-      const res = await fetch("/api/admin/analytics")
-      if (res.ok) {
-        // Use the existing admin analytics data for course list
-      }
-      const res2 = await fetch("/api/courses/list")
-      if (res2.ok) setCourses(await res2.json())
+      const res = await fetch("/api/courses/list")
+      if (res.ok) setCourses(await res.json())
     } finally { setLoading(false) }
   }
 
@@ -45,7 +40,6 @@ export default function CoursesPage() {
   const handleAIApply = async (result: { slides: { title: string; content: string; slideType: string; order: number }[]; questions: any[] }) => {
     setCreating(true)
     try {
-      // Create course
       const courseRes = await fetch("/api/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -58,7 +52,6 @@ export default function CoursesPage() {
       if (!courseRes.ok) { alert("Failed to create course"); return }
       const course = await courseRes.json()
 
-      // Add slides
       for (const slide of result.slides) {
         await fetch(`/api/courses/${course.id}/slides`, {
           method: "POST",
@@ -69,6 +62,7 @@ export default function CoursesPage() {
 
       setShowAI(false)
       await load()
+      // BUG-010 fix: redirect to edit page (which now exists)
       router.push(`/courses/${course.id}/edit`)
     } finally { setCreating(false) }
   }
@@ -79,19 +73,22 @@ export default function CoursesPage() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Courses</h1>
-          <p className="text-gray-500 mt-1">{loading ? "Loading…" : `${courses.length} courses total`}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{isAdmin ? "Courses" : "My Courses"}</h1>
+          <p className="text-gray-500 mt-1">{loading ? "Loading…" : `${courses.length} course${courses.length !== 1 ? "s" : ""} available`}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowAI(true)} className="gap-2 text-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-            <Sparkles className="h-4 w-4" /> AI Builder
-          </Button>
-          <Link href="/courses/new">
-            <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2 text-sm">
-              <Plus className="h-4 w-4" /> New Course
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAI(true)} disabled={creating}
+              className="gap-2 text-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+              <Sparkles className="h-4 w-4" /> AI Builder
             </Button>
-          </Link>
-        </div>
+            <Link href="/courses/new">
+              <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2 text-sm">
+                <Plus className="h-4 w-4" /> New Course
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 mb-6">
@@ -110,18 +107,18 @@ export default function CoursesPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">{search ? "No courses match your search" : "No courses yet. Create one or use the AI Builder!"}</p>
+          <p className="text-gray-500">
+            {search ? "No courses match your search" : isAdmin ? "No courses yet. Create one or use the AI Builder!" : "No courses available yet."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(c => (
             <Card key={c.id} className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
               <div className={`h-32 ${c.coverColor} flex items-end p-4`}>
-                <div>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${c.isPublished ? "bg-white/20 text-white" : "bg-black/20 text-white/80"}`}>
-                    {c.isPublished ? "Published" : "Draft"}
-                  </span>
-                </div>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${c.isPublished ? "bg-white/20 text-white" : "bg-black/20 text-white/80"}`}>
+                  {c.isPublished ? "Published" : "Draft"}
+                </span>
               </div>
               <CardContent className="p-4">
                 <h3 className="font-semibold text-gray-900 truncate">{c.title}</h3>
@@ -132,12 +129,22 @@ export default function CoursesPage() {
                   {c.duration && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {c.duration}m</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <Link href={`/courses/${c.id}/edit`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs"><Edit className="h-3.5 w-3.5" /> Edit</Button>
-                  </Link>
-                  <Link href={`/learn/${c.id}`}>
-                    <Button size="sm" className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700"><Eye className="h-3.5 w-3.5" /> Preview</Button>
-                  </Link>
+                  {isAdmin ? (
+                    <>
+                      <Link href={`/courses/${c.id}/edit`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs"><Edit className="h-3.5 w-3.5" /> Edit</Button>
+                      </Link>
+                      <Link href={`/learn/${c.id}`}>
+                        <Button size="sm" className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700"><Eye className="h-3.5 w-3.5" /> Preview</Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <Link href={`/learn/${c.id}`} className="flex-1">
+                      <Button size="sm" className="w-full gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700">
+                        <LogIn className="h-3.5 w-3.5" /> Start Course
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>

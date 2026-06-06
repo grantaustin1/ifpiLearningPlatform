@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       _count: { select: { slides: true, enrollments: true } },
     },
-    orderBy: [{ enrollments: { _count: 'desc' } }, { createdAt: 'desc' }],
+    // BUG-008 fix: correct Prisma syntax for ordering by relation count
+    orderBy: [{ _count: { enrollments: 'desc' } }, { createdAt: 'desc' }],
     take: 100,
   })
 
