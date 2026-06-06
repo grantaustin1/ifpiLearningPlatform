@@ -17,6 +17,16 @@ const nextConfig = {
       },
     ]
   },
+  async redirects() {
+    return [
+      // /signup is a common alias — send it to the canonical registration page
+      {
+        source: '/signup',
+        destination: '/register',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
