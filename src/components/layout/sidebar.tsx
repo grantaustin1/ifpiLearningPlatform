@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award,
   BarChart3, Users, Settings, GraduationCap, LogOut,
-  Building2, Route,
+  Building2, Route, Trophy,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { signOut, useSession } from "next-auth/react"
@@ -16,6 +16,7 @@ const adminNavItems = [
   { href: "/exams",          label: "Exams",           icon: ClipboardList },
   { href: "/learning-paths", label: "Learning Paths",  icon: Route },
   { href: "/certificates",   label: "Certificates",    icon: Award },
+  { href: "/leaderboard",    label: "Leaderboard",     icon: Trophy },
   { href: "/reports",        label: "Reports",         icon: BarChart3 },
   { href: "/users",          label: "Users",           icon: Users },
   { href: "/academies",      label: "Academies",       icon: Building2 },
@@ -26,6 +27,7 @@ const learnerNavItems = [
   { href: "/courses",        label: "My Courses",      icon: BookOpen },
   { href: "/learning-paths", label: "Learning Paths",  icon: Route },
   { href: "/certificates",   label: "My Certificates", icon: Award },
+  { href: "/leaderboard",    label: "Leaderboard",     icon: Trophy },
 ]
 
 export function Sidebar() {
@@ -44,7 +46,6 @@ export function Sidebar() {
 
   return (
     <div className="w-60 flex flex-col h-screen bg-[#0f172a] border-r border-white/5">
-      {/* Logo */}
       <div className="px-5 py-5 border-b border-white/5">
         <Link href={homeHref} className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
@@ -57,7 +58,6 @@ export function Sidebar() {
         </Link>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map(item => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
@@ -85,16 +85,12 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* User + Sign out */}
       <div className="px-3 pb-4 border-t border-white/5 pt-3 space-y-1">
-        {/* Clicking the user card navigates to /profile */}
         <Link
           href="/profile"
           className={cn(
             "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group",
-            pathname === "/profile"
-              ? "bg-indigo-500/10"
-              : "hover:bg-white/5"
+            pathname === "/profile" ? "bg-indigo-500/10" : "hover:bg-white/5"
           )}
         >
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
@@ -102,7 +98,7 @@ export function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-300 leading-none truncate group-hover:text-slate-100 transition-colors">
-              {session?.user?.name ?? "\u2026"}
+              {session?.user?.name ?? "…"}
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5">{userRole}</p>
           </div>
