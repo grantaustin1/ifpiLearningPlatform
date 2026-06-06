@@ -3,18 +3,29 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-// ─── Runtime fix ─────────────────────────────────────────────────────────────
-// If NEXTAUTH_URL was left pointing at localhost (e.g. Railway picked it up from
-// a dev .env or a mis-configured variable), delete it so that NextAuth v5 falls
-// back to trustHost and derives the canonical URL from the incoming request
-// headers instead.
+// ─── BUG-001 fix: NEXTAUTH_URL runtime correction ────────────────────────────────
+//
+// If NEXTAUTH_URL is left pointing at localhost (common on Railway when the
+// variable was seeded from a dev .env), override it with the actual production
+// URL that Railway itself provides via RAILWAY_PUBLIC_DOMAIN before NextAuth
+// initialises.  This runs at module-load time, so it fires before the
+// NextAuth() call below captures the environment.
+//
+// Falls back to deleting NEXTAUTH_URL entirely so that trustHost:true can
+// derive the canonical URL from the incoming request Host header.
 if (
   typeof process !== "undefined" &&
   process.env.NEXTAUTH_URL?.includes("localhost")
 ) {
-  delete process.env.NEXTAUTH_URL
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    process.env.NEXTAUTH_URL = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  } else {
+    // Non-Railway environment (Vercel, custom host, etc.) — remove stale value
+    // and let trustHost pick it up from the request headers.
+    delete process.env.NEXTAUTH_URL
+  }
 }
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────
 
 // Extend NextAuth types
 declare module "next-auth" {
