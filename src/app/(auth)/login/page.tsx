@@ -27,7 +27,7 @@ export default function LoginPage() {
       if (session?.user?.role === "ADMIN") {
         router.push("/dashboard")
       } else {
-        router.push("/learn")
+        router.push("/courses")
       }
     }
   }
