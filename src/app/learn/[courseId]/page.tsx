@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, CheckCircle, BookOpen, Menu, X, Star } from "lucide-react"
+import { ChevronLeft, ChevronRight, CheckCircle, BookOpen, Menu, X, Star, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Discussion } from "@/components/course/discussion"
 
 interface Slide {
   id: string; title: string; content: string
@@ -16,6 +17,8 @@ interface CompletionResult {
   xpEarned: number; badgesEarned: string[]; alreadyCompleted?: boolean
 }
 
+type Tab = "slides" | "discussion"
+
 export default function LearnPage() {
   const params = useParams()
   const router = useRouter()
@@ -26,6 +29,7 @@ export default function LearnPage() {
   const [loading, setLoading] = useState(true)
   const [finishing, setFinishing] = useState(false)
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>("slides")
 
   useEffect(() => {
     fetch(`/api/courses/${params.courseId}`)
@@ -66,6 +70,7 @@ export default function LearnPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
       <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r bg-white flex-shrink-0 overflow-hidden transition-all duration-200`}>
         <div className="p-4 border-b">
           <h2 className="font-semibold text-gray-900 text-sm truncate">{course.title}</h2>
@@ -76,9 +81,9 @@ export default function LearnPage() {
         </div>
         <nav className="p-2 overflow-y-auto max-h-[calc(100vh-120px)]">
           {course.slides.map((s, i) => (
-            <button key={s.id} onClick={() => setCurrent(i)}
+            <button key={s.id} onClick={() => { setCurrent(i); setActiveTab("slides") }}
               className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-colors mb-0.5 ${
-                i === current ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50"
+                i === current && activeTab === "slides" ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50"
               }`}
             >
               <span className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs">
@@ -90,20 +95,48 @@ export default function LearnPage() {
         </nav>
       </div>
 
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="bg-white border-b px-6 py-3 flex items-center gap-4">
+        {/* Topbar */}
+        <div className="bg-white border-b px-4 py-3 flex items-center gap-3 flex-shrink-0">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-gray-900">
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <BookOpen className="h-5 w-5 text-indigo-600" />
-          <span className="text-sm font-medium text-gray-700 truncate">{course.title}</span>
-          <div className="ml-auto flex items-center gap-2 text-sm text-gray-500">
-            <span>{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span>
+          <BookOpen className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+          <span className="text-sm font-medium text-gray-700 truncate flex-1">{course.title}</span>
+
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 flex-shrink-0">
+            <button
+              onClick={() => setActiveTab("slides")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeTab === "slides" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" /> Slides
+            </button>
+            <button
+              onClick={() => setActiveTab("discussion")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeTab === "discussion" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> Discussion
+            </button>
           </div>
+
+          {activeTab === "slides" && (
+            <div className="text-sm text-gray-500 flex-shrink-0">
+              {Math.min(current + 1, course.slides.length)} / {course.slides.length}
+            </div>
+          )}
         </div>
 
+        {/* Content area */}
         <div className="flex-1 overflow-y-auto">
-          {slide ? (
+          {activeTab === "discussion" ? (
+            <Discussion courseId={course.id} />
+          ) : slide ? (
             <div className="max-w-3xl mx-auto px-6 py-10">
               <h1 className="text-2xl font-bold text-gray-900 mb-6">{slide.title}</h1>
               {slide.slideType === "VIDEO" && slide.mediaUrl && (
@@ -150,8 +183,9 @@ export default function LearnPage() {
           )}
         </div>
 
-        {slide && (
-          <div className="bg-white border-t px-6 py-4 flex items-center justify-between">
+        {/* Bottom nav — slides tab only */}
+        {activeTab === "slides" && slide && (
+          <div className="bg-white border-t px-6 py-4 flex items-center justify-between flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => setCurrent(Math.max(0, current - 1))}
