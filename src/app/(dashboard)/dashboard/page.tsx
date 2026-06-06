@@ -1,3 +1,5 @@
+import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import Link from "next/link"
 import {
   BookOpen, ClipboardList, Users, Award, TrendingUp,
@@ -65,7 +67,9 @@ const quickActions = [
 // Sparkline bars — mock weekly data
 const completionData = [42, 58, 51, 67, 73, 71, 78]
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await auth()
+  if (!session || session.user.role !== "ADMIN") redirect("/courses")
   return (
     <div className="p-6 lg:p-8 space-y-8">
 

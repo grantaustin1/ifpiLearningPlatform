@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award,
   BarChart3, Users, Settings, GraduationCap, LogOut,
-  Building2, Route, ChevronRight,
+  Building2, Route,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { signOut } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 
-const navItems = [
+const adminNavItems = [
   { href: "/dashboard",      label: "Dashboard",      icon: LayoutDashboard },
   { href: "/courses",        label: "Courses",         icon: BookOpen },
   { href: "/exams",          label: "Exams",           icon: ClipboardList },
@@ -22,20 +22,37 @@ const navItems = [
   { href: "/settings",       label: "Settings",        icon: Settings },
 ]
 
+const learnerNavItems = [
+  { href: "/courses",        label: "My Courses",      icon: BookOpen },
+  { href: "/learning-paths", label: "Learning Paths",  icon: Route },
+  { href: "/certificates",   label: "My Certificates", icon: Award },
+]
+
 export function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+
+  const isAdmin = session?.user?.role === "ADMIN"
+  const navItems = isAdmin ? adminNavItems : learnerNavItems
+  const portalLabel = isAdmin ? "Admin Portal" : "Learner Portal"
+  const homeHref = isAdmin ? "/dashboard" : "/courses"
+
+  const userInitials = session?.user?.name
+    ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "?"
+  const userRole = isAdmin ? "Administrator" : "Learner"
 
   return (
     <div className="w-60 flex flex-col h-screen bg-[#0f172a] border-r border-white/5">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/5">
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href={homeHref} className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
             <GraduationCap className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
           </div>
           <div>
             <span className="text-white font-semibold text-sm tracking-tight">IFPI Learning</span>
-            <p className="text-[10px] text-slate-500 leading-none mt-0.5">Admin Portal</p>
+            <p className="text-[10px] text-slate-500 leading-none mt-0.5">{portalLabel}</p>
           </div>
         </Link>
       </div>
@@ -63,23 +80,24 @@ export function Sidebar() {
                 )}
               />
               <span className="truncate">{item.label}</span>
-              {isActive && (
-                <ChevronRight style={{ width: 12, height: 12 }} className="ml-auto text-indigo-500/60" />
-              )}
             </Link>
           )
         })}
       </nav>
 
-      {/* Divider label */}
-      <div className="px-5 pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Account</p>
-      </div>
-
-      {/* Sign out */}
-      <div className="px-3 pb-4">
+      {/* User + Sign out */}
+      <div className="px-3 pb-4 border-t border-white/5 pt-3 space-y-1">
+        <div className="flex items-center gap-2.5 px-3 py-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] font-bold text-white">{userInitials}</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-300 leading-none truncate">{session?.user?.name ?? "…"}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{userRole}</p>
+          </div>
+        </div>
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ redirectTo: "/login" })}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
         >
           <LogOut style={{ width: 16, height: 16 }} className="text-slate-600 flex-shrink-0" />
