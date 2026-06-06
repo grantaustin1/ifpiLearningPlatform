@@ -1,4 +1,4 @@
-// Prisma schema — Sprint 4 (adds Assignment + AssignmentSubmission)
+// Prisma schema — Sprint 7 (adds LiveSession)
 generator client {
   provider = "prisma-client-js"
 }
@@ -33,6 +33,7 @@ model User {
   comments            CourseComment[]
   createdAssignments  Assignment[]          @relation("AssignmentCreator")
   submissions         AssignmentSubmission[]
+  createdLiveSessions LiveSession[]         @relation("LiveSessionCreator")
 }
 
 model Account {
@@ -116,6 +117,7 @@ model Course {
   certificates  Certificate[]      @relation("CourseCertificate")
   comments      CourseComment[]
   assignments   Assignment[]
+  liveSessions  LiveSession[]
 }
 
 model CourseSlide {
@@ -286,8 +288,6 @@ model CourseComment {
   @@index([userId])
 }
 
-// ─── Assignments ──────────────────────────────────────────────────────────────
-
 model Assignment {
   id          String    @id @default(cuid())
   courseId    String
@@ -299,11 +299,9 @@ model Assignment {
   isPublished Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
   course      Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
   createdBy   User                  @relation("AssignmentCreator", fields: [createdById], references: [id])
   submissions AssignmentSubmission[]
-
   @@index([courseId])
 }
 
@@ -316,14 +314,37 @@ model AssignmentSubmission {
   fileName     String?
   score        Float?
   feedback     String?   @db.Text
-  status       String    @default("SUBMITTED") // SUBMITTED | GRADED | RETURNED
+  status       String    @default("SUBMITTED")
   submittedAt  DateTime  @default(now())
   gradedAt     DateTime?
-
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user       User       @relation(fields: [userId], references: [id])
-
   @@unique([assignmentId, userId])
   @@index([assignmentId])
   @@index([userId])
+}
+
+// ─── Live Sessions ─────────────────────────────────────────────────────────────
+
+model LiveSession {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?  @db.Text
+  courseId     String?
+  createdById  String
+  scheduledAt  DateTime
+  durationMins Int      @default(60)
+  meetingUrl   String?
+  platform     String   @default("zoom") // zoom | meet | teams | custom
+  maxCapacity  Int?
+  isPublished  Boolean  @default(false)
+  recordingUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  createdBy User    @relation("LiveSessionCreator", fields: [createdById], references: [id])
+
+  @@index([scheduledAt])
+  @@index([courseId])
 }
