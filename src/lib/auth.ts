@@ -19,6 +19,9 @@ declare module "next-auth" {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // trustHost allows NextAuth to derive the base URL from the incoming request
+  // headers, so login/signout redirects work correctly in production without
+  // requiring NEXTAUTH_URL to be set to an exact value.
   trustHost: true,
   session: { strategy: "jwt" },
   providers: [

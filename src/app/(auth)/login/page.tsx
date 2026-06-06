@@ -64,7 +64,7 @@ export default function LoginPage() {
 
         {/* Quote */}
         <div className="relative z-10">
-          <p className="text-slate-400 text-sm italic">"The platform that powers IFPI's global training network."</p>
+          <p className="text-slate-400 text-sm italic">&quot;The platform that powers IFPI&apos;s global training network.&quot;</p>
         </div>
       </div>
 
@@ -112,7 +112,9 @@ export default function LoginPage() {
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
                   Password
                 </label>
-                <button type="button" className="text-xs text-indigo-600 hover:underline">Forgot password?</button>
+                <Link href="/forgot-password" className="text-xs text-indigo-600 hover:underline">
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative">
                 <input
@@ -148,7 +150,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-6">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="text-indigo-600 hover:text-indigo-700 font-semibold">
               Sign up free
             </Link>
