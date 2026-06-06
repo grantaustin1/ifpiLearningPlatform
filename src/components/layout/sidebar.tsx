@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3,
   Users, Settings, GraduationCap, LogOut, Building2, Route,
-  Trophy, FileText,
+  Trophy, FileText, Video, Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { signOut, useSession } from "next-auth/react"
@@ -18,9 +18,11 @@ const adminNavItems = [
   { href: "/certificates",   label: "Certificates",    icon: Award },
   { href: "/leaderboard",    label: "Leaderboard",     icon: Trophy },
   { href: "/assignments",    label: "Grading Queue",   icon: FileText },
+  { href: "/live-sessions",  label: "Live Sessions",   icon: Video },
   { href: "/reports",        label: "Reports",         icon: BarChart3 },
   { href: "/users",          label: "Users",           icon: Users },
   { href: "/academies",      label: "Academies",       icon: Building2 },
+  { href: "/catalog",        label: "Public Catalog",  icon: Globe },
   { href: "/settings",       label: "Settings",        icon: Settings },
 ]
 
@@ -29,6 +31,7 @@ const learnerNavItems = [
   { href: "/learning-paths", label: "Learning Paths",  icon: Route },
   { href: "/certificates",   label: "My Certificates", icon: Award },
   { href: "/leaderboard",    label: "Leaderboard",     icon: Trophy },
+  { href: "/live-sessions",  label: "Live Sessions",   icon: Video },
 ]
 
 export function Sidebar() {
@@ -41,9 +44,8 @@ export function Sidebar() {
   const homeHref = isAdmin ? "/dashboard" : "/courses"
 
   const userInitials = session?.user?.name
-    ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "?"
-  const userRole = session?.user?.role === "ADMIN" ? "Administrator" : session?.user?.role === "INSTRUCTOR" ? "Instructor" : "Learner"
+    ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "?"
+  const userRole = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN" ? "Administrator" : session?.user?.role === "INSTRUCTOR" ? "Instructor" : "Learner"
 
   return (
     <div className="w-60 flex flex-col h-screen bg-[#0f172a] border-r border-white/5">
