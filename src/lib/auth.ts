@@ -3,6 +3,19 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+// ─── Runtime fix ─────────────────────────────────────────────────────────────
+// If NEXTAUTH_URL was left pointing at localhost (e.g. Railway picked it up from
+// a dev .env or a mis-configured variable), delete it so that NextAuth v5 falls
+// back to trustHost and derives the canonical URL from the incoming request
+// headers instead.
+if (
+  typeof process !== "undefined" &&
+  process.env.NEXTAUTH_URL?.includes("localhost")
+) {
+  delete process.env.NEXTAUTH_URL
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Extend NextAuth types
 declare module "next-auth" {
   interface Session {
