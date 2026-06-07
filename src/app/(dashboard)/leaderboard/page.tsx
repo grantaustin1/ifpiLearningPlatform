@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Trophy, BookOpen, Award } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { BADGE_META } from "@/lib/gamification"
@@ -48,7 +49,7 @@ export default function LeaderboardPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Leaderboard</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Top learners ranked by XP points</p>
+          <p className="text-sm text-slate-500 mt-0.5">Top learners ranked by XP — click any card to view their profile</p>
         </div>
       </div>
 
@@ -60,10 +61,11 @@ export default function LeaderboardPage() {
             const rank = idx + 1
             const isYou = l.id === session?.user?.id
             return (
-              <div
+              <Link
                 key={l.id}
+                href={isYou ? "/profile" : `/users/${l.id}`}
                 className={[
-                  "rounded-2xl p-4 text-center border",
+                  "rounded-2xl p-4 text-center border block hover:shadow-md transition-all hover:-translate-y-0.5",
                   rank === 1 ? "bg-amber-50 border-amber-200 shadow-md" : rank === 2 ? "bg-slate-50 border-slate-200" : "bg-orange-50 border-orange-200",
                   idx === 0 ? "order-2" : idx === 1 ? "order-1" : "order-3",
                   isYou ? "ring-2 ring-indigo-400" : "",
@@ -72,7 +74,7 @@ export default function LeaderboardPage() {
                 <div className="text-2xl mb-1">{rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}</div>
                 <p className="text-sm font-bold text-slate-800 truncate">{l.name ?? "Learner"}{isYou ? " (you)" : ""}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{l.points.toLocaleString()} XP</p>
-              </div>
+              </Link>
             )
           })}
         </div>
@@ -87,7 +89,11 @@ export default function LeaderboardPage() {
           ) : learners.map((l, idx) => {
             const isYou = l.id === session?.user?.id
             return (
-              <div key={l.id} className={`flex items-center gap-4 px-5 py-3.5 ${isYou ? "bg-indigo-50" : "hover:bg-slate-50"} transition-colors`}>
+              <Link
+                key={l.id}
+                href={isYou ? "/profile" : `/users/${l.id}`}
+                className={`flex items-center gap-4 px-5 py-3.5 ${isYou ? "bg-indigo-50" : "hover:bg-slate-50"} transition-colors block`}
+              >
                 <div className="w-8 flex items-center justify-center flex-shrink-0">
                   <RankMedal rank={idx + 1} />
                 </div>
@@ -120,7 +126,7 @@ export default function LeaderboardPage() {
                   <p className="text-sm font-bold text-slate-900">{l.points.toLocaleString()}</p>
                   <p className="text-[10px] text-slate-400">XP</p>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
