@@ -76,17 +76,15 @@ async function main() {
       data: {
         title: "IFPI Fundamentals Assessment",
         description: "Test your knowledge of IFPI's mission and structure.",
-        instructions: "Read each question carefully. You have 15 minutes and 3 attempts.",
         passingScore: 70,
         timeLimit: 15,
         maxAttempts: 3,
         isPublished: true,
-        category: "Foundation",
         createdById: admin.id,
         questions: {
           create: [
             {
-              text: "What does IFPI stand for?",
+              question: "What does IFPI stand for?",
               questionType: "MULTIPLE_CHOICE",
               options: JSON.stringify(["International Federation of the Phonographic Industry", "International Foundation for Performing Industry", "International Forum for Publishing Interests", "International Fund for Phonographic Innovation"]),
               correctAnswer: "0",
@@ -94,7 +92,7 @@ async function main() {
               order: 1,
             },
             {
-              text: "In which year was IFPI founded?",
+              question: "In which year was IFPI founded?",
               questionType: "MULTIPLE_CHOICE",
               options: JSON.stringify(["1920", "1933", "1945", "1960"]),
               correctAnswer: "1",
@@ -102,7 +100,7 @@ async function main() {
               order: 2,
             },
             {
-              text: "Where is IFPI headquartered?",
+              question: "Where is IFPI headquartered?",
               questionType: "MULTIPLE_CHOICE",
               options: JSON.stringify(["New York", "Paris", "London", "Geneva"]),
               correctAnswer: "2",
@@ -110,7 +108,7 @@ async function main() {
               order: 3,
             },
             {
-              text: "Streaming represents the majority of global music revenues.",
+              question: "Streaming represents the majority of global music revenues.",
               questionType: "TRUE_FALSE",
               options: JSON.stringify(["True", "False"]),
               correctAnswer: "0",
