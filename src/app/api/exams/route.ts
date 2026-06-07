@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
     data: {
       title: body.title,
       description: body.description,
-      instructions: body.instructions,
       passingScore: body.passingScore ?? 70,
       timeLimit: body.timeLimit,
       maxAttempts: body.maxAttempts ?? 3,
