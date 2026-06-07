@@ -10,9 +10,8 @@ export async function POST(
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { answers, timeTaken } = await req.json() as {
+  const { answers } = await req.json() as {
     answers: Record<string, string>
-    timeTaken?: number
   }
 
   const examId = params.id
@@ -32,7 +31,7 @@ export async function POST(
   let earned = 0
   let totalPoints = 0
   const answerRecords: Array<{
-    questionId: string; answer: string; isCorrect: boolean; points: number
+    questionId: string; answer: string
   }> = []
 
   for (const q of exam.questions) {
@@ -43,7 +42,7 @@ export async function POST(
       isCorrect = userAnswer.toLowerCase() === q.correctAnswer.toString().trim().toLowerCase()
     }
     if (isCorrect) earned += q.points
-    answerRecords.push({ questionId: q.id, answer: userAnswer, isCorrect, points: isCorrect ? q.points : 0 })
+    answerRecords.push({ questionId: q.id, answer: userAnswer })
   }
 
   const score = totalPoints > 0 ? Math.round((earned / totalPoints) * 100) : 0
@@ -52,8 +51,7 @@ export async function POST(
   const attempt = await prisma.examAttempt.create({
     data: {
       examId, userId, score, passed,
-      submittedAt: new Date(),
-      timeTaken: timeTaken ?? null,
+      completedAt: new Date(),
       answers: { create: answerRecords },
     },
     select: { id: true },
