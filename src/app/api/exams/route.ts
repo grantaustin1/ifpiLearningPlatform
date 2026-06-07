@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
       passingScore: body.passingScore ?? 70,
       timeLimit: body.timeLimit,
       maxAttempts: body.maxAttempts ?? 3,
-      category: body.category,
       createdById: session!.user!.id as string,
     },
   })
