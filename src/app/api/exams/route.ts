@@ -28,8 +28,6 @@ export async function POST(req: NextRequest) {
       passingScore: body.passingScore ?? 70,
       timeLimit: body.timeLimit,
       maxAttempts: body.maxAttempts ?? 3,
-      isRandomized: body.isRandomized ?? false,
-      showResults: body.showResults ?? true,
       category: body.category,
       createdById: session!.user!.id as string,
     },
