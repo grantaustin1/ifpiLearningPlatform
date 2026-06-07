@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   Plus, Search, Upload, CheckCircle, XCircle,
   Shield, BookOpen, Award, MoreVertical, Loader2, X,
@@ -156,6 +157,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState("ALL")
+  const router = useRouter()
   const [showImport, setShowImport] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
 
@@ -282,7 +284,7 @@ export default function UsersPage() {
                   const initials = (u.name ?? "?").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
                   const joined = new Date(u.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={u.id} onClick={() => router.push(`/users/${u.id}`)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -305,9 +307,7 @@ export default function UsersPage() {
                       <td className="px-6 py-4 text-right text-slate-600">{u.certificates}</td>
                       <td className="px-6 py-4 text-right text-slate-400 text-xs">{joined}</td>
                       <td className="px-6 py-4 text-right">
-                        <button className="text-slate-400 hover:text-slate-700">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                        <span className="text-slate-300 text-xs">→</span>
                       </td>
                     </tr>
                   )
