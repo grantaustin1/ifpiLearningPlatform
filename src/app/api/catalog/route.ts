@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
   const courses = await prisma.course.findMany({
     where: {
       isPublished: true,
-      ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
-      ...(category ? { category: { equals: category, mode: 'insensitive' } } : {}),
+      ...(q ? { title: { contains: q } } : {}),
+      ...(category ? { category: { equals: category } } : {}),
     },
     select: {
       id: true,
