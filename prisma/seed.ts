@@ -41,7 +41,6 @@ async function main() {
       name: "IFPI Main Academy",
       slug: "ifpi-main",
       description: "The primary training portal for IFPI members",
-      primaryColor: "#6366f1",
     },
   })
   console.log("✅ Academy:", academy.name)
