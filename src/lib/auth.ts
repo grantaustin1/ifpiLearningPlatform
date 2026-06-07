@@ -3,19 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-// ─── BUG-001 fix: force trustHost in production ───────────────────────────────
-//
-// With trustHost: true configured below, NextAuth derives the canonical URL
-// from the incoming request Host header — no hardcoded URL is needed.
-// Clearing NEXTAUTH_URL and AUTH_URL unconditionally in production ensures
-// NextAuth always uses the real host regardless of what Railway (or any other
-// host) has set in its environment variables.
-if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-  delete process.env.NEXTAUTH_URL
-  delete process.env.AUTH_URL
-}
-// ────────────────────────────────────────────────────────────────────────────
-
 // Extend NextAuth types
 declare module "next-auth" {
   interface Session {
@@ -32,9 +19,9 @@ declare module "next-auth" {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // trustHost allows NextAuth to derive the base URL from the incoming request
-  // headers, so login/signout redirects work correctly in production without
-  // requiring NEXTAUTH_URL to be set to an exact value.
+  // trustHost: true lets NextAuth v5 derive the canonical URL from the
+  // incoming request Host / X-Forwarded-Host headers when NEXTAUTH_URL is
+  // absent, ensuring redirects work correctly on any deployment host.
   trustHost: true,
   session: { strategy: "jwt" },
   providers: [
