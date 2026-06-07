@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -42,12 +42,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
@@ -124,7 +124,7 @@ model CourseSlide {
   id         String   @id @default(cuid())
   courseId   String
   title      String
-  content    String?  @db.Text
+  content    String?
   slideType  String   @default("TEXT")
   mediaUrl   String?
   order      Int
@@ -157,11 +157,11 @@ model Exam {
 model ExamQuestion {
   id            String   @id @default(cuid())
   examId        String
-  question      String   @db.Text
+  question      String
   questionType  String   @default("MCQ")
-  options       String?  @db.Text
+  options       String?
   correctAnswer String
-  explanation   String?  @db.Text
+  explanation   String?
   points        Int      @default(1)
   order         Int
   createdAt     DateTime @default(now())
@@ -188,7 +188,7 @@ model ExamAnswers {
   id         String @id @default(cuid())
   attemptId  String
   questionId String
-  answer     String @db.Text
+  answer     String
   attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question ExamQuestion @relation(fields: [questionId], references: [id])
   @@unique([attemptId, questionId])
@@ -272,7 +272,7 @@ model Notification {
 
 model CourseComment {
   id        String   @id @default(cuid())
-  content   String   @db.Text
+  content   String
   isPinned  Boolean  @default(false)
   isDeleted Boolean  @default(false)
   courseId  String
@@ -293,7 +293,7 @@ model Assignment {
   courseId    String
   createdById String
   title       String
-  description String?   @db.Text
+  description String?
   dueAt       DateTime?
   maxScore    Int       @default(100)
   isPublished Boolean   @default(false)
@@ -309,11 +309,11 @@ model AssignmentSubmission {
   id           String    @id @default(cuid())
   assignmentId String
   userId       String
-  content      String?   @db.Text
+  content      String?
   fileUrl      String?
   fileName     String?
   score        Float?
-  feedback     String?   @db.Text
+  feedback     String?
   status       String    @default("SUBMITTED")
   submittedAt  DateTime  @default(now())
   gradedAt     DateTime?
@@ -329,7 +329,7 @@ model AssignmentSubmission {
 model LiveSession {
   id           String   @id @default(cuid())
   title        String
-  description  String?  @db.Text
+  description  String?
   courseId     String?
   createdById  String
   scheduledAt  DateTime
