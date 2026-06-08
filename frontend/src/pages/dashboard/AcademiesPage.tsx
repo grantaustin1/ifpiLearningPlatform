@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Plus, Building2, Users, BookOpen, X, Send } from 'lucide-react'
+import { Plus, Building2, Users, BookOpen, X, Send, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { timeAgo } from 'lib/utils'
 
@@ -43,7 +43,11 @@ export default function AcademiesPage() {
               <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" /> {a.course_count} courses</span>
               <span className="ml-auto">{timeAgo(a.created_at)}</span>
             </div>
-            <a href={`/a/${a.slug}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline">View public portal →</a>
+            <a href={`/a/${a.slug}`} target="_blank" rel="noreferrer"
+               data-testid={`academy-demo-${a.id}`}
+               className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md px-2 py-1 -ml-2">
+              <ExternalLink className="h-3.5 w-3.5" /> Demo this academy
+            </a>
           </div>
         ))}
       </div>

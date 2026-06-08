@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     erp360_billing_webhook_secret: str = ""
     sso_enabled: bool = False
 
+    # Public-facing base URL (used in emails, cert verify links).
+    # Optional — if empty, request.base_url is used. Set this in production
+    # so that links survive the k8s ingress (which sets the upstream host
+    # header to the internal cluster name).
+    public_base_url: str = ""
+
+    # File storage backend — mirrors ERP360's storage_service abstraction.
+    # local: write to STORAGE_PATH on the container's disk (default).
+    # s3:    Amazon S3 — requires S3_BUCKET (+ AWS creds in env).
+    # gcs:   Google Cloud Storage — requires GCS_BUCKET (+ GCP creds).
+    storage_backend: str = "local"
+    storage_path: str = "./uploads"
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+    gcs_bucket: str = ""
+    gcs_project: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"

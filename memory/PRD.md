@@ -22,6 +22,13 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 5 polish)
+- ✅ **Pluggable storage backend** — ported the ERP360 `storage_service.py` pattern into `/app/backend/services/storage_service.py` as a clean, IFPI-owned port (zero imports from ERP360). Selectable via `STORAGE_BACKEND={local|s3|gcs}` env var. Default stays `local` writing to `./uploads/`. boto3 + google-cloud-storage are lazy-loaded so they aren't hard deps until needed. The `POST /api/uploads/image` route now delegates to `get_storage().save()`; uploads land under a `branding/` namespace prefix. Legacy flat-path URLs continue to serve (path:path matcher), so old logos don't break.
+- ✅ **`PUBLIC_BASE_URL` env** — added `settings.public_base_url`; when set, cert verify URLs in preview + emails use it instead of `request.base_url` (which yields the cluster-internal hostname under k8s ingress). Safe default: empty string falls back to current behavior.
+- ✅ **Auto-debounced live cert preview** — `OrganizationSettingsPage` now re-renders the iframe 500ms after any branding field changes (name, logo, accent colors, signature text/image, footer). Initial render still requires one click on "Live preview" to opt in.
+- ✅ **"Demo this academy" CTA** — `AcademiesPage` cards now have a prominent `ExternalLink` button that opens `/a/<slug>` in a new tab for instant tenant demos.
+- ✅ **Decision: SSO bolt-on is OPT-IN.** ERP360 integration remains entirely feature-flagged (`SSO_ENABLED`, `BILLING_LIVE_MODE`). IFPI runs standalone forever if desired — zero penalty for not bolting on. Documented in PRD.
+
 ## What's been implemented (2026-02-08 — iteration 5)
 - ✅ **Cert template live preview** — `POST /api/admin/cert-preview` renders an in-memory sample PDF using submitted branding (no DB writes); `/settings` page now has a Live preview button + sticky iframe panel showing the result.
 - ✅ **SUPER_ADMIN multi-tenant invite flow** — `GET/POST /api/academies` (SUPER_ADMIN-only). Creating an academy issues a 14-day admin invitation queued in the new tenant's outbox. New `/academies` page with create-modal + per-academy stats card and public-portal deep link.
@@ -84,13 +91,13 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P2** — Wire real cloud storage (S3 / Cloudinary) for `/api/uploads/image` once a bucket is available. Today logos/signatures land on the local container disk under `/app/backend/uploads/` — fine for MVP but resets on redeploy.
-- **P2** — Auto-debounced live cert preview on `/settings` (currently behind a button click).
-- **P3** — SSO: implement ERP360 `/api/sso/mint` once the parent app is ready; flip `SSO_ENABLED=true` here.
+- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction is already in place — just set `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds. Zero code change needed. *(Note: ERP360 also still runs on local disk — when they migrate, both apps flip together.)*
 - **P3** — Outgoing /leads → ERP360 webhook receiver in ERP360 to verify the HMAC headers we now emit.
-- **P3** — Replace `request.base_url`-derived URLs in cert verify links with a `PUBLIC_BASE_URL` env (currently fine because emails are stub-only; matters once live mail is on).
 - **P3** — Drag-reorder for badge tiers + course catalog ordering.
 - **P3** — Sort/filter/search on the Academies page once there are many tenants.
+
+## Deliberately deferred (not forgotten)
+- ERP360 SSO bridge (`POST /api/sso/mint` on ERP360 + flip `SSO_ENABLED=true` here). IFPI is fully functional without it — every ERP360 integration seam (SSO, live billing, mail dispatch) is feature-flagged off by default. Activating any of them is a single env-var change.
 
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.

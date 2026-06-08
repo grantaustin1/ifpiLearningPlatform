@@ -42,7 +42,8 @@ def learner():
 def test_alembic_head_iteration4():
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
-    assert "7497425df8bc" in out, out
+    # Iter 4 head was 7497425df8bc; iter 5 added 9acf884483b9 — accept either.
+    assert ("7497425df8bc" in out) or ("9acf884483b9" in out), out
 
 
 def test_org_cert_branding_columns_exist():

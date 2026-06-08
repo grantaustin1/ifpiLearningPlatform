@@ -26,9 +26,8 @@ from models import (
     Course, CourseSlide, LifecycleStage, Organization, Person, SlideComment, User, UserRole,
 )
 from services.invitation_service import InvitationService
+from services.storage_service import StorageError, get_storage
 
-UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_MIME = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"}
 
@@ -55,7 +54,7 @@ def preview_cert(
     """Render a SAMPLE certificate PDF using the supplied branding — no DB writes.
     Used by the Settings page Live Preview."""
     from services.pdf_certificate_service import render_certificate
-    base = str(request.base_url).rstrip("/")
+    base = settings.public_base_url or str(request.base_url).rstrip("/")
     pdf = render_certificate(
         recipient_name="Jane Sample",
         course_title="Sample Course Title",
@@ -87,35 +86,39 @@ async def upload_image(
     request: Request = None,
     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
 ):
-    """Accepts logo / signature image. Returns a public URL the cert renderer can fetch."""
+    """Accepts logo / signature image. Delegates to the configured storage
+    backend (local | s3 | gcs) — mirrors the ERP360 storage abstraction."""
     if file.content_type not in ALLOWED_IMAGE_MIME:
         raise HTTPException(status_code=400, detail=f"Unsupported image type: {file.content_type}")
     data = await file.read()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File too large (max 5MB)")
     suffix = Path(file.filename or "upload").suffix.lower() or ".png"
-    safe_name = f"{uuid.uuid4().hex}{_SAFE_NAME.sub('_', suffix)}"
-    dest = UPLOAD_DIR / safe_name
-    dest.write_bytes(data)
-    # Return a path-only URL so the frontend resolves it against its own
-    # origin (which proxies /api/* to this backend via the k8s ingress).
-    # `request.base_url` yields the cluster-internal host under ingress.
-    url = f"/api/uploads/files/{safe_name}"
-    return {"url": url, "filename": safe_name, "size": len(data)}
+    safe_suffix = _SAFE_NAME.sub("_", suffix)
+    key = f"branding/{uuid.uuid4().hex}{safe_suffix}"
+    try:
+        url = get_storage().save(data, key, content_type=file.content_type)
+    except StorageError as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    return {"url": url, "key": key, "size": len(data)}
 
 
-@uploads_router.get("/files/{name}")
-def serve_upload(name: str):
-    safe_name = _SAFE_NAME.sub("_", name)
-    target = UPLOAD_DIR / safe_name
-    if not target.exists() or not target.is_file():
+@uploads_router.get("/files/{path:path}")
+def serve_upload(path: str):
+    """Serve a previously-uploaded file. ONLY meaningful for the `local`
+    backend — S3/GCS URLs are public/CDN and bypass this route."""
+    storage = get_storage()
+    if not storage.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
-    # Best-effort MIME sniffing
-    suffix = target.suffix.lower()
+    try:
+        content = storage.load(path)
+    except StorageError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    suffix = Path(path).suffix.lower()
     mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".webp": "image/webp", ".svg": "image/svg+xml"}.get(suffix, "application/octet-stream")
     return Response(
-        content=target.read_bytes(), media_type=mime,
+        content=content, media_type=mime,
         headers={"Cache-Control": "public, max-age=3600"},
     )
 
