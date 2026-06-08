@@ -22,7 +22,15 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
-## What's been implemented (2026-01-08)
+## What's been implemented (2026-01-08 — iteration 2)
+- ✅ **Alembic migrations** — `/app/backend/alembic/` with baseline migration; runs identically on SQLite (dev) and Postgres (prod). `Base.metadata.create_all` retained as dev safety net only.
+- ✅ **Person model** — separate identity entity from User (matches ERP360 pattern). 1:1 with User via unique FK. Holds `lifecycle_stage` (PROSPECT/LEARNER/ALUMNI), `erp360_person_id` for future SSO mapping, contact details (phone/job_title/company/country), `source` (self_register / sso_erp360 / seed). Auto-created on registration and SSO JIT-provision. Seed updated to create Person rows for the seeded admin + learner.
+- ✅ **Explicit publish workflow** — `POST /api/courses/{id}/publish` and `/unpublish` with validation (course must have ≥1 slide). Course Edit page now has a status pill + green Publish CTA / amber Unpublish CTA replacing the bare status dropdown.
+- ✅ **PDF certificates** — branded landscape A4 cert via ReportLab with QR code linking to `/verify/{code}` for instant verification. Permission-gated: owner OR admin in same org only (403 otherwise). Download button on `/certificates`.
+- ✅ **Learning Paths** — full CRUD + ordered items + prerequisites table + enrol-in-path (auto-enrols learner in all child courses, idempotent) + publish validation. Sidebar item added for both admin (`Manage`) and learner (`Enrol in Path`).
+- ✅ Tests: 38/38 backend pytest pass (11 new for iter 2 + 27 regression). Frontend Playwright verified.
+
+## What's been implemented (2026-01-08 — iteration 1)
 - ✅ Backend: auth (register/login/refresh/logout/me + SSO bridge stub), course CRUD + slides + enrol + complete, exam CRUD + question replace + attempt grading, certificates + verify, leaderboard + gamification (XP/badges), notifications, admin analytics (SQLite-safe — no DATE_TRUNC), admin users list, billing subscribe + subscriptions + webhook handler, public catalog. 27/27 pytest tests pass.
 - ✅ Frontend pages: Landing, Login, Register (LEARNER-only), Public Catalog, Verify Certificate, Dashboard, Courses list (with AI Builder modal), Course Edit (working save + slides), Exams list, Certificates, Users, Reports, Leaderboard, Billing (stub banner). Course player (`/learn/:id`), Exam taker (`/take/:id`).
 - ✅ AI Course Builder: live, real LLM calls via `EMERGENT_LLM_KEY` (default `gpt-4o-mini`), generates slides + multi-choice questions, "Apply to Course" creates a draft course + draft exam in one shot.
@@ -45,15 +53,14 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P1** — Generate a real branded PDF for certificates (currently the cert exists in DB and verifies; UI shows it but no PDF download yet).
-- **P1** — Course publish workflow: explicit "Publish" action (today it's just a status toggle in the right sidebar).
-- **P2** — Learning paths (group ordered courses with prerequisites — schema not yet added).
+- **P1** — Cert PDF: add IFPI logo to the template (currently uses a wordmark — replace with actual SVG/PNG when supplied).
+- **P1** — Course prerequisites enforcement: schema exists (`course_prerequisites` table) but the LearnPage doesn't yet block entry if prereqs incomplete. Add a check in `POST /api/courses/{id}/enroll`.
 - **P2** — Discussion / comments on slides.
 - **P2** — Instructor invitation flow (today admin upgrade is DB-only).
 - **P2** — Course duplication / templates.
-- **P3** — Alembic migrations replacing the dev `Base.metadata.create_all`.
-- **P3** — Frontend: drag-reorder slides in the editor.
-- **P3** — Cert PDF templating (reuse ERP360's `certificate_service` once SSO is wired).
+- **P3** — Frontend: drag-reorder slides + path items in the editors.
+- **P3** — Cert PDF template variants (badge/CPD/exam-pass) and per-academy branding.
+- **P3** — Background job to email new certificates as PDF attachments (would reuse ERP360 mail transport once wired).
 
 ## Files of interest
 - `/app/backend/server.py` — entry, router registration.
