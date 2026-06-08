@@ -1,0 +1,78 @@
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { api, setAccessToken } from 'lib/api'
+
+export interface User {
+  id: number
+  email: string
+  name?: string | null
+  organization_id: number
+  roles: string[]
+  points: number
+}
+
+interface AuthCtx {
+  user: User | null
+  loading: boolean
+  login: (email: string, password: string) => Promise<User>
+  register: (email: string, password: string, name: string) => Promise<User>
+  logout: () => Promise<void>
+  refresh: () => Promise<void>
+  hasRole: (...allowed: string[]) => boolean
+}
+
+const Ctx = createContext<AuthCtx | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchMe = useCallback(async () => {
+    try {
+      const r = await api.get('/auth/me')
+      setUser(r.data)
+    } catch {
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchMe() }, [fetchMe])
+
+  const login = async (email: string, password: string) => {
+    const r = await api.post('/auth/login', { email, password })
+    if (r.data?.access_token) setAccessToken(r.data.access_token)
+    setUser(r.data.user)
+    return r.data.user as User
+  }
+
+  const register = async (email: string, password: string, name: string) => {
+    const r = await api.post('/auth/register', { email, password, name })
+    if (r.data?.access_token) setAccessToken(r.data.access_token)
+    setUser(r.data.user)
+    return r.data.user as User
+  }
+
+  const logout = async () => {
+    try { await api.post('/auth/logout') } catch { /* swallow */ }
+    setAccessToken(null)
+    setUser(null)
+  }
+
+  const refresh = async () => { await fetchMe() }
+
+  const hasRole = (...allowed: string[]) =>
+    !!user && allowed.some((r) => user.roles.includes(r))
+
+  return (
+    <Ctx.Provider value={{ user, loading, login, register, logout, refresh, hasRole }}>
+      {children}
+    </Ctx.Provider>
+  )
+}
+
+export function useAuth() {
+  const v = useContext(Ctx)
+  if (!v) throw new Error('useAuth must be inside AuthProvider')
+  return v
+}

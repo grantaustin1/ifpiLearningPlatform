@@ -1,0 +1,319 @@
+"""Misc routes: AI builder, enrollments, certificates, notifications, leaderboard, analytics, billing, public catalog."""
+from __future__ import annotations
+
+import logging
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
+
+from auth.dependencies import CurrentUser, get_current_user, requires_roles
+from core.database import get_db
+from core.role_registry import ADMIN_ROLES
+from models import (
+    Certificate, Course, CourseStatus, Enrollment, EnrollmentStatus, Exam,
+    ExamAttempt, Notification, Subscription, User, UserBadge,
+)
+from schemas import (
+    AIBuilderRequest, AIBuilderResponse, AnalyticsOverview, CertificateOut,
+    CourseSummary, EnrollmentOut, LeaderboardEntry, NotificationOut,
+    SubscribeRequest, SubscribeResponse, SubscriptionOut,
+)
+from services.ai_builder_service import generate_course
+from services.billing_service import BillingService
+from services.gamification_service import BADGE_META
+
+logger = logging.getLogger(__name__)
+
+
+# ── AI builder ───────────────────────────────────────────────────────
+ai_router = APIRouter(prefix="/api/ai", tags=["AI"])
+
+
+@ai_router.post("/course-builder", response_model=AIBuilderResponse)
+async def ai_course_builder(
+    body: AIBuilderRequest,
+    current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
+):
+    result = await generate_course(
+        topic=body.topic, description=body.description or "",
+        num_slides=body.num_slides, include_quiz=body.include_quiz,
+        num_questions=body.num_questions,
+    )
+    return AIBuilderResponse(**result)
+
+
+# ── Enrollments ──────────────────────────────────────────────────────
+enroll_router = APIRouter(prefix="/api/enrollments", tags=["Enrollments"])
+
+
+@enroll_router.get("", response_model=List[EnrollmentOut])
+def my_enrollments(db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(get_current_user)):
+    rows = db.query(Enrollment).filter(
+        Enrollment.user_id == current.id,
+    ).order_by(Enrollment.enrolled_at.desc()).all()
+    out = []
+    for e in rows:
+        out.append(EnrollmentOut(
+            id=e.id, course_id=e.course_id, course_title=e.course.title,
+            status=e.status.value, progress=e.progress,
+            enrolled_at=e.enrolled_at, completed_at=e.completed_at,
+        ))
+    return out
+
+
+# ── Certificates ─────────────────────────────────────────────────────
+cert_router = APIRouter(prefix="/api/certificates", tags=["Certificates"])
+
+
+@cert_router.get("", response_model=List[CertificateOut])
+def my_certificates(db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(get_current_user)):
+    if current.has_any_role(ADMIN_ROLES):
+        rows = db.query(Certificate).join(User).filter(
+            User.organization_id == current.organization_id,
+        ).order_by(Certificate.issued_at.desc()).all()
+    else:
+        rows = db.query(Certificate).filter(
+            Certificate.user_id == current.id,
+        ).order_by(Certificate.issued_at.desc()).all()
+    return [CertificateOut(
+        id=c.id, code=c.code, type=c.type,
+        course_title=c.course.title if c.course else None,
+        issued_at=c.issued_at, score=c.score,
+    ) for c in rows]
+
+
+@cert_router.get("/verify/{code}")
+def verify_certificate(code: str, db: Session = Depends(get_db)):
+    c = db.query(Certificate).filter(Certificate.code == code).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    return {
+        "valid": True, "code": c.code, "type": c.type,
+        "recipient_name": c.user.name if c.user else None,
+        "course_title": c.course.title if c.course else None,
+        "issued_at": c.issued_at,
+    }
+
+
+# ── Notifications ────────────────────────────────────────────────────
+notif_router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
+
+
+@notif_router.get("")
+def list_notifications(db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(get_current_user)):
+    rows = db.query(Notification).filter(
+        Notification.user_id == current.id,
+    ).order_by(Notification.created_at.desc()).limit(25).all()
+    unread = sum(1 for n in rows if not n.is_read)
+    return {
+        "notifications": [NotificationOut.model_validate(n).model_dump() for n in rows],
+        "unread_count": unread,
+    }
+
+
+@notif_router.patch("/read-all")
+def mark_all_read(db: Session = Depends(get_db),
+                  current: CurrentUser = Depends(get_current_user)):
+    db.query(Notification).filter(
+        Notification.user_id == current.id, Notification.is_read.is_(False),
+    ).update({"is_read": True})
+    db.commit()
+    return {"ok": True}
+
+
+# ── Leaderboard & gamification ───────────────────────────────────────
+gam_router = APIRouter(prefix="/api/gamification", tags=["Gamification"])
+
+
+@gam_router.get("/leaderboard", response_model=List[LeaderboardEntry])
+def leaderboard(db: Session = Depends(get_db),
+                current: CurrentUser = Depends(get_current_user)):
+    rows = db.query(User).filter(
+        User.organization_id == current.organization_id, User.is_active.is_(True),
+    ).order_by(desc(User.points)).limit(50).all()
+    out = []
+    for u in rows:
+        completed = sum(1 for e in u.enrollments if e.status == EnrollmentStatus.COMPLETED)
+        out.append(LeaderboardEntry(
+            user_id=u.id, name=u.name, points=u.points or 0,
+            badges=len(u.badges), completed=completed,
+        ))
+    return out
+
+
+@gam_router.get("/me")
+def my_gamification(db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current.id).first()
+    badges = [{
+        "badge": b.badge, "earned_at": b.earned_at,
+        "meta": BADGE_META.get(b.badge, {"label": b.badge, "emoji": "🏅", "desc": ""}),
+    } for b in user.badges]
+    rank = db.query(User).filter(
+        User.organization_id == current.organization_id,
+        User.points > (user.points or 0),
+    ).count() + 1
+    total = db.query(User).filter(
+        User.organization_id == current.organization_id, User.is_active.is_(True),
+    ).count()
+    return {"points": user.points or 0, "badges": badges, "rank": rank, "total": total}
+
+
+# ── Analytics (admin) ────────────────────────────────────────────────
+admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+@admin_router.get("/analytics", response_model=AnalyticsOverview)
+def analytics(db: Session = Depends(get_db),
+              current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    org = current.organization_id
+    total_learners = db.query(User).filter(User.organization_id == org).count()
+    total_courses = db.query(Course).filter(Course.organization_id == org).count()
+    total_enrollments = db.query(Enrollment).join(Course).filter(Course.organization_id == org).count()
+    completed = db.query(Enrollment).join(Course).filter(
+        Course.organization_id == org, Enrollment.status == EnrollmentStatus.COMPLETED,
+    ).count()
+    completion_rate = round((completed / total_enrollments) * 100) if total_enrollments else 0
+    total_certificates = db.query(Certificate).join(User).filter(User.organization_id == org).count()
+
+    attempts = db.query(ExamAttempt).join(Exam).filter(Exam.organization_id == org).all()
+    avg_score = round(sum(a.score for a in attempts) / len(attempts)) if attempts else 0
+
+    # Monthly enrollments — last 6 months via Python (DB-agnostic; avoids DATE_TRUNC)
+    from collections import OrderedDict
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    months = OrderedDict()
+    for i in range(5, -1, -1):
+        y = now.year + ((now.month - i - 1) // 12)
+        m = ((now.month - i - 1) % 12) + 1
+        months[f"{y}-{m:02d}"] = 0
+    enrolls = db.query(Enrollment).join(Course).filter(Course.organization_id == org).all()
+    for e in enrolls:
+        key = f"{e.enrolled_at.year}-{e.enrolled_at.month:02d}"
+        if key in months:
+            months[key] += 1
+    monthly = [{"month": k, "count": v} for k, v in months.items()]
+
+    # Top courses by enrolment
+    top_q = db.query(Course, func.count(Enrollment.id).label("c")).outerjoin(Enrollment).filter(
+        Course.organization_id == org,
+    ).group_by(Course.id).order_by(desc("c")).limit(8).all()
+    top_courses = []
+    for c, total in top_q:
+        comp = sum(1 for e in c.enrollments if e.status == EnrollmentStatus.COMPLETED)
+        top_courses.append({
+            "id": c.id, "title": c.title, "total": total,
+            "completed": comp,
+            "rate": round((comp / total) * 100) if total else 0,
+        })
+
+    recents = db.query(Enrollment).join(Course).filter(
+        Course.organization_id == org,
+    ).order_by(desc(Enrollment.enrolled_at)).limit(8).all()
+    recent_activity = [{
+        "user_name": e.user.name or "Learner", "course_title": e.course.title,
+        "status": e.status.value, "progress": e.progress,
+        "enrolled_at": e.enrolled_at,
+    } for e in recents]
+
+    return AnalyticsOverview(
+        total_learners=total_learners, total_courses=total_courses,
+        total_enrollments=total_enrollments, completion_rate=completion_rate,
+        total_certificates=total_certificates,
+        total_exam_attempts=len(attempts), avg_exam_score=avg_score,
+        monthly_enrollments=monthly, top_courses=top_courses,
+        recent_activity=recent_activity,
+    )
+
+
+@admin_router.get("/users")
+def list_users(db: Session = Depends(get_db),
+               current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    rows = db.query(User).filter(
+        User.organization_id == current.organization_id,
+    ).order_by(User.created_at.desc()).all()
+    return [{
+        "id": u.id, "email": u.email, "name": u.name,
+        "roles": [ur.role for ur in u.user_roles],
+        "points": u.points or 0, "enrollments": len(u.enrollments),
+        "completed": sum(1 for e in u.enrollments if e.status == EnrollmentStatus.COMPLETED),
+        "certificates": len(u.certificates), "created_at": u.created_at,
+        "is_active": u.is_active,
+    } for u in rows]
+
+
+# ── Billing ──────────────────────────────────────────────────────────
+billing_router = APIRouter(prefix="/api/billing", tags=["Billing"])
+
+
+@billing_router.post("/subscribe", response_model=SubscribeResponse)
+def subscribe(body: SubscribeRequest, db: Session = Depends(get_db),
+              current: CurrentUser = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current.id).first()
+    course = db.query(Course).filter(
+        Course.id == body.course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    result = BillingService(db).subscribe(user, course)
+    return SubscribeResponse(**result)
+
+
+@billing_router.get("/subscriptions", response_model=List[SubscriptionOut])
+def my_subscriptions(db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(get_current_user)):
+    rows = db.query(Subscription).filter(
+        Subscription.user_id == current.id,
+    ).order_by(Subscription.created_at.desc()).all()
+    return rows
+
+
+@billing_router.post("/webhook")
+async def billing_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receives ERP360 billing webhooks. Verified via X-Signature header."""
+    body = await request.body()
+    sig = request.headers.get("X-Signature") or request.headers.get("x-signature")
+    svc = BillingService(db)
+    if not svc.verify_webhook_signature(body, sig):
+        raise HTTPException(status_code=401, detail="Bad signature")
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    event_type = data.get("type") or data.get("event_type") or "unknown"
+    return svc.handle_event(event_type, data.get("data") or data)
+
+
+# ── Public catalog (no auth) ─────────────────────────────────────────
+catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
+
+
+@catalog_router.get("")
+def catalog(q: str | None = Query(None),
+            category: str | None = Query(None),
+            db: Session = Depends(get_db)):
+    query = db.query(Course).filter(Course.status == CourseStatus.PUBLISHED)
+    if q:
+        query = query.filter(Course.title.ilike(f"%{q}%"))
+    if category:
+        query = query.filter(Course.category == category)
+    courses = query.order_by(Course.created_at.desc()).limit(100).all()
+    cats = [r[0] for r in db.query(Course.category).filter(
+        Course.status == CourseStatus.PUBLISHED, Course.category.isnot(None),
+    ).distinct().all() if r[0]]
+    return {
+        "courses": [{
+            "id": c.id, "title": c.title, "description": c.description,
+            "category": c.category, "cover_color": c.cover_color,
+            "duration_minutes": c.duration_minutes, "price_cents": c.price_cents,
+            "currency": c.currency, "slide_count": len(c.slides),
+            "enrollment_count": len(c.enrollments),
+        } for c in courses],
+        "categories": cats,
+    }
