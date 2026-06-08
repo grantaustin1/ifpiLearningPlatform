@@ -162,6 +162,43 @@ def unpublish_course(course_id: int, db: Session = Depends(get_db),
     return {"ok": True, "status": c.status.value}
 
 
+@router.post("/{course_id}/duplicate")
+def duplicate_course(course_id: int, db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Deep-clone a course (with all slides) as a new DRAFT. Optional template path:
+    instructors can keep a master "template" course and duplicate it as a base
+    for each new cohort."""
+    src = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="Course not found")
+    new_course = Course(
+        organization_id=src.organization_id,
+        title=f"{src.title} (copy)",
+        description=src.description, category=src.category,
+        cover_color=src.cover_color, cover_image=src.cover_image,
+        status=CourseStatus.DRAFT,
+        passing_score=src.passing_score, duration_minutes=src.duration_minutes,
+        price_cents=src.price_cents, currency=src.currency,
+        created_by_id=current.id,
+    )
+    db.add(new_course)
+    db.flush()
+    for s in src.slides:
+        db.add(CourseSlide(
+            course_id=new_course.id, title=s.title, content=s.content,
+            slide_type=s.slide_type, media_url=s.media_url,
+            order_index=s.order_index, is_required=s.is_required,
+        ))
+    db.commit()
+    db.refresh(new_course)
+    return {
+        "ok": True, "course_id": new_course.id, "title": new_course.title,
+        "slides_copied": len(src.slides),
+    }
+
+
 # ── Slides ─────────────────────────────────────────────────────────
 @router.post("/{course_id}/slides", response_model=SlideOut)
 def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
@@ -371,6 +408,10 @@ def complete_course(course_id: int, request: Request, db: Session = Depends(get_
                 issued_at=cert.issued_at, verify_url=verify_url,
                 organisation_name=org.name if org else "IFPI Learning",
                 organisation_logo_url=org.logo_url if org else None,
+                accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
+                signature_text=org.cert_signature_text if org else None,
+                signature_image_url=org.cert_signature_image_url if org else None,
+                footer_text=org.cert_footer_text if org else None,
             )
             MailService(db).send_email(
                 to_email=user.email, to_name=user.name,

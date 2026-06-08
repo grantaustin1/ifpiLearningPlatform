@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2 } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function CoursesPage() {
@@ -20,6 +20,15 @@ export default function CoursesPage() {
   const createMut = useMutation({
     mutationFn: async (body: any) => (await api.post('/courses', body)).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['courses'] }); toast.success('Course created') },
+  })
+
+  const dupMut = useMutation({
+    mutationFn: async (id: number) => (await api.post(`/courses/${id}/duplicate`)).data,
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ['courses'] })
+      toast.success(`Duplicated with ${d.slides_copied} slide${d.slides_copied !== 1 ? 's' : ''}`)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not duplicate'),
   })
 
   const handleNewCourse = async () => {
@@ -88,6 +97,11 @@ export default function CoursesPage() {
                       <Link to={`/courses/${c.id}/edit`} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs border border-slate-200 hover:border-slate-300 rounded-lg py-1.5 font-medium">
                         <Edit className="h-3.5 w-3.5" /> Edit
                       </Link>
+                      <button onClick={() => dupMut.mutate(c.id)} disabled={dupMut.isPending} data-testid={`duplicate-${c.id}`}
+                        title="Duplicate as draft"
+                        className="inline-flex items-center justify-center text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                       <Link to={`/learn/${c.id}`} className="inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium">
                         <Eye className="h-3.5 w-3.5" /> Preview
                       </Link>

@@ -59,10 +59,20 @@ def render_certificate(
     *, recipient_name: str, course_title: str, certificate_code: str,
     issued_at: datetime, verify_url: str, organisation_name: str = "IFPI Learning",
     organisation_logo_url: Optional[str] = None,
+    accent_color: str = "#6366f1",
+    signature_text: Optional[str] = None,
+    signature_image_url: Optional[str] = None,
+    footer_text: Optional[str] = None,
     cert_type: str = "Course Completion",
     score: Optional[float] = None,
 ) -> bytes:
     """Returns the PDF as raw bytes — caller streams to client."""
+    # Validate accent_color (fall back to default on any malformed input)
+    try:
+        accent = colors.HexColor(accent_color)
+    except Exception:
+        accent = colors.HexColor("#6366f1")
+
     buf = io.BytesIO()
     page_w, page_h = landscape(A4)
     c = canvas.Canvas(buf, pagesize=landscape(A4))
@@ -71,7 +81,7 @@ def render_certificate(
     c.setFillColor(colors.HexColor("#f8fafc"))
     c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
     # Decorative top band
-    c.setFillColor(colors.HexColor("#6366f1"))
+    c.setFillColor(accent)
     c.rect(0, page_h - 25 * mm, page_w, 25 * mm, fill=1, stroke=0)
     c.setFillColor(colors.HexColor("#8b5cf6"))
     c.rect(0, 0, page_w, 12 * mm, fill=1, stroke=0)
@@ -98,7 +108,7 @@ def render_certificate(
         except Exception:
             logo_buf = None
     if logo_buf is None:
-        c.setFillColor(colors.HexColor("#6366f1"))
+        c.setFillColor(accent)
         c.setFont("Helvetica-Bold", 14)
         c.drawCentredString(page_w / 2, page_h - 38 * mm, organisation_name.upper())
 
@@ -120,7 +130,7 @@ def render_certificate(
     c.setFillColor(colors.HexColor("#0f172a"))
     c.drawCentredString(page_w / 2, page_h - 120 * mm, recipient_name or "Anonymous Learner")
     # underline-style accent
-    c.setStrokeColor(colors.HexColor("#6366f1"))
+    c.setStrokeColor(accent)
     c.setLineWidth(2)
     text_w = c.stringWidth(recipient_name or "Anonymous Learner", "Helvetica-Bold", 32)
     c.line((page_w - text_w) / 2 - 10, page_h - 125 * mm,
@@ -141,7 +151,7 @@ def render_certificate(
         c.drawCentredString(page_w / 2, page_h - 162 * mm,
                             f"with a score of {int(score)}%")
 
-    # ── Bottom row: date (left) · seal (centre) · QR + code (right) ─
+    # ── Bottom row: date (left) · signature (centre) · QR + code (right) ─
     bottom_y = inset + 18 * mm
     # Date
     c.setFont("Helvetica", 10)
@@ -152,17 +162,39 @@ def render_certificate(
     c.drawString(inset + 12 * mm, bottom_y - 6,
                  issued_at.strftime("%d %B %Y"))
 
-    # Seal in centre
-    seal_x, seal_y = page_w / 2, bottom_y + 4
-    c.setStrokeColor(colors.HexColor("#6366f1"))
-    c.setLineWidth(1.5)
-    c.circle(seal_x, seal_y, 14 * mm, fill=0, stroke=1)
-    c.circle(seal_x, seal_y, 10 * mm, fill=0, stroke=1)
-    c.setFillColor(colors.HexColor("#6366f1"))
-    c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(seal_x, seal_y + 2, "VERIFIED")
-    c.setFont("Helvetica", 7)
-    c.drawCentredString(seal_x, seal_y - 6, "IFPI Learning")
+    # Signature block in centre
+    sig_cx = page_w / 2
+    if signature_image_url:
+        sig_buf = _fetch_logo(signature_image_url)
+        if sig_buf is not None:
+            try:
+                from reportlab.lib.utils import ImageReader
+                sig_img = ImageReader(sig_buf)
+                iw, ih = sig_img.getSize()
+                target_h = 14 * mm
+                target_w = target_h * (iw / ih) if ih else 40 * mm
+                c.drawImage(sig_img, sig_cx - target_w / 2, bottom_y + 4,
+                            width=target_w, height=target_h, mask="auto")
+            except Exception:
+                signature_image_url = None  # fall through to text-only
+    # Signature line + text
+    c.setStrokeColor(colors.HexColor("#cbd5e1"))
+    c.setLineWidth(0.5)
+    c.line(sig_cx - 30 * mm, bottom_y + 2, sig_cx + 30 * mm, bottom_y + 2)
+    if signature_text:
+        c.setFont("Helvetica", 9)
+        c.setFillColor(colors.HexColor("#475569"))
+        c.drawCentredString(sig_cx, bottom_y - 8, signature_text)
+    else:
+        # Default decorative seal
+        c.setStrokeColor(accent)
+        c.setLineWidth(1.5)
+        c.circle(sig_cx, bottom_y + 12, 11 * mm, fill=0, stroke=1)
+        c.setFillColor(accent)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(sig_cx, bottom_y + 14, "VERIFIED")
+        c.setFont("Helvetica", 6)
+        c.drawCentredString(sig_cx, bottom_y + 8, organisation_name[:20])
 
     # QR + code on right
     qr_buf = _make_qr_image(verify_url)
@@ -178,6 +210,12 @@ def render_certificate(
     c.setFont("Courier", 8)
     c.setFillColor(colors.HexColor("#475569"))
     c.drawRightString(page_w - inset - 12 * mm, bottom_y - 12, certificate_code)
+
+    # ── Footer text (below the inner card) ─────────────────────────
+    if footer_text:
+        c.setFont("Helvetica", 7)
+        c.setFillColor(colors.HexColor("#cbd5e1"))
+        c.drawCentredString(page_w / 2, 7 * mm, footer_text[:200])
 
     c.showPage()
     c.save()

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 
@@ -14,12 +14,21 @@ export default function CourseEditPage() {
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
+  const [prereqs, setPrereqs] = useState<any[]>([])
+  const [allCourses, setAllCourses] = useState<any[]>([])
+  const [showAddPrereq, setShowAddPrereq] = useState(false)
 
   const load = async () => {
-    const r = await api.get(`/courses/${id}`)
+    const [r, p, all] = await Promise.all([
+      api.get(`/courses/${id}`),
+      api.get(`/courses/${id}/prerequisites`),
+      api.get('/courses'),
+    ])
     setCourse(r.data)
     setSlides(r.data.slides || [])
     setActive(r.data.slides?.[0]?.id ?? null)
+    setPrereqs(p.data)
+    setAllCourses(all.data)
   }
   useEffect(() => { load() }, [id])
 
@@ -198,7 +207,64 @@ export default function CourseEditPage() {
             <option value="DRAFT">DRAFT</option><option value="PUBLISHED">PUBLISHED</option><option value="ARCHIVED">ARCHIVED</option>
           </select>
         </Field>
+
+        <div className="mt-6 pt-4 border-t border-slate-200" data-testid="prereqs-section">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> Prerequisites</h4>
+            <button onClick={() => setShowAddPrereq(true)} data-testid="add-prereq-btn"
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"><Plus className="h-3 w-3" /> Add</button>
+          </div>
+          {prereqs.length === 0 ? (
+            <p className="text-xs text-slate-400">No prerequisites — learners can enrol directly.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {prereqs.map((p: any) => (
+                <div key={p.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg group" data-testid={`prereq-${p.course_id}`}>
+                  <Lock className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                  <span className="text-xs text-slate-700 flex-1 truncate">{p.title}</span>
+                  <button onClick={async () => {
+                    await api.delete(`/courses/${id}/prerequisites/${p.course_id}`)
+                    setPrereqs(prereqs.filter((x: any) => x.id !== p.id))
+                    toast.success('Prerequisite removed')
+                  }} data-testid={`remove-prereq-${p.course_id}`}
+                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </aside>
+
+      {showAddPrereq && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="add-prereq-modal">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">Add a prerequisite</h3>
+              <button onClick={() => setShowAddPrereq(false)}><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+            <div className="p-6 max-h-80 overflow-y-auto space-y-2">
+              <p className="text-xs text-slate-500 mb-3">Learners must complete the selected course before they can enrol in <strong>{course.title}</strong>.</p>
+              {allCourses.filter((c: any) => c.id !== Number(id) && !prereqs.some((p: any) => p.course_id === c.id)).map((c: any) => (
+                <button key={c.id} onClick={async () => {
+                  await api.post(`/courses/${id}/prerequisites/${c.id}`)
+                  await load()
+                  setShowAddPrereq(false)
+                  toast.success('Prerequisite added')
+                }} data-testid={`pick-prereq-${c.id}`}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 text-left">
+                  <div className={`w-8 h-8 rounded-lg ${c.cover_color}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{c.title}</p>
+                    <p className="text-[11px] text-slate-400">{c.status}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
