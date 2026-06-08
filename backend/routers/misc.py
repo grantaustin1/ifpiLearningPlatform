@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
@@ -170,11 +170,15 @@ gam_router = APIRouter(prefix="/api/gamification", tags=["Gamification"])
 
 
 @gam_router.get("/leaderboard", response_model=List[LeaderboardEntry])
-def leaderboard(db: Session = Depends(get_db),
+def leaderboard(cohort: Optional[str] = None,
+                db: Session = Depends(get_db),
                 current: CurrentUser = Depends(get_current_user)):
-    rows = db.query(User).filter(
+    q = db.query(User).filter(
         User.organization_id == current.organization_id, User.is_active.is_(True),
-    ).order_by(desc(User.points)).limit(50).all()
+    )
+    if cohort:
+        q = q.filter(User.cohort == cohort)
+    rows = q.order_by(desc(User.points)).limit(50).all()
     out = []
     for u in rows:
         completed = sum(1 for e in u.enrollments if e.status == EnrollmentStatus.COMPLETED)

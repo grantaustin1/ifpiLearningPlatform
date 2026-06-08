@@ -106,6 +106,9 @@ class Organization(Base):
     smtp_from_email = Column(String(200))
     smtp_from_name = Column(String(200))
     smtp_use_tls = Column(Boolean, default=True)
+    # Cohort milestone celebrations (per-tenant tuneable)
+    cohort_threshold = Column(Integer, default=75)         # % completion required to fire
+    cohort_celebration_webhook_url = Column(Text)          # optional Discord/Slack URL
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

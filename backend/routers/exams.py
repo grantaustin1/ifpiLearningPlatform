@@ -9,12 +9,13 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import INSTRUCTOR_ROLES
-from models import Exam, ExamAttempt, ExamQuestion, QuestionType
+from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType
 from schemas import (
     AttemptResult, AttemptSubmit, ExamCreate, ExamDetail, ExamSummary,
     ExamUpdate, QuestionIn, QuestionOut,
 )
 from services.exam_service import ExamService
+from services import ai_quiz_service
 
 router = APIRouter(prefix="/api/exams", tags=["Exams"])
 
@@ -126,21 +127,28 @@ def delete_exam(exam_id: int, db: Session = Depends(get_db),
 
 
 @router.put("/{exam_id}/questions", response_model=List[QuestionOut])
-def replace_questions(exam_id: int, body: List[QuestionIn], db: Session = Depends(get_db),
+def replace_questions(exam_id: int, body: List[QuestionIn],
+                      mode: str = "replace",
+                      db: Session = Depends(get_db),
                       current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """mode='replace' (default) wipes & sets. mode='append' adds to existing."""
     e = db.query(Exam).filter(
         Exam.id == exam_id, Exam.organization_id == current.organization_id,
     ).first()
     if not e:
         raise HTTPException(status_code=404, detail="Exam not found")
-    db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam_id).delete()
+    if mode == "replace":
+        db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam_id).delete()
+        start_idx = 0
+    else:
+        start_idx = db.query(ExamQuestion).filter(ExamQuestion.exam_id == exam_id).count()
     for i, q in enumerate(body):
         qt = q.question_type if q.question_type in QuestionType.__members__ else "MULTIPLE_CHOICE"
         db.add(ExamQuestion(
             exam_id=exam_id, question_text=q.question_text,
             question_type=QuestionType(qt), options=q.options,
             correct_answer=q.correct_answer, explanation=q.explanation,
-            points=q.points, order_index=q.order_index or (i + 1),
+            points=q.points, order_index=q.order_index or (start_idx + i + 1),
         ))
     db.commit()
     db.refresh(e)
@@ -160,3 +168,44 @@ def submit_attempt(exam_id: int, body: AttemptSubmit, db: Session = Depends(get_
         organization_id=current.organization_id, answers=body.answers,
     )
     return AttemptResult(**result)
+
+
+
+# ── AI quiz generator ────────────────────────────────────────────────
+from pydantic import BaseModel, Field
+
+
+class AIQuizRequest(BaseModel):
+    course_id: int
+    num_questions: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/ai-generate-questions")
+async def ai_generate_questions(
+    body: AIQuizRequest, db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles(*INSTRUCTOR_ROLES)),
+):
+    """Generate exam questions from a course's slide content using the
+    Emergent LLM. Returns a preview payload — does NOT persist to the DB.
+    Frontend bulk-inserts the questions via the existing POST /questions
+    endpoint after admin review.
+    """
+    course = db.query(Course).filter(
+        Course.id == body.course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    slides = db.query(CourseSlide).filter(CourseSlide.course_id == course.id).order_by(
+        CourseSlide.order_index.asc()).all()
+    slide_dicts = [{"title": s.title, "content_text": s.content} for s in slides]
+    questions = await ai_quiz_service.generate_questions(
+        course_title=course.title, slides=slide_dicts,
+        num_questions=body.num_questions,
+    )
+    from services import audit_service
+    audit_service.record(db, current, "AI_QUIZ_GENERATED",
+        target_type="course", target_id=str(course.id),
+        metadata={"requested": body.num_questions, "returned": len(questions)})
+    db.commit()
+    return {"course_id": course.id, "course_title": course.title, "questions": questions}

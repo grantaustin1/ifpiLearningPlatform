@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
@@ -172,7 +172,31 @@ def get_org(db: Session = Depends(get_db),
         "cert_signature_image_url": o.cert_signature_image_url,
         "cert_footer_text": o.cert_footer_text,
         "theme_preset": o.theme_preset,
+        "cohort_threshold": o.cohort_threshold or 75,
+        "cohort_celebration_webhook_url": o.cohort_celebration_webhook_url,
     }
+
+
+class CohortSettingsIn(BaseModel):
+    cohort_threshold: int = Field(ge=1, le=100, default=75)
+    cohort_celebration_webhook_url: Optional[str] = None
+
+
+@org_router.put("/cohort-settings")
+def update_cohort_settings(body: CohortSettingsIn, db: Session = Depends(get_db),
+                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    o.cohort_threshold = body.cohort_threshold
+    o.cohort_celebration_webhook_url = (body.cohort_celebration_webhook_url or "").strip() or None
+    from services import audit_service
+    audit_service.record(db, current, "COHORT_SETTINGS_UPDATED",
+        target_type="organization", target_id=str(o.id),
+        metadata={"threshold": body.cohort_threshold,
+                  "webhook": bool(o.cohort_celebration_webhook_url)})
+    db.commit()
+    return {"ok": True}
 
 
 @org_router.get("/themes")

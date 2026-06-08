@@ -1,0 +1,99 @@
+name: PR Agent Reports
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+  actions: read
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Download agent reports artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-reports
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: reports
+        continue-on-error: true
+
+      - name: Find PR number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`,
+            });
+            return prs.data[0]?.number || '';
+          result-encoding: string
+
+      - name: Format + post sticky PR comment
+        if: steps.pr.outputs.result != ''
+        uses: actions/github-script@v7
+        env:
+          PR: ${{ steps.pr.outputs.result }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const readJson = (p) => {
+              try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+            };
+            const r007 = readJson('reports/agent_007.json');
+            const r008 = readJson('reports/agent_008.json');
+            const r010 = readJson('reports/agent_010.json');
+
+            const fmt007 = r007
+              ? r007.violations
+                ? `🔴 **Agent 007 — Invariants**: ${r007.violations} violation(s)\n` +
+                  r007.failures.slice(0, 5).map(f => `  - ${f.invariant}: count=${f.count}`).join('\n')
+                : `🟢 **Agent 007 — Invariants**: ${r007.invariants_checked}/${r007.invariants_checked} clean`
+              : '⚪ Agent 007 — report missing';
+
+            const fmt008 = r008
+              ? r008.ok
+                ? `🟢 **Agent 008 — E2E Journey**: all ${r008.steps.length} steps passed`
+                : `🔴 **Agent 008 — E2E Journey**: FAILED at step "${r008.steps.find(s => !s.ok)?.step || 'unknown'}"`
+              : '⚪ Agent 008 — report missing';
+
+            const fmt010 = r010
+              ? r010.failed === 0
+                ? `🟢 **Agent 010 — Infra Sentry**: ${r010.checks}/${r010.checks} checks green`
+                : `🟡 **Agent 010 — Infra Sentry**: ${r010.failed}/${r010.checks} check(s) failing`
+              : '⚪ Agent 010 — report missing';
+
+            const body = [
+              '## IFPI QA Agent Report',
+              '',
+              fmt007, fmt008, fmt010,
+              '',
+              `_Workflow: ${context.payload.workflow_run.html_url}_`,
+            ].join('\n');
+
+            // Find existing comment to update (sticky)
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: parseInt(process.env.PR),
+            });
+            const existing = comments.data.find(c => c.body && c.body.startsWith('## IFPI QA Agent Report'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: parseInt(process.env.PR), body,
+              });
+            }
