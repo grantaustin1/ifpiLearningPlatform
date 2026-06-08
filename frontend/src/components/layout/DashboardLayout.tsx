@@ -13,6 +13,7 @@ const ADMIN_NAV = [
   { href: '/exams',         label: 'Exams',        icon: ClipboardList },
   { href: '/certificates',  label: 'Certificates', icon: Award },
   { href: '/leaderboard',   label: 'Leaderboard',  icon: Trophy },
+  { href: '/badge-tiers',   label: 'Badge tiers',  icon: Award },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
   { href: '/users',         label: 'Users',        icon: Users },
   { href: '/outbox',        label: 'Email Outbox', icon: Mail },

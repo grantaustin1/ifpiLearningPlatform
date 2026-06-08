@@ -206,6 +206,80 @@ def apply_theme_preset(slug: str, db: Session = Depends(get_db),
     return {"ok": True, "applied": preset["slug"]}
 
 
+# ── Per-tenant SMTP overrides ────────────────────────────────────────
+class SmtpConfigIn(BaseModel):
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None  # plain in transit, encrypted at rest
+    smtp_from_email: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    smtp_use_tls: bool = True
+
+
+@org_router.get("/smtp")
+def get_smtp_config(db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Returns the SMTP config minus the password. Password is write-only."""
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    return {
+        "smtp_host": o.smtp_host, "smtp_port": o.smtp_port,
+        "smtp_username": o.smtp_username, "smtp_from_email": o.smtp_from_email,
+        "smtp_from_name": o.smtp_from_name, "smtp_use_tls": o.smtp_use_tls,
+        "has_password": bool(o.smtp_password_enc),
+        "is_configured": bool(o.smtp_host and o.smtp_from_email),
+    }
+
+
+@org_router.put("/smtp")
+def update_smtp_config(body: SmtpConfigIn, db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    from services.smtp_service import encrypt_password
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    o.smtp_host = body.smtp_host
+    o.smtp_port = body.smtp_port
+    o.smtp_username = body.smtp_username
+    if body.smtp_password is not None and body.smtp_password != "":
+        o.smtp_password_enc = encrypt_password(body.smtp_password)
+    elif body.smtp_password == "":  # explicit empty string = clear
+        o.smtp_password_enc = None
+    o.smtp_from_email = body.smtp_from_email
+    o.smtp_from_name = body.smtp_from_name
+    o.smtp_use_tls = body.smtp_use_tls
+    db.commit()
+    return {"ok": True}
+
+
+@org_router.post("/smtp/test")
+def test_smtp_send(body: dict, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Send a test email immediately (synchronous, NOT via the outbox)."""
+    from services.smtp_service import send_via_org_smtp
+    to = (body.get("to") or "").strip()
+    if not to:
+        raise HTTPException(status_code=400, detail="`to` email required")
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o or not o.smtp_host or not o.smtp_from_email:
+        raise HTTPException(status_code=400, detail="SMTP not configured")
+    try:
+        send_via_org_smtp(
+            host=o.smtp_host, port=o.smtp_port or 587,
+            username=o.smtp_username, password_enc=o.smtp_password_enc,
+            use_tls=o.smtp_use_tls if o.smtp_use_tls is not None else True,
+            from_email=o.smtp_from_email, from_name=o.smtp_from_name,
+            to_email=to, to_name=None, subject=f"[{o.name}] SMTP test from IFPI",
+            body_html=f"<p>This is a test email from <strong>{o.name}</strong> on IFPI Learning. If you got this, your SMTP is working.</p>",
+            body_text=f"This is a test email from {o.name} on IFPI Learning.",
+        )
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"SMTP test failed: {str(e)[:300]}")
+
+
 @org_router.patch("")
 def update_org(body: OrgUpdate, db: Session = Depends(get_db),
                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):

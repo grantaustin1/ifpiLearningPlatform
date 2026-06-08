@@ -43,7 +43,7 @@ def test_alembic_head_iteration4():
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
     # Iter 4 head was 7497425df8bc; iter 5+ added more — accept any later head.
-    assert any(h in out for h in ("7497425df8bc", "9acf884483b9", "c1f29b3e9d04")), out
+    assert any(h in out for h in ("7497425df8bc", "9acf884483b9", "c1f29b3e9d04", "e5a721f43b18")), out
 
 
 def test_org_cert_branding_columns_exist():

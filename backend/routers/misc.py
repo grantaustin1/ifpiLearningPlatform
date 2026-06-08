@@ -189,9 +189,19 @@ def leaderboard(db: Session = Depends(get_db),
 def my_gamification(db: Session = Depends(get_db),
                     current: CurrentUser = Depends(get_current_user)):
     user = db.query(User).filter(User.id == current.id).first()
+    # Resolve badge meta from per-org BadgeTier rows (with global fallback)
+    from models import BadgeTier
+    tiers = {t.slug: t for t in db.query(BadgeTier).filter(
+        BadgeTier.organization_id == current.organization_id,
+        BadgeTier.is_active.is_(True),
+    ).all()}
+    def _meta(slug: str) -> dict:
+        t = tiers.get(slug)
+        if t:
+            return {"label": t.label, "emoji": t.emoji or "🏅", "desc": t.description or ""}
+        return BADGE_META.get(slug, {"label": slug, "emoji": "🏅", "desc": ""})
     badges = [{
-        "badge": b.badge, "earned_at": b.earned_at,
-        "meta": BADGE_META.get(b.badge, {"label": b.badge, "emoji": "🏅", "desc": ""}),
+        "badge": b.badge, "earned_at": b.earned_at, "meta": _meta(b.badge),
     } for b in user.badges]
     rank = db.query(User).filter(
         User.organization_id == current.organization_id,

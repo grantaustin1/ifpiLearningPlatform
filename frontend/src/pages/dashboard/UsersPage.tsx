@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Shield, BookOpen, Award, UserPlus, X, Mail, Send } from 'lucide-react'
+import { Shield, BookOpen, Award, UserPlus, X, Mail, Send, Upload, Users as UsersIcon, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { timeAgo } from 'lib/utils'
 
@@ -10,6 +10,7 @@ const INVITE_ROLES = ['INSTRUCTOR', 'ADMIN', 'BILLING_VIEWER', 'LEARNER']
 export default function UsersPage() {
   const [tab, setTab] = useState<'users' | 'invitations'>('users')
   const [showInvite, setShowInvite] = useState(false)
+  const [showBulk, setShowBulk] = useState(false)
   const qc = useQueryClient()
 
   const { data: users = [], isLoading } = useQuery<any[]>({
@@ -34,16 +35,26 @@ export default function UsersPage() {
         qc.invalidateQueries({ queryKey: ['invitations'] })
         setShowInvite(false); setTab('invitations')
       }} />}
+      {showBulk && <BulkInviteModal onClose={() => setShowBulk(false)} onDone={() => {
+        qc.invalidateQueries({ queryKey: ['invitations'] })
+        setShowBulk(false); setTab('invitations')
+      }} />}
 
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 font-display">Users</h1>
           <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${users.length} members · ${pendingInvites} pending invitations`}</p>
         </div>
-        <button onClick={() => setShowInvite(true)} data-testid="invite-user-btn"
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
-          <UserPlus className="h-4 w-4" /> Invite User
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowBulk(true)} data-testid="bulk-invite-btn"
+            className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg">
+            <UsersIcon className="h-4 w-4" /> Bulk invite
+          </button>
+          <button onClick={() => setShowInvite(true)} data-testid="invite-user-btn"
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">
+            <UserPlus className="h-4 w-4" /> Invite User
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
@@ -197,6 +208,114 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <button type="submit" disabled={loading} data-testid="invite-submit"
             className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">
             {loading ? 'Sending…' : <><Send className="h-3.5 w-3.5" /> Send invitation</>}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+
+function BulkInviteModal({ onClose, onDone }: { onClose: () => void, onDone: () => void }) {
+  const [text, setText] = useState('')
+  const [role, setRole] = useState('LEARNER')
+  const [loading, setLoading] = useState(false)
+  const [results, setResults] = useState<Array<{ email: string, status: string, reason?: string | null }> | null>(null)
+
+  const parseRows = (): Array<{ email: string, name?: string }> => {
+    return text
+      .split(/[\n,]/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(line => {
+        const [email, ...rest] = line.split(/[,;\t]/).map(s => s.trim())
+        return { email, name: rest.join(' ').trim() || undefined }
+      })
+      .filter(r => r.email && r.email.includes('@'))
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const rows = parseRows()
+    if (!rows.length) return toast.error('Paste at least one valid email')
+    if (rows.length > 500) return toast.error('Max 500 rows per batch')
+    setLoading(true); setResults(null)
+    try {
+      const r = await api.post('/admin/invitations/bulk', {
+        invitations: rows.map(x => ({ email: x.email, name: x.name, role })),
+      })
+      setResults(r.data.results)
+      const ok = r.data.queued; const total = r.data.total
+      if (ok === total) {
+        toast.success(`All ${ok} invitations queued`)
+        setTimeout(onDone, 1500)
+      } else {
+        toast.warning(`${ok}/${total} queued — see results below`)
+      }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Bulk invite failed') }
+    finally { setLoading(false) }
+  }
+
+  const onFile = async (file: File) => {
+    if (file.size > 1024 * 1024) return toast.error('CSV must be ≤1MB')
+    const content = await file.text()
+    const lines = content.split(/\r?\n/).filter(Boolean)
+    const start = /email/i.test(lines[0] || '') ? 1 : 0
+    setText(lines.slice(start).join('\n'))
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <form onClick={e => e.stopPropagation()} onSubmit={submit} className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="bulk-invite-modal">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><UsersIcon className="h-4 w-4 text-indigo-600" /> Bulk invite</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Paste emails (one per line) or upload a CSV with columns: email, name. Up to 500 per batch.</p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4 text-slate-400" /></button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Recipients</label>
+            <label className="cursor-pointer text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1">
+              <Upload className="h-3 w-3" /> Upload CSV
+              <input type="file" accept=".csv,text/csv" className="hidden" data-testid="bulk-csv-input"
+                     onChange={e => e.target.files?.[0] && onFile(e.target.files[0])} />
+            </label>
+          </div>
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            data-testid="bulk-textarea" rows={8} disabled={loading}
+            placeholder={`alice@example.com\nbob@example.com, Bob Smith\n…`}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+          <div className="flex items-center gap-3 mt-3">
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Role</label>
+            <select value={role} onChange={e => setRole(e.target.value)} data-testid="bulk-role"
+                    className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
+              {INVITE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <span className="text-xs text-slate-400 ml-auto">{parseRows().length} valid emails detected</span>
+          </div>
+
+          {results && (
+            <div className="mt-5 border border-slate-200 rounded-xl divide-y max-h-64 overflow-y-auto" data-testid="bulk-results">
+              {results.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  {r.status === 'queued' ? <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" /> : <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />}
+                  <span className="font-mono text-xs flex-1 truncate">{r.email}</span>
+                  <span className={`text-xs ${r.status === 'queued' ? 'text-emerald-700' : 'text-amber-700'}`}>{r.status}</span>
+                  {r.reason && <span className="text-[11px] text-slate-500 truncate max-w-xs">{r.reason}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t flex justify-end gap-2 bg-slate-50">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 rounded-lg hover:bg-slate-100">Cancel</button>
+          <button type="submit" disabled={loading || !text.trim()} data-testid="bulk-submit"
+            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">
+            {loading ? 'Inviting…' : <><Send className="h-3.5 w-3.5" /> Queue invitations</>}
           </button>
         </div>
       </form>

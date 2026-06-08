@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.config import settings
 from core.database import SessionLocal
-from models import OutboxMessage
+from models import Organization, OutboxMessage
 
 logger = logging.getLogger("ifpi.outbox")
 
@@ -23,7 +23,35 @@ BACKOFF_SECONDS = [30, 300, 1800]
 
 
 def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]]:
-    """Returns (status, transport_message_id, error)."""
+    """Returns (status, transport_message_id, error).
+
+    Priority order:
+    1. Per-tenant SMTP — when the message's org has smtp_host configured
+       we deliver directly via that server.
+    2. ERP360 bridge — when BILLING_LIVE_MODE + ERP360_BASE_URL are set.
+    3. Stub — log only, mark STUB.
+    """
+    # 1) Per-tenant SMTP
+    if msg.organization_id:
+        with SessionLocal() as _db:
+            org = _db.query(Organization).filter(Organization.id == msg.organization_id).first()
+            if org and org.smtp_host and org.smtp_from_email:
+                try:
+                    from services.smtp_service import send_via_org_smtp
+                    send_via_org_smtp(
+                        host=org.smtp_host, port=org.smtp_port or 587,
+                        username=org.smtp_username, password_enc=org.smtp_password_enc,
+                        use_tls=org.smtp_use_tls if org.smtp_use_tls is not None else True,
+                        from_email=org.smtp_from_email, from_name=org.smtp_from_name,
+                        to_email=msg.to_email, to_name=msg.to_name,
+                        subject=msg.subject, body_html=msg.body_html or "",
+                        body_text=msg.body_text or "",
+                    )
+                    return "SENT", None, None
+                except Exception as e:
+                    logger.warning("Per-tenant SMTP failed for msg %s: %s", msg.id, e)
+                    return "FAILED", None, f"smtp: {str(e)[:900]}"
+    # 2) ERP360 bridge / 3) Stub
     if not (settings.billing_live_mode and settings.erp360_base_url):
         return "STUB", None, None
     try:
