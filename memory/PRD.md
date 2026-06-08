@@ -22,6 +22,16 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-01-08 — iteration 3)
+- ✅ **PDF cert with logo plumbing** — `Organization.logo_url` (URL or local path) now rendered on the cert. Graceful fallback to generated wordmark when URL unreachable. New `GET/PATCH /api/organization` so admins can update branding.
+- ✅ **Course prerequisites enforced** — `POST /api/courses/{id}/enroll` returns `412 Precondition Failed` with `{message, missing: [{id, title}]}` when prereqs not done. New admin endpoints: `GET /api/courses/{id}/prerequisites`, `POST/DELETE /api/courses/{id}/prerequisites/{prereq_course_id}`.
+- ✅ **Instructor invitation flow** — `POST /api/admin/invitations {email, name, role}` issues a token (14-day TTL, revokes prior pending invite for the same email), queues an HTML invitation email in the outbox. Public `GET /api/invitations/{token}` looks it up; `POST /api/invitations/{token}/accept {password, name}` creates the User + Person + UserRole and auto-logs them in. UI: new "Invite User" modal + "Invitations" tab on `/users`; new `/accept-invite/{token}` public page.
+- ✅ **Drag-reorder** — `@dnd-kit/sortable` wrapped in a reusable `SortableList` component. Used on the slides sidebar in CourseEditPage and on the items list in LearningPathEditPage. Backend endpoints: `PATCH /api/courses/{id}/slides/reorder` and `PATCH /api/learning-paths/{id}/items/reorder`.
+- ✅ **Cert emails as PDF attachments** — when a learner first completes a course, the PDF cert is generated and the email is queued via `MailService`. Try/except wraps the call so any failure doesn't block the completion.
+- ✅ **MailService** — `stub` mode (default — persists to new `outbox_messages` table only) and `erp360` mode (POSTs to `/api/notifications/send` on ERP360 with `X-Service-Token`). Flips on with `BILLING_LIVE_MODE=true` + `ERP360_BASE_URL`. New `GET /api/admin/outbox` audit endpoint + `/outbox` page in the admin UI.
+- ✅ **Smart enhancement — Lead Capture** — public `POST /api/leads` accepts `{email, name, source, phone, company, job_title, country, organization_slug}` (no auth). Creates/updates a `Person` row with `lifecycle_stage=PROSPECT` (never downgrades existing LEARNER). Also serves a self-contained JS embed widget at `GET /api/leads/embed.js?organization=<slug>` — partner sites drop one `<script>` tag and they have a working signup form that feeds straight into IFPI.
+- ✅ Tests: 53/53 backend pytest pass (15 new iter 3 + 11 iter 2 + 27 iter 1). Frontend Playwright verified all critical iter-3 flows.
+
 ## What's been implemented (2026-01-08 — iteration 2)
 - ✅ **Alembic migrations** — `/app/backend/alembic/` with baseline migration; runs identically on SQLite (dev) and Postgres (prod). `Base.metadata.create_all` retained as dev safety net only.
 - ✅ **Person model** — separate identity entity from User (matches ERP360 pattern). 1:1 with User via unique FK. Holds `lifecycle_stage` (PROSPECT/LEARNER/ALUMNI), `erp360_person_id` for future SSO mapping, contact details (phone/job_title/company/country), `source` (self_register / sso_erp360 / seed). Auto-created on registration and SSO JIT-provision. Seed updated to create Person rows for the seeded admin + learner.
@@ -53,14 +63,14 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P1** — Cert PDF: add IFPI logo to the template (currently uses a wordmark — replace with actual SVG/PNG when supplied).
-- **P1** — Course prerequisites enforcement: schema exists (`course_prerequisites` table) but the LearnPage doesn't yet block entry if prereqs incomplete. Add a check in `POST /api/courses/{id}/enroll`.
+- **P1** — Server-side pagination on `/outbox` (currently shows all; will be slow with many emails).
+- **P1** — UI to manage course prerequisites from the Course Edit page (today only via API).
 - **P2** — Discussion / comments on slides.
-- **P2** — Instructor invitation flow (today admin upgrade is DB-only).
 - **P2** — Course duplication / templates.
-- **P3** — Frontend: drag-reorder slides + path items in the editors.
-- **P3** — Cert PDF template variants (badge/CPD/exam-pass) and per-academy branding.
-- **P3** — Background job to email new certificates as PDF attachments (would reuse ERP360 mail transport once wired).
+- **P2** — Personalised certificate templates per academy (logo + signature + footer text).
+- **P3** — Drag-reorder for badges + course catalog ordering.
+- **P3** — Background worker for the outbox (today emails dispatch synchronously inside the request).
+- **P3** — Webhook signing for outgoing /leads → ERP360 mirroring once SSO is on.
 
 ## Files of interest
 - `/app/backend/server.py` — entry, router registration.

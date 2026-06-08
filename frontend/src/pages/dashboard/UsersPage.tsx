@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Shield, BookOpen, Award, UserPlus, X, Mail, MoreHorizontal, Trash2, Send } from 'lucide-react'
+import { Shield, BookOpen, Award, UserPlus, X, Mail, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { timeAgo } from 'lib/utils'
 
