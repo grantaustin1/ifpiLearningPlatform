@@ -22,6 +22,14 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-01-08 — iteration 4)
+- ✅ **Async outbox worker** — `services/outbox_worker.py` using APScheduler runs every 5s on app startup, drains QUEUED rows. MailService now ALWAYS just queues (no inline dispatch), decoupling request latency from upstream mail provider. In stub mode the worker stamps QUEUED→STUB. In live mode it POSTs to ERP360 `/api/notifications/send`.
+- ✅ **Outbox pagination + filters** — `GET /api/admin/outbox?page=&page_size=&status=&template=&q=` returns `{messages, page, page_size, total, total_pages}`. New `/stats` endpoint for the counter cards. Frontend Outbox page rewritten with search, status filter, Prev/Next pager.
+- ✅ **Course duplication** — `POST /api/courses/{id}/duplicate` deep-clones the course (title + " (copy)") with all slides as a new DRAFT. Copy button on every admin course card. Lets instructors keep a master "template" course and clone it per cohort.
+- ✅ **Personalised cert templates per academy** — `Organization` gained `cert_accent_color`, `cert_signature_text`, `cert_signature_image_url`, `cert_footer_text` columns. PDF renderer now uses all of them with graceful fallbacks (malformed colour → default indigo; signature image fetch failure → text signature). New `/settings` admin page with colour pickers, logo URL preview, signature/footer text fields.
+- ✅ **Prerequisites UI** — right-sidebar panel on `/courses/:id/edit` lists current prereqs (Lock icon) with a modal picker to add more (excludes self + already-added). Wires to existing `POST/DELETE /api/courses/{id}/prerequisites/{prereq_course_id}` endpoints.
+- ✅ Tests: 69/69 backend pytest pass (16 new iter 4 + 15 iter 3 + 11 iter 2 + 27 iter 1). Frontend Playwright verified all critical flows.
+
 ## What's been implemented (2026-01-08 — iteration 3)
 - ✅ **PDF cert with logo plumbing** — `Organization.logo_url` (URL or local path) now rendered on the cert. Graceful fallback to generated wordmark when URL unreachable. New `GET/PATCH /api/organization` so admins can update branding.
 - ✅ **Course prerequisites enforced** — `POST /api/courses/{id}/enroll` returns `412 Precondition Failed` with `{message, missing: [{id, title}]}` when prereqs not done. New admin endpoints: `GET /api/courses/{id}/prerequisites`, `POST/DELETE /api/courses/{id}/prerequisites/{prereq_course_id}`.
@@ -63,14 +71,13 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P1** — Server-side pagination on `/outbox` (currently shows all; will be slow with many emails).
-- **P1** — UI to manage course prerequisites from the Course Edit page (today only via API).
 - **P2** — Discussion / comments on slides.
-- **P2** — Course duplication / templates.
-- **P2** — Personalised certificate templates per academy (logo + signature + footer text).
-- **P3** — Drag-reorder for badges + course catalog ordering.
-- **P3** — Background worker for the outbox (today emails dispatch synchronously inside the request).
-- **P3** — Webhook signing for outgoing /leads → ERP360 mirroring once SSO is on.
+- **P2** — Multi-tenant invitation flow (today a SUPER_ADMIN can't easily invite an ADMIN into a *new* academy from the UI).
+- **P2** — Cert template live preview on the Settings page (render a thumbnail without committing).
+- **P3** — Drag-reorder for badge tiers + course catalog ordering.
+- **P3** — Outbox retry policy + dead-letter handling (today FAILED stays FAILED; need exponential backoff in the worker).
+- **P3** — Webhook signing for outgoing /leads → ERP360 once SSO is on.
+- **P3** — File upload for logo + signature image (today URL-only).
 
 ## Files of interest
 - `/app/backend/server.py` — entry, router registration.
