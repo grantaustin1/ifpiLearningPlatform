@@ -22,6 +22,13 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 7)
+- ✅ **Configurable badge tiers** — new `badge_tiers` table (migration `e5a721f43b18`) with per-org rows. Default 5 tiers (First Step / Graduate / Scholar / Perfectionist / Course Master) auto-seeded for every org including any new academy created via `POST /api/academies`. Admin `/badge-tiers` page with drag-reorder + inline edit modal + delete + toggle-active. `GamificationService` consults DB rows first, falls back to hard-coded map only when an org has no rows (failsafe). `GET /api/gamification/me` now returns per-org tier meta.
+- ✅ **Live preset preview** — each preset card on `/settings` now has separate **Preview** and **Apply** buttons. Preview pipes the preset's colors directly to `POST /api/admin/cert-preview` and renders the iframe — zero DB writes. Apply persists.
+- ✅ **Per-tenant SMTP overrides** — new columns on `organizations`: `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password_enc` (Fernet-encrypted), `smtp_from_email`, `smtp_from_name`, `smtp_use_tls`. New `services/smtp_service.py` handles encryption + send. Outbox worker now tries per-tenant SMTP FIRST (when configured), then ERP360 bridge, then STUB. New `/settings → Email delivery (per-tenant SMTP)` section with all fields + masked password input + **Send test** button. Endpoints: `GET/PUT /api/organization/smtp` + `POST /api/organization/smtp/test`. **Security**: in production `SMTP_ENCRYPTION_KEY` (32-byte url-safe base64) is REQUIRED. For dev/local, set `SMTP_ALLOW_PLAINTEXT=1` to opt in to plaintext storage with a warning log line — otherwise PUT raises 500.
+- ✅ **Bulk learner invites** — `POST /api/admin/invitations/bulk` (cap 500/batch). Per-row response with `{email, status, reason}` so the admin sees exactly what got through. New "Bulk invite" button on `/users → Invitations` opens a modal with textarea (one email per line, optional `, Name` suffix) or CSV upload. Live counter, per-row result feedback, automatic tab-switch to Invitations on success.
+- ✅ Tests: iter7 backend suite **13/13 PASS**, iter6 regression **11/11 PASS**, full pytest **99/100** (single pre-existing exam-state pollution unrelated to this batch). Frontend Playwright 100%.
+
 ## What's been implemented (2026-02-08 — iteration 6)
 - ✅ **Course catalog drag-reorder** — `courses.display_order` column (migration `c1f29b3e9d04`) + `PATCH /api/courses/reorder` endpoint. Admin Courses page has a "Reorder" toggle that switches the grid into a vertical SortableList with drag handles. Order is honored on both `/courses` and the public `/portal/:slug` endpoint.
 - ✅ **Academies search/filter/sort** — `GET /api/academies` now accepts `q`, `status_filter`, and `sort` (newest/oldest/name/users/courses). New search input + status dropdown + sort dropdown + Clear link on the Academies page. Cards now show a theme_preset pill when one is applied + use the academy's primary_color in the icon background.
@@ -98,14 +105,13 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction already in place — `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds and you're done. Pure config.
-- **P3** — Drag-reorder for badge tiers. *(Deferred — badges are hard-coded identifiers in `gamification_service.BADGE_META`, no DB rows to reorder. Reorderable only after badges become organization-configurable, which is its own feature.)*
-- **P3** — Live "preview my preset" before applying (currently apply is the only way to see the cert in the preset's accent).
-- **P3** — Per-tenant SMTP overrides (today email is global stub or routed to ERP360).
+- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction already in place — `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds. Pure config.
+- **P3** — Cohort enrollments — assign a tag/cohort to invited learners + filter on it.
+- **P3** — Per-tenant audit log of admin actions (who applied which theme, who reordered badges, who triggered bulk invite).
 
 ## Deliberately deferred (not forgotten)
-- ERP360 SSO bridge (`POST /api/sso/mint` on ERP360 + flip `SSO_ENABLED=true` here). IFPI is fully functional without it — every ERP360 integration seam (SSO, live billing, mail dispatch) is feature-flagged off by default. Activating any of them is a single env-var change.
-- ERP360 webhook receiver — IFPI emits HMAC-signed webhooks today; ERP360 just needs to add the receiver route. Paste-ready code at `/app/docs/ERP360_INTEGRATION.md`.
+- ERP360 SSO bridge (`POST /api/sso/mint` on ERP360 + flip `SSO_ENABLED=true` here). IFPI works standalone — every ERP360 seam is feature-flagged off by default.
+- ERP360 webhook receiver — code provided in `/app/docs/ERP360_INTEGRATION.md`.
 
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.
