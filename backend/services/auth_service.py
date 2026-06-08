@@ -15,7 +15,7 @@ from core.security import (
     create_access_token, create_refresh_token, decode_token,
     get_password_hash, password_needs_rehash, verify_password,
 )
-from models import Organization, RefreshToken, User, UserRole
+from models import LifecycleStage, Organization, Person, RefreshToken, User, UserRole
 
 
 MAX_FAILED_ATTEMPTS = 5
@@ -51,6 +51,12 @@ class AuthService:
         self.db.flush()
         # CRITICAL: self-registration is LEARNER only. Admins are invite-only.
         self.db.add(UserRole(user_id=user.id, role="LEARNER"))
+        # Auto-create Person identity row (mirrors ERP360 pattern)
+        self.db.add(Person(
+            user_id=user.id, organization_id=organization_id,
+            email=email, name=name, lifecycle_stage=LifecycleStage.LEARNER,
+            source="self_register",
+        ))
         self.db.commit()
         self.db.refresh(user)
         return user

@@ -2,27 +2,29 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from 'contexts/AuthContext'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
 const ADMIN_NAV = [
-  { href: '/dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/courses',     label: 'Courses',      icon: BookOpen },
-  { href: '/exams',       label: 'Exams',        icon: ClipboardList },
-  { href: '/certificates',label: 'Certificates', icon: Award },
-  { href: '/leaderboard', label: 'Leaderboard',  icon: Trophy },
-  { href: '/reports',     label: 'Reports',      icon: BarChart3 },
-  { href: '/users',       label: 'Users',        icon: Users },
-  { href: '/billing',     label: 'Billing',      icon: CreditCard },
-  { href: '/catalog',     label: 'Public Catalog', icon: Globe },
+  { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/courses',       label: 'Courses',      icon: BookOpen },
+  { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
+  { href: '/exams',         label: 'Exams',        icon: ClipboardList },
+  { href: '/certificates',  label: 'Certificates', icon: Award },
+  { href: '/leaderboard',   label: 'Leaderboard',  icon: Trophy },
+  { href: '/reports',       label: 'Reports',      icon: BarChart3 },
+  { href: '/users',         label: 'Users',        icon: Users },
+  { href: '/billing',       label: 'Billing',      icon: CreditCard },
+  { href: '/catalog',       label: 'Public Catalog', icon: Globe },
 ]
 
 const LEARNER_NAV = [
-  { href: '/courses',     label: 'My Courses',     icon: BookOpen },
-  { href: '/certificates',label: 'My Certificates',icon: Award },
-  { href: '/leaderboard', label: 'Leaderboard',    icon: Trophy },
-  { href: '/billing',     label: 'Subscriptions',  icon: CreditCard },
+  { href: '/courses',       label: 'My Courses',     icon: BookOpen },
+  { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
+  { href: '/certificates',  label: 'My Certificates',icon: Award },
+  { href: '/leaderboard',   label: 'Leaderboard',    icon: Trophy },
+  { href: '/billing',       label: 'Subscriptions',  icon: CreditCard },
 ]
 
 export default function DashboardLayout() {

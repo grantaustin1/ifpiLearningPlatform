@@ -11,6 +11,7 @@ from core.database import Base, engine
 from routers import auth as auth_router
 from routers import courses as courses_router
 from routers import exams as exams_router
+from routers import learning_paths as paths_router
 from routers import misc as misc_router
 
 logging.basicConfig(
@@ -19,10 +20,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ifpi")
 
-# Create tables (Alembic-equivalent for dev SQLite).
-# In production with Postgres, run `alembic upgrade head` instead.
-import models  # noqa: F401  — ensures all models are imported before metadata creation
-Base.metadata.create_all(bind=engine)
+# Schema is managed by Alembic (`alembic upgrade head`).
+# In dev we also auto-create any tables that don't exist yet (e.g. before
+# you've run migrations on a fresh checkout). In production this is a no-op
+# because Alembic has already created everything.
+import models  # noqa: F401  — ensures all models register on metadata
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(
     title="IFPI Learning Platform API",
@@ -43,6 +46,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(courses_router.router)
 app.include_router(exams_router.router)
+app.include_router(paths_router.router)
 app.include_router(misc_router.ai_router)
 app.include_router(misc_router.enroll_router)
 app.include_router(misc_router.cert_router)

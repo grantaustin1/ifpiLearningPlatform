@@ -132,6 +132,36 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     return {"ok": True}
 
 
+@router.post("/{course_id}/publish")
+def publish_course(course_id: int, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Explicit publish action with validation. Course must have at least
+    one slide before it can be published."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if len(c.slides) == 0:
+        raise HTTPException(status_code=400, detail="Add at least one slide before publishing")
+    c.status = CourseStatus.PUBLISHED
+    db.commit()
+    return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
+
+
+@router.post("/{course_id}/unpublish")
+def unpublish_course(course_id: int, db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    c.status = CourseStatus.DRAFT
+    db.commit()
+    return {"ok": True, "status": c.status.value}
+
+
 # ── Slides ─────────────────────────────────────────────────────────
 @router.post("/{course_id}/slides", response_model=SlideOut)
 def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),

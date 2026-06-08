@@ -68,6 +68,19 @@ class SubscriptionStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class LifecycleStage(str, enum.Enum):
+    """Mirrors ERP360's Person lifecycle terminology. PROSPECT → LEARNER → ALUMNI."""
+    PROSPECT = "PROSPECT"
+    LEARNER = "LEARNER"
+    ALUMNI = "ALUMNI"
+
+
+class LearningPathStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    ARCHIVED = "ARCHIVED"
+
+
 # ── Organization (academy / tenant) ───────────────────────────────────
 class Organization(Base):
     __tablename__ = "organizations"
@@ -102,6 +115,8 @@ class User(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organization = relationship("Organization", back_populates="users")
+    person = relationship("Person", back_populates="user", uselist=False,
+                          cascade="all,delete-orphan")
     user_roles = relationship("UserRole", back_populates="user", cascade="all,delete-orphan")
     enrollments = relationship("Enrollment", back_populates="user", cascade="all,delete-orphan")
     exam_attempts = relationship("ExamAttempt", back_populates="user", cascade="all,delete-orphan")
@@ -323,3 +338,101 @@ class BillingEvent(Base):
     external_id = Column(String(100), nullable=True)
     payload = Column(JSON)
     processed_at = Column(DateTime, default=_utcnow)
+
+
+# ── Person (mirrors ERP360 identity model — separate from User auth) ──
+class Person(Base):
+    """A person's identity & lifecycle (LEAD → LEARNER → ALUMNI).
+
+    ERP360 has a `Person` table as the central identity entity, distinct from
+    the auth-bearing `User`. IFPI mirrors that here — when SSO is enabled,
+    `erp360_person_id` links one IFPI Person → one ERP360 Person.
+
+    Cardinality: User 1—1 Person (auto-created with User; can also exist
+    without a User in future for invited learners who haven't registered).
+    """
+    __tablename__ = "persons"
+    __table_args__ = (
+        Index("ix_persons_org_email", "organization_id", "email"),
+        Index("ix_persons_erp", "erp360_person_id"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    email = Column(String(200), nullable=False)
+    name = Column(String(200))
+    phone = Column(String(50))
+    job_title = Column(String(150))
+    company = Column(String(200))
+    country = Column(String(80))
+    lifecycle_stage = Column(SQLEnum(LifecycleStage), default=LifecycleStage.PROSPECT, index=True)
+    source = Column(String(50))            # e.g. "self_register", "sso_erp360", "import"
+    erp360_person_id = Column(Integer, nullable=True, index=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    user = relationship("User", back_populates="person")
+
+
+# ── Learning paths (ordered courses with prerequisites) ──────────────
+class LearningPath(Base):
+    __tablename__ = "learning_paths"
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    slug = Column(String(120), index=True)
+    description = Column(Text)
+    cover_color = Column(String(32), default="bg-violet-500")
+    status = Column(SQLEnum(LearningPathStatus), default=LearningPathStatus.DRAFT, index=True)
+    estimated_hours = Column(Integer)
+    price_cents = Column(Integer, default=0)
+    currency = Column(String(3), default="ZAR")
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    items = relationship("LearningPathItem", back_populates="path",
+                         cascade="all,delete-orphan", order_by="LearningPathItem.order_index")
+    enrollments = relationship("LearningPathEnrollment", back_populates="path",
+                               cascade="all,delete-orphan")
+
+
+class LearningPathItem(Base):
+    """Ordered course in a learning path. `is_required=False` = optional bonus."""
+    __tablename__ = "learning_path_items"
+    __table_args__ = (UniqueConstraint("path_id", "course_id", name="uq_path_course"),)
+    id = Column(Integer, primary_key=True)
+    path_id = Column(Integer, ForeignKey("learning_paths.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    order_index = Column(Integer, default=0)
+    is_required = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+    path = relationship("LearningPath", back_populates="items")
+    course = relationship("Course")
+
+
+class CoursePrerequisite(Base):
+    """A course can require another course be completed first. Many-to-many."""
+    __tablename__ = "course_prerequisites"
+    __table_args__ = (UniqueConstraint("course_id", "prerequisite_course_id",
+                                       name="uq_course_prereq"),)
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    prerequisite_course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class LearningPathEnrollment(Base):
+    __tablename__ = "learning_path_enrollments"
+    __table_args__ = (UniqueConstraint("user_id", "path_id", name="uq_path_enroll"),)
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    path_id = Column(Integer, ForeignKey("learning_paths.id"), nullable=False, index=True)
+    status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.IN_PROGRESS)
+    progress = Column(Float, default=0.0)
+    enrolled_at = Column(DateTime, default=_utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    path = relationship("LearningPath", back_populates="enrollments")
+

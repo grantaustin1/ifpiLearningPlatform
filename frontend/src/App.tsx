@@ -14,6 +14,8 @@ import UsersPage from 'pages/dashboard/UsersPage'
 import ReportsPage from 'pages/dashboard/ReportsPage'
 import LeaderboardPage from 'pages/dashboard/LeaderboardPage'
 import BillingPage from 'pages/dashboard/BillingPage'
+import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
+import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
 import TakeExamPage from 'pages/take/TakeExamPage'
 import CatalogPage from 'pages/catalog/CatalogPage'
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="/courses" element={<CoursesPage />} />
         <Route path="/courses/:id/edit" element={<Protected adminOnly><CourseEditPage /></Protected>} />
         <Route path="/exams" element={<ExamsPage />} />
+        <Route path="/learning-paths" element={<LearningPathsPage />} />
+        <Route path="/learning-paths/:id/edit" element={<Protected adminOnly><LearningPathEditPage /></Protected>} />
         <Route path="/certificates" element={<CertificatesPage />} />
         <Route path="/users" element={<Protected adminOnly><UsersPage /></Protected>} />
         <Route path="/reports" element={<Protected adminOnly><ReportsPage /></Protected>} />

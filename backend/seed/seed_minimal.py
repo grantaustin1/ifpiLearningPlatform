@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from core.database import SessionLocal
 from core.security import get_password_hash
 from models import (
-    Course, CourseSlide, CourseStatus, Exam, ExamQuestion, Organization,
-    QuestionType, SlideType, User, UserRole,
+    Course, CourseSlide, CourseStatus, Exam, ExamQuestion, LifecycleStage,
+    Organization, Person, QuestionType, SlideType, User, UserRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,9 @@ def seed(db: Session) -> None:
         db.add(admin)
         db.flush()
         db.add(UserRole(user_id=admin.id, role="ADMIN"))
+        db.add(Person(user_id=admin.id, organization_id=org.id,
+                      email=admin.email, name=admin.name,
+                      lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
         logger.info("Seeded admin: %s / admin123", admin.email)
 
     # 3. Learner user
@@ -53,6 +56,9 @@ def seed(db: Session) -> None:
         db.add(learner)
         db.flush()
         db.add(UserRole(user_id=learner.id, role="LEARNER"))
+        db.add(Person(user_id=learner.id, organization_id=org.id,
+                      email=learner.email, name=learner.name,
+                      lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
         logger.info("Seeded learner: %s / learner123", learner.email)
 
     # 4. Sample course
