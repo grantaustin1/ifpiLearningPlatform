@@ -97,8 +97,10 @@ async def upload_image(
     safe_name = f"{uuid.uuid4().hex}{_SAFE_NAME.sub('_', suffix)}"
     dest = UPLOAD_DIR / safe_name
     dest.write_bytes(data)
-    base = str(request.base_url).rstrip("/") if request else ""
-    url = f"{base}/api/uploads/files/{safe_name}"
+    # Return a path-only URL so the frontend resolves it against its own
+    # origin (which proxies /api/* to this backend via the k8s ingress).
+    # `request.base_url` yields the cluster-internal host under ingress.
+    url = f"/api/uploads/files/{safe_name}"
     return {"url": url, "filename": safe_name, "size": len(data)}
 
 

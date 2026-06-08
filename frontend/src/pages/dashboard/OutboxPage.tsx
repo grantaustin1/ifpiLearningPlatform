@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Mail, CheckCircle, AlertCircle, Clock, FileText, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Mail, CheckCircle, AlertCircle, Clock, FileText, ChevronLeft, ChevronRight, Search, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 import { timeAgo } from 'lib/utils'
 
 const PAGE_SIZE = 25
@@ -10,6 +11,7 @@ export default function OutboxPage() {
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
+  const qc = useQueryClient()
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ['outbox', page, statusFilter, search],
@@ -85,6 +87,7 @@ export default function OutboxPage() {
               <th className="text-left px-6 py-3 font-medium text-slate-500">Attachments</th>
               <th className="text-left px-6 py-3 font-medium text-slate-500">Status</th>
               <th className="text-left px-6 py-3 font-medium text-slate-500">Created</th>
+              <th className="text-right px-6 py-3 font-medium text-slate-500"></th>
             </tr></thead>
             <tbody className="divide-y">
               {messages.map((m: any) => (
@@ -105,6 +108,23 @@ export default function OutboxPage() {
                     }`}>{m.status}</span>
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500">{timeAgo(m.created_at)}</td>
+                  <td className="px-6 py-4 text-right">
+                    {(m.status === 'FAILED' || m.status === 'DEAD_LETTER') && (
+                      <button
+                        data-testid={`outbox-retry-${m.id}`}
+                        onClick={async () => {
+                          try {
+                            await api.post(`/admin/outbox/${m.id}/retry`)
+                            toast.success('Queued for retry')
+                            qc.invalidateQueries({ queryKey: ['outbox'] })
+                            qc.invalidateQueries({ queryKey: ['outbox-stats'] })
+                          } catch (e: any) { toast.error(e?.response?.data?.detail || 'Retry failed') }
+                        }}
+                        className="inline-flex items-center gap-1 border border-slate-200 hover:bg-slate-50 text-xs rounded-md px-2 py-1 text-slate-600">
+                        <RefreshCw className="h-3 w-3" /> Retry
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
