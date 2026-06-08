@@ -240,6 +240,25 @@ def outbox_stats(db: Session = Depends(get_db),
     return {status: count for status, count in rows}
 
 
+@outbox_router.post("/{message_id}/retry")
+def retry_outbox(message_id: int, db: Session = Depends(get_db),
+                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker
+    picks it up on its next tick. Scoped to the caller's organization."""
+    m = db.query(OutboxMessage).filter(
+        OutboxMessage.id == message_id,
+        OutboxMessage.organization_id == current.organization_id,
+    ).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Message not found")
+    m.status = "QUEUED"
+    m.attempt_count = 0
+    m.next_attempt_at = None
+    m.error = None
+    db.commit()
+    return {"ok": True, "id": m.id, "status": m.status}
+
+
 # ── Learning path item reorder ────────────────────────────────────────
 paths_extra_router = APIRouter(prefix="/api/learning-paths", tags=["Learning Paths"])
 

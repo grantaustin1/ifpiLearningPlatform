@@ -22,6 +22,19 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 5)
+- ✅ **Cert template live preview** — `POST /api/admin/cert-preview` renders an in-memory sample PDF using submitted branding (no DB writes); `/settings` page now has a Live preview button + sticky iframe panel showing the result.
+- ✅ **SUPER_ADMIN multi-tenant invite flow** — `GET/POST /api/academies` (SUPER_ADMIN-only). Creating an academy issues a 14-day admin invitation queued in the new tenant's outbox. New `/academies` page with create-modal + per-academy stats card and public-portal deep link.
+- ✅ **Slide comments** — `GET/POST/DELETE /api/slides/{slide_id}/comments` with soft-delete and 200-row cap. `CommentsPanel.tsx` mounted in `LearnPage.tsx`: post, reply, see, delete own (admins/instructors can delete any).
+- ✅ **Outbox retries + dead-letter** — APScheduler worker (`services/outbox_worker.py`) ticks every 5s, exponential backoff (30s → 5m → 30m), 3-attempt cap → `DEAD_LETTER`. Admin endpoint `POST /api/admin/outbox/{id}/retry` resets a row to `QUEUED`. New per-row Retry button surfaces on FAILED / DEAD_LETTER rows on the Outbox page.
+- ✅ **File upload (logos + signature images)** — `POST /api/uploads/image` (5MB cap, mime-allowlist) writes to `/app/backend/uploads/`. Returns a relative `/api/uploads/files/<uuid>.png` URL so it resolves through the public ingress (fixed cluster-host bug). `GET /api/uploads/files/{name}` serves with cache headers. Settings page wires both Logo + Signature upload buttons.
+- ✅ **Public academy portal** — `GET /api/portal/{slug}` (no auth) returns org branding + stats + published courses. Frontend route `/a/:slug` renders the public landing.
+- ✅ **Outgoing webhook HMAC signing** — `sign_outgoing_payload()` produces `X-Signature` (HMAC-SHA256 of body+timestamp) + `X-Timestamp` headers. Used automatically by the outbox worker when dispatching to ERP360 in live mode.
+- ✅ Tests: Iteration 5 backend test suite added at `/app/backend/tests/test_iteration5.py` (20 tests, all green after the two fixes). Frontend Playwright verified all critical flows.
+- 🐛 Fixes after iter5 testing agent:
+  - `POST /api/uploads/image` now returns relative path (previously returned cluster-internal hostname unreachable from the browser).
+  - Added missing `POST /api/admin/outbox/{id}/retry`.
+
 ## What's been implemented (2026-01-08 — iteration 4)
 - ✅ **Async outbox worker** — `services/outbox_worker.py` using APScheduler runs every 5s on app startup, drains QUEUED rows. MailService now ALWAYS just queues (no inline dispatch), decoupling request latency from upstream mail provider. In stub mode the worker stamps QUEUED→STUB. In live mode it POSTs to ERP360 `/api/notifications/send`.
 - ✅ **Outbox pagination + filters** — `GET /api/admin/outbox?page=&page_size=&status=&template=&q=` returns `{messages, page, page_size, total, total_pages}`. New `/stats` endpoint for the counter cards. Frontend Outbox page rewritten with search, status filter, Prev/Next pager.
@@ -71,13 +84,21 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P2** — Discussion / comments on slides.
-- **P2** — Multi-tenant invitation flow (today a SUPER_ADMIN can't easily invite an ADMIN into a *new* academy from the UI).
-- **P2** — Cert template live preview on the Settings page (render a thumbnail without committing).
+- **P2** — Wire real cloud storage (S3 / Cloudinary) for `/api/uploads/image` once a bucket is available. Today logos/signatures land on the local container disk under `/app/backend/uploads/` — fine for MVP but resets on redeploy.
+- **P2** — Auto-debounced live cert preview on `/settings` (currently behind a button click).
+- **P3** — SSO: implement ERP360 `/api/sso/mint` once the parent app is ready; flip `SSO_ENABLED=true` here.
+- **P3** — Outgoing /leads → ERP360 webhook receiver in ERP360 to verify the HMAC headers we now emit.
+- **P3** — Replace `request.base_url`-derived URLs in cert verify links with a `PUBLIC_BASE_URL` env (currently fine because emails are stub-only; matters once live mail is on).
 - **P3** — Drag-reorder for badge tiers + course catalog ordering.
-- **P3** — Outbox retry policy + dead-letter handling (today FAILED stays FAILED; need exponential backoff in the worker).
-- **P3** — Webhook signing for outgoing /leads → ERP360 once SSO is on.
-- **P3** — File upload for logo + signature image (today URL-only).
+- **P3** — Sort/filter/search on the Academies page once there are many tenants.
+
+## Iteration 5 completed items (was backlog)
+- ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.
+- ✅ Multi-tenant invitation flow (SUPER_ADMIN) → `/academies` page + `POST /api/academies`.
+- ✅ Cert template live preview on Settings → `POST /api/admin/cert-preview`.
+- ✅ Outbox retry policy + dead-letter handling → backoff in worker + `POST /admin/outbox/{id}/retry`.
+- ✅ Webhook signing for outgoing calls → `sign_outgoing_payload()` HMAC headers.
+- ✅ File upload for logo + signature image → `POST /api/uploads/image`.
 
 ## Files of interest
 - `/app/backend/server.py` — entry, router registration.
