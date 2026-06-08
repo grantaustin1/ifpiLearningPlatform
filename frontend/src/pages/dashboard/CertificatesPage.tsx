@@ -1,12 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, API_BASE, getAccessToken } from 'lib/api'
-import { Award, Download } from 'lucide-react'
+import { Award, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function CertificatesPage() {
   const { data: certs = [], isLoading } = useQuery<any[]>({
     queryKey: ['certificates'], queryFn: async () => (await api.get('/certificates')).data,
   })
+
+  const downloadTranscript = async () => {
+    try {
+      const r = await api.get('/certificates/transcript', { responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'IFPI-Transcript.pdf'
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Transcript downloaded')
+    } catch (e: any) {
+      toast.error('Could not download transcript')
+    }
+  }
 
   const downloadPdf = async (cert: any) => {
     try {
@@ -24,8 +39,16 @@ export default function CertificatesPage() {
 
   return (
     <div className="p-8" data-testid="certificates-page">
-      <h1 className="text-2xl font-bold text-slate-900 font-display">Certificates</h1>
-      <p className="text-slate-500 mt-1 mb-8">{isLoading ? 'Loading…' : `${certs.length} certificates`}</p>
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 font-display">Certificates</h1>
+          <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${certs.length} certificates`}</p>
+        </div>
+        <button onClick={downloadTranscript} data-testid="download-transcript-btn"
+          className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg">
+          <FileText className="h-4 w-4" /> Download transcript
+        </button>
+      </div>
       {certs.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <Award className="h-12 w-12 text-slate-300 mx-auto mb-4" />

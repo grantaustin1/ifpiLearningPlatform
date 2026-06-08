@@ -219,6 +219,7 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 function BulkInviteModal({ onClose, onDone }: { onClose: () => void, onDone: () => void }) {
   const [text, setText] = useState('')
   const [role, setRole] = useState('LEARNER')
+  const [cohort, setCohort] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<Array<{ email: string, status: string, reason?: string | null }> | null>(null)
 
@@ -243,6 +244,7 @@ function BulkInviteModal({ onClose, onDone }: { onClose: () => void, onDone: () 
     try {
       const r = await api.post('/admin/invitations/bulk', {
         invitations: rows.map(x => ({ email: x.email, name: x.name, role })),
+        cohort: cohort.trim() || undefined,
       })
       setResults(r.data.results)
       const ok = r.data.queued; const total = r.data.total
@@ -288,12 +290,16 @@ function BulkInviteModal({ onClose, onDone }: { onClose: () => void, onDone: () 
             data-testid="bulk-textarea" rows={8} disabled={loading}
             placeholder={`alice@example.com\nbob@example.com, Bob Smith\n…`}
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
             <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Role</label>
             <select value={role} onChange={e => setRole(e.target.value)} data-testid="bulk-role"
                     className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
               {INVITE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Cohort</label>
+            <input value={cohort} onChange={e => setCohort(e.target.value)} data-testid="bulk-cohort"
+              placeholder="Q1-2026 Producer Bootcamp" maxLength={100}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white w-56" />
             <span className="text-xs text-slate-400 ml-auto">{parseRows().length} valid emails detected</span>
           </div>
 

@@ -282,6 +282,10 @@ def create_academy(body: AcademyCreate, request: Request, db: Session = Depends(
         email=body.admin_email, name=body.admin_name, role="ADMIN",
         app_base_url=base_url,
     )
+    from services import audit_service
+    audit_service.record(db, current, "ACADEMY_CREATED",
+        target_type="organization", target_id=str(org.id),
+        metadata={"name": org.name, "slug": org.slug, "admin_email": body.admin_email})
     db.commit()
     return {"ok": True, "academy_id": org.id, "slug": org.slug,
             "admin_invited": body.admin_email}

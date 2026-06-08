@@ -126,6 +126,7 @@ class User(Base):
     failed_login_attempts = Column(Integer, default=0)
     last_login_at = Column(DateTime)
     points = Column(Integer, default=0)             # gamification XP
+    cohort = Column(String(100), index=True)         # nullable — populated when invited via a cohort batch
     erp360_user_id = Column(Integer, nullable=True, index=True)  # link for SSO
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -492,6 +493,7 @@ class Invitation(Base):
     email = Column(String(200), nullable=False)
     name = Column(String(200))
     role = Column(String(50), nullable=False)
+    cohort = Column(String(100), index=True)         # nullable — propagated to the User on accept
     token = Column(String(64), unique=True, nullable=False, index=True)
     invited_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     expires_at = Column(DateTime, nullable=False)
@@ -538,3 +540,27 @@ class SlideComment(Base):
     parent_id = Column(Integer, ForeignKey("slide_comments.id"), nullable=True, index=True)
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
+
+
+# ── Audit log: append-only record of admin mutations ──
+class AuditLog(Base):
+    """Append-only log of admin actions for compliance + forensic review.
+
+    Captures: who (actor_user_id), did what (action), to what (target_type +
+    target_id), with what payload (metadata JSON), and when. Never UPDATEd
+    or DELETEd in normal operation. Scoped to organisation_id for tenant
+    isolation."""
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_org_created", "organization_id", "created_at"),
+        Index("ix_audit_actor_created", "actor_user_id", "created_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(80), nullable=False, index=True)
+    target_type = Column(String(60))
+    target_id = Column(String(80))
+    audit_metadata = Column(JSON)
+    ip_address = Column(String(45))
+    created_at = Column(DateTime, default=_utcnow, index=True)

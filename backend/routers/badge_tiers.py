@@ -68,6 +68,11 @@ def create_tier(body: BadgeTierIn, db: Session = Depends(get_db),
         order_index=next_order,
     )
     db.add(t); db.commit(); db.refresh(t)
+    from services import audit_service
+    audit_service.record(db, current, "BADGE_TIER_CREATED",
+        target_type="badge_tier", target_id=str(t.id),
+        metadata={"slug": t.slug, "label": t.label})
+    db.commit()
     return _to_dict(t)
 
 
@@ -83,6 +88,10 @@ def reorder_tiers(body: dict, db: Session = Depends(get_db),
     for idx, tid in enumerate(ids):
         if tid in by_id:
             by_id[tid].order_index = idx
+    from services import audit_service
+    audit_service.record(db, current, "BADGE_TIERS_REORDERED",
+        target_type="organization", target_id=str(current.organization_id),
+        metadata={"order": ids})
     db.commit()
     return {"ok": True, "updated": len(rows)}
 
@@ -98,6 +107,10 @@ def update_tier(tier_id: int, body: BadgeTierUpdate, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Tier not found")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(t, k, v)
+    from services import audit_service
+    audit_service.record(db, current, "BADGE_TIER_UPDATED",
+        target_type="badge_tier", target_id=str(t.id),
+        metadata=body.model_dump(exclude_unset=True))
     db.commit(); db.refresh(t)
     return _to_dict(t)
 
@@ -111,5 +124,10 @@ def delete_tier(tier_id: int, db: Session = Depends(get_db),
     ).first()
     if not t:
         raise HTTPException(status_code=404, detail="Tier not found")
-    db.delete(t); db.commit()
+    snapshot = {"slug": t.slug, "label": t.label}
+    db.delete(t)
+    from services import audit_service
+    audit_service.record(db, current, "BADGE_TIER_DELETED",
+        target_type="badge_tier", target_id=str(tier_id), metadata=snapshot)
+    db.commit()
     return {"ok": True}

@@ -105,6 +105,7 @@ class BulkInviteRow(BaseModel):
 
 class BulkInviteBody(BaseModel):
     invitations: List[BulkInviteRow]
+    cohort: Optional[str] = None
 
 
 @admin_router.post("/bulk")
@@ -112,7 +113,8 @@ def bulk_invite(body: BulkInviteBody, request: Request,
                 db: Session = Depends(get_db),
                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     """Issue up to 500 invitations in one call. Each row returns its own
-    {email, status, reason} so the admin sees exactly what got through."""
+    {email, status, reason} so the admin sees exactly what got through.
+    Optional cohort string applies to every row in the batch."""
     rows = body.invitations or []
     if len(rows) > 500:
         raise HTTPException(status_code=400, detail="Bulk invite cap is 500 rows per request")
@@ -124,16 +126,26 @@ def bulk_invite(body: BulkInviteBody, request: Request,
     queued = 0
     for row in rows:
         try:
-            svc.create(
+            inv = svc.create(
                 organization_id=current.organization_id, invited_by_id=current.id,
                 email=row.email, name=row.name, role=row.role, app_base_url=base_url,
             )
+            if body.cohort:
+                inv.cohort = body.cohort
             results.append({"email": row.email, "status": "queued", "reason": None})
             queued += 1
         except HTTPException as he:
             results.append({"email": row.email, "status": "skipped", "reason": he.detail})
         except Exception as e:
             results.append({"email": row.email, "status": "error", "reason": str(e)[:200]})
+    from services import audit_service
+    audit_service.record(
+        db, current, "INVITATIONS_BULK_QUEUED",
+        target_type="organization", target_id=str(current.organization_id),
+        metadata={"queued": queued, "total": len(rows), "cohort": body.cohort},
+        request=request,
+    )
+    db.commit()
     return {"queued": queued, "total": len(rows), "results": results}
 
 

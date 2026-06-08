@@ -18,6 +18,7 @@ import BillingPage from 'pages/dashboard/BillingPage'
 import OutboxPage from 'pages/dashboard/OutboxPage'
 import OrganizationSettingsPage from 'pages/dashboard/OrganizationSettingsPage'
 import AcademiesPage from 'pages/dashboard/AcademiesPage'
+import AuditLogPage from 'pages/dashboard/AuditLogPage'
 import BadgeTiersPage from 'pages/dashboard/BadgeTiersPage'
 import PortalPage from 'pages/PortalPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/settings" element={<Protected adminOnly><OrganizationSettingsPage /></Protected>} />
         <Route path="/academies" element={<Protected adminOnly><AcademiesPage /></Protected>} />
         <Route path="/badge-tiers" element={<Protected adminOnly><BadgeTiersPage /></Protected>} />
+        <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
