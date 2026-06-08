@@ -479,9 +479,24 @@ class OutboxMessage(Base):
     body_html = Column(Text)
     attachments = Column(JSON, nullable=True)   # [{filename, mime, base64?, url?}]
     template = Column(String(60))               # e.g. "cert_issued", "invitation"
-    status = Column(String(20), default="QUEUED", index=True)   # QUEUED, SENT, FAILED, STUB
+    status = Column(String(20), default="QUEUED", index=True)   # QUEUED, SENT, FAILED, STUB, DEAD_LETTER
     transport = Column(String(20))              # "stub", "erp360"
     transport_message_id = Column(String(120))  # upstream id (when real send happens)
     error = Column(Text)
+    attempt_count = Column(Integer, default=0)  # incremented every dispatch attempt
+    next_attempt_at = Column(DateTime, nullable=True)  # backoff schedule
     created_at = Column(DateTime, default=_utcnow)
     sent_at = Column(DateTime, nullable=True)
+
+
+# ── Slide comments (discussion threads under each slide) ─────────────
+class SlideComment(Base):
+    __tablename__ = "slide_comments"
+    __table_args__ = (Index("ix_comments_slide_created", "slide_id", "created_at"),)
+    id = Column(Integer, primary_key=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body = Column(Text, nullable=False)
+    parent_id = Column(Integer, ForeignKey("slide_comments.id"), nullable=True, index=True)
+    is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=_utcnow)
