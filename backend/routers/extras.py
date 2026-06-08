@@ -243,10 +243,12 @@ def update_smtp_config(body: SmtpConfigIn, db: Session = Depends(get_db),
     o.smtp_host = body.smtp_host
     o.smtp_port = body.smtp_port
     o.smtp_username = body.smtp_username
-    if body.smtp_password is not None and body.smtp_password != "":
+    if body.smtp_password is None:
+        pass  # leave existing password alone
+    elif body.smtp_password == "":
+        o.smtp_password_enc = None  # explicit clear
+    else:
         o.smtp_password_enc = encrypt_password(body.smtp_password)
-    elif body.smtp_password == "":  # explicit empty string = clear
-        o.smtp_password_enc = None
     o.smtp_from_email = body.smtp_from_email
     o.smtp_from_name = body.smtp_from_name
     o.smtp_use_tls = body.smtp_use_tls

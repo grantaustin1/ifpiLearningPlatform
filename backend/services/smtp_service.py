@@ -43,8 +43,15 @@ def encrypt_password(plaintext: str) -> str:
         return ""
     key = _key()
     if not key:
-        logger.warning("SMTP_ENCRYPTION_KEY unset — storing SMTP password without encryption. DO NOT use in production.")
-        return f"plain:{plaintext}"
+        # In production we refuse to store plaintext. The env flag below
+        # opts in to dev-mode plaintext storage for local development.
+        if os.environ.get("SMTP_ALLOW_PLAINTEXT", "").lower() in ("1", "true", "yes"):
+            logger.warning("SMTP_ENCRYPTION_KEY unset — storing SMTP password in plaintext (DEV ONLY).")
+            return f"plain:{plaintext}"
+        raise RuntimeError(
+            "SMTP_ENCRYPTION_KEY env var is required to persist SMTP passwords. "
+            "Set a 32-byte url-safe base64 key, or set SMTP_ALLOW_PLAINTEXT=1 for dev only."
+        )
     return f"enc:{Fernet(key).encrypt(plaintext.encode()).decode()}"
 
 
