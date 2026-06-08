@@ -118,6 +118,8 @@ def _tick():
 def _cohort_tick():
     """Periodic cohort milestone checker. Independent from the outbox drain
     so it runs at a lower cadence and never blocks email delivery."""
+    import time
+    started = time.monotonic()
     try:
         with SessionLocal() as db:
             from services.cohort_celebrations import check_cohorts
@@ -126,6 +128,9 @@ def _cohort_tick():
                 logger.info("Fired %s cohort celebration(s) this tick", fired)
     except Exception as e:
         logger.exception("cohort celebration tick failed: %s", e)
+    elapsed = time.monotonic() - started
+    if elapsed > 30:
+        logger.warning("cohort tick took %.1fs — consider increasing interval", elapsed)
 
 
 def start_scheduler() -> None:
@@ -140,6 +145,7 @@ def start_scheduler() -> None:
     sched.add_job(
         _cohort_tick, "interval", seconds=60,  # check once a minute
         id="cohort_celebrations", max_instances=1, coalesce=True,
+        misfire_grace_time=120,
     )
     sched.start()
     _scheduler = sched

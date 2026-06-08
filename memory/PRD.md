@@ -22,6 +22,16 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 9)
+- ✅ **Cohort-aware dashboard widgets** — new "Cohort breakdown" card on `/reports` with a dropdown of all cohorts (with learner counts) and 5 live stat tiles (Learners / Enrollments / Completion rate (indigo accent) / Avg exam score / Certificates).
+- ✅ **JSONB migration** — `a9c2470b8e15` no-op on SQLite, converts `audit_logs.audit_metadata` to JSONB + creates a GIN index on Postgres. Single migration, dialect-aware.
+- ✅ **Agent 008 hardened + deterministic** — full 18-step E2E (admin login → fixture course/exam lookup → bulk invite with cohort → accept → learner login → enrol → 5 slides complete → exam 100% → cert issued → transcript downloaded → agent_007 re-verified clean). Wired into the `qa-agents` CI job alongside agents 007 and 010.
+- ✅ **NEW IMPROVEMENT — Cohort milestone celebrations** (`services/cohort_celebrations.py`): APScheduler job runs every 60s (separate from outbox drain). When a cohort hits ≥75% completion it (a) writes a `COHORT_MILESTONE_REACHED` audit row with full stats + `actor: "system"` in metadata, (b) queues an outbox email to every ADMIN in the org with the milestone copy. Idempotent — once the audit row exists for `(org, "cohort", <cohort_name>)` the celebration never re-fires. Slow-tick warning logs at >30s; misfire_grace_time=120s.
+- ✅ Code-review nits addressed:
+  - Replaced LIKE-based JSON dedupe with composite-key dedupe (org + action + target_type + target_id) — safer across dialects, immune to substring false-positives.
+  - System events now stamp `actor="system"` in metadata so the audit UI can distinguish from missing-actor bugs.
+- ✅ Tests: **iter9 11/11 PASS**, iter8 16/16 regression, agent 007 9/9, agent 008 18/18 (was 0 before this iter), 40/40 across iter7+8+9. Frontend Playwright 100%.
+
 ## What's been implemented (2026-02-08 — iteration 8)
 - ✅ **Learner cohorts** — `users.cohort` + `invitations.cohort` columns (migration `f6b832c5a4e1`). Bulk invite modal gets a "Cohort name" field that propagates to every learner in the batch — and from the Invitation to the User on accept. New endpoints: `GET /api/admin/cohorts` (distinct labels + learner counts) and `GET /api/admin/reports/cohort-stats?cohort=X` (completion rate, avg exam score, certificates issued, badges earned).
 - ✅ **Audit log** — new `audit_logs` append-only table (actor, action, target_type, target_id, JSON metadata, ip_address, created_at). `services/audit_service.py::record()` helper instrumented on: `THEME_APPLIED`, `SMTP_CONFIG_UPDATED`, `BADGE_TIER_CREATED/UPDATED/DELETED`, `BADGE_TIERS_REORDERED`, `ACADEMY_CREATED`, `INVITATIONS_BULK_QUEUED`. New `GET /api/admin/audit-log` with action/actor/target filters + pagination. New admin `/audit` page with colored action pills.
@@ -117,10 +127,10 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 
 ## Prioritised backlog
 - **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction in place — pure config flip.
-- **P3** — Cohort-aware dashboard widgets on `/reports` (currently only the API exists; UI shows aggregate).
-- **P3** — Wire `agent_008_e2e_journey.py` into CI once we seed a deterministic published-course-with-slides-and-exam fixture.
-- **P3** — Migrate `audit_logs.audit_metadata` from `JSON` (text in SQLite) to `JSONB` when we move to Postgres.
-- **P3** — Make `ACTION_COLORS` on AuditLogPage derive colour from the action prefix so newly-added actions auto-color.
+- **P3** — Per-tenant cohort threshold + optional Discord/Slack webhook URL for celebrations (today threshold is a global 75% constant and celebrations fan out as email only).
+- **P3** — Cohort-aware leaderboard scope on `/leaderboard` (mirror what we did on `/reports`).
+- **P3** — UI loading/empty/error states on the cohort widget (today the tiles silently vanish on API error).
+- **P3** — Push agent_008 result + agent_007 JSON report as a PR comment via the GitHub Checks API.
 
 ## Deliberately deferred (not forgotten)
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
