@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 5 testing complete. Backend pytest /app/backend/tests/test_iteration5.py — 18/20 PASS (90%). Frontend Playwright — all critical flows verified: admin login, /academies modal+create+toast+refresh, /settings live preview triggers /api/admin/cert-preview, logo PNG upload accepts file+populates URL field, /a/ifpi-main public portal renders, learner /learn/1 CommentsPanel post→visible→delete all functional, dashboard pages (Dashboard/Courses/Exams/Certificates/Outbox/Reports/Leaderboard/Users/Learning-Paths/Settings/Academies/Billing/Catalog) all load without runtime errors. Two backend bugs found.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/uploads/image",
+        "issue": "Returned `url` uses internal cluster hostname (e.g. http://<host>.cluster-11.preview.emergentcf.cloud/api/uploads/files/<name>) instead of the public REACT_APP_BACKEND_URL. That URL responds 403 externally so logo/signature previews break in the frontend. The same file IS reachable via the public ingress URL — fix is to derive the URL from the X-Forwarded-* headers OR settings.public_base_url OR just return a relative path '/api/uploads/files/<name>' and let the frontend prefix it with REACT_APP_BACKEND_URL.",
+        "priority": "HIGH",
+        "repro": "POST a PNG to /api/uploads/image as admin → GET the returned `url` → 403. GET the same path on REACT_APP_BACKEND_URL → 200."
+      },
+      {
+        "endpoint": "POST /api/admin/outbox/{id}/retry",
+        "issue": "Endpoint is MISSING (returns 404). Review request explicitly requires it to reset FAILED→QUEUED so the worker picks it up. /api/admin/outbox/stats works but there is no retry route in routers/extras.py (only GET / and GET /stats are defined).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Settings → Logo upload",
+        "issue": "Upload succeeds and the URL field gets populated, but because the backend returns a non-public cluster URL the inline Logo preview shows blank (the image element 403s). Fixing the backend URL bug resolves this — frontend behaviour is otherwise correct (upload button, toast, value binding all good).",
+        "affected_selectors": ["[data-testid='org-logo-url']", "input[type='file']"]
+      },
+      {
+        "flow": "Settings → Live cert preview on accent color change",
+        "issue": "Review request says 'Adjust accent color and verify the cert live preview iframe re-renders'. Currently the preview iframe ONLY re-renders when the explicit 'Live preview' button is clicked (which does correctly call /api/admin/cert-preview and renders a PDF). The accent color picker change alone does NOT auto-trigger a re-render. If auto-debounced live update is desired, add a useEffect that POSTs to /api/admin/cert-preview when branding fields change.",
+        "affected_selectors": ["input[type='color']", "button:has-text('Live preview')"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5.py",
+    "/app/test_reports/pytest/iteration5_results.xml"
+  ],
+  "action_items": [
+    "Fix POST /api/uploads/image to return a publicly-reachable URL — preferred: return relative `/api/uploads/files/{name}` and let the frontend prefix with REACT_APP_BACKEND_URL. Alternative: read X-Forwarded-Host / X-Forwarded-Proto headers from the ingress, or read a settings.public_base_url env var.",
+    "Implement POST /api/admin/outbox/{id}/retry → set status=QUEUED, attempt_count=0, next_attempt_at=null, error=null; require ADMIN or SUPER_ADMIN; scope by organization_id like other outbox endpoints.",
+    "(Nice-to-have) Auto-trigger cert preview re-render when branding fields change in /settings — debounce ~500ms and POST to /api/admin/cert-preview. Currently requires manual 'Live preview' click."
+  ],
+  "critical_code_review_comments": [
+    "routers/iter5.py upload_image: `url = f\"{base}/api/uploads/files/{safe_name}\"` where base = `request.base_url` — under k8s ingress this yields the cluster-internal hostname, not the user-facing REACT_APP_BACKEND_URL. Same issue would affect any other handler that builds public URLs from request.base_url (cert preview uses it for verify_url too — may also be broken for cert verification links in emails).",
+    "routers/extras.py defines GET /api/admin/outbox and GET /api/admin/outbox/stats but no POST /{id}/retry — explicit gap vs review request. The outbox_worker already handles backoff + dead-letter; the retry endpoint just needs to reset the row.",
+    "routers/iter5.py create_academy: invitation outbox row gets organization_id=new_org_id — verified directly in DB. Stats endpoint (extras.py:233) is org-scoped, so the new academy's invitation doesn't appear in the current admin's stats response (expected behaviour for multi-tenant isolation, but worth documenting).",
+    "Frontend LogoUpload component correctly handles the upload response (file accepted, URL field bound), so once backend URL fix lands, no frontend changes required.",
+    "Public portal /a/ifpi-main is fully no-auth; renders org branding + 9 published courses + Enrol CTA. Confirmed working in fresh incognito context.",
+    "CommentsPanel works end-to-end on /learn/1: post comment → appears in 'Discussion (N)' → delete button removes it. Backend soft-delete behaviour matches.",
+    "EmailStr in AcademyCreate lowercases the admin_email before the invitation row is created — minor surprise if callers expect mixed-case preservation; behaviour is RFC-correct so probably fine."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5.py (new — 20 tests covering all iteration 5 endpoints + regressions)"
+  ],
+  "success_rate": {"backend": "90% (18/20 — 2 real bugs)", "frontend": "100% of iteration-5 critical flows verified"},
+  "test_credentials": "admin@ifpi.org / admin123 (has BOTH ADMIN and SUPER_ADMIN roles in this env — verified via DB query). learner@ifpi.org / learner123.",
+  "seed_data_creation": "Test created 3 throwaway academies (test-acad-* and ui-acad-*) plus several TEST_ outbox rows. Harmless seed pollution — does not affect other tests. To clean: DELETE FROM organizations WHERE slug LIKE 'test-acad-%' OR slug LIKE 'ui-acad-%';",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && REACT_APP_BACKEND_URL=https://5dae153e-be68-452c-9cf0-d868811c3d07.preview.emergentagent.com python -m pytest tests/test_iteration5.py -v. SUPER_ADMIN: admin@ifpi.org already has both ADMIN + SUPER_ADMIN roles — no extra seeding needed. After backend fixes for the 2 bugs above, re-run test_image_upload_admin_then_serve and test_outbox_retry_and_worker_drains to confirm. Live preview is gated behind a button click — review request wording ('Adjust accent color and verify') is ambiguous and current behaviour may be acceptable. Logo upload UI is fully functional; only the returned URL is broken.",
+  "rca_of_the_issue": "Upload URL bug: routers/iter5.py:100 uses `str(request.base_url).rstrip('/')` to construct the public URL. Under a k8s ingress, Starlette sees the internal upstream host header (cluster-internal). The frontend then tries to load this cluster URL which is unreachable from outside the cluster (returns 403). Mitigation: return relative path or trust X-Forwarded-Host. Outbox retry bug: simply missing route in routers/extras.py — add `@outbox_router.post('/{id}/retry')` that resets the row and returns {ok:true}."
+}
