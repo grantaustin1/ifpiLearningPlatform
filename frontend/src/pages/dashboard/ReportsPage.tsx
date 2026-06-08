@@ -42,7 +42,7 @@ export default function ReportsPage() {
           <div className="flex items-end gap-3 h-32">
             {(data.monthly_enrollments || []).map((m: any, i: number) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full bg-indigo-500 rounded-t-md transition-all" style={{ height: `${Math.max((m.count / maxMonthly) * 100, 2)}%` }} />
+                <div className="w-full bg-indigo-500 rounded-t-md transition-all" style={{ height: `${m.count > 0 ? Math.max((m.count / maxMonthly) * 100, 8) : 2}%` }} title={`${m.count} enrolment(s)`} />
                 <span className="text-[10px] text-slate-400">{m.month}</span>
               </div>
             ))}

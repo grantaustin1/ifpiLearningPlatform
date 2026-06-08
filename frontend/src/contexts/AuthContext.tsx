@@ -28,8 +28,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchMe = useCallback(async () => {
     try {
-      const r = await api.get('/auth/me')
-      setUser(r.data)
+      // Silence axios console noise on the initial unauth probe
+      const r = await api.get('/auth/me', { validateStatus: (s) => s < 500 })
+      if (r.status === 200) setUser(r.data); else setUser(null)
     } catch {
       setUser(null)
     } finally {
