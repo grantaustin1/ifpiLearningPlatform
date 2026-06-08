@@ -116,19 +116,36 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./ifpi_ci.db
-        run: alembic upgrade head
+        run: |
+          alembic upgrade head
+          python -m seed.seed_minimal
+      - name: Start backend (background) for agent 008
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ifpi_ci.db
+          JWT_SECRET: test-secret-for-ci
+          SMTP_ALLOW_PLAINTEXT: '1'
+        run: |
+          (uvicorn server:app --host 127.0.0.1 --port 8001 &) && sleep 4
       - name: Agent 007 — Invariants
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./ifpi_ci.db
         run: python scripts/qa_agents/agent_007_invariants.py
-      - name: Agent 010 — Infra Sentry (skip E2E network checks in CI)
+      - name: Agent 008 — E2E learner journey
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./ifpi_ci.db
+          API_URL: http://127.0.0.1:8001
+        run: python scripts/qa_agents/agent_008_e2e_journey.py
+      - name: Agent 010 — Infra Sentry
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ifpi_ci.db
+          API_URL: http://127.0.0.1:8001
           SMTP_ALLOW_PLAINTEXT: '1'
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python scripts/qa_agents/agent_010_infra_sentry.py || true   # advisory until C-1/C-4 settle in CI
+        run: python scripts/qa_agents/agent_010_infra_sentry.py || true   # advisory until C-1 settled
       - uses: actions/upload-artifact@v4
         if: always()
         with:

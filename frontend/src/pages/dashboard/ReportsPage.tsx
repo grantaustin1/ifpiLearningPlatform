@@ -1,11 +1,24 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Users, BookOpen, Award, ClipboardList } from 'lucide-react'
+import { Users, BookOpen, Award, ClipboardList, Layers } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
 
 export default function ReportsPage() {
+  const [cohort, setCohort] = useState<string>('')
+
   const { data, isLoading } = useQuery<any>({
     queryKey: ['analytics'], queryFn: async () => (await api.get('/admin/analytics')).data,
+  })
+  const { data: cohorts = [] } = useQuery<any[]>({
+    queryKey: ['cohorts'], queryFn: async () => (await api.get('/admin/cohorts')).data,
+  })
+  const { data: cohortStats } = useQuery<any>({
+    queryKey: ['cohort-stats', cohort],
+    queryFn: async () => (await api.get('/admin/reports/cohort-stats', {
+      params: { cohort: cohort || undefined },
+    })).data,
+    enabled: cohorts.length > 0,
   })
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
@@ -35,6 +48,30 @@ export default function ReportsPage() {
           </div>
         ))}
       </div>
+
+      {cohorts.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-5" data-testid="cohort-widget">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Layers className="h-4 w-4 text-indigo-500" /> Cohort breakdown</h2>
+            <select value={cohort} onChange={e => setCohort(e.target.value)} data-testid="cohort-select"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
+              <option value="">All learners</option>
+              {cohorts.map((c: any) => (
+                <option key={c.cohort} value={c.cohort}>{c.cohort} ({c.learner_count})</option>
+              ))}
+            </select>
+          </div>
+          {cohortStats && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <CohortStat label="Learners" value={cohortStats.learners} />
+              <CohortStat label="Enrollments" value={cohortStats.enrollments} />
+              <CohortStat label="Completion rate" value={`${cohortStats.completion_rate}%`} accent />
+              <CohortStat label="Avg exam score" value={`${cohortStats.avg_exam_score}%`} />
+              <CohortStat label="Certificates" value={cohortStats.certificates_issued} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm p-5">
@@ -98,6 +135,16 @@ function Donut({ pct, color, label }: any) {
         <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="18" fontWeight="700" fill="#0f172a">{pct}%</text>
       </svg>
       <span className="text-xs text-slate-500">{label}</span>
+    </div>
+  )
+}
+
+
+function CohortStat({ label, value, accent }: { label: string, value: any, accent?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={`text-2xl font-bold ${accent ? 'text-indigo-600' : 'text-slate-900'} mt-1`}>{value}</p>
     </div>
   )
 }
