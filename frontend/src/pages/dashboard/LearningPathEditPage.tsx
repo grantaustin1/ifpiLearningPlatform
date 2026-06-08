@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Send, EyeOff, Trash2, Plus, X, Layers, BookOpen } from 'lucide-react'
+import { ArrowLeft, Save, Send, EyeOff, Trash2, Plus, X, Layers, BookOpen, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
+import { SortableList } from 'components/SortableList'
 
 export default function LearningPathEditPage() {
   const { id } = useParams()
@@ -66,7 +67,7 @@ export default function LearningPathEditPage() {
   }
 
   const deletePath = async () => {
-    if (!confirm('Delete this learning path? This cannot be undone.')) return
+    if (!window.confirm('Delete this learning path? This cannot be undone.')) return
     await api.delete(`/learning-paths/${id}`)
     toast.success('Deleted')
     nav('/learning-paths')
@@ -126,21 +127,37 @@ export default function LearningPathEditPage() {
             {path.items.length === 0 ? (
               <p className="px-6 py-10 text-center text-slate-400 text-sm">No courses yet. Add the first course to get started.</p>
             ) : (
-              <ol className="divide-y">
-                {path.items.map((it: any, i: number) => (
-                  <li key={it.id} className="flex items-center gap-4 px-6 py-4" data-testid={`path-item-${i}`}>
-                    <span className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold">{i + 1}</span>
-                    <BookOpen className="h-4 w-4 text-slate-400" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{it.course_title}</p>
-                      <p className="text-[11px] text-slate-400">{it.course_status} · {it.is_required ? 'Required' : 'Optional'}</p>
+              <SortableList
+                items={path.items}
+                onReorder={async (ids) => {
+                  const reordered = ids.map((iid, idx) => ({
+                    ...path.items.find((x: any) => x.id === iid), order_index: idx + 1,
+                  }))
+                  setPath({ ...path, items: reordered })
+                  try { await api.patch(`/learning-paths/${id}/items/reorder`, { item_ids: ids }) }
+                  catch { toast.error('Could not save new order') }
+                }}
+              >
+                {(it: any, listeners) => {
+                  const i = path.items.findIndex((x: any) => x.id === it.id)
+                  return (
+                    <div className="flex items-center gap-4 px-6 py-4 border-t border-slate-50 first:border-t-0" data-testid={`path-item-${it.id}`}>
+                      <span {...listeners} className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500" title="Drag to reorder">
+                        <GripVertical className="h-4 w-4" />
+                      </span>
+                      <span className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                      <BookOpen className="h-4 w-4 text-slate-400" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">{it.course_title}</p>
+                        <p className="text-[11px] text-slate-400">{it.course_status} · {it.is_required ? 'Required' : 'Optional'}</p>
+                      </div>
+                      <button onClick={() => removeCourse(it.course_id)} className="text-slate-300 hover:text-red-500" data-testid={`remove-item-${it.id}`}>
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button onClick={() => removeCourse(it.course_id)} className="text-slate-300 hover:text-red-500" data-testid={`remove-item-${i}`}>
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ol>
+                  )
+                }}
+              </SortableList>
             )}
           </div>
         </div>

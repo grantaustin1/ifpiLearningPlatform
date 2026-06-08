@@ -4,6 +4,7 @@ import LandingPage from 'pages/LandingPage'
 import LoginPage from 'pages/auth/LoginPage'
 import RegisterPage from 'pages/auth/RegisterPage'
 import VerifyCertPage from 'pages/VerifyCertPage'
+import AcceptInvitePage from 'pages/AcceptInvitePage'
 import DashboardLayout from 'components/layout/DashboardLayout'
 import DashboardPage from 'pages/dashboard/DashboardPage'
 import CoursesPage from 'pages/dashboard/CoursesPage'
@@ -14,6 +15,7 @@ import UsersPage from 'pages/dashboard/UsersPage'
 import ReportsPage from 'pages/dashboard/ReportsPage'
 import LeaderboardPage from 'pages/dashboard/LeaderboardPage'
 import BillingPage from 'pages/dashboard/BillingPage'
+import OutboxPage from 'pages/dashboard/OutboxPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
@@ -46,6 +48,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/catalog" element={<CatalogPage />} />
       <Route path="/verify/:code" element={<VerifyCertPage />} />
+      <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
 
       <Route element={<Protected><DashboardLayout /></Protected>}>
         <Route path="/dashboard" element={<Protected adminOnly><DashboardPage /></Protected>} />
@@ -59,6 +62,7 @@ export default function App() {
         <Route path="/reports" element={<Protected adminOnly><ReportsPage /></Protected>} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/billing" element={<BillingPage />} />
+        <Route path="/outbox" element={<Protected adminOnly><OutboxPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />

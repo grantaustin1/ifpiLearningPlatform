@@ -436,3 +436,47 @@ class LearningPathEnrollment(Base):
 
     path = relationship("LearningPath", back_populates="enrollments")
 
+
+
+
+# ── Invitations (admin-issued tokens to onboard instructors/admins) ──
+class Invitation(Base):
+    """Email-based invite. Once accepted, creates a User+Person with the chosen role."""
+    __tablename__ = "invitations"
+    __table_args__ = (Index("ix_invites_org_email", "organization_id", "email"),)
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    email = Column(String(200), nullable=False)
+    name = Column(String(200))
+    role = Column(String(50), nullable=False)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    invited_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+# ── Outbox: append-only audit of every email we sent (or tried to send) ──
+class OutboxMessage(Base):
+    """Captures every transactional email. In stub mode, this IS the email log
+    (no SMTP sent). In live mode (ERP360 transport), also records the upstream id.
+    """
+    __tablename__ = "outbox_messages"
+    __table_args__ = (Index("ix_outbox_status_created", "status", "created_at"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    to_email = Column(String(200), nullable=False)
+    to_name = Column(String(200))
+    subject = Column(String(300), nullable=False)
+    body_text = Column(Text)
+    body_html = Column(Text)
+    attachments = Column(JSON, nullable=True)   # [{filename, mime, base64?, url?}]
+    template = Column(String(60))               # e.g. "cert_issued", "invitation"
+    status = Column(String(20), default="QUEUED", index=True)   # QUEUED, SENT, FAILED, STUB
+    transport = Column(String(20))              # "stub", "erp360"
+    transport_message_id = Column(String(120))  # upstream id (when real send happens)
+    error = Column(Text)
+    created_at = Column(DateTime, default=_utcnow)
+    sent_at = Column(DateTime, nullable=True)
