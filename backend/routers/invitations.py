@@ -126,12 +126,11 @@ def bulk_invite(body: BulkInviteBody, request: Request,
     queued = 0
     for row in rows:
         try:
-            inv = svc.create(
+            svc.create(
                 organization_id=current.organization_id, invited_by_id=current.id,
                 email=row.email, name=row.name, role=row.role, app_base_url=base_url,
+                cohort=body.cohort,
             )
-            if body.cohort:
-                inv.cohort = body.cohort
             results.append({"email": row.email, "status": "queued", "reason": None})
             queued += 1
         except HTTPException as he:

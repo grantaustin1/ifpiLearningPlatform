@@ -22,6 +22,17 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 8)
+- ✅ **Learner cohorts** — `users.cohort` + `invitations.cohort` columns (migration `f6b832c5a4e1`). Bulk invite modal gets a "Cohort name" field that propagates to every learner in the batch — and from the Invitation to the User on accept. New endpoints: `GET /api/admin/cohorts` (distinct labels + learner counts) and `GET /api/admin/reports/cohort-stats?cohort=X` (completion rate, avg exam score, certificates issued, badges earned).
+- ✅ **Audit log** — new `audit_logs` append-only table (actor, action, target_type, target_id, JSON metadata, ip_address, created_at). `services/audit_service.py::record()` helper instrumented on: `THEME_APPLIED`, `SMTP_CONFIG_UPDATED`, `BADGE_TIER_CREATED/UPDATED/DELETED`, `BADGE_TIERS_REORDERED`, `ACADEMY_CREATED`, `INVITATIONS_BULK_QUEUED`. New `GET /api/admin/audit-log` with action/actor/target filters + pagination. New admin `/audit` page with colored action pills.
+- ✅ **NEW IMPROVEMENT — Learner PDF transcripts** — `GET /api/certificates/transcript` renders a single branded PDF for the authenticated user: name, email, cohort, total XP, all completed courses with date+best exam score, all badges with earned dates, footer disclaimer. Branded with the academy's primary_color. "Download transcript" button on `/certificates`.
+- ✅ **QA agents ported from ERP360**:
+  - `agent_007_invariants.py` — 9 DB invariants (orphan comments, archived-course enrollments, dangling audit FK, duplicate cert codes, etc.)
+  - `agent_008_e2e_journey.py` — synthetic learner full flow (run on-demand, not in CI yet)
+  - `agent_010_infra_sentry.py` — 8 infra checks (HTTP health, DB, ReportLab, APScheduler, outbox drain, LLM key, Fernet, storage roundtrip)
+- ✅ **CI pipeline** — `.github/workflows/ci.yml` with 6 jobs: secret-scan (blocking) → backend-tests / migration-smoke (up→down→up) / service-layer-check (advisory) / qa-agents / frontend lint+build. Secret scanner at `scripts/security/scan-secrets.sh` (104 LOC, 10 patterns, allowlist-aware).
+- ✅ Tests: **iter8 16/16 PASS**, iter7 13/13 regression, agent 007 9/9, agent 010 8/8, secret scan PASS. Frontend Playwright 100%.
+
 ## What's been implemented (2026-02-08 — iteration 7)
 - ✅ **Configurable badge tiers** — new `badge_tiers` table (migration `e5a721f43b18`) with per-org rows. Default 5 tiers (First Step / Graduate / Scholar / Perfectionist / Course Master) auto-seeded for every org including any new academy created via `POST /api/academies`. Admin `/badge-tiers` page with drag-reorder + inline edit modal + delete + toggle-active. `GamificationService` consults DB rows first, falls back to hard-coded map only when an org has no rows (failsafe). `GET /api/gamification/me` now returns per-org tier meta.
 - ✅ **Live preset preview** — each preset card on `/settings` now has separate **Preview** and **Apply** buttons. Preview pipes the preset's colors directly to `POST /api/admin/cert-preview` and renders the iframe — zero DB writes. Apply persists.
@@ -105,13 +116,15 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction already in place — `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds. Pure config.
-- **P3** — Cohort enrollments — assign a tag/cohort to invited learners + filter on it.
-- **P3** — Per-tenant audit log of admin actions (who applied which theme, who reordered badges, who triggered bulk invite).
+- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction in place — pure config flip.
+- **P3** — Cohort-aware dashboard widgets on `/reports` (currently only the API exists; UI shows aggregate).
+- **P3** — Wire `agent_008_e2e_journey.py` into CI once we seed a deterministic published-course-with-slides-and-exam fixture.
+- **P3** — Migrate `audit_logs.audit_metadata` from `JSON` (text in SQLite) to `JSONB` when we move to Postgres.
+- **P3** — Make `ACTION_COLORS` on AuditLogPage derive colour from the action prefix so newly-added actions auto-color.
 
 ## Deliberately deferred (not forgotten)
-- ERP360 SSO bridge (`POST /api/sso/mint` on ERP360 + flip `SSO_ENABLED=true` here). IFPI works standalone — every ERP360 seam is feature-flagged off by default.
-- ERP360 webhook receiver — code provided in `/app/docs/ERP360_INTEGRATION.md`.
+- ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
+- ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.
