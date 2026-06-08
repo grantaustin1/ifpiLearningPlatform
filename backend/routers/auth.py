@@ -1,0 +1,103 @@
+"""Auth routes: register, login, refresh, logout, /me, and the SSO bridge."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.orm import Session
+
+from auth.cookies import (
+    REFRESH_COOKIE, clear_auth_cookies, set_auth_cookie, set_refresh_cookie,
+    should_include_token_in_body,
+)
+from auth.dependencies import CurrentUser, get_current_user
+from core.config import settings
+from core.database import get_db
+from core.role_registry import normalize_role_names
+from schemas import LoginRequest, LoginResponse, RegisterRequest, UserOut
+from services.auth_service import AuthService
+from services.sso_service import SSOService
+
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def _to_user_out(user) -> UserOut:
+    roles = normalize_role_names([ur.role for ur in user.user_roles]) or ["LEARNER"]
+    return UserOut(
+        id=user.id, email=user.email, name=user.name,
+        organization_id=user.organization_id, roles=roles, points=user.points or 0,
+    )
+
+
+def _login_response(response: Response, user, access: str, refresh: str) -> LoginResponse:
+    set_auth_cookie(response, access)
+    set_refresh_cookie(response, refresh)
+    return LoginResponse(
+        access_token=access if should_include_token_in_body() else None,
+        expires_in=settings.jwt_expiration_minutes * 60,
+        user=_to_user_out(user),
+    )
+
+
+@router.post("/register", response_model=LoginResponse)
+def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+    svc = AuthService(db)
+    user = svc.register(body.email, body.password, body.name)
+    access, refresh = svc.issue_tokens(user)
+    return _login_response(response, user, access, refresh)
+
+
+@router.post("/login", response_model=LoginResponse)
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    svc = AuthService(db)
+    user = svc.login(body.email, body.password)
+    access, refresh = svc.issue_tokens(user)
+    return _login_response(response, user, access, refresh)
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    token = request.cookies.get(REFRESH_COOKIE)
+    if not token:
+        # Allow Bearer fallback
+        authz = request.headers.get("authorization", "")
+        if authz.lower().startswith("bearer "):
+            token = authz.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+    access, new_refresh, user = AuthService(db).rotate_refresh(token)
+    return _login_response(response, user, access, new_refresh)
+
+
+@router.post("/logout")
+def logout(response: Response, current: CurrentUser = Depends(get_current_user),
+           db: Session = Depends(get_db)):
+    AuthService(db).revoke_all(current.id)
+    clear_auth_cookies(response)
+    return {"ok": True}
+
+
+@router.get("/me", response_model=UserOut)
+def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    from models import User
+    user = db.query(User).filter(User.id == current.id).first()
+    return _to_user_out(user)
+
+
+# ── SSO bridge (stubbed until ERP360 is wired) ───────────────────────
+@router.post("/sso-exchange", response_model=LoginResponse)
+def sso_exchange(payload: dict, response: Response, db: Session = Depends(get_db)):
+    """Inbound SSO from ERP360. Body: {"erp_token": "..."}.
+    Returns same shape as login so the frontend handles it identically.
+    """
+    sso = SSOService(db)
+    if not sso.is_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="SSO is not enabled. Set SSO_ENABLED=true and ERP360_SSO_SHARED_SECRET to activate.",
+        )
+    token = payload.get("erp_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="erp_token is required")
+    claims = sso.verify_inbound_token(token)
+    user = sso.jit_provision(claims)
+    access, refresh = AuthService(db).issue_tokens(user)
+    return _login_response(response, user, access, refresh)

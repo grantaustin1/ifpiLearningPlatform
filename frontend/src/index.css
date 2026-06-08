@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom utility classes (kept minimal — Tailwind owns most of the look) */
+.hero-mesh {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% -10%, rgba(99,102,241,.14) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 60%, rgba(139,92,246,.10) 0%, transparent 60%),
+    #fff;
+}
+.glass {
+  @apply bg-white/70 backdrop-blur-md border border-white/40;
+}
+.card-glow { box-shadow: 0 0 0 1px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.06); }
+
+/* Scrollbar — subtle */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
