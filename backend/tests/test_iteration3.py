@@ -59,7 +59,7 @@ def test_alembic_head_is_iteration3():
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
     # Iteration 4 raised head — accept both
-    assert ("feb2000f209a" in out) or ("7497425df8bc" in out) or ("9acf884483b9" in out), out
+    assert ("feb2000f209a" in out) or ("7497425df8bc" in out) or ("9acf884483b9" in out) or ("c1f29b3e9d04" in out), out
 
 
 def test_new_tables_exist():

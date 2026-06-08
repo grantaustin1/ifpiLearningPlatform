@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
+import { SortableList } from 'components/SortableList'
 
 export default function CoursesPage() {
   const qc = useQueryClient()
@@ -12,9 +13,16 @@ export default function CoursesPage() {
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
   const [search, setSearch] = useState('')
   const [showAI, setShowAI] = useState(false)
+  const [reordering, setReordering] = useState(false)
 
   const { data: courses = [], isLoading } = useQuery<any[]>({
     queryKey: ['courses'], queryFn: async () => (await api.get('/courses')).data,
+  })
+
+  const reorderMut = useMutation({
+    mutationFn: async (ids: number[]) => (await api.patch('/courses/reorder', { course_ids: ids })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['courses'] }),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Reorder failed'),
   })
 
   const createMut = useMutation({
@@ -51,6 +59,10 @@ export default function CoursesPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
+            <button onClick={() => setReordering(r => !r)} data-testid="reorder-toggle"
+              className={`inline-flex items-center gap-2 text-sm border px-4 py-2 rounded-lg font-medium ${reordering ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500' : 'border-slate-200 hover:bg-slate-50 text-slate-700'}`}>
+              <ArrowUpDown className="h-4 w-4" /> {reordering ? 'Done' : 'Reorder'}
+            </button>
             <button onClick={() => setShowAI(true)} data-testid="ai-builder-btn"
               className="inline-flex items-center gap-2 text-sm border border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-4 py-2 rounded-lg font-medium">
               <Sparkles className="h-4 w-4" /> AI Builder
@@ -73,6 +85,23 @@ export default function CoursesPage() {
         <div className="text-center py-16">
           <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500">{search ? 'No matches' : isAdmin ? 'No courses yet. Create one!' : 'No courses available yet.'}</p>
+        </div>
+      ) : reordering ? (
+        <div className="max-w-2xl space-y-2" data-testid="reorder-list">
+          <p className="text-xs text-slate-500 mb-3">Drag to set catalog order. The order applies to both the admin list and the public portal.</p>
+          <SortableList items={filtered} onReorder={(ids) => reorderMut.mutate(ids as number[])}>
+            {(c: any, listeners: any) => (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-3 p-3 mb-2" data-testid={`reorder-row-${c.id}`}>
+                <button {...listeners} className="text-slate-400 hover:text-slate-600 cursor-grab" aria-label="drag"><GripVertical className="h-5 w-5" /></button>
+                <div className={`w-10 h-10 rounded-lg ${c.cover_color} flex-shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">{c.title}</p>
+                  <p className="text-xs text-slate-500">{c.category || 'Uncategorised'} · {c.status}</p>
+                </div>
+                <span className="text-xs text-slate-400 font-mono">#{c.id}</span>
+              </div>
+            )}
+          </SortableList>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -95,6 +95,7 @@ class Organization(Base):
     cert_signature_text = Column(String(200))            # e.g. "Frances Moore, CEO"
     cert_signature_image_url = Column(String(500))       # signature PNG/SVG
     cert_footer_text = Column(Text)                      # disclaimer / contact line
+    theme_preset = Column(String(40))                    # nullable — e.g. "conservatoire" | "music_school"
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -174,6 +175,7 @@ class Course(Base):
     duration_minutes = Column(Integer)
     price_cents = Column(Integer, default=0)            # 0 = free
     currency = Column(String(3), default="ZAR")
+    display_order = Column(Integer, default=0, index=True)  # catalog ordering
     created_by_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

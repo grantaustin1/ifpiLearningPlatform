@@ -171,7 +171,39 @@ def get_org(db: Session = Depends(get_db),
         "cert_signature_text": o.cert_signature_text,
         "cert_signature_image_url": o.cert_signature_image_url,
         "cert_footer_text": o.cert_footer_text,
+        "theme_preset": o.theme_preset,
     }
+
+
+@org_router.get("/themes")
+def list_theme_presets(current: CurrentUser = Depends(get_current_user)):
+    """Read-only list of curated theme presets an ADMIN can apply in one click."""
+    from services.theme_presets import PRESETS
+    return PRESETS
+
+
+@org_router.post("/apply-theme/{slug}")
+def apply_theme_preset(slug: str, db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Copy a preset's branding values onto the caller's organization."""
+    from services.theme_presets import get_preset
+    preset = get_preset(slug)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Theme preset not found")
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    o.primary_color = preset["primary_color"]
+    o.cert_accent_color = preset["cert_accent_color"]
+    # Only seed the text fields if they are still empty — never overwrite
+    # admin-customised copy.
+    if not (o.cert_signature_text or "").strip():
+        o.cert_signature_text = preset["cert_signature_text_suggestion"]
+    if not (o.cert_footer_text or "").strip():
+        o.cert_footer_text = preset["cert_footer_text_suggestion"]
+    o.theme_preset = preset["slug"]
+    db.commit()
+    return {"ok": True, "applied": preset["slug"]}
 
 
 @org_router.patch("")
