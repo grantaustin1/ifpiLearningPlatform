@@ -259,6 +259,20 @@ def create_academy(body: AcademyCreate, request: Request, db: Session = Depends(
     org = Organization(name=body.name, slug=slug, description=body.description)
     db.add(org)
     db.flush()
+    # Seed default badge tiers for the new academy
+    from models import BadgeTier
+    _DEFAULTS = [
+        ("FIRST_ENROLLMENT", "First Step",    "🎯", "Enrolled in your first course",  10),
+        ("FIRST_COURSE",     "Graduate",      "🎓", "Completed your first course",    50),
+        ("EXAM_PASSER",      "Scholar",       "📚", "Passed your first exam",        100),
+        ("PERFECT_SCORE",    "Perfectionist", "💯", "Scored 100% on an exam",        200),
+        ("COURSE_MASTER",    "Course Master", "🏆", "Completed 5 courses",           500),
+    ]
+    for idx, (slug_, label, emoji, desc, xp) in enumerate(_DEFAULTS):
+        db.add(BadgeTier(
+            organization_id=org.id, slug=slug_, label=label, emoji=emoji,
+            description=desc, threshold_xp=xp, order_index=idx, is_active=True,
+        ))
     # Issue an admin invitation tied to this new academy
     base_url = str(request.base_url).rstrip("/")
     if base_url.endswith("/api"):

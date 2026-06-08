@@ -96,6 +96,16 @@ class Organization(Base):
     cert_signature_image_url = Column(String(500))       # signature PNG/SVG
     cert_footer_text = Column(Text)                      # disclaimer / contact line
     theme_preset = Column(String(40))                    # nullable — e.g. "conservatoire" | "music_school"
+    # Per-tenant SMTP override (nullable — when populated, outbox worker
+    # dispatches via this server instead of falling back to the global stub
+    # / ERP360 bridge). smtp_password_enc is encrypted at rest with Fernet.
+    smtp_host = Column(String(200))
+    smtp_port = Column(Integer)
+    smtp_username = Column(String(200))
+    smtp_password_enc = Column(Text)                     # Fernet-encrypted; never returned to API clients
+    smtp_from_email = Column(String(200))
+    smtp_from_name = Column(String(200))
+    smtp_use_tls = Column(Boolean, default=True)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -288,6 +298,32 @@ class Certificate(Base):
 
 
 # ── Gamification ─────────────────────────────────────────────────────
+class BadgeTier(Base):
+    """Per-organization configurable badge ladder.
+
+    Each row defines one tier. `slug` is the durable identifier the
+    gamification service references when awarding (FIRST_ENROLLMENT etc.).
+    `threshold_xp` is informational/sort-only — actual award triggers live
+    in code (course-completion, perfect-score, etc.) and reference by slug.
+    `order_index` drives display order (admin drag-reorder).
+    """
+    __tablename__ = "badge_tiers"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "slug", name="uq_badge_tier_slug"),
+        Index("ix_badge_tier_org_order", "organization_id", "order_index"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    slug = Column(String(50), nullable=False)
+    label = Column(String(100), nullable=False)
+    emoji = Column(String(8), default="🏅")
+    description = Column(Text)
+    threshold_xp = Column(Integer, default=0)
+    order_index = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
 class UserBadge(Base):
     __tablename__ = "user_badges"
     __table_args__ = (UniqueConstraint("user_id", "badge", name="uq_user_badge"),)

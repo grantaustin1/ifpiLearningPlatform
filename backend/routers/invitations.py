@@ -97,6 +97,46 @@ def revoke_invitation(invitation_id: int, db: Session = Depends(get_db),
     return {"ok": True}
 
 
+class BulkInviteRow(BaseModel):
+    email: str
+    name: Optional[str] = None
+    role: str = "LEARNER"
+
+
+class BulkInviteBody(BaseModel):
+    invitations: List[BulkInviteRow]
+
+
+@admin_router.post("/bulk")
+def bulk_invite(body: BulkInviteBody, request: Request,
+                db: Session = Depends(get_db),
+                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Issue up to 500 invitations in one call. Each row returns its own
+    {email, status, reason} so the admin sees exactly what got through."""
+    rows = body.invitations or []
+    if len(rows) > 500:
+        raise HTTPException(status_code=400, detail="Bulk invite cap is 500 rows per request")
+    base_url = str(request.base_url).rstrip("/")
+    if base_url.endswith("/api"):
+        base_url = base_url[:-4]
+    svc = InvitationService(db)
+    results = []
+    queued = 0
+    for row in rows:
+        try:
+            svc.create(
+                organization_id=current.organization_id, invited_by_id=current.id,
+                email=row.email, name=row.name, role=row.role, app_base_url=base_url,
+            )
+            results.append({"email": row.email, "status": "queued", "reason": None})
+            queued += 1
+        except HTTPException as he:
+            results.append({"email": row.email, "status": "skipped", "reason": he.detail})
+        except Exception as e:
+            results.append({"email": row.email, "status": "error", "reason": str(e)[:200]})
+    return {"queued": queued, "total": len(rows), "results": results}
+
+
 # ── Public endpoints (no auth — keyed by opaque token) ───────────────
 public_router = APIRouter(prefix="/api/invitations", tags=["Invitations"])
 

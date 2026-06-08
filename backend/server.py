@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.database import Base, engine
 from routers import auth as auth_router
+from routers import badge_tiers as badge_tiers_router
 from routers import courses as courses_router
 from routers import exams as exams_router
 from routers import extras as extras_router
@@ -69,6 +70,7 @@ app.include_router(iter5_router.uploads_router)
 app.include_router(iter5_router.comments_router)
 app.include_router(iter5_router.academies_router)
 app.include_router(iter5_router.portal_router)
+app.include_router(badge_tiers_router.router)
 
 
 @app.get("/api")

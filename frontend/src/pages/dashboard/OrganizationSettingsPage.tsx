@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, API_BASE, getAccessToken } from 'lib/api'
-import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check } from 'lucide-react'
+import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function OrganizationSettingsPage() {
@@ -77,6 +77,25 @@ export default function OrganizationSettingsPage() {
     finally { setPreviewing(false) }
   }
 
+  // Render the cert using a preset's values — no DB write.
+  const previewPreset = async (preset: any) => {
+    setPreviewing(true)
+    try {
+      const r = await api.post('/admin/cert-preview', {
+        organisation_name: org.name,
+        organisation_logo_url: org.logo_url,
+        accent_color: preset.cert_accent_color,
+        signature_text: org.cert_signature_text || preset.cert_signature_text_suggestion,
+        signature_image_url: org.cert_signature_image_url,
+        footer_text: org.cert_footer_text || preset.cert_footer_text_suggestion,
+      }, { responseType: 'blob' })
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(URL.createObjectURL(r.data))
+      toast.message(`Previewing "${preset.name}" — click Apply to keep it`)
+    } catch (e: any) { toast.error('Could not render preview') }
+    finally { setPreviewing(false) }
+  }
+
   const uploadImage = async (file: File, target: 'logo' | 'signature') => {
     if (file.size > 5 * 1024 * 1024) { toast.error('Max 5 MB'); return }
     const fd = new FormData(); fd.append('file', file)
@@ -131,15 +150,15 @@ export default function OrganizationSettingsPage() {
           )}
         </Section>
 
-        <Section icon={Sparkles} title="Theme presets" help="One-click brand kits. Tap to apply — your existing logo, signature image, and any customised text are preserved.">
+        <Section icon={Sparkles} title="Theme presets" help="Hover for Preview / Apply. Preview renders the cert with the preset's colors WITHOUT saving. Apply persists.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="theme-presets-grid">
             {themes.map((t: any) => {
               const active = org.theme_preset === t.slug
+              const busy = applyingTheme === t.slug
               return (
-                <button key={t.slug} type="button" onClick={() => applyTheme(t.slug)}
-                  disabled={applyingTheme === t.slug}
+                <div key={t.slug}
                   data-testid={`theme-preset-${t.slug}`}
-                  className={`text-left rounded-xl border p-3 flex items-start gap-3 transition hover:shadow-sm disabled:opacity-50 ${active ? 'border-indigo-500 bg-indigo-50/40 ring-1 ring-indigo-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  className={`group relative text-left rounded-xl border p-3 flex items-start gap-3 transition ${active ? 'border-indigo-500 bg-indigo-50/40 ring-1 ring-indigo-200' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'} ${busy ? 'opacity-50' : ''}`}>
                   <div className="flex flex-col gap-1 pt-0.5">
                     <span className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.primary_color }} />
                     <span className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.cert_accent_color }} />
@@ -147,8 +166,20 @@ export default function OrganizationSettingsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">{t.name}{active && <Check className="h-3.5 w-3.5 text-indigo-600" />}</p>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{t.description}</p>
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" onClick={() => previewPreset(t)}
+                        data-testid={`theme-preview-${t.slug}`}
+                        className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1 rounded-md inline-flex items-center gap-1">
+                        <Eye className="h-3 w-3" /> Preview
+                      </button>
+                      <button type="button" onClick={() => applyTheme(t.slug)} disabled={busy || active}
+                        data-testid={`theme-apply-${t.slug}`}
+                        className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 disabled:text-slate-400 disabled:hover:bg-transparent px-2 py-1 rounded-md inline-flex items-center gap-1">
+                        <Check className="h-3 w-3" /> {active ? 'Applied' : 'Apply'}
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -179,6 +210,8 @@ export default function OrganizationSettingsPage() {
             <textarea rows={2} value={org.cert_footer_text || ''} onChange={e => setOrg({...org, cert_footer_text: e.target.value})} className={inputCls} data-testid="org-footer-text" />
           </Field>
         </Section>
+
+        <SmtpSection inputCls={inputCls} />
       </div>
 
       <aside className="xl:col-span-2 sticky top-6 self-start">
@@ -229,5 +262,88 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
       <input value={value} onChange={e => onChange(e.target.value)} placeholder="#6366f1"
         className={`flex-1 ${inputCls} font-mono`} />
     </div>
+  )
+}
+
+
+function SmtpSection({ inputCls }: { inputCls: string }) {
+  const [cfg, setCfg] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [testTo, setTestTo] = useState('')
+  const [testing, setTesting] = useState(false)
+
+  useEffect(() => { api.get('/organization/smtp').then(r => setCfg(r.data)).catch(() => setCfg({})) }, [])
+  if (!cfg) return null
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.put('/organization/smtp', cfg)
+      toast.success('SMTP settings saved')
+      const r = await api.get('/organization/smtp'); setCfg(r.data)
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
+    finally { setSaving(false) }
+  }
+
+  const sendTest = async () => {
+    if (!testTo) return toast.error('Enter a recipient first')
+    setTesting(true)
+    try {
+      await api.post('/organization/smtp/test', { to: testTo })
+      toast.success('Test email sent — check inbox')
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Test failed') }
+    finally { setTesting(false) }
+  }
+
+  return (
+    <Section icon={Mail} title="Email delivery (per-tenant SMTP)" help="When configured, outbox emails go via this server instead of the global stub. Leave host blank to disable.">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">SMTP host</label>
+          <input value={cfg.smtp_host || ''} onChange={e => setCfg({ ...cfg, smtp_host: e.target.value })} placeholder="smtp.sendgrid.net" className={inputCls} data-testid="smtp-host" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Port</label>
+          <input type="number" value={cfg.smtp_port || ''} onChange={e => setCfg({ ...cfg, smtp_port: Number(e.target.value) || null })} placeholder="587" className={inputCls} data-testid="smtp-port" />
+        </div>
+        <div className="flex items-end pb-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={cfg.smtp_use_tls ?? true} onChange={e => setCfg({ ...cfg, smtp_use_tls: e.target.checked })} data-testid="smtp-tls" className="rounded" />
+            Use STARTTLS
+          </label>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Username</label>
+          <input value={cfg.smtp_username || ''} onChange={e => setCfg({ ...cfg, smtp_username: e.target.value })} placeholder="apikey" className={inputCls} data-testid="smtp-user" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Password {cfg.has_password && <span className="text-emerald-600 ml-1">(stored)</span>}</label>
+          <input type="password" value={cfg.smtp_password || ''} onChange={e => setCfg({ ...cfg, smtp_password: e.target.value })} placeholder={cfg.has_password ? '••• stored, type to replace' : 'API key or password'} className={inputCls} data-testid="smtp-password" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">From email</label>
+          <input value={cfg.smtp_from_email || ''} onChange={e => setCfg({ ...cfg, smtp_from_email: e.target.value })} placeholder="learn@ifpi.org" className={inputCls} data-testid="smtp-from-email" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">From name</label>
+          <input value={cfg.smtp_from_name || ''} onChange={e => setCfg({ ...cfg, smtp_from_name: e.target.value })} placeholder="IFPI Learning" className={inputCls} data-testid="smtp-from-name" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+        <div className="flex items-center gap-2">
+          <input value={testTo} onChange={e => setTestTo(e.target.value)} placeholder="test@example.com"
+                 className={`w-56 ${inputCls}`} data-testid="smtp-test-to" />
+          <button type="button" onClick={sendTest} disabled={testing || !cfg.is_configured}
+                  data-testid="smtp-test-btn"
+                  className="inline-flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-xs font-medium px-3 py-2 rounded-lg">
+            <Send className="h-3.5 w-3.5" /> {testing ? 'Sending…' : 'Send test'}
+          </button>
+        </div>
+        <button type="button" onClick={save} disabled={saving} data-testid="smtp-save"
+                className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50">
+          <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save SMTP'}
+        </button>
+      </div>
+    </Section>
   )
 }
