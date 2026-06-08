@@ -27,7 +27,7 @@ class InvitationService:
 
     def create(self, organization_id: int, invited_by_id: int,
                email: str, name: Optional[str], role: str,
-               app_base_url: str) -> Invitation:
+               app_base_url: str, cohort: Optional[str] = None) -> Invitation:
         email = (email or "").lower().strip()
         if not email:
             raise HTTPException(status_code=400, detail="email is required")
@@ -55,6 +55,7 @@ class InvitationService:
         inv = Invitation(
             organization_id=organization_id, email=email, name=name,
             role=canonical_role, token=token, invited_by_id=invited_by_id,
+            cohort=cohort,
             expires_at=now + timedelta(days=INVITE_TTL_DAYS),
         )
         self.db.add(inv)

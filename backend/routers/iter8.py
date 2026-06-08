@@ -131,16 +131,13 @@ def my_transcript(db: Session = Depends(get_db),
     ).all()
     courses = {c.id: c for c in db.query(Course).filter(
         Course.id.in_([e.course_id for e in enrolls])).all()}
-    attempts = db.query(ExamAttempt).filter(
+    # Join exam→course once instead of touching a.exam.course_id N times
+    from models import Exam
+    attempt_rows = db.query(ExamAttempt, Exam.course_id).join(Exam, Exam.id == ExamAttempt.exam_id).filter(
         ExamAttempt.user_id == user.id, ExamAttempt.score.isnot(None),
     ).order_by(ExamAttempt.completed_at.desc().nullslast()).all()
     best_score_per_course: dict[int, float] = {}
-    for a in attempts:
-        cid = None
-        try:
-            cid = a.exam.course_id if a.exam else None
-        except Exception:
-            cid = None
+    for a, cid in attempt_rows:
         if cid and (cid not in best_score_per_course or a.score > best_score_per_course[cid]):
             best_score_per_course[cid] = a.score
     badges = db.query(UserBadge).filter(UserBadge.user_id == user.id).order_by(UserBadge.earned_at.asc()).all()
