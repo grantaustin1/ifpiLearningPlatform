@@ -22,6 +22,17 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 10)
+- ✅ **Per-tenant cohort threshold + Discord/Slack webhook** — `organizations.cohort_threshold` (default 75) + `cohort_celebration_webhook_url` (nullable) (migration `b3d8915cef27`). `check_cohorts()` reads per-org threshold; celebrations POST to the webhook with a Slack/Discord-compatible payload. New `/settings → Cohort milestone celebrations` card with a 1-100 slider + monospace webhook URL field + Save button. Idempotency still holds — lowering threshold doesn't re-fire existing milestones.
+- ✅ **Cohort-scoped leaderboard** — `GET /api/gamification/leaderboard?cohort=X` filters to a single cohort. `/leaderboard` page (admin only) gains a cohort dropdown next to the title; banner reflects active filter.
+- ✅ **Loading skeletons + empty state** on `/reports` cohort widget — animated skeleton tiles while `cohortStats` loads; friendly empty card with a link to `/users` when zero cohorts exist.
+- ✅ **GitHub Actions PR comment workflow** — `.github/workflows/pr-agent-comments.yml` runs on `workflow_run` completion, downloads the `agent-reports` artifact, formats agent_007/008/010 results, and updates a sticky PR comment via the GitHub API.
+- ✅ **NEW IMPROVEMENT — AI quiz generator**: `POST /api/exams/ai-generate-questions` ingests a course's slide content into Emergent LLM (gpt-4o-mini), returns 1-20 validated multiple-choice questions (correct answer always present in options). `PUT /exams/{id}/questions?mode=replace|append` with `Literal` validation (422 on bad mode). New "AI quiz" button on `/exams` opens a modal that does **generate → review-and-edit → save as new exam OR append to existing exam**. Each generation writes an `AI_QUIZ_GENERATED` audit row.
+- ✅ Code-review fixes from reviewer:
+  - `mode` query param now uses `Literal["replace","append"]` → 422 on invalid values (was silently appending).
+  - AI quiz error responses now include the exception class name (`AI generation failed (TimeoutError) — please retry`) so admins can distinguish auth/timeout/rate-limit failures without grepping logs.
+- ✅ Tests: **iter10 14/14 PASS**, iter9 11/11, iter8 16/16. AI quiz returned 3 valid music-industry MCQs in ~5s with correct answers in options. Frontend Playwright 100%.
+
 ## What's been implemented (2026-02-08 — iteration 9)
 - ✅ **Cohort-aware dashboard widgets** — new "Cohort breakdown" card on `/reports` with a dropdown of all cohorts (with learner counts) and 5 live stat tiles (Learners / Enrollments / Completion rate (indigo accent) / Avg exam score / Certificates).
 - ✅ **JSONB migration** — `a9c2470b8e15` no-op on SQLite, converts `audit_logs.audit_metadata` to JSONB + creates a GIN index on Postgres. Single migration, dialect-aware.
@@ -127,10 +138,10 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 
 ## Prioritised backlog
 - **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction in place — pure config flip.
-- **P3** — Per-tenant cohort threshold + optional Discord/Slack webhook URL for celebrations (today threshold is a global 75% constant and celebrations fan out as email only).
-- **P3** — Cohort-aware leaderboard scope on `/leaderboard` (mirror what we did on `/reports`).
-- **P3** — UI loading/empty/error states on the cohort widget (today the tiles silently vanish on API error).
-- **P3** — Push agent_008 result + agent_007 JSON report as a PR comment via the GitHub Checks API.
+- **P3** — AI quiz "regenerate this one question" affordance (per-card refresh inside the review modal).
+- **P3** — AI quiz: support short-answer & true/false question types (currently MCQ only).
+- **P3** — Surface the `AI_QUIZ_GENERATED` audit metadata (course, count, exception class) in the /audit page action pill colour.
+- **P3** — Cohort leaderboard CSV export (admin → "Download as CSV").
 
 ## Deliberately deferred (not forgotten)
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
