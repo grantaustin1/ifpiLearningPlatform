@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Mail, CheckCircle, AlertCircle, Clock, FileText, Send } from 'lucide-react'
+import { Mail, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
 
 export default function OutboxPage() {

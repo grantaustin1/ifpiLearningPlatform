@@ -458,22 +458,6 @@ def remove_prerequisite(course_id: int, prereq_course_id: int, db: Session = Dep
     return {"ok": True}
 
 
-# ── Slide reorder ─────────────────────────────────────────────────────
-@router.patch("/{course_id}/slides/reorder")
-def reorder_slides(course_id: int, body: dict, db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
-    """Accepts {"slide_ids": [id1, id2, ...]} in the desired order."""
-    c = db.query(Course).filter(
-        Course.id == course_id, Course.organization_id == current.organization_id,
-    ).first()
-    if not c:
-        raise HTTPException(status_code=404, detail="Course not found")
-    ids = body.get("slide_ids") or []
-    if not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="slide_ids must be a list")
-    slides = {s.id: s for s in c.slides}
-    for i, sid in enumerate(ids, start=1):
-        if sid in slides:
-            slides[sid].order_index = i
-    db.commit()
-    return {"ok": True, "count": len(ids)}
+# (Slide reorder route is declared earlier in this file, before the dynamic
+# /slides/{slide_id} route — see line ~193 — to avoid FastAPI's prefix
+# matching grabbing the static "reorder" path as a dynamic id.)
