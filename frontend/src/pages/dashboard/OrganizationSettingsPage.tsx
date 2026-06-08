@@ -13,6 +13,22 @@ export default function OrganizationSettingsPage() {
 
   useEffect(() => { api.get('/organization').then(r => setOrg(r.data)) }, [])
 
+  // Auto-debounced live preview: re-render the cert PDF 500ms after the
+  // admin stops typing/changing branding fields. Initial render is skipped
+  // until the org is loaded and the first manual preview is rendered.
+  const previewKey = JSON.stringify({
+    n: org?.name, l: org?.logo_url, a: org?.cert_accent_color,
+    p: org?.primary_color, st: org?.cert_signature_text,
+    si: org?.cert_signature_image_url, f: org?.cert_footer_text,
+  })
+  useEffect(() => {
+    if (!org) return
+    if (!previewUrl) return // wait until user clicks "Live preview" once
+    const t = setTimeout(() => { livePreview() }, 500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewKey])
+
   const save = async () => {
     setSaving(true)
     try {

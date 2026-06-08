@@ -127,10 +127,12 @@ def test_image_upload_admin_then_serve(admin_session):
     r = admin_session.post(f"{API}/uploads/image", files=files)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert "url" in data and "filename" in data and "size" in data
+    assert "url" in data and ("key" in data or "filename" in data) and "size" in data
     assert data["size"] == len(PNG_BYTES)
-    # GET that URL returns same bytes
-    r2 = requests.get(data["url"])
+    # GET that URL returns same bytes — url is relative under the new
+    # storage abstraction (resolves through the ingress).
+    full_url = data["url"] if data["url"].startswith("http") else f"{BASE_URL}{data['url']}"
+    r2 = requests.get(full_url)
     assert r2.status_code == 200
     assert r2.headers["content-type"].startswith("image/png")
     assert r2.content == PNG_BYTES
