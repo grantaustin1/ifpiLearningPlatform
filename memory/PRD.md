@@ -22,6 +22,13 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 6)
+- ✅ **Course catalog drag-reorder** — `courses.display_order` column (migration `c1f29b3e9d04`) + `PATCH /api/courses/reorder` endpoint. Admin Courses page has a "Reorder" toggle that switches the grid into a vertical SortableList with drag handles. Order is honored on both `/courses` and the public `/portal/:slug` endpoint.
+- ✅ **Academies search/filter/sort** — `GET /api/academies` now accepts `q`, `status_filter`, and `sort` (newest/oldest/name/users/courses). New search input + status dropdown + sort dropdown + Clear link on the Academies page. Cards now show a theme_preset pill when one is applied + use the academy's primary_color in the icon background.
+- ✅ **NEW: Per-academy theme presets** — `services/theme_presets.py` ships 5 curated brand kits (IFPI Classic, Conservatoire, Modern Music School, Industry Body, Label Academy). One click on `/settings → Theme presets` copies primary + cert-accent colors and seeds signature/footer text **only if those fields are still empty** (never overwrites admin customisations). Schema: `organizations.theme_preset` (nullable string).
+- ✅ **ERP360 webhook receiver reference** — `/app/docs/ERP360_INTEGRATION.md` is a paste-ready FastAPI snippet the ERP360 team can drop into their codebase (HMAC verification + 5-min replay window). IFPI itself unchanged — outbox worker already emits the signed headers via `sign_outgoing_payload()`.
+- ✅ Tests: iter6 backend suite 11/11 PASS, iter5 regression 20/20 PASS, frontend Playwright 100% on theme apply / restore / courses reorder / academies filter+sort+clear flows.
+
 ## What's been implemented (2026-02-08 — iteration 5 polish)
 - ✅ **Pluggable storage backend** — ported the ERP360 `storage_service.py` pattern into `/app/backend/services/storage_service.py` as a clean, IFPI-owned port (zero imports from ERP360). Selectable via `STORAGE_BACKEND={local|s3|gcs}` env var. Default stays `local` writing to `./uploads/`. boto3 + google-cloud-storage are lazy-loaded so they aren't hard deps until needed. The `POST /api/uploads/image` route now delegates to `get_storage().save()`; uploads land under a `branding/` namespace prefix. Legacy flat-path URLs continue to serve (path:path matcher), so old logos don't break.
 - ✅ **`PUBLIC_BASE_URL` env** — added `settings.public_base_url`; when set, cert verify URLs in preview + emails use it instead of `request.base_url` (which yields the cluster-internal hostname under k8s ingress). Safe default: empty string falls back to current behavior.
@@ -91,13 +98,14 @@ User-confirmed choices (all option (a)):
 That's it. No ERP360 schema changes, no model merges, no shared codebase. Two new ERP360 endpoints + one nav link.
 
 ## Prioritised backlog
-- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction is already in place — just set `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds. Zero code change needed. *(Note: ERP360 also still runs on local disk — when they migrate, both apps flip together.)*
-- **P3** — Outgoing /leads → ERP360 webhook receiver in ERP360 to verify the HMAC headers we now emit.
-- **P3** — Drag-reorder for badge tiers + course catalog ordering.
-- **P3** — Sort/filter/search on the Academies page once there are many tenants.
+- **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction already in place — `STORAGE_BACKEND=s3` + `S3_BUCKET=...` + AWS creds and you're done. Pure config.
+- **P3** — Drag-reorder for badge tiers. *(Deferred — badges are hard-coded identifiers in `gamification_service.BADGE_META`, no DB rows to reorder. Reorderable only after badges become organization-configurable, which is its own feature.)*
+- **P3** — Live "preview my preset" before applying (currently apply is the only way to see the cert in the preset's accent).
+- **P3** — Per-tenant SMTP overrides (today email is global stub or routed to ERP360).
 
 ## Deliberately deferred (not forgotten)
 - ERP360 SSO bridge (`POST /api/sso/mint` on ERP360 + flip `SSO_ENABLED=true` here). IFPI is fully functional without it — every ERP360 integration seam (SSO, live billing, mail dispatch) is feature-flagged off by default. Activating any of them is a single env-var change.
+- ERP360 webhook receiver — IFPI emits HMAC-signed webhooks today; ERP360 just needs to add the receiver route. Paste-ready code at `/app/docs/ERP360_INTEGRATION.md`.
 
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.
