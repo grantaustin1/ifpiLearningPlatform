@@ -1,7 +1,7 @@
 """Exam routes: CRUD + question management + take + attempt submission."""
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -128,7 +128,7 @@ def delete_exam(exam_id: int, db: Session = Depends(get_db),
 
 @router.put("/{exam_id}/questions", response_model=List[QuestionOut])
 def replace_questions(exam_id: int, body: List[QuestionIn],
-                      mode: str = "replace",
+                      mode: Literal["replace", "append"] = "replace",
                       db: Session = Depends(get_db),
                       current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
     """mode='replace' (default) wipes & sets. mode='append' adds to existing."""

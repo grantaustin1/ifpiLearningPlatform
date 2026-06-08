@@ -85,7 +85,10 @@ async def generate_questions(
         raw = await chat.send_message(UserMessage(text=prompt))
     except Exception as e:
         logger.exception("AI quiz LLM call failed: %s", e)
-        raise HTTPException(status_code=502, detail="AI generation failed — please retry")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI generation failed ({type(e).__name__}) — please retry",
+        )
 
     text = (raw if isinstance(raw, str) else getattr(raw, "content", str(raw))).strip()
     # Strip code fences the model may have added despite the prompt
