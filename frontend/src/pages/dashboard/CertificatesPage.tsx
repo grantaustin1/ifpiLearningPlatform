@@ -1,11 +1,26 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from 'lib/api'
-import { Award } from 'lucide-react'
+import { api, API_BASE, getAccessToken } from 'lib/api'
+import { Award, Download } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function CertificatesPage() {
   const { data: certs = [], isLoading } = useQuery<any[]>({
     queryKey: ['certificates'], queryFn: async () => (await api.get('/certificates')).data,
   })
+
+  const downloadPdf = async (cert: any) => {
+    try {
+      const r = await api.get(`/certificates/${cert.id}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `IFPI-Certificate-${cert.code}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      toast.error('Could not download certificate')
+    }
+  }
 
   return (
     <div className="p-8" data-testid="certificates-page">
@@ -26,7 +41,13 @@ export default function CertificatesPage() {
                 <p className="text-xs text-slate-500 mt-0.5">{c.type}</p>
                 <p className="text-[11px] text-slate-400 mt-1 font-mono">/{c.code}</p>
               </div>
-              <a href={`/verify/${c.code}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">Verify</a>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={() => downloadPdf(c)} data-testid={`cert-download-${c.id}`}
+                  className="inline-flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium">
+                  <Download className="h-3.5 w-3.5" /> PDF
+                </button>
+                <a href={`/verify/${c.code}`} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium text-center">Verify</a>
+              </div>
             </div>
           ))}
         </div>

@@ -5,6 +5,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -97,6 +98,38 @@ def verify_certificate(code: str, db: Session = Depends(get_db)):
         "course_title": c.course.title if c.course else None,
         "issued_at": c.issued_at,
     }
+
+
+@cert_router.get("/{cert_id}/pdf")
+def download_certificate_pdf(
+    cert_id: int, request: Request, db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Generate a branded PDF for a certificate. Owner or admin only."""
+    from services.pdf_certificate_service import render_certificate
+    c = db.query(Certificate).filter(Certificate.id == cert_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    # Only the certificate owner or an admin in the same org can download
+    if c.user_id != current.id and not current.has_any_role({"ADMIN", "SUPER_ADMIN"}):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    # Build the public verify URL
+    base = str(request.base_url).rstrip("/")
+    verify_url = f"{base}/verify/{c.code}"
+    pdf = render_certificate(
+        recipient_name=c.user.name or c.user.email,
+        course_title=c.course.title if c.course else "IFPI Course",
+        certificate_code=c.code,
+        issued_at=c.issued_at,
+        verify_url=verify_url,
+        score=c.score,
+        cert_type="Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title(),
+    )
+    filename = f"IFPI-Certificate-{c.code}.pdf"
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Notifications ────────────────────────────────────────────────────

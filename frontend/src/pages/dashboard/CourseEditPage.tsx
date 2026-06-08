@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 
 const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF']
@@ -65,6 +65,26 @@ export default function CourseEditPage() {
     if (active === sid) setActive(remaining[0]?.id ?? null)
   }
 
+  const publish = async () => {
+    try {
+      const r = await api.post(`/courses/${id}/publish`)
+      setCourse({ ...course, status: r.data.status })
+      toast.success('Course published')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Publish failed')
+    }
+  }
+
+  const unpublish = async () => {
+    try {
+      const r = await api.post(`/courses/${id}/unpublish`)
+      setCourse({ ...course, status: r.data.status })
+      toast.success('Course unpublished')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed')
+    }
+  }
+
   const update = (sid: number, patch: any) =>
     setSlides(prev => prev.map(s => s.id === sid ? { ...s, ...patch } : s))
 
@@ -102,12 +122,24 @@ export default function CourseEditPage() {
       <div className="flex-1 flex flex-col">
         <div className="bg-white border-b px-5 py-3 flex items-center justify-between">
           {savedAt ? <div className="text-sm text-emerald-600 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Saved {savedAt.toLocaleTimeString()}</div> : <div />}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${course.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`} data-testid="course-status-pill">{course.status}</span>
             <Link to={`/learn/${id}`} className="inline-flex items-center gap-1.5 text-xs border border-slate-200 rounded-lg px-3 py-1.5 font-medium"><Eye className="h-3.5 w-3.5" /> Preview</Link>
             <button onClick={save} disabled={saving} data-testid="save-course-btn"
-              className="inline-flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">
               <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
             </button>
+            {course.status === 'PUBLISHED' ? (
+              <button onClick={unpublish} data-testid="unpublish-btn"
+                className="inline-flex items-center gap-1.5 text-xs border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg px-3 py-1.5 font-medium">
+                <EyeOff className="h-3.5 w-3.5" /> Unpublish
+              </button>
+            ) : (
+              <button onClick={publish} data-testid="publish-btn"
+                className="inline-flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 font-medium shadow-sm">
+                <Send className="h-3.5 w-3.5" /> Publish
+              </button>
+            )}
           </div>
         </div>
         {activeSlide ? (

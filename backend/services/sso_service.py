@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from core.config import settings
 from core.role_registry import normalize_role_names
-from models import Organization, User, UserRole
+from models import LifecycleStage, Organization, Person, User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,25 @@ class SSOService:
             user.name = claims.get("name") or user.name
             user.erp360_user_id = int(erp_user_id) if erp_user_id else user.erp360_user_id
             user.is_active = True
+
+        # Person identity row — upsert with erp360_person_id from claim if present
+        person = self.db.query(Person).filter(Person.user_id == user.id).first()
+        erp_person_id = claims.get("person_id") or claims.get("erp360_person_id")
+        if not person:
+            person = Person(
+                user_id=user.id, organization_id=org.id,
+                email=email, name=claims.get("name"),
+                lifecycle_stage=LifecycleStage.LEARNER,
+                source="sso_erp360",
+                erp360_person_id=int(erp_person_id) if erp_person_id else None,
+            )
+            self.db.add(person)
+        else:
+            person.email = email
+            person.name = claims.get("name") or person.name
+            person.lifecycle_stage = LifecycleStage.LEARNER
+            if erp_person_id:
+                person.erp360_person_id = int(erp_person_id)
 
         # Map roles ERP360 → IFPI
         incoming_erp_roles = normalize_role_names(claims.get("roles") or [])
