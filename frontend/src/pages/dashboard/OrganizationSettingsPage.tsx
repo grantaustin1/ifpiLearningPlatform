@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, API_BASE, getAccessToken } from 'lib/api'
-import { Save, Palette, Award, Building2, Eye, Upload } from 'lucide-react'
+import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function OrganizationSettingsPage() {
@@ -8,10 +8,26 @@ export default function OrganizationSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState(false)
+  const [themes, setThemes] = useState<any[]>([])
+  const [applyingTheme, setApplyingTheme] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const sigInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { api.get('/organization').then(r => setOrg(r.data)) }, [])
+  useEffect(() => {
+    api.get('/organization').then(r => setOrg(r.data))
+    api.get('/organization/themes').then(r => setThemes(r.data)).catch(() => {})
+  }, [])
+
+  const applyTheme = async (slug: string) => {
+    setApplyingTheme(slug)
+    try {
+      await api.post(`/organization/apply-theme/${slug}`)
+      const r = await api.get('/organization')
+      setOrg(r.data)
+      toast.success(`Applied "${themes.find(t => t.slug === slug)?.name}" theme`)
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Could not apply theme') }
+    finally { setApplyingTheme(null) }
+  }
 
   // Auto-debounced live preview: re-render the cert PDF 500ms after the
   // admin stops typing/changing branding fields. Initial render is skipped
@@ -115,6 +131,29 @@ export default function OrganizationSettingsPage() {
           )}
         </Section>
 
+        <Section icon={Sparkles} title="Theme presets" help="One-click brand kits. Tap to apply — your existing logo, signature image, and any customised text are preserved.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="theme-presets-grid">
+            {themes.map((t: any) => {
+              const active = org.theme_preset === t.slug
+              return (
+                <button key={t.slug} type="button" onClick={() => applyTheme(t.slug)}
+                  disabled={applyingTheme === t.slug}
+                  data-testid={`theme-preset-${t.slug}`}
+                  className={`text-left rounded-xl border p-3 flex items-start gap-3 transition hover:shadow-sm disabled:opacity-50 ${active ? 'border-indigo-500 bg-indigo-50/40 ring-1 ring-indigo-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <div className="flex flex-col gap-1 pt-0.5">
+                    <span className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.primary_color }} />
+                    <span className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.cert_accent_color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">{t.name}{active && <Check className="h-3.5 w-3.5 text-indigo-600" />}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{t.description}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </Section>
+
         <Section icon={Palette} title="Brand colours">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Primary"><ColorInput value={org.primary_color || '#6366f1'} onChange={(v: string) => setOrg({...org, primary_color: v})} /></Field>
@@ -161,10 +200,12 @@ export default function OrganizationSettingsPage() {
 
 const inputCls = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
 
-function Section({ icon: Icon, title, children }: any) {
+function Section({ icon: Icon, title, help, children }: any) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 mb-4">
-      <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2"><Icon className="h-4 w-4 text-indigo-500" /> {title}</h2>
+      <h2 className="text-sm font-semibold text-slate-900 mb-1 flex items-center gap-2"><Icon className="h-4 w-4 text-indigo-500" /> {title}</h2>
+      {help && <p className="text-xs text-slate-500 mb-4">{help}</p>}
+      {!help && <div className="mb-4" />}
       {children}
     </div>
   )

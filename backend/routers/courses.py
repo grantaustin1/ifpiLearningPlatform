@@ -49,8 +49,28 @@ def list_courses(
         query = query.filter(Course.title.ilike(f"%{q}%"))
     if category:
         query = query.filter(Course.category == category)
-    courses = query.order_by(Course.created_at.desc()).all()
+    courses = query.order_by(Course.display_order.asc(), Course.created_at.desc()).all()
     return [_summary(c) for c in courses]
+
+
+@router.patch("/reorder")
+def reorder_catalog(
+    body: dict, db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
+):
+    """Body: {"course_ids": [id1, id2, ...]} — sets display_order to the
+    list index. Only courses in the caller's org are updated."""
+    ids = body.get("course_ids") or []
+    rows = db.query(Course).filter(
+        Course.id.in_(ids),
+        Course.organization_id == current.organization_id,
+    ).all()
+    by_id = {c.id: c for c in rows}
+    for idx, cid in enumerate(ids):
+        if cid in by_id:
+            by_id[cid].display_order = idx
+    db.commit()
+    return {"ok": True, "updated": len(rows)}
 
 
 @router.post("", response_model=CourseDetail)
