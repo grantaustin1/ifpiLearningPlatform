@@ -106,16 +106,16 @@ def download_certificate_pdf(
     current: CurrentUser = Depends(get_current_user),
 ):
     """Generate a branded PDF for a certificate. Owner or admin only."""
+    from models import Organization
     from services.pdf_certificate_service import render_certificate
     c = db.query(Certificate).filter(Certificate.id == cert_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Certificate not found")
-    # Only the certificate owner or an admin in the same org can download
     if c.user_id != current.id and not current.has_any_role({"ADMIN", "SUPER_ADMIN"}):
         raise HTTPException(status_code=403, detail="Forbidden")
-    # Build the public verify URL
     base = str(request.base_url).rstrip("/")
     verify_url = f"{base}/verify/{c.code}"
+    org = db.query(Organization).filter(Organization.id == c.user.organization_id).first() if c.user else None
     pdf = render_certificate(
         recipient_name=c.user.name or c.user.email,
         course_title=c.course.title if c.course else "IFPI Course",
@@ -124,6 +124,12 @@ def download_certificate_pdf(
         verify_url=verify_url,
         score=c.score,
         cert_type="Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title(),
+        organisation_name=org.name if org else "IFPI Learning",
+        organisation_logo_url=org.logo_url if org else None,
+        accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
+        signature_text=org.cert_signature_text if org else None,
+        signature_image_url=org.cert_signature_image_url if org else None,
+        footer_text=org.cert_footer_text if org else None,
     )
     filename = f"IFPI-Certificate-{c.code}.pdf"
     return Response(

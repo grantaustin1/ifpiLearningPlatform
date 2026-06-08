@@ -151,6 +151,10 @@ class OrgUpdate(BaseModel):
     logo_url: Optional[str] = None
     primary_color: Optional[str] = None
     description: Optional[str] = None
+    cert_accent_color: Optional[str] = None
+    cert_signature_text: Optional[str] = None
+    cert_signature_image_url: Optional[str] = None
+    cert_footer_text: Optional[str] = None
 
 
 @org_router.get("")
@@ -159,9 +163,15 @@ def get_org(db: Session = Depends(get_db),
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Organisation not found")
-    return {"id": o.id, "name": o.name, "slug": o.slug, "logo_url": o.logo_url,
-            "primary_color": o.primary_color, "description": o.description,
-            "status": o.status.value}
+    return {
+        "id": o.id, "name": o.name, "slug": o.slug, "logo_url": o.logo_url,
+        "primary_color": o.primary_color, "description": o.description,
+        "status": o.status.value,
+        "cert_accent_color": o.cert_accent_color,
+        "cert_signature_text": o.cert_signature_text,
+        "cert_signature_image_url": o.cert_signature_image_url,
+        "cert_footer_text": o.cert_footer_text,
+    }
 
 
 @org_router.patch("")
@@ -181,18 +191,53 @@ outbox_router = APIRouter(prefix="/api/admin/outbox", tags=["Outbox"])
 
 
 @outbox_router.get("")
-def list_outbox(limit: int = 50, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
-    rows = db.query(OutboxMessage).filter(
+def list_outbox(
+    page: int = 1,
+    page_size: int = 25,
+    status: Optional[str] = None,
+    template: Optional[str] = None,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    query = db.query(OutboxMessage).filter(
         OutboxMessage.organization_id == current.organization_id,
-    ).order_by(OutboxMessage.created_at.desc()).limit(limit).all()
-    return [{
-        "id": m.id, "to_email": m.to_email, "to_name": m.to_name,
-        "subject": m.subject, "template": m.template, "status": m.status,
-        "transport": m.transport, "error": m.error,
-        "attachments": m.attachments, "created_at": m.created_at,
-        "sent_at": m.sent_at,
-    } for m in rows]
+    )
+    if status:
+        query = query.filter(OutboxMessage.status == status.upper())
+    if template:
+        query = query.filter(OutboxMessage.template == template)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (OutboxMessage.to_email.ilike(like)) | (OutboxMessage.subject.ilike(like)),
+        )
+    total = query.count()
+    rows = query.order_by(OutboxMessage.created_at.desc())\
+                .offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "messages": [{
+            "id": m.id, "to_email": m.to_email, "to_name": m.to_name,
+            "subject": m.subject, "template": m.template, "status": m.status,
+            "transport": m.transport, "error": m.error,
+            "attachments": m.attachments, "created_at": m.created_at,
+            "sent_at": m.sent_at,
+        } for m in rows],
+        "page": page, "page_size": page_size, "total": total,
+        "total_pages": (total + page_size - 1) // page_size if page_size else 1,
+    }
+
+
+@outbox_router.get("/stats")
+def outbox_stats(db: Session = Depends(get_db),
+                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    from sqlalchemy import func as sa_func
+    rows = db.query(OutboxMessage.status, sa_func.count(OutboxMessage.id)).filter(
+        OutboxMessage.organization_id == current.organization_id,
+    ).group_by(OutboxMessage.status).all()
+    return {status: count for status, count in rows}
 
 
 # ── Learning path item reorder ────────────────────────────────────────

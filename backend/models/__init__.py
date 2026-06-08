@@ -90,6 +90,11 @@ class Organization(Base):
     description = Column(Text)
     logo_url = Column(String(500))
     primary_color = Column(String(16), default="#6366f1")
+    # Certificate branding (used by services/pdf_certificate_service.py)
+    cert_accent_color = Column(String(16))               # falls back to primary_color
+    cert_signature_text = Column(String(200))            # e.g. "Frances Moore, CEO"
+    cert_signature_image_url = Column(String(500))       # signature PNG/SVG
+    cert_footer_text = Column(Text)                      # disclaimer / contact line
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

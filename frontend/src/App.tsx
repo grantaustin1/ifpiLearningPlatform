@@ -16,6 +16,7 @@ import ReportsPage from 'pages/dashboard/ReportsPage'
 import LeaderboardPage from 'pages/dashboard/LeaderboardPage'
 import BillingPage from 'pages/dashboard/BillingPage'
 import OutboxPage from 'pages/dashboard/OutboxPage'
+import OrganizationSettingsPage from 'pages/dashboard/OrganizationSettingsPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/outbox" element={<Protected adminOnly><OutboxPage /></Protected>} />
+        <Route path="/settings" element={<Protected adminOnly><OrganizationSettingsPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />

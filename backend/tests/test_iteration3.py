@@ -58,7 +58,8 @@ def second_course(admin):
 def test_alembic_head_is_iteration3():
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
-    assert "feb2000f209a" in out, out
+    # Iteration 4 raised head — accept both
+    assert ("feb2000f209a" in out) or ("7497425df8bc" in out), out
 
 
 def test_new_tables_exist():
@@ -139,7 +140,8 @@ def test_invitation_create_list_and_outbox(admin):
     lst = admin.get(f"{BASE_URL}/api/admin/invitations").json()
     assert any(i["email"] == email for i in lst)
     # outbox
-    ob = admin.get(f"{BASE_URL}/api/admin/outbox").json()
+    ob_resp = admin.get(f"{BASE_URL}/api/admin/outbox?page_size=100").json()
+    ob = ob_resp["messages"] if isinstance(ob_resp, dict) else ob_resp
     assert any(m["to_email"] == email and "invit" in (m.get("template") or "").lower() for m in ob)
 
 
@@ -231,14 +233,18 @@ def test_cert_email_outbox_no_duplicate(admin, learner):
     conn.commit()
     conn.close()
 
-    before = admin.get(f"{BASE_URL}/api/admin/outbox").json()
+    def _outbox():
+        d = admin.get(f"{BASE_URL}/api/admin/outbox?page_size=200").json()
+        return d["messages"] if isinstance(d, dict) else d
+
+    before = _outbox()
     before_cert = [m for m in before if (m.get("template") or "") == "cert_issued"]
     before_count = len(before_cert)
 
     r = learner.post(f"{BASE_URL}/api/courses/1/complete")
     assert r.status_code == 200, r.text
 
-    after = admin.get(f"{BASE_URL}/api/admin/outbox").json()
+    after = _outbox()
     after_cert = [m for m in after if (m.get("template") or "") == "cert_issued"]
     assert len(after_cert) == before_count + 1, "expected 1 new cert_issued outbox message"
     newest = after_cert[0]
@@ -247,7 +253,7 @@ def test_cert_email_outbox_no_duplicate(admin, learner):
     # second completion should NOT add another email
     r2 = learner.post(f"{BASE_URL}/api/courses/1/complete")
     assert r2.status_code == 200
-    after2 = admin.get(f"{BASE_URL}/api/admin/outbox").json()
+    after2 = _outbox()
     after2_cert = [m for m in after2 if (m.get("template") or "") == "cert_issued"]
     assert len(after2_cert) == before_count + 1, "duplicate cert email created on re-complete"
 

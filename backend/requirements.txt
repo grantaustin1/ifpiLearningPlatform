@@ -1,12 +1,13 @@
 alembic==1.14.0
+apscheduler==3.10.4
 bcrypt==4.2.1
 emergentintegrations
 fastapi==0.115.5
 httpx==0.28.0
 pillow==12.2.0
 psycopg2-binary==2.9.10
-pydantic[email]==2.10.3
 pydantic-settings==2.6.1
+pydantic[email]==2.10.3
 python-dotenv==1.0.1
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.18

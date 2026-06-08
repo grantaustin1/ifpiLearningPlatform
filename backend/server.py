@@ -86,3 +86,12 @@ def on_startup():
     # Seed minimal data if the DB is empty (idempotent).
     from seed.seed_minimal import run_if_empty
     run_if_empty()
+    # Start the background outbox worker
+    from services.outbox_worker import start_scheduler
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    from services.outbox_worker import shutdown_scheduler
+    shutdown_scheduler()
