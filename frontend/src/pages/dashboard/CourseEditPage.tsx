@@ -138,6 +138,7 @@ export default function CourseEditPage() {
 
       <aside className="w-72 bg-white border-l p-4 overflow-y-auto">
         <h3 className="font-semibold text-slate-900 text-sm mb-4">Course Settings</h3>
+        <Field label="Title"><input value={course.title || ''} onChange={e => setCourse({ ...course, title: e.target.value })} data-testid="sidebar-course-title" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
         <Field label="Description"><textarea value={course.description || ''} onChange={e => setCourse({ ...course, description: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
         <Field label="Category"><input value={course.category || ''} onChange={e => setCourse({ ...course, category: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
         <Field label="Duration (minutes)"><input type="number" min={0} value={course.duration_minutes || 0} onChange={e => setCourse({ ...course, duration_minutes: +e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
