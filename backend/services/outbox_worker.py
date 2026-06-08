@@ -115,6 +115,19 @@ def _tick():
         db.commit()
 
 
+def _cohort_tick():
+    """Periodic cohort milestone checker. Independent from the outbox drain
+    so it runs at a lower cadence and never blocks email delivery."""
+    try:
+        with SessionLocal() as db:
+            from services.cohort_celebrations import check_cohorts
+            fired = check_cohorts(db)
+            if fired:
+                logger.info("Fired %s cohort celebration(s) this tick", fired)
+    except Exception as e:
+        logger.exception("cohort celebration tick failed: %s", e)
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -124,9 +137,13 @@ def start_scheduler() -> None:
         _tick, "interval", seconds=WORKER_INTERVAL_SECONDS,
         id="outbox_drain", max_instances=1, coalesce=True,
     )
+    sched.add_job(
+        _cohort_tick, "interval", seconds=60,  # check once a minute
+        id="cohort_celebrations", max_instances=1, coalesce=True,
+    )
     sched.start()
     _scheduler = sched
-    logger.info("Outbox worker scheduled every %ss (max %s attempts)",
+    logger.info("Outbox worker scheduled every %ss (max %s attempts), cohort celebrator every 60s",
                 WORKER_INTERVAL_SECONDS, MAX_ATTEMPTS)
 
 
