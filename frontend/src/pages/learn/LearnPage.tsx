@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ChevronLeft, ChevronRight, CheckCircle, Star } from 'lucide-react'
 import { toast } from 'sonner'
+import CommentsPanel from 'components/CommentsPanel'
 
 export default function LearnPage() {
   const { courseId } = useParams()
@@ -72,6 +73,7 @@ export default function LearnPage() {
               {slide.slide_type === 'VIDEO' && slide.media_url && <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allowFullScreen title="video" /></div>}
               {slide.slide_type === 'IMAGE' && slide.media_url && <img src={slide.media_url} alt="" className="mb-6 rounded-xl w-full" />}
               {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: slide.content }} />}
+              <CommentsPanel slideId={slide.id} />
             </div>
           ) : (
             <div className="flex items-center justify-center h-full" data-testid="learn-complete-card">

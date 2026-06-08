@@ -1,16 +1,8 @@
-"""Background outbox worker.
-
-In stub mode, every email is auto-marked STUB on insert (the worker is a no-op).
-In live mode (`BILLING_LIVE_MODE=true` + `ERP360_BASE_URL`), the worker polls
-QUEUED messages every few seconds and dispatches them to ERP360's notification
-endpoint. Async-ish: requests return immediately; delivery happens in the
-background, decoupling slow upstream calls from user-facing latency.
-"""
+"""Background outbox worker with exponential backoff + dead-letter handling."""
 from __future__ import annotations
 
-import base64
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -26,12 +18,13 @@ _scheduler: Optional[BackgroundScheduler] = None
 WORKER_INTERVAL_SECONDS = 5
 BATCH_SIZE = 25
 MAX_ATTEMPTS = 3
+# Exponential backoff: 30s, 5min, 30min before going to dead-letter
+BACKOFF_SECONDS = [30, 300, 1800]
 
 
 def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]]:
-    """Returns (status, transport_message_id, error). Pure function — caller commits."""
+    """Returns (status, transport_message_id, error)."""
     if not (settings.billing_live_mode and settings.erp360_base_url):
-        # Stub mode: just stamp it as STUB and move on
         return "STUB", None, None
     try:
         payload = {
@@ -39,16 +32,17 @@ def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]
             "subject": msg.subject, "html": msg.body_html, "text": msg.body_text or "",
             "template": msg.template,
             "metadata": {"ifpi_outbox_id": msg.id, "ifpi_user_id": msg.user_id},
-            # Note: attachment bytes are NOT persisted to the row (only metadata).
-            # In live mode we re-render on demand if needed; for now we send
-            # without the binary blob since the worker doesn't have it.
             "attachments_metadata": msg.attachments or [],
         }
+        # Sign the request body for downstream HMAC verification
+        import json
+        from routers.iter5 import sign_outgoing_payload
+        raw = json.dumps(payload).encode("utf-8")
+        headers = sign_outgoing_payload(raw) or {"X-Service-Token": settings.erp360_sso_shared_secret}
         with httpx.Client(timeout=20) as cli:
             r = cli.post(
                 f"{settings.erp360_base_url}/api/notifications/send",
-                json=payload,
-                headers={"X-Service-Token": settings.erp360_sso_shared_secret},
+                content=raw, headers={**headers, "Content-Type": "application/json"},
             )
             r.raise_for_status()
             data = r.json()
@@ -59,19 +53,37 @@ def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]
 
 
 def _tick():
-    """One polling tick — drain up to BATCH_SIZE QUEUED rows."""
+    """One polling tick. Picks up:
+    - QUEUED messages whose next_attempt_at has passed (or is null)
+    - FAILED messages eligible for retry under backoff
+    Anything that hits MAX_ATTEMPTS becomes DEAD_LETTER.
+    """
+    now = datetime.now(timezone.utc)
     with SessionLocal() as db:
         rows = db.query(OutboxMessage).filter(
-            OutboxMessage.status == "QUEUED",
+            OutboxMessage.status.in_(("QUEUED", "FAILED")),
+            (OutboxMessage.next_attempt_at.is_(None)) | (OutboxMessage.next_attempt_at <= now),
         ).order_by(OutboxMessage.id.asc()).limit(BATCH_SIZE).all()
         if not rows:
             return
         for m in rows:
+            m.attempt_count = (m.attempt_count or 0) + 1
             status, mid, err = _dispatch_one(m)
-            m.status = status
-            m.transport_message_id = mid
-            m.error = err
-            m.sent_at = datetime.now(timezone.utc) if status in {"SENT", "STUB"} else None
+            if status in {"SENT", "STUB"}:
+                m.status = status
+                m.transport_message_id = mid
+                m.error = None
+                m.sent_at = now
+                m.next_attempt_at = None
+            else:
+                m.error = err
+                if m.attempt_count >= MAX_ATTEMPTS:
+                    m.status = "DEAD_LETTER"
+                    m.next_attempt_at = None
+                else:
+                    m.status = "FAILED"
+                    idx = min(m.attempt_count - 1, len(BACKOFF_SECONDS) - 1)
+                    m.next_attempt_at = now + timedelta(seconds=BACKOFF_SECONDS[idx])
         db.commit()
 
 
@@ -86,7 +98,8 @@ def start_scheduler() -> None:
     )
     sched.start()
     _scheduler = sched
-    logger.info("Outbox worker scheduled every %ss", WORKER_INTERVAL_SECONDS)
+    logger.info("Outbox worker scheduled every %ss (max %s attempts)",
+                WORKER_INTERVAL_SECONDS, MAX_ATTEMPTS)
 
 
 def shutdown_scheduler() -> None:

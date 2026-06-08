@@ -13,6 +13,7 @@ from routers import courses as courses_router
 from routers import exams as exams_router
 from routers import extras as extras_router
 from routers import invitations as invitations_router
+from routers import iter5 as iter5_router
 from routers import learning_paths as paths_router
 from routers import misc as misc_router
 
@@ -63,6 +64,11 @@ app.include_router(extras_router.leads_router)
 app.include_router(extras_router.org_router)
 app.include_router(extras_router.outbox_router)
 app.include_router(extras_router.paths_extra_router)
+app.include_router(iter5_router.preview_router)
+app.include_router(iter5_router.uploads_router)
+app.include_router(iter5_router.comments_router)
+app.include_router(iter5_router.academies_router)
+app.include_router(iter5_router.portal_router)
 
 
 @app.get("/api")

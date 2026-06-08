@@ -91,11 +91,14 @@ class BillingService:
             "webhook_url": f"{settings.erp360_base_url}/webhooks/ifpi-billing",
         }
         try:
+            import json
+            from routers.iter5 import sign_outgoing_payload
+            raw = json.dumps(payload).encode("utf-8")
+            headers = sign_outgoing_payload(raw) or {"X-Service-Token": settings.erp360_sso_shared_secret}
             with httpx.Client(timeout=15) as cli:
                 r = cli.post(
                     f"{settings.erp360_base_url}/api/lite-billing/profiles",
-                    json=payload,
-                    headers={"X-Service-Token": settings.erp360_sso_shared_secret},
+                    content=raw, headers={**headers, "Content-Type": "application/json"},
                 )
                 r.raise_for_status()
                 data = r.json()
