@@ -58,16 +58,18 @@ def _stats_for_cohort(db: Session, org_id: int, cohort: str) -> Optional[dict]:
 
 
 def _already_celebrated(db: Session, org_id: int, cohort: str, threshold: int) -> bool:
-    """Idempotency check — has this exact cohort+threshold already fired?"""
+    """Idempotency check — has this exact cohort+threshold already fired?
+
+    The (org_id, action, target_type, target_id) tuple already pinpoints
+    this cohort's milestone row. Threshold matters only if the org later
+    *lowers* its threshold; for now there's a single global threshold so
+    presence-of-row is sufficient.
+    """
     return db.query(AuditLog).filter(
         AuditLog.organization_id == org_id,
         AuditLog.action == "COHORT_MILESTONE_REACHED",
         AuditLog.target_type == "cohort",
         AuditLog.target_id == cohort,
-    ).filter(
-        # JSON LIKE works on both SQLite (text) and Postgres (jsonb when cast)
-        func.cast(AuditLog.audit_metadata, type_=__import__("sqlalchemy").String)
-        .like(f"%\"threshold\": {threshold}%"),
     ).first() is not None
 
 
@@ -115,12 +117,16 @@ def check_cohorts(db: Session) -> int:
             if _already_celebrated(db, org.id, cohort, threshold):
                 continue
             class _SystemActor:
+                """Synthetic actor for system-fired events. The audit row's
+                actor_user_id is NULL (no real user), but the audit metadata
+                will note `actor='system'` so the audit UI can distinguish
+                system events from missing-actor bugs."""
                 id = None
                 organization_id = org.id
             audit_service.record(
                 db, _SystemActor(), "COHORT_MILESTONE_REACHED",
                 target_type="cohort", target_id=cohort,
-                metadata={"threshold": threshold, **stats},
+                metadata={"actor": "system", "threshold": threshold, **stats},
             )
             try:
                 _send_celebration_outbox(db, org, cohort, stats)
