@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
+import { SortableList } from 'components/SortableList'
 
 const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF']
 
@@ -102,14 +103,30 @@ export default function CourseEditPage() {
           <p className="text-xs text-slate-400 mt-1">{slides.length} slides</p>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {slides.map((s, i) => (
-            <div key={s.id} onClick={() => setActive(s.id)} data-testid={`slide-row-${i}`}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer mb-0.5 group ${s.id === active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>
-              <span className="text-xs flex-1 truncate">{i + 1}. {s.title || 'Untitled'}</span>
-              {s._local && <span className="text-[10px] text-amber-500 font-medium">unsaved</span>}
-              <button onClick={e => { e.stopPropagation(); removeSlide(s.id) }} className="opacity-0 group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
-            </div>
-          ))}
+          <SortableList
+            items={slides}
+            onReorder={async (ids) => {
+              setSlides(prev => ids.map((id, i) => ({ ...prev.find((p: any) => p.id === id), order_index: i + 1 })))
+              const persisted = slides.filter((s: any) => !s._local).map((s: any) => s.id)
+              const orderedIds = ids.filter((id: any) => persisted.includes(id))
+              if (orderedIds.length) {
+                try { await api.patch(`/courses/${id}/slides/reorder`, { slide_ids: orderedIds }) }
+                catch { toast.error('Could not save new order') }
+              }
+            }}
+          >
+            {(s: any, listeners) => (
+              <div onClick={() => setActive(s.id)} data-testid={`slide-row-${s.id}`}
+                className={`flex items-center gap-2 px-2 py-2.5 rounded-lg mb-0.5 group ${s.id === active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                <span {...listeners} className="cursor-grab active:cursor-grabbing p-0.5 text-slate-300 hover:text-slate-500" title="Drag to reorder">
+                  <GripVertical className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-xs flex-1 truncate cursor-pointer">{(slides.findIndex((x: any) => x.id === s.id)) + 1}. {s.title || 'Untitled'}</span>
+                {s._local && <span className="text-[10px] text-amber-500 font-medium">unsaved</span>}
+                <button onClick={e => { e.stopPropagation(); removeSlide(s.id) }} className="opacity-0 group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+          </SortableList>
         </div>
         <div className="p-3 border-t">
           <button onClick={addSlide} data-testid="add-slide-btn"

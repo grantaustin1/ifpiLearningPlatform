@@ -15,6 +15,7 @@ import io
 from datetime import datetime
 from typing import Optional
 
+import httpx
 import qrcode
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, A4
@@ -33,9 +34,31 @@ def _make_qr_image(url: str) -> io.BytesIO:
     return buf
 
 
+def _fetch_logo(logo_url: Optional[str]) -> Optional[io.BytesIO]:
+    """Fetch a logo from URL or local path. Returns None on any failure
+    so the cert still renders with a generated wordmark fallback."""
+    if not logo_url:
+        return None
+    try:
+        if logo_url.startswith(("http://", "https://")):
+            with httpx.Client(timeout=5) as cli:
+                r = cli.get(logo_url)
+                r.raise_for_status()
+            data = r.content
+        else:
+            with open(logo_url, "rb") as f:
+                data = f.read()
+        buf = io.BytesIO(data)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
+
+
 def render_certificate(
     *, recipient_name: str, course_title: str, certificate_code: str,
     issued_at: datetime, verify_url: str, organisation_name: str = "IFPI Learning",
+    organisation_logo_url: Optional[str] = None,
     cert_type: str = "Course Completion",
     score: Optional[float] = None,
 ) -> bytes:
@@ -61,10 +84,23 @@ def render_certificate(
     c.roundRect(inset, inset, page_w - 2 * inset, page_h - 2 * inset - 6 * mm,
                 radius=8, fill=1, stroke=1)
 
-    # ── Organisation wordmark (top centred) ────────────────────────
-    c.setFillColor(colors.HexColor("#6366f1"))
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(page_w / 2, page_h - 38 * mm, organisation_name.upper())
+    # ── Organisation logo OR wordmark (top centred) ────────────────
+    logo_buf = _fetch_logo(organisation_logo_url)
+    if logo_buf is not None:
+        try:
+            from reportlab.lib.utils import ImageReader
+            img = ImageReader(logo_buf)
+            iw, ih = img.getSize()
+            target_h = 18 * mm
+            target_w = target_h * (iw / ih) if ih else 40 * mm
+            c.drawImage(img, (page_w - target_w) / 2, page_h - 48 * mm,
+                        width=target_w, height=target_h, mask="auto")
+        except Exception:
+            logo_buf = None
+    if logo_buf is None:
+        c.setFillColor(colors.HexColor("#6366f1"))
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(page_w / 2, page_h - 38 * mm, organisation_name.upper())
 
     # ── Big title ──────────────────────────────────────────────────
     c.setFillColor(colors.HexColor("#0f172a"))

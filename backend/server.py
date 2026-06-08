@@ -11,6 +11,8 @@ from core.database import Base, engine
 from routers import auth as auth_router
 from routers import courses as courses_router
 from routers import exams as exams_router
+from routers import extras as extras_router
+from routers import invitations as invitations_router
 from routers import learning_paths as paths_router
 from routers import misc as misc_router
 
@@ -55,6 +57,12 @@ app.include_router(misc_router.gam_router)
 app.include_router(misc_router.admin_router)
 app.include_router(misc_router.billing_router)
 app.include_router(misc_router.catalog_router)
+app.include_router(invitations_router.admin_router)
+app.include_router(invitations_router.public_router)
+app.include_router(extras_router.leads_router)
+app.include_router(extras_router.org_router)
+app.include_router(extras_router.outbox_router)
+app.include_router(extras_router.paths_extra_router)
 
 
 @app.get("/api")

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -190,6 +190,26 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
     )
 
 
+@router.patch("/{course_id}/slides/reorder")
+def reorder_slides_early(course_id: int, body: dict, db: Session = Depends(get_db),
+                         current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    ids = body.get("slide_ids") or []
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="slide_ids must be a list")
+    slides = {s.id: s for s in c.slides}
+    for i, sid in enumerate(ids, start=1):
+        if sid in slides:
+            slides[sid].order_index = i
+    db.commit()
+    return {"ok": True, "count": len(ids)}
+
+
 @router.patch("/{course_id}/slides/{slide_id}", response_model=SlideOut)
 def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Depends(get_db),
                  current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
@@ -237,12 +257,23 @@ def enroll(course_id: int, db: Session = Depends(get_db),
     from services.gamification_service import (
         XP_FIRST_ENROLLMENT, GamificationService,
     )
+    from services.prerequisite_service import get_unmet_prerequisites
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
         Course.status == CourseStatus.PUBLISHED,
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found or not published")
+    # Prerequisite check
+    unmet = get_unmet_prerequisites(db, current.id, course_id)
+    if unmet:
+        raise HTTPException(
+            status_code=412,
+            detail={
+                "message": "Complete prerequisite courses first",
+                "missing": [{"id": cid, "title": title} for cid, title in unmet],
+            },
+        )
     if c.price_cents > 0:
         # Caller should hit /api/billing/subscribe instead
         from models import Subscription, SubscriptionStatus
@@ -270,14 +301,16 @@ def enroll(course_id: int, db: Session = Depends(get_db),
 
 
 @router.post("/{course_id}/complete")
-def complete_course(course_id: int, db: Session = Depends(get_db),
+def complete_course(course_id: int, request: Request, db: Session = Depends(get_db),
                     current: CurrentUser = Depends(get_current_user)):
     from datetime import datetime, timezone
 
-    from models import Certificate
+    from models import Certificate, Organization
     from services.gamification_service import (
         XP_COURSE_COMPLETE, GamificationService,
     )
+    from services.mail_service import MailService
+    from services.pdf_certificate_service import render_certificate
 
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
@@ -300,8 +333,11 @@ def complete_course(course_id: int, db: Session = Depends(get_db),
     cert = db.query(Certificate).filter(
         Certificate.user_id == current.id, Certificate.course_id == course_id,
     ).first()
-    if not cert:
-        db.add(Certificate(user_id=current.id, course_id=course_id, type="COURSE_COMPLETION"))
+    cert_is_new = cert is None
+    if cert_is_new:
+        cert = Certificate(user_id=current.id, course_id=course_id, type="COURSE_COMPLETION")
+        db.add(cert)
+        db.flush()
 
     if already:
         db.commit()
@@ -320,5 +356,124 @@ def complete_course(course_id: int, db: Session = Depends(get_db),
         badges.append("FIRST_COURSE")
     if completed >= 5 and gam.award_badge(current.id, "COURSE_MASTER"):
         badges.append("COURSE_MASTER")
+
+    # Email the cert PDF (stub mode persists to outbox)
+    if cert_is_new:
+        try:
+            from models import User
+            user = db.query(User).filter(User.id == current.id).first()
+            org = db.query(Organization).filter(Organization.id == current.organization_id).first()
+            base = str(request.base_url).rstrip("/")
+            verify_url = f"{base}/verify/{cert.code}"
+            pdf_bytes = render_certificate(
+                recipient_name=user.name or user.email,
+                course_title=c.title, certificate_code=cert.code,
+                issued_at=cert.issued_at, verify_url=verify_url,
+                organisation_name=org.name if org else "IFPI Learning",
+                organisation_logo_url=org.logo_url if org else None,
+            )
+            MailService(db).send_email(
+                to_email=user.email, to_name=user.name,
+                subject=f"🎓 Your certificate for {c.title}",
+                body_html=_cert_email_html(user.name or "there", c.title, verify_url),
+                template="cert_issued", organization_id=current.organization_id,
+                user_id=current.id,
+                attachments=[{
+                    "filename": f"IFPI-Certificate-{cert.code}.pdf",
+                    "mime": "application/pdf", "content": pdf_bytes,
+                }],
+            )
+        except Exception as ex:
+            import logging
+            logging.getLogger(__name__).warning("Cert email queue failed: %s", ex)
     db.commit()
     return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges}
+
+
+def _cert_email_html(name: str, course_title: str, verify_url: str) -> str:
+    return f"""
+<!DOCTYPE html><html><body style="font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; padding: 32px;">
+  <div style="max-width: 540px; margin: 0 auto; background: white; border-radius: 16px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,.05);">
+    <h1 style="margin: 0 0 8px; color: #0f172a; font-size: 22px;">🎓 Congratulations, {name}!</h1>
+    <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
+      You've successfully completed <strong>{course_title}</strong>. Your certificate is attached to this email.
+    </p>
+    <p style="color: #64748b; font-size: 14px; line-height: 1.6;">You can also <a href="{verify_url}" style="color: #6366f1;">verify your certificate online</a>.</p>
+  </div>
+</body></html>
+""".strip()
+
+
+# ── Prerequisite management ───────────────────────────────────────────
+@router.get("/{course_id}/prerequisites")
+def list_prerequisites(course_id: int, db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(get_current_user)):
+    from models import CoursePrerequisite
+    rows = db.query(CoursePrerequisite).filter(
+        CoursePrerequisite.course_id == course_id,
+    ).all()
+    out = []
+    for r in rows:
+        pc = db.query(Course).filter(Course.id == r.prerequisite_course_id).first()
+        if pc:
+            out.append({"id": r.id, "course_id": pc.id, "title": pc.title, "status": pc.status.value})
+    return out
+
+
+@router.post("/{course_id}/prerequisites/{prereq_course_id}")
+def add_prerequisite(course_id: int, prereq_course_id: int, db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from models import CoursePrerequisite
+    if course_id == prereq_course_id:
+        raise HTTPException(status_code=400, detail="Course can't be its own prerequisite")
+    # Both courses must belong to this org
+    for cid in (course_id, prereq_course_id):
+        if not db.query(Course).filter(
+            Course.id == cid, Course.organization_id == current.organization_id,
+        ).first():
+            raise HTTPException(status_code=404, detail=f"Course #{cid} not found")
+    existing = db.query(CoursePrerequisite).filter(
+        CoursePrerequisite.course_id == course_id,
+        CoursePrerequisite.prerequisite_course_id == prereq_course_id,
+    ).first()
+    if existing:
+        return {"ok": True, "already": True}
+    db.add(CoursePrerequisite(course_id=course_id, prerequisite_course_id=prereq_course_id))
+    db.commit()
+    return {"ok": True, "already": False}
+
+
+@router.delete("/{course_id}/prerequisites/{prereq_course_id}")
+def remove_prerequisite(course_id: int, prereq_course_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from models import CoursePrerequisite
+    row = db.query(CoursePrerequisite).filter(
+        CoursePrerequisite.course_id == course_id,
+        CoursePrerequisite.prerequisite_course_id == prereq_course_id,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Prerequisite not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
+
+
+# ── Slide reorder ─────────────────────────────────────────────────────
+@router.patch("/{course_id}/slides/reorder")
+def reorder_slides(course_id: int, body: dict, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Accepts {"slide_ids": [id1, id2, ...]} in the desired order."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    ids = body.get("slide_ids") or []
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="slide_ids must be a list")
+    slides = {s.id: s for s in c.slides}
+    for i, sid in enumerate(ids, start=1):
+        if sid in slides:
+            slides[sid].order_index = i
+    db.commit()
+    return {"ok": True, "count": len(ids)}
