@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, API_BASE, getAccessToken } from 'lib/api'
-import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send } from 'lucide-react'
+import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function OrganizationSettingsPage() {
@@ -212,6 +212,7 @@ export default function OrganizationSettingsPage() {
         </Section>
 
         <SmtpSection inputCls={inputCls} />
+        <CohortSettingsSection inputCls={inputCls} />
       </div>
 
       <aside className="xl:col-span-2 sticky top-6 self-start">
@@ -347,3 +348,55 @@ function SmtpSection({ inputCls }: { inputCls: string }) {
     </Section>
   )
 }
+
+function CohortSettingsSection({ inputCls }: { inputCls: string }) {
+  const [threshold, setThreshold] = useState(75)
+  const [webhook, setWebhook] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.get('/organization').then(r => {
+      setThreshold(r.data.cohort_threshold || 75)
+      setWebhook(r.data.cohort_celebration_webhook_url || '')
+    })
+  }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.put('/organization/cohort-settings', {
+        cohort_threshold: threshold,
+        cohort_celebration_webhook_url: webhook.trim() || null,
+      })
+      toast.success('Cohort settings saved')
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Section icon={Trophy} title="Cohort milestone celebrations" help="When a cohort hits this completion %, IFPI emails every admin + (optionally) pings a Discord/Slack channel. Idempotent — fires once per cohort.">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Completion threshold: <span className="text-indigo-600">{threshold}%</span></label>
+          <input type="range" min={1} max={100} value={threshold} onChange={e => setThreshold(Number(e.target.value))}
+            data-testid="cohort-threshold-slider"
+            className="w-full accent-indigo-500" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Discord / Slack webhook (optional)</label>
+          <input value={webhook} onChange={e => setWebhook(e.target.value)} placeholder="https://discord.com/api/webhooks/… or https://hooks.slack.com/…"
+            data-testid="cohort-webhook"
+            className={`${inputCls} font-mono text-xs`} />
+          <p className="text-[11px] text-slate-400 mt-1">Slack/Discord both accept the same payload — paste the incoming-webhook URL from your channel settings.</p>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={save} disabled={saving} data-testid="cohort-save"
+            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50">
+            <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save cohort settings'}
+          </button>
+        </div>
+      </div>
+    </Section>
+  )
+}
+

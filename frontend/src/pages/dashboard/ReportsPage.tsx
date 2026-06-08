@@ -49,7 +49,7 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {cohorts.length > 0 && (
+      {cohorts.length > 0 ? (
         <div className="bg-white rounded-2xl shadow-sm p-5" data-testid="cohort-widget">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Layers className="h-4 w-4 text-indigo-500" /> Cohort breakdown</h2>
@@ -61,7 +61,7 @@ export default function ReportsPage() {
               ))}
             </select>
           </div>
-          {cohortStats && (
+          {cohortStats ? (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <CohortStat label="Learners" value={cohortStats.learners} />
               <CohortStat label="Enrollments" value={cohortStats.enrollments} />
@@ -69,7 +69,21 @@ export default function ReportsPage() {
               <CohortStat label="Avg exam score" value={`${cohortStats.avg_exam_score}%`} />
               <CohortStat label="Certificates" value={cohortStats.certificates_issued} />
             </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[0, 1, 2, 3, 4].map(i => (
+                <div key={i} className="animate-pulse" data-testid={`cohort-skeleton-${i}`}>
+                  <div className="h-3 bg-slate-200 rounded w-3/4 mb-2" />
+                  <div className="h-6 bg-slate-200 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
           )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm p-5 text-center" data-testid="cohort-widget-empty">
+          <Layers className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+          <p className="text-sm text-slate-500">No cohorts yet — assign one when you bulk-invite learners on the <a href="/users" className="text-indigo-600 hover:underline">Users page</a>.</p>
         </div>
       )}
 

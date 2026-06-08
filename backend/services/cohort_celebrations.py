@@ -101,12 +101,30 @@ def _send_celebration_outbox(db: Session, org: Organization, cohort: str, stats:
         )
 
 
+def _post_webhook(url: str, payload: dict) -> None:
+    """Best-effort POST to a Discord/Slack incoming webhook.
+
+    Both providers accept a simple `{content: ...}` body for text;
+    we send a richer formatted message so it renders nicely in either."""
+    try:
+        import requests as _r
+        # Slack accepts {text:...}; Discord accepts {content:...}.
+        # Send both so the same URL works for either provider.
+        _r.post(url, json={
+            "text": payload["text"],
+            "content": payload["text"],
+            "username": "IFPI Learning",
+        }, timeout=8)
+    except Exception as e:
+        logger.exception("celebration webhook POST failed: %s", e)
+
+
 def check_cohorts(db: Session) -> int:
     """Run by the outbox worker on each tick. Returns count of celebrations fired."""
     fired = 0
     orgs = db.query(Organization).all()
     for org in orgs:
-        threshold = DEFAULT_THRESHOLD
+        threshold = org.cohort_threshold or DEFAULT_THRESHOLD
         cohorts = [r[0] for r in db.query(User.cohort).filter(
             User.organization_id == org.id, User.cohort.isnot(None), User.cohort != "",
         ).distinct().all()]
@@ -116,11 +134,9 @@ def check_cohorts(db: Session) -> int:
                 continue
             if _already_celebrated(db, org.id, cohort, threshold):
                 continue
+
             class _SystemActor:
-                """Synthetic actor for system-fired events. The audit row's
-                actor_user_id is NULL (no real user), but the audit metadata
-                will note `actor='system'` so the audit UI can distinguish
-                system events from missing-actor bugs."""
+                """Synthetic actor for system-fired events."""
                 id = None
                 organization_id = org.id
             audit_service.record(
@@ -132,6 +148,14 @@ def check_cohorts(db: Session) -> int:
                 _send_celebration_outbox(db, org, cohort, stats)
             except Exception as e:
                 logger.exception("celebration outbox failed for %s/%s: %s", org.slug, cohort, e)
+            if org.cohort_celebration_webhook_url:
+                _post_webhook(org.cohort_celebration_webhook_url, {
+                    "text": (f"🎉 *{org.name}* cohort *{cohort}* hit "
+                             f"*{stats['completion_rate']}%* completion! "
+                             f"({stats['completions']}/{stats['enrollments']} enrolments, "
+                             f"avg score {stats['avg_exam_score']}%, "
+                             f"{stats['certificates']} certs)"),
+                })
             db.commit()
             fired += 1
             logger.info("Celebrated cohort %s/%s at %.1f%%", org.slug, cohort, stats["completion_rate"])

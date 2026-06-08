@@ -1,20 +1,45 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Trophy, Star, Award, CheckCircle } from 'lucide-react'
+import { Trophy, Star, Award, CheckCircle, Layers } from 'lucide-react'
+import { useAuth } from 'contexts/AuthContext'
 
 export default function LeaderboardPage() {
+  const { user } = useAuth()
+  const isAdmin = (user?.roles || []).some((r: string) => ['ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR'].includes(r))
+  const [cohort, setCohort] = useState('')
+
   const { data: rows = [] } = useQuery<any[]>({
-    queryKey: ['leaderboard'], queryFn: async () => (await api.get('/gamification/leaderboard')).data,
+    queryKey: ['leaderboard', cohort],
+    queryFn: async () => (await api.get('/gamification/leaderboard', {
+      params: { cohort: cohort || undefined },
+    })).data,
   })
   const { data: me } = useQuery<any>({
     queryKey: ['gam-me'], queryFn: async () => (await api.get('/gamification/me')).data,
   })
+  const { data: cohorts = [] } = useQuery<any[]>({
+    queryKey: ['cohorts'],
+    queryFn: async () => (await api.get('/admin/cohorts')).data,
+    enabled: isAdmin,
+  })
 
   return (
     <div className="p-8 space-y-6" data-testid="leaderboard-page">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 font-display">Leaderboard</h1>
-        <p className="text-slate-500 mt-1">Top learners by XP</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 font-display">Leaderboard</h1>
+          <p className="text-slate-500 mt-1">Top learners by XP{cohort && <span> · cohort <span className="font-semibold text-indigo-600">{cohort}</span></span>}</p>
+        </div>
+        {isAdmin && cohorts.length > 0 && (
+          <select value={cohort} onChange={e => setCohort(e.target.value)} data-testid="leaderboard-cohort"
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
+            <option value="">All learners</option>
+            {cohorts.map((c: any) => (
+              <option key={c.cohort} value={c.cohort}>{c.cohort} ({c.learner_count})</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {me && (
