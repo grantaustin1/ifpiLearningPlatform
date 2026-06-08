@@ -103,6 +103,7 @@ class InvitationService:
             email=inv.email, name=name or inv.name,
             password_hash=get_password_hash(password),
             organization_id=inv.organization_id, is_active=True,
+            cohort=inv.cohort,
         )
         self.db.add(user)
         self.db.flush()

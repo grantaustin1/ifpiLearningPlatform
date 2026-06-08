@@ -202,6 +202,10 @@ def apply_theme_preset(slug: str, db: Session = Depends(get_db),
     if not (o.cert_footer_text or "").strip():
         o.cert_footer_text = preset["cert_footer_text_suggestion"]
     o.theme_preset = preset["slug"]
+    from services import audit_service
+    audit_service.record(db, current, "THEME_APPLIED",
+        target_type="organization", target_id=str(o.id),
+        metadata={"preset": preset["slug"]})
     db.commit()
     return {"ok": True, "applied": preset["slug"]}
 
@@ -252,6 +256,10 @@ def update_smtp_config(body: SmtpConfigIn, db: Session = Depends(get_db),
     o.smtp_from_email = body.smtp_from_email
     o.smtp_from_name = body.smtp_from_name
     o.smtp_use_tls = body.smtp_use_tls
+    from services import audit_service
+    audit_service.record(db, current, "SMTP_CONFIG_UPDATED",
+        target_type="organization", target_id=str(o.id),
+        metadata={"host": o.smtp_host, "from": o.smtp_from_email})
     db.commit()
     return {"ok": True}
 

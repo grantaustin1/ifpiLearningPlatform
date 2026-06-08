@@ -15,6 +15,7 @@ from routers import exams as exams_router
 from routers import extras as extras_router
 from routers import invitations as invitations_router
 from routers import iter5 as iter5_router
+from routers import iter8 as iter8_router
 from routers import learning_paths as paths_router
 from routers import misc as misc_router
 
@@ -71,6 +72,7 @@ app.include_router(iter5_router.comments_router)
 app.include_router(iter5_router.academies_router)
 app.include_router(iter5_router.portal_router)
 app.include_router(badge_tiers_router.router)
+app.include_router(iter8_router.router)
 
 
 @app.get("/api")
