@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, API_BASE } from 'lib/api'
-import { Trophy, Star, Award, CheckCircle, Layers, Download } from 'lucide-react'
+import { api } from 'lib/api'
+import { Trophy, Star, Award, CheckCircle, Download } from 'lucide-react'
 import { useAuth } from 'contexts/AuthContext'
 
 export default function LeaderboardPage() {

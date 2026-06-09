@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api, API_BASE, getAccessToken } from 'lib/api'
+import { api } from 'lib/api'
 import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -399,4 +399,3 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
     </Section>
   )
 }
-
