@@ -122,6 +122,8 @@ jobs:
     name: QA Agents (007 invariants + 010 infra)
     runs-on: ubuntu-latest
     needs: [backend-tests, migration-smoke]
+    env:
+      AGENT_REPORT_DIR: ${{ github.workspace }}/test_reports
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
