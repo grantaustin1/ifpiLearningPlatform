@@ -43,7 +43,7 @@ def _report_path(name: str) -> Path:
     report_dir = os.environ.get("AGENT_REPORT_DIR")
     if report_dir:
         return Path(report_dir) / name
-    return Path(__file__).resolve().parents[3] / "test_reports" / name
+    return Path(__file__).absolute().parents[3] / "test_reports" / name
 
 
 def main() -> int:

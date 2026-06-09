@@ -48,7 +48,7 @@ def check(name: str):
 
 def _report_path(filename: str) -> Path:
     report_dir = os.environ.get("AGENT_REPORT_DIR")
-    base = Path(report_dir) if report_dir else Path(__file__).resolve().parents[3] / "test_reports"
+    base = Path(report_dir) if report_dir else Path(__file__).absolute().parents[3] / "test_reports"
     return base / filename
 
 
