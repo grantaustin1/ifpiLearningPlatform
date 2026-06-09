@@ -52,7 +52,8 @@ def _report_path(filename: str) -> Path:
         candidate = Path(report_dir)
         try:
             candidate.mkdir(parents=True, exist_ok=True)
-            return candidate / filename
+            if os.access(candidate, os.W_OK):
+                return candidate / filename
         except OSError:
             pass
     base = Path(__file__).absolute().parents[3] / "test_reports"
