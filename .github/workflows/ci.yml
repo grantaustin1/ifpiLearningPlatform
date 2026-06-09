@@ -36,7 +36,7 @@ jobs:
       - name: Install
         run: |
           pip install -r backend/requirements.txt
-          pip install pytest pytest-cov httpx
+          pip install pytest pytest-cov httpx requests
       - name: Bootstrap DB
         working-directory: backend
         env:
@@ -47,13 +47,23 @@ jobs:
         run: |
           alembic upgrade head
           python -c "from seed_data import seed; seed()" || true
+      - name: Start backend
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci.db
+          SMTP_ALLOW_PLAINTEXT: '1'
+        run: |
+          (uvicorn server:app --host 127.0.0.1 --port 8000 &) && sleep 4
+          curl --fail http://127.0.0.1:8000/api/health
       - name: Run pytest
         working-directory: backend
         env:
           JWT_SECRET: test-secret-for-ci
           DATABASE_URL: sqlite:///./ifpi_ci.db
           SMTP_ALLOW_PLAINTEXT: '1'
-        run: pytest -q --maxfail=5
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+        run: pytest -q tests/test_iteration2.py --maxfail=5
 
   # ─── Migration smoke: head → downgrade -1 → head ───────────────
   migration-smoke:
