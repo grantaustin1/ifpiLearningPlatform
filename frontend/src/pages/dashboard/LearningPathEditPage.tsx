@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ArrowLeft, Save, Send, EyeOff, Trash2, Plus, X, Layers, BookOpen, GripVertical } from 'lucide-react'
@@ -14,16 +14,16 @@ export default function LearningPathEditPage() {
   const [chosenCourse, setChosenCourse] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [p, c] = await Promise.all([
       api.get(`/learning-paths/${id}`),
       api.get('/courses'),
     ])
     setPath(p.data)
     setAllCourses(c.data)
-  }
+  }, [id])
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [load])
 
   const save = async () => {
     setSaving(true)

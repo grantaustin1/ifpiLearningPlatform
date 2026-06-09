@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
 import { MessageCircle, Send, Trash2 } from 'lucide-react'
@@ -12,8 +12,8 @@ export default function CommentsPanel({ slideId }: { slideId: number }) {
   const [posting, setPosting] = useState(false)
   const isMod = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
 
-  const load = () => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data))
-  useEffect(() => { load() }, [slideId])
+  const load = useCallback(() => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data)), [slideId])
+  useEffect(() => { load() }, [load])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
