@@ -16,7 +16,11 @@ if not BASE_URL:
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
-DB_PATH = "/app/backend/ifpi_lms.db"
+database_url = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
+if database_url.startswith("sqlite:///"):
+    DB_PATH = os.path.abspath(database_url.replace("sqlite:///", "", 1))
+else:
+    DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ifpi_lms.db"))
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
