@@ -1,3 +1,5 @@
+# NOTE: `emergentintegrations` is intentionally omitted here because it is not
+# published on PyPI; AI services lazy-import it and return 503 if unavailable.
 alembic==1.14.0
 apscheduler==3.10.4
 bcrypt==4.2.1
