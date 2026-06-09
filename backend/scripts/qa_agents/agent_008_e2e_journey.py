@@ -19,7 +19,8 @@ Journey:
     9. Download /api/certificates/transcript
    10. Re-run agent_007 invariants — should still be clean
 
-Exit 0 on success, 1 on failure. JSON report at /app/test_reports/agent_008.json.
+Exit 0 on success, 1 on failure. JSON report at test_reports/agent_008.json
+(or AGENT_REPORT_DIR override).
 """
 from __future__ import annotations
 
@@ -59,8 +60,15 @@ def step(name: str, ok: bool, detail: str = "") -> None:
         raise SystemExit(1)
 
 
+def _report_path(name: str) -> Path:
+    report_dir = os.environ.get("AGENT_REPORT_DIR")
+    if report_dir:
+        return Path(report_dir) / name
+    return Path(__file__).resolve().parents[3] / "test_reports" / name
+
+
 def _write_report(ok: bool) -> None:
-    out = Path("/app/test_reports/agent_008.json")
+    out = _report_path("agent_008.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"ok": ok, "steps": LOG}, indent=2))
 
