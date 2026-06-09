@@ -5,3 +5,11 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# CI/QA test report artifacts
+test_reports/
