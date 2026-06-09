@@ -33,6 +33,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 RESULTS: list[dict] = []
 
 
+def _report_path(name: str) -> Path:
+    report_dir = os.environ.get("AGENT_REPORT_DIR")
+    if report_dir:
+        return Path(report_dir) / name
+    return Path(__file__).resolve().parents[3] / "test_reports" / name
+
+
 def check(name: str):
     def _decorator(fn):
         try:
@@ -125,7 +132,7 @@ def c8():
 
 
 def main() -> int:
-    out = Path("/app/test_reports/agent_010.json")
+    out = _report_path("agent_010.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     failed = [r for r in RESULTS if not r["ok"]]
     out.write_text(json.dumps({
