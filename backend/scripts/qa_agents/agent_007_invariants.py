@@ -42,8 +42,15 @@ from models import (  # noqa: E402
 def _report_path(name: str) -> Path:
     report_dir = os.environ.get("AGENT_REPORT_DIR")
     if report_dir:
-        return Path(report_dir) / name
-    return Path(__file__).absolute().parents[3] / "test_reports" / name
+        candidate = Path(report_dir)
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate / name
+        except OSError:
+            pass
+    fallback = Path(__file__).absolute().parents[3] / "test_reports"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback / name
 
 
 def main() -> int:
@@ -131,7 +138,6 @@ def main() -> int:
         "violations": len(failures), "failures": failures,
     }
     out = _report_path("agent_007.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str))
 
     if failures:
