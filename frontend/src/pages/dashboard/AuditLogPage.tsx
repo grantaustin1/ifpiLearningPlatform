@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Shield, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Shield, ChevronLeft, ChevronRight, Search, Sparkles, RefreshCw } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
 
 const ACTION_COLORS: Record<string, string> = {
@@ -13,6 +13,9 @@ const ACTION_COLORS: Record<string, string> = {
   BADGE_TIERS_REORDERED: 'bg-indigo-50 text-indigo-700',
   ACADEMY_CREATED: 'bg-cyan-50 text-cyan-700',
   INVITATIONS_BULK_QUEUED: 'bg-pink-50 text-pink-700',
+  COHORT_MILESTONE_REACHED: 'bg-yellow-100 text-yellow-800',
+  COHORT_SETTINGS_UPDATED: 'bg-orange-50 text-orange-700',
+  AI_QUIZ_GENERATED: 'bg-amber-100 text-amber-800',
 }
 
 export default function AuditLogPage() {
@@ -36,6 +39,8 @@ export default function AuditLogPage() {
         <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2"><Shield className="h-5 w-5 text-indigo-500" /> Audit log</h1>
         <p className="text-sm text-slate-500">Append-only record of who-did-what for compliance and forensic review.</p>
       </div>
+
+      <AuditDigestCard />
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
@@ -98,3 +103,56 @@ export default function AuditLogPage() {
     </div>
   )
 }
+
+function AuditDigestCard() {
+  const [days, setDays] = useState(14)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { data, isLoading, isFetching, refetch } = useQuery<any>({
+    queryKey: ['audit-digest', days, refreshKey],
+    queryFn: async () => (await api.get('/admin/audit-digest', { params: { days } })).data,
+    staleTime: 5 * 60_000,
+  })
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-50 via-white to-amber-50 border border-indigo-100 rounded-2xl p-5" data-testid="audit-digest-card">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-500" /> Audit briefing — last {days} days</h2>
+        <div className="flex items-center gap-2">
+          <select value={days} onChange={e => setDays(Number(e.target.value))} data-testid="digest-days"
+            className="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white">
+            <option value={7}>7d</option>
+            <option value={14}>14d</option>
+            <option value={30}>30d</option>
+            <option value={90}>90d</option>
+          </select>
+          <button onClick={() => { setRefreshKey(k => k + 1); refetch() }} disabled={isFetching}
+            data-testid="digest-refresh"
+            className="text-xs text-indigo-600 hover:bg-indigo-100 px-2 py-1 rounded inline-flex items-center gap-1">
+            <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse" data-testid="digest-skeleton">
+          <div className="h-3 bg-slate-200 rounded w-full" />
+          <div className="h-3 bg-slate-200 rounded w-5/6" />
+          <div className="h-3 bg-slate-200 rounded w-2/3" />
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-slate-700 leading-relaxed">{data?.summary}</p>
+          {data?.total_actions > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3" data-testid="digest-pills">
+              {Object.entries(data.counts_by_action || {}).slice(0, 6).map(([k, v]: any) => (
+                <span key={k} className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${ACTION_COLORS[k] || 'bg-slate-100 text-slate-700'}`}>
+                  {k.replace(/_/g, ' ')}: {v}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+

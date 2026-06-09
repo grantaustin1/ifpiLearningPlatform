@@ -92,9 +92,11 @@ export default function ExamsPage() {
 function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => void }) {
   const [courseId, setCourseId] = useState<number | ''>('')
   const [numQ, setNumQ] = useState(5)
+  const [qType, setQType] = useState<'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'MIXED'>('MULTIPLE_CHOICE')
   const [examMode, setExamMode] = useState<'new' | 'append'>('new')
   const [targetExamId, setTargetExamId] = useState<number | ''>('')
   const [loading, setLoading] = useState(false)
+  const [regenIdx, setRegenIdx] = useState<number | null>(null)
   const [questions, setQuestions] = useState<any[] | null>(null)
 
   const { data: courses = [] } = useQuery<any[]>({
@@ -109,10 +111,25 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
     setLoading(true)
     try {
       const r = await api.post('/exams/ai-generate-questions',
-        { course_id: courseId, num_questions: numQ })
+        { course_id: courseId, num_questions: numQ, question_type: qType })
       setQuestions(r.data.questions)
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Generation failed') }
     finally { setLoading(false) }
+  }
+
+  const regenerateOne = async (i: number) => {
+    if (!questions || !courseId) return
+    setRegenIdx(i)
+    try {
+      const avoid = questions.map(q => q.question_text)
+      const r = await api.post('/exams/ai-generate-questions',
+        { course_id: courseId, num_questions: 1, question_type: questions[i].question_type, avoid_topics: avoid })
+      const fresh = r.data.questions[0]
+      if (!fresh) return toast.error('AI returned nothing — try again')
+      setQuestions(qs => qs!.map((q, k) => k === i ? fresh : q))
+      toast.success('Regenerated')
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Regenerate failed') }
+    finally { setRegenIdx(null) }
   }
 
   const save = async () => {
@@ -133,8 +150,9 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
       }
       await api.put(`/exams/${examId}/questions?mode=${examMode === 'new' ? 'replace' : 'append'}`,
         questions.map((q, i) => ({
-          question_text: q.question_text, question_type: 'MULTIPLE_CHOICE',
-          options: q.options, correct_answer: q.correct_answer,
+          question_text: q.question_text,
+          question_type: q.question_type || 'MULTIPLE_CHOICE',
+          options: q.options || [], correct_answer: q.correct_answer,
           explanation: q.explanation, points: 1, order_index: i + 1,
         })))
       toast.success(`${questions.length} questions saved`)
@@ -170,6 +188,16 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
                 <input type="number" min={1} max={20} value={numQ} onChange={e => setNumQ(Number(e.target.value))}
                   data-testid="ai-numq" className="w-32 px-3 py-2 border border-slate-200 rounded-lg text-sm" />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5">Question type</label>
+                <select value={qType} onChange={e => setQType(e.target.value as any)} data-testid="ai-type"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                  <option value="MULTIPLE_CHOICE">Multiple choice (4 options)</option>
+                  <option value="TRUE_FALSE">True / False</option>
+                  <option value="SHORT_ANSWER">Short answer</option>
+                  <option value="MIXED">Mixed (auto-pick per question)</option>
+                </select>
+              </div>
               <button onClick={generate} disabled={loading || !courseId} data-testid="ai-generate-btn"
                 className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white text-sm font-medium px-4 py-2 rounded-lg">
                 {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -181,14 +209,27 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
               <div className="text-xs text-slate-500">Review {questions.length} generated questions. Edit, remove, or save them to a new or existing exam.</div>
               {questions.map((q, i) => (
                 <div key={i} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50" data-testid={`ai-q-${i}`}>
-                  <p className="font-medium text-sm text-slate-900">{i + 1}. {q.question_text}</p>
-                  <ul className="mt-2 space-y-1 text-xs">
-                    {q.options.map((o: string, j: number) => (
-                      <li key={j} className={o === q.correct_answer ? 'text-emerald-700 font-medium' : 'text-slate-500'}>
-                        {o === q.correct_answer ? '✓ ' : '  '}{o}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-sm text-slate-900 flex-1">{i + 1}. {q.question_text}
+                      <span className="ml-2 text-[10px] uppercase tracking-wide font-semibold text-slate-400">{(q.question_type || 'MCQ').replace('_', ' ')}</span>
+                    </p>
+                    <button onClick={() => regenerateOne(i)} disabled={regenIdx === i}
+                      data-testid={`ai-regen-${i}`}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded inline-flex items-center gap-1 disabled:opacity-40">
+                      <RefreshCw className={`h-3 w-3 ${regenIdx === i ? 'animate-spin' : ''}`} /> Regenerate
+                    </button>
+                  </div>
+                  {q.question_type === 'SHORT_ANSWER' ? (
+                    <p className="mt-2 text-xs text-emerald-700 font-medium">Expected: {q.correct_answer}</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-xs">
+                      {(q.options || []).map((o: string, j: number) => (
+                        <li key={j} className={o === q.correct_answer ? 'text-emerald-700 font-medium' : 'text-slate-500'}>
+                          {o === q.correct_answer ? '✓ ' : '  '}{o}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {q.explanation && <p className="text-[11px] text-slate-500 mt-2 italic">{q.explanation}</p>}
                   <button onClick={() => setQuestions(qs => qs!.filter((_, k) => k !== i))}
                           className="text-[11px] text-red-500 hover:text-red-700 mt-1">Remove</button>

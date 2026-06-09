@@ -178,6 +178,8 @@ from pydantic import BaseModel, Field
 class AIQuizRequest(BaseModel):
     course_id: int
     num_questions: int = Field(default=5, ge=1, le=20)
+    question_type: Literal["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "MIXED"] = "MULTIPLE_CHOICE"
+    avoid_topics: list[str] | None = None
 
 
 @router.post("/ai-generate-questions")
@@ -186,10 +188,7 @@ async def ai_generate_questions(
     current: CurrentUser = Depends(requires_roles(*INSTRUCTOR_ROLES)),
 ):
     """Generate exam questions from a course's slide content using the
-    Emergent LLM. Returns a preview payload — does NOT persist to the DB.
-    Frontend bulk-inserts the questions via the existing POST /questions
-    endpoint after admin review.
-    """
+    Emergent LLM. Returns a preview payload — does NOT persist to the DB."""
     course = db.query(Course).filter(
         Course.id == body.course_id,
         Course.organization_id == current.organization_id,
@@ -201,11 +200,13 @@ async def ai_generate_questions(
     slide_dicts = [{"title": s.title, "content_text": s.content} for s in slides]
     questions = await ai_quiz_service.generate_questions(
         course_title=course.title, slides=slide_dicts,
-        num_questions=body.num_questions,
+        num_questions=body.num_questions, question_type=body.question_type,
+        avoid_topics=body.avoid_topics,
     )
     from services import audit_service
     audit_service.record(db, current, "AI_QUIZ_GENERATED",
         target_type="course", target_id=str(course.id),
-        metadata={"requested": body.num_questions, "returned": len(questions)})
+        metadata={"requested": body.num_questions, "returned": len(questions),
+                  "type": body.question_type})
     db.commit()
     return {"course_id": course.id, "course_title": course.title, "questions": questions}

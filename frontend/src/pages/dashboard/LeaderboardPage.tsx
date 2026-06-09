@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api } from 'lib/api'
-import { Trophy, Star, Award, CheckCircle, Layers } from 'lucide-react'
+import { api, API_BASE } from 'lib/api'
+import { Trophy, Star, Award, CheckCircle, Layers, Download } from 'lucide-react'
 import { useAuth } from 'contexts/AuthContext'
 
 export default function LeaderboardPage() {
@@ -32,13 +32,32 @@ export default function LeaderboardPage() {
           <p className="text-slate-500 mt-1">Top learners by XP{cohort && <span> · cohort <span className="font-semibold text-indigo-600">{cohort}</span></span>}</p>
         </div>
         {isAdmin && cohorts.length > 0 && (
-          <select value={cohort} onChange={e => setCohort(e.target.value)} data-testid="leaderboard-cohort"
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
-            <option value="">All learners</option>
-            {cohorts.map((c: any) => (
-              <option key={c.cohort} value={c.cohort}>{c.cohort} ({c.learner_count})</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select value={cohort} onChange={e => setCohort(e.target.value)} data-testid="leaderboard-cohort"
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
+              <option value="">All learners</option>
+              {cohorts.map((c: any) => (
+                <option key={c.cohort} value={c.cohort}>{c.cohort} ({c.learner_count})</option>
+              ))}
+            </select>
+            <button
+              data-testid="leaderboard-csv"
+              onClick={async () => {
+                const r = await api.get('/admin/leaderboard.csv', {
+                  params: { cohort: cohort || undefined },
+                  responseType: 'blob',
+                })
+                const url = URL.createObjectURL(r.data)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `leaderboard${cohort ? '_' + cohort : ''}.csv`
+                document.body.appendChild(a); a.click(); a.remove()
+                URL.revokeObjectURL(url)
+              }}
+              className="inline-flex items-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-slate-700">
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+          </div>
         )}
       </div>
 
