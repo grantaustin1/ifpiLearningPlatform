@@ -54,7 +54,13 @@ jobs:
           DATABASE_URL: sqlite:///./ifpi_ci.db
           SMTP_ALLOW_PLAINTEXT: '1'
         run: |
-          (uvicorn server:app --host 127.0.0.1 --port 8000 &) && sleep 4
+          (uvicorn server:app --host 127.0.0.1 --port 8000 &)
+          for i in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/api/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
           curl --fail http://127.0.0.1:8000/api/health
       - name: Run pytest
         working-directory: backend
