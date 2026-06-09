@@ -12,6 +12,6 @@ python-jose[cryptography]==3.4.0
 python-multipart==0.0.27
 qrcode[pil]==8.0
 reportlab==4.2.5
-requests==2.32.3
+requests==2.33.0
 sqlalchemy==2.0.36
 uvicorn[standard]==0.32.1
