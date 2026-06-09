@@ -22,35 +22,58 @@ logger = logging.getLogger("ifpi.ai_quiz")
 
 
 _SYSTEM_PROMPT = (
-    "You are a music-industry education expert who writes high-quality "
-    "multiple-choice exam questions. Every option must be plausible — no "
-    "throwaway distractors. Output STRICT JSON only — no commentary, no "
-    "markdown fences, no explanations outside the JSON."
+    "You are a music-industry education expert who writes high-quality exam "
+    "questions. Output STRICT JSON only — no commentary, no markdown fences."
 )
 
+_TYPE_RULES = {
+    "MULTIPLE_CHOICE": (
+        "EXACTLY 4 plausible options per question; correct_answer must be the "
+        "EXACT text of one option (not 'A'/'B')."
+    ),
+    "TRUE_FALSE": (
+        "Each question must be a single factual statement. Set options to "
+        "[\"True\", \"False\"] and correct_answer to the right value."
+    ),
+    "SHORT_ANSWER": (
+        "Open-ended. options must be an empty list []. correct_answer is the "
+        "expected answer (a short phrase). Include an explanation."
+    ),
+    "MIXED": (
+        "Use a mix of MULTIPLE_CHOICE, TRUE_FALSE, and SHORT_ANSWER. Add a "
+        "`question_type` field per question with one of those three values."
+    ),
+}
 
-def _build_prompt(course_title: str, slide_excerpts: List[dict], num_questions: int) -> str:
+
+def _build_prompt(course_title: str, slide_excerpts: List[dict], num_questions: int,
+                  question_type: str = "MULTIPLE_CHOICE",
+                  avoid_topics: Optional[List[str]] = None) -> str:
     excerpt_block = "\n\n".join(
         f"Slide {i+1}: {s.get('title','')}\n{(s.get('content_text') or '')[:600]}"
         for i, s in enumerate(slide_excerpts)
     )
+    type_rule = _TYPE_RULES.get(question_type, _TYPE_RULES["MULTIPLE_CHOICE"])
+    avoid = ""
+    if avoid_topics:
+        avoid = ("\n\nAVOID rephrasing any of these existing questions; pick a "
+                 "different concept from the material:\n- " +
+                 "\n- ".join(avoid_topics[:20]))
     structure = """{
   "questions": [
     {
       "question_text": "string",
-      "options": ["option A", "option B", "option C", "option D"],
-      "correct_answer": "option A",
-      "explanation": "1-2 sentences explaining why the correct answer is correct"
+      "question_type": "MULTIPLE_CHOICE | TRUE_FALSE | SHORT_ANSWER",
+      "options": ["..."],
+      "correct_answer": "string",
+      "explanation": "1-2 sentences"
     }
   ]
 }"""
     return (
-        f'Generate EXACTLY {num_questions} multiple-choice questions for the course '
-        f'"{course_title}". Each question must:\n'
-        f"- Test understanding, not rote recall.\n"
-        f"- Have EXACTLY 4 options.\n"
-        f"- Include the EXACT correct option text in `correct_answer` (not just A/B/C/D).\n"
-        f"- Cover different slides where possible.\n\n"
+        f'Generate EXACTLY {num_questions} {question_type} exam question(s) for '
+        f'the course "{course_title}". {type_rule}\n'
+        f"Every question must test understanding, not rote recall.{avoid}\n\n"
         f"Course material:\n\n{excerpt_block}\n\n"
         f"Output ONLY this JSON shape:\n{structure}"
     )
@@ -58,6 +81,8 @@ def _build_prompt(course_title: str, slide_excerpts: List[dict], num_questions: 
 
 async def generate_questions(
     course_title: str, slides: List[dict], num_questions: int = 5,
+    question_type: str = "MULTIPLE_CHOICE",
+    avoid_topics: Optional[List[str]] = None,
 ) -> List[dict]:
     if not settings.emergent_llm_key:
         raise HTTPException(status_code=503,
@@ -80,7 +105,8 @@ async def generate_questions(
         system_message=_SYSTEM_PROMPT,
     ).with_model(settings.ai_builder_provider, settings.ai_builder_model)
 
-    prompt = _build_prompt(course_title, slides, num_questions)
+    prompt = _build_prompt(course_title, slides, num_questions,
+                           question_type=question_type, avoid_topics=avoid_topics)
     try:
         raw = await chat.send_message(UserMessage(text=prompt))
     except Exception as e:
@@ -106,25 +132,43 @@ async def generate_questions(
     out: List[dict] = []
     for q in raw_qs:
         question_text = str(q.get("question_text") or "").strip()
+        qtype = str(q.get("question_type") or question_type).upper()
+        if qtype not in ("MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"):
+            qtype = "MULTIPLE_CHOICE"
         options = [str(o).strip() for o in (q.get("options") or []) if str(o).strip()]
         correct = str(q.get("correct_answer") or "").strip()
-        if not (question_text and len(options) >= 2 and correct):
+        if not (question_text and correct):
             continue
-        # If the model put correct_answer as "A"/"B" — coerce
-        if len(correct) == 1 and correct.upper() in "ABCD":
-            idx = "ABCD".index(correct.upper())
-            if idx < len(options):
-                correct = options[idx]
-        # Ensure the correct answer actually appears in the options list
-        if correct not in options:
-            # Best-effort substring match — otherwise drop the question
-            match = next((o for o in options if correct.lower() in o.lower()), None)
-            if match is None:
+        if qtype == "MULTIPLE_CHOICE":
+            if len(options) < 2:
                 continue
-            correct = match
+            # If the model put correct_answer as "A"/"B" — coerce
+            if len(correct) == 1 and correct.upper() in "ABCD":
+                idx = "ABCD".index(correct.upper())
+                if idx < len(options):
+                    correct = options[idx]
+            if correct not in options:
+                match = next((o for o in options if correct.lower() in o.lower()), None)
+                if match is None:
+                    continue
+                correct = match
+            options = options[:4]
+        elif qtype == "TRUE_FALSE":
+            options = ["True", "False"]
+            # Normalise correct to True/False label
+            c = correct.strip().lower()
+            if c in ("true", "t", "yes"):
+                correct = "True"
+            elif c in ("false", "f", "no"):
+                correct = "False"
+            else:
+                continue
+        else:  # SHORT_ANSWER
+            options = []
         out.append({
             "question_text": question_text,
-            "options": options[:4],
+            "question_type": qtype,
+            "options": options,
             "correct_answer": correct,
             "explanation": str(q.get("explanation") or "").strip()[:500],
         })

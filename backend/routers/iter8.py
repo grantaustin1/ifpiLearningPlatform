@@ -8,8 +8,9 @@ Iteration 8 additions:
 """
 from __future__ import annotations
 
+import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -106,6 +107,82 @@ def cohort_stats(
         "completion_rate": round((completed / total_enr) * 100, 1) if total_enr else 0,
         "avg_exam_score": round(float(avg_score), 1),
         "certificates_issued": certs, "badges_earned": badges,
+    }
+
+
+@router.get("/api/admin/leaderboard.csv")
+def leaderboard_csv(cohort: Optional[str] = None,
+                    db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    q = db.query(User).filter(
+        User.organization_id == current.organization_id, User.is_active.is_(True),
+    )
+    if cohort:
+        q = q.filter(User.cohort == cohort)
+    rows = q.order_by(User.points.desc().nullslast()).all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["rank", "name", "email", "cohort", "xp", "badges_earned", "certificates"])
+    for i, u in enumerate(rows, 1):
+        badges = db.query(UserBadge).filter(UserBadge.user_id == u.id).count()
+        certs = db.query(Certificate).filter(Certificate.user_id == u.id).count()
+        w.writerow([i, u.name or "", u.email, u.cohort or "", u.points or 0, badges, certs])
+    name = f"leaderboard{'_' + cohort if cohort else ''}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={name}"},
+    )
+
+
+@router.get("/api/admin/audit-digest")
+async def audit_digest(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """LLM-generated plain-English summary of the last N days of admin
+    activity in this org. Falls back to a deterministic stats-only summary
+    when the LLM call fails so the page always renders something useful."""
+    days = max(1, min(days, 90))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = db.query(AuditLog).filter(
+        AuditLog.organization_id == current.organization_id,
+        AuditLog.created_at >= since,
+    ).all()
+    by_action: dict[str, int] = {}
+    for r in rows:
+        by_action[r.action] = by_action.get(r.action, 0) + 1
+    deterministic = (
+        f"In the last {days} days: {len(rows)} admin action(s) recorded. " +
+        (", ".join(f"{k.replace('_', ' ').title()}: {v}"
+                   for k, v in sorted(by_action.items(), key=lambda kv: -kv[1])[:6])
+         or "no admin activity to summarise.")
+    )
+    digest = deterministic
+    if rows:
+        try:
+            from core.config import settings
+            if settings.emergent_llm_key:
+                from emergentintegrations.llm.chat import LlmChat, UserMessage
+                import uuid as _uuid
+                lines = "\n".join(
+                    f"- {r.created_at:%Y-%m-%d}  {r.action}  {r.target_type or ''}#{r.target_id or ''}  meta={r.audit_metadata}"
+                    for r in rows[:80]
+                )
+                chat = LlmChat(api_key=settings.emergent_llm_key,
+                               session_id=f"digest-{_uuid.uuid4().hex}",
+                               system_message="You produce concise, executive-friendly summaries of admin activity. 3-5 sentences, plain English, no jargon, no markdown.").with_model(
+                    settings.ai_builder_provider, settings.ai_builder_model)
+                resp = await chat.send_message(UserMessage(
+                    text=f"Summarise the last {days} days of admin activity for an "
+                         f"IFPI Learning academy. Counts: {by_action}\n\nRaw rows:\n{lines}"))
+                digest = (resp if isinstance(resp, str) else getattr(resp, "content", str(resp))).strip()
+        except Exception as e:  # noqa: BLE001
+            digest = deterministic + f" (AI summary unavailable: {type(e).__name__})"
+    return {
+        "days": days, "total_actions": len(rows),
+        "counts_by_action": by_action,
+        "summary": digest,
     }
 
 
