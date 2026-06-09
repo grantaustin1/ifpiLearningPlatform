@@ -153,10 +153,11 @@ async def audit_digest(
     for r in rows:
         by_action[r.action] = by_action.get(r.action, 0) + 1
     deterministic = (
-        f"In the last {days} days: {len(rows)} admin action(s) recorded. " +
-        (", ".join(f"{k.replace('_', ' ').title()}: {v}"
-                   for k, v in sorted(by_action.items(), key=lambda kv: -kv[1])[:6])
-         or "no admin activity to summarise.")
+        f"In the last {days} days: {len(rows)} admin action(s) recorded."
+        + ((" "
+            + ", ".join(f"{k.replace('_', ' ').title()}: {v}"
+                        for k, v in sorted(by_action.items(), key=lambda kv: -kv[1])[:6])
+            + ".") if by_action else " No admin activity to summarise.")
     )
     digest = deterministic
     if rows:
@@ -178,7 +179,9 @@ async def audit_digest(
                          f"IFPI Learning academy. Counts: {by_action}\n\nRaw rows:\n{lines}"))
                 digest = (resp if isinstance(resp, str) else getattr(resp, "content", str(resp))).strip()
         except Exception as e:  # noqa: BLE001
-            digest = deterministic + f" (AI summary unavailable: {type(e).__name__})"
+            import logging
+            logging.getLogger("ifpi.audit_digest").exception("digest LLM call failed: %s", e)
+            digest = deterministic + " (AI summary unavailable — see logs.)"
     return {
         "days": days, "total_actions": len(rows),
         "counts_by_action": by_action,

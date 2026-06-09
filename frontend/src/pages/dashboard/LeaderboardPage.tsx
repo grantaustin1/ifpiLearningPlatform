@@ -47,10 +47,15 @@ export default function LeaderboardPage() {
                   params: { cohort: cohort || undefined },
                   responseType: 'blob',
                 })
+                // Honor the backend's Content-Disposition (includes date stamp)
+                const cd = r.headers['content-disposition'] || ''
+                const match = /filename=([^;]+)/.exec(cd)
+                const filename = match ? match[1].trim().replace(/['"]/g, '')
+                  : `leaderboard${cohort ? '_' + cohort : ''}.csv`
                 const url = URL.createObjectURL(r.data)
                 const a = document.createElement('a')
                 a.href = url
-                a.download = `leaderboard${cohort ? '_' + cohort : ''}.csv`
+                a.download = filename
                 document.body.appendChild(a); a.click(); a.remove()
                 URL.revokeObjectURL(url)
               }}
