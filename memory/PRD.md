@@ -22,6 +22,18 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 11)
+- ✅ **AI quiz: regenerate one question** — per-card `RefreshCw` button calls `/ai-generate-questions` with `num_questions=1` + `avoid_topics=<all current question_texts>`. Replaces only that card; spin animation while pending; isolated update verified.
+- ✅ **AI quiz: TRUE_FALSE + SHORT_ANSWER + MIXED** — `_TYPE_RULES` dict in `ai_quiz_service.py` drives the LLM prompt; per-question `question_type` is preserved and validated (TRUE_FALSE coerces `True/T/Yes` → `True`, false-equivalents → `False`; SHORT_ANSWER forces `options=[]`; MIXED lets the model choose). Frontend renders type pill + format-aware preview (✓ option / Expected: …).
+- ✅ **Action-pill colours** for `AI_QUIZ_GENERATED` (amber), `COHORT_MILESTONE_REACHED` (yellow), `COHORT_SETTINGS_UPDATED` (orange) added to `ACTION_COLORS`.
+- ✅ **Cohort leaderboard CSV export** — `GET /api/admin/leaderboard.csv?cohort=X` returns `text/csv` with date-stamped Content-Disposition; admin-only download button on `/leaderboard` next to the cohort dropdown; frontend now reads filename from `Content-Disposition`.
+- ✅ **NEW IMPROVEMENT — Audit briefing card on /audit**: `GET /api/admin/audit-digest?days={7|14|30|90}` returns `{days, total_actions, counts_by_action, summary}`. Summary is Emergent-LLM-generated (gpt-4o-mini) plain-English 3-5 sentence executive briefing. Deterministic fallback fires when LLM unavailable. Gradient card at top of `/audit` with days selector, refresh button, summary paragraph, top-6 action pills.
+- ✅ Code-review fixes from reviewer:
+  - Added `Optional` to `from typing import` in `ai_quiz_service.py` (was only working under `from __future__ import annotations`).
+  - Audit digest LLM-failure path logs exception + shows "see logs" instead of leaking exception class to admin UI.
+  - Leaderboard CSV: frontend now honours `Content-Disposition` filename (preserves date stamp).
+- ✅ Tests: **iter11 14/14 PASS** (incl. LLM avoid_topics honour, TF/SA/MIXED parse, CSV format, deterministic digest fallback), iter10 14/14, iter9 11/11, 39/39 across the three. Frontend 100%.
+
 ## What's been implemented (2026-02-08 — iteration 10)
 - ✅ **Per-tenant cohort threshold + Discord/Slack webhook** — `organizations.cohort_threshold` (default 75) + `cohort_celebration_webhook_url` (nullable) (migration `b3d8915cef27`). `check_cohorts()` reads per-org threshold; celebrations POST to the webhook with a Slack/Discord-compatible payload. New `/settings → Cohort milestone celebrations` card with a 1-100 slider + monospace webhook URL field + Save button. Idempotency still holds — lowering threshold doesn't re-fire existing milestones.
 - ✅ **Cohort-scoped leaderboard** — `GET /api/gamification/leaderboard?cohort=X` filters to a single cohort. `/leaderboard` page (admin only) gains a cohort dropdown next to the title; banner reflects active filter.
@@ -138,10 +150,10 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 
 ## Prioritised backlog
 - **P2** — Provision a real S3 / R2 / GCS bucket. Storage abstraction in place — pure config flip.
-- **P3** — AI quiz "regenerate this one question" affordance (per-card refresh inside the review modal).
-- **P3** — AI quiz: support short-answer & true/false question types (currently MCQ only).
-- **P3** — Surface the `AI_QUIZ_GENERATED` audit metadata (course, count, exception class) in the /audit page action pill colour.
-- **P3** — Cohort leaderboard CSV export (admin → "Download as CSV").
+- **P3** — Schedule audit digest as a weekly email to all admins (currently UI-only on `/audit`).
+- **P3** — AI quiz: pre-fetch cost estimate from the LLM provider before kicking off a large batch.
+- **P3** — Cohort CSV: include badge breakdown columns + completion percentage per learner.
+- **P3** — `/audit` row drill-down: clicking a row opens a side panel with full JSON metadata + linked target.
 
 ## Deliberately deferred (not forgotten)
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
