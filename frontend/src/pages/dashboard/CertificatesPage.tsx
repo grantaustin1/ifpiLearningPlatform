@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { api, API_BASE, getAccessToken } from 'lib/api'
+import { api } from 'lib/api'
 import { Award, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 

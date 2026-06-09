@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X } from 'lucide-react'
@@ -18,7 +18,7 @@ export default function CourseEditPage() {
   const [allCourses, setAllCourses] = useState<any[]>([])
   const [showAddPrereq, setShowAddPrereq] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [r, p, all] = await Promise.all([
       api.get(`/courses/${id}`),
       api.get(`/courses/${id}/prerequisites`),
@@ -29,8 +29,8 @@ export default function CourseEditPage() {
     setActive(r.data.slides?.[0]?.id ?? null)
     setPrereqs(p.data)
     setAllCourses(all.data)
-  }
-  useEffect(() => { load() }, [id])
+  }, [id])
+  useEffect(() => { load() }, [load])
 
   const save = async () => {
     if (!course) return

@@ -176,7 +176,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'yarn', cache-dependency-path: frontend/yarn.lock }
+        with: { node-version: '20' }
       - working-directory: frontend
         run: |
           yarn install --frozen-lockfile
