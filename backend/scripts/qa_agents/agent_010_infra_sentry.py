@@ -33,13 +33,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 RESULTS: list[dict] = []
 
 
-def _report_path(name: str) -> Path:
-    report_dir = os.environ.get("AGENT_REPORT_DIR")
-    if report_dir:
-        return Path(report_dir) / name
-    return Path(__file__).resolve().parents[3] / "test_reports" / name
-
-
 def check(name: str):
     def _decorator(fn):
         try:
@@ -51,6 +44,12 @@ def check(name: str):
             print(f"FAIL {name}: {e}")
         return fn
     return _decorator
+
+
+def _report_path(filename: str) -> Path:
+    report_dir = os.environ.get("AGENT_REPORT_DIR")
+    base = Path(report_dir) if report_dir else Path(__file__).resolve().parents[3] / "test_reports"
+    return base / filename
 
 
 @check("C-1 backend http healthcheck")
