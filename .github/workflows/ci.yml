@@ -177,6 +177,7 @@ jobs:
     needs: secret-scan
     steps:
       - uses: actions/checkout@v4
+      # Keep setup-node lockfile-agnostic here; cache path validation can fail before install on PR merges.
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - working-directory: frontend
