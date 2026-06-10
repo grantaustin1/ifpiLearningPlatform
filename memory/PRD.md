@@ -22,6 +22,10 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-02-08 — iteration 12)
+- ✅ **Cohort celebration webhook — "Send test ping" + provider auto-detect** — new `POST /api/organization/cohort-settings/test-webhook` endpoint sends a sample celebration payload (`{text, content, username}`) to the supplied URL, returns `{ok, status_code, provider, error}` so the UI surfaces the upstream response inline. Provider is auto-detected from URL (`discord` | `slack` | `generic`) and shown as a colored pill above the input. Inline result card renders green ✓ on 2xx, red ✗ with HTTP code + Discord/Slack error body on failure. Collapsible "Preview celebration message" panel shows what the message will look like before saving. Every test writes a `COHORT_WEBHOOK_TESTED` audit row (with provider + status_code metadata), surfaced with teal pill in `/audit`.
+- ✅ Tests: **iter12 7/7 PASS** (422 on bad URL, 403 for learner, network failure → ok=false structured response, Discord/Slack provider detection, audit row written). Regression: iter9/10/11 = 39/39 PASS.
+
 ## What's been implemented (2026-02-08 — iteration 11)
 - ✅ **AI quiz: regenerate one question** — per-card `RefreshCw` button calls `/ai-generate-questions` with `num_questions=1` + `avoid_topics=<all current question_texts>`. Replaces only that card; spin animation while pending; isolated update verified.
 - ✅ **AI quiz: TRUE_FALSE + SHORT_ANSWER + MIXED** — `_TYPE_RULES` dict in `ai_quiz_service.py` drives the LLM prompt; per-question `question_type` is preserved and validated (TRUE_FALSE coerces `True/T/Yes` → `True`, false-equivalents → `False`; SHORT_ANSWER forces `options=[]`; MIXED lets the model choose). Frontend renders type pill + format-aware preview (✓ option / Expected: …).
