@@ -189,6 +189,15 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
+## Iteration 16 — Bulk Content Migration (Feb 2026)
+- ✅ `ImportJob` model + Alembic head `e7a3b9c4d816_import_jobs`
+- ✅ HTML sanitizer at `core/sanitizer.py` (bleach + plain-text helper)
+- ✅ Extended media uploads (video/audio/PDF) → `POST /api/uploads/media`, `/bulk-media`
+- ✅ Bulk migration script `scripts/bulk_import.py` + background runner
+- ✅ Endpoints `GET /api/admin/imports`, `/{id}`, `POST /run`
+- ✅ Frontend `pages/dashboard/ImportsPage.tsx` wired into `/imports` route + admin sidebar ("Content imports")
+- ✅ `tests/test_iteration16.py` — 14/14 passing
+
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.
 - ✅ Multi-tenant invitation flow (SUPER_ADMIN) → `/academies` page + `POST /api/academies`.
