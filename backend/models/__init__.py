@@ -109,6 +109,10 @@ class Organization(Base):
     # Cohort milestone celebrations (per-tenant tuneable)
     cohort_threshold = Column(Integer, default=75)         # % completion required to fire
     cohort_celebration_webhook_url = Column(Text)          # optional Discord/Slack URL
+    # Weekly cohort digest (Monday 09:00 UTC) — predictive nudge for cohorts
+    # approaching the threshold + recap of those past it.
+    cohort_digest_enabled = Column(Boolean, default=True, nullable=False)
+    cohort_digest_last_sent_at = Column(DateTime)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
