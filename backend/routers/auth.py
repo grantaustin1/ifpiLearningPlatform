@@ -83,8 +83,25 @@ def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(g
 
 
 # ── SSO bridge (stubbed until ERP360 is wired) ───────────────────────
+@router.get("/sso-status")
+def sso_status():
+    """Public endpoint — the login page calls this on mount to decide whether
+    to render the "Continue with ERP360" button. Returns the redirect URL
+    where ERP360 will mint the token and bounce back to IFPI."""
+    enabled = settings.sso_enabled and bool(settings.erp360_sso_shared_secret)
+    initiate_url = None
+    if enabled and settings.erp360_base_url:
+        # ERP360 hands off to IFPI by redirecting back to /sso/return?erp_token=...
+        initiate_url = (
+            settings.erp360_base_url.rstrip("/")
+            + "/api/sso/mint?return_to=/sso/return&app=ifpi"
+        )
+    return {"enabled": enabled, "initiate_url": initiate_url}
+
+
 @router.post("/sso-exchange", response_model=LoginResponse)
-def sso_exchange(payload: dict, response: Response, db: Session = Depends(get_db)):
+def sso_exchange(payload: dict, response: Response, request: Request,
+                 db: Session = Depends(get_db)):
     """Inbound SSO from ERP360. Body: {"erp_token": "..."}.
     Returns same shape as login so the frontend handles it identically.
     """
@@ -98,6 +115,32 @@ def sso_exchange(payload: dict, response: Response, db: Session = Depends(get_db
     if not token:
         raise HTTPException(status_code=400, detail="erp_token is required")
     claims = sso.verify_inbound_token(token)
-    user = sso.jit_provision(claims)
+    user, created = sso.jit_provision(claims)
+
+    # Audit — split create vs login so admins can see provisioning events
+    from services import audit_service
+
+    class _SSOActor:
+        id = user.id
+        organization_id = user.organization_id
+
+    actor = _SSOActor()
+    if created:
+        audit_service.record(
+            db, actor, "SSO_USER_PROVISIONED",
+            target_type="user", target_id=str(user.id),
+            metadata={"erp360_user_id": user.erp360_user_id,
+                      "email": user.email,
+                      "roles": [ur.role for ur in user.user_roles]},
+            request=request,
+        )
+    audit_service.record(
+        db, actor, "SSO_LOGIN_SUCCESS",
+        target_type="user", target_id=str(user.id),
+        metadata={"erp360_user_id": user.erp360_user_id, "email": user.email},
+        request=request,
+    )
+    db.commit()
+
     access, refresh = AuthService(db).issue_tokens(user)
     return _login_response(response, user, access, refresh)
