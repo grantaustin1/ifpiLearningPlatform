@@ -352,16 +352,21 @@ function SmtpSection({ inputCls }: { inputCls: string }) {
 function CohortSettingsSection({ inputCls }: { inputCls: string }) {
   const [threshold, setThreshold] = useState(75)
   const [webhook, setWebhook] = useState('')
+  const [digestEnabled, setDigestEnabled] = useState(true)
+  const [digestLastSent, setDigestLastSent] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [sendingDigest, setSendingDigest] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; status_code: number | null; provider: string; error: string | null } | null>(null)
 
-  useEffect(() => {
-    api.get('/organization').then(r => {
-      setThreshold(r.data.cohort_threshold || 75)
-      setWebhook(r.data.cohort_celebration_webhook_url || '')
-    })
-  }, [])
+  const loadOrg = () => api.get('/organization').then(r => {
+    setThreshold(r.data.cohort_threshold || 75)
+    setWebhook(r.data.cohort_celebration_webhook_url || '')
+    setDigestEnabled(r.data.cohort_digest_enabled !== false)
+    setDigestLastSent(r.data.cohort_digest_last_sent_at || null)
+  })
+
+  useEffect(() => { loadOrg() }, [])
 
   const save = async () => {
     setSaving(true)
@@ -369,6 +374,7 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
       await api.put('/organization/cohort-settings', {
         cohort_threshold: threshold,
         cohort_celebration_webhook_url: webhook.trim() || null,
+        cohort_digest_enabled: digestEnabled,
       })
       toast.success('Cohort settings saved')
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
@@ -406,6 +412,24 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
       setTestResult({ ok: false, status_code: null, provider, error: detail })
       toast.error(detail)
     } finally { setTesting(false) }
+  }
+
+  const sendDigestNow = async () => {
+    setSendingDigest(true)
+    try {
+      const r = await api.post('/organization/cohort-digest/send-now')
+      toast.success(`Digest queued to ${r.data.queued} admin${r.data.queued === 1 ? '' : 's'} — ${r.data.total_cohorts} cohort${r.data.total_cohorts === 1 ? '' : 's'} (${r.data.past} past · ${r.data.nudge} nudge)`)
+      await loadOrg()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Send failed')
+    } finally { setSendingDigest(false) }
+  }
+
+  const fmtLastSent = (iso: string | null): string => {
+    if (!iso) return 'never'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return 'never'
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   }
 
   return (
@@ -459,6 +483,39 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
             <p className="text-[10px] text-slate-400 mt-1.5">Same payload sent to both Slack (`text`) and Discord (`content`) — works with either provider.</p>
           </div>
         </details>
+
+        {/* Weekly digest — predictive nudge */}
+        <div className="rounded-lg border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-white px-4 py-3" data-testid="cohort-digest-block">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-indigo-600" />
+                <span className="text-sm font-semibold text-slate-800">Weekly cohort digest</span>
+                <span data-testid="cohort-digest-status" className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${digestEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                  {digestEnabled ? 'ON' : 'OFF'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Every Monday 09:00 UTC, every admin gets a recap of cohorts past the threshold + a nudge for any within 15pp of it.
+                <br />
+                Last sent: <span className="font-mono text-slate-700" data-testid="cohort-digest-last-sent">{fmtLastSent(digestLastSent)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 items-end">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={digestEnabled} onChange={e => setDigestEnabled(e.target.checked)}
+                  data-testid="cohort-digest-toggle"
+                  className="rounded accent-indigo-500 h-4 w-4" />
+                <span className="text-xs font-medium text-slate-700">{digestEnabled ? 'Enabled' : 'Disabled'}</span>
+              </label>
+              <button type="button" onClick={sendDigestNow} disabled={sendingDigest}
+                data-testid="cohort-digest-send-now"
+                className="inline-flex items-center gap-1.5 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-40 text-xs font-medium px-3 py-1.5 rounded-lg whitespace-nowrap text-indigo-700">
+                <Send className="h-3.5 w-3.5" /> {sendingDigest ? 'Sending…' : 'Send digest now'}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="flex justify-end">
           <button onClick={save} disabled={saving} data-testid="cohort-save"

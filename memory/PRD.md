@@ -22,6 +22,14 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-06-29 — iteration 13)
+- ✅ **Weekly cohort digest** — new APScheduler cron job (`Mon 09:00 UTC`) calls `services.cohort_digest.send_weekly_digests()`. For each org with `cohort_digest_enabled=True`, composes a single HTML email per admin bucketing cohorts into **past threshold / nudge zone (within 15pp) / early progress**. Nudge rows show "N more completions to celebrate". Idempotent — `cohort_digest_last_sent_at` + 6-day dedupe window guarantees ≤1 send/week even on misfire.
+- ✅ Migration `c4f9826dfe44` — adds `organizations.cohort_digest_enabled` (Boolean, default True) + `cohort_digest_last_sent_at` (DateTime nullable).
+- ✅ New endpoint `POST /api/organization/cohort-digest/send-now` (admin only) — manual trigger that bypasses dedupe so admins can preview. Returns `{queued, total_cohorts, past, nudge, threshold}`. Writes `COHORT_DIGEST_SENT` audit row.
+- ✅ PUT `/cohort-settings` now accepts optional `cohort_digest_enabled` (omitted = unchanged).
+- ✅ Frontend Settings → Cohort celebrations: new gradient "Weekly cohort digest" card with ON/OFF status pill, enabled checkbox, last-sent timestamp (`Last sent: Jun 29, 2026, 11:56 AM`), and "Send digest now" button. `COHORT_DIGEST_SENT` gets indigo pill in `/audit`.
+- ✅ Tests: **iter13 10/10 PASS**, iter12 7/7, iter11 14/14, iter10 14/14, iter9 11/11 — **56/56 across all iterations**. Updated iter9 alembic head test to accept new revision id.
+
 ## What's been implemented (2026-02-08 — iteration 12)
 - ✅ **Cohort celebration webhook — "Send test ping" + provider auto-detect** — new `POST /api/organization/cohort-settings/test-webhook` endpoint sends a sample celebration payload (`{text, content, username}`) to the supplied URL, returns `{ok, status_code, provider, error}` so the UI surfaces the upstream response inline. Provider is auto-detected from URL (`discord` | `slack` | `generic`) and shown as a colored pill above the input. Inline result card renders green ✓ on 2xx, red ✗ with HTTP code + Discord/Slack error body on failure. Collapsible "Preview celebration message" panel shows what the message will look like before saving. Every test writes a `COHORT_WEBHOOK_TESTED` audit row (with provider + status_code metadata), surfaced with teal pill in `/audit`.
 - ✅ Tests: **iter12 7/7 PASS** (422 on bad URL, 403 for learner, network failure → ok=false structured response, Discord/Slack provider detection, audit row written). Regression: iter9/10/11 = 39/39 PASS.
