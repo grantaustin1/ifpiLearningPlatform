@@ -218,6 +218,86 @@ def _resolve_user_from_actor(db: Session, actor: XApiActor, fallback_org_id: int
     return user, org_id
 
 
+# xAPI verbs that should auto-complete an IFPI enrollment.
+_COMPLETION_VERBS = {
+    "http://adlnet.gov/expapi/verbs/completed",
+    "http://adlnet.gov/expapi/verbs/passed",
+}
+
+
+def _resolve_course_id_from_statement(db: Session, org_id: int,
+                                       object_id: str) -> Optional[int]:
+    """Try several conventions to map an xAPI object_id → IFPI course_id.
+
+    1. `ifpi://course/<id>` — explicit, recommended for hand-authored content.
+    2. `/api/scorm/files/<pkg_id>/…` — when SCORM content sends its own launch URL.
+    3. Suffix `/<id>` matching a SCORM package's launch_url.
+    """
+    if not object_id:
+        return None
+    # Pattern 1
+    if object_id.startswith("ifpi://course/"):
+        try:
+            return int(object_id.rsplit("/", 1)[-1])
+        except ValueError:
+            return None
+    # Pattern 2/3 — locate SCORM package whose launch_url is contained in this iri
+    pkgs = db.query(ScormPackage).filter(
+        ScormPackage.organization_id == org_id,
+        ScormPackage.course_id.isnot(None),
+    ).all()
+    for pkg in pkgs:
+        if pkg.launch_url and pkg.launch_url in object_id:
+            return pkg.course_id
+    return None
+
+
+def _maybe_auto_complete(db: Session, user: "User", course_id: int) -> dict:
+    """Mark the user's enrollment COMPLETED + ensure a Certificate row exists.
+    Idempotent — calling twice is a no-op. Returns a small summary that's
+    bubbled up in the xAPI response so admins can see what happened.
+    """
+    from models import Certificate, Course, Enrollment, EnrollmentStatus
+
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == user.organization_id,
+    ).first()
+    if not course:
+        return {"completed": False, "reason": "course not found in user's org"}
+
+    e = db.query(Enrollment).filter(
+        Enrollment.user_id == user.id, Enrollment.course_id == course_id,
+    ).first()
+    already = bool(e and e.status == EnrollmentStatus.COMPLETED)
+    if not e:
+        e = Enrollment(user_id=user.id, course_id=course_id)
+        db.add(e)
+        db.flush()
+    e.status = EnrollmentStatus.COMPLETED
+    e.progress = 100.0
+    e.completed_at = datetime.now(timezone.utc)
+
+    cert = db.query(Certificate).filter(
+        Certificate.user_id == user.id, Certificate.course_id == course_id,
+    ).first()
+    cert_new = cert is None
+    if cert_new:
+        cert = Certificate(user_id=user.id, course_id=course_id,
+                           type="COURSE_COMPLETION")
+        db.add(cert)
+        db.flush()
+    db.commit()
+
+    return {
+        "completed": True, "course_id": course_id,
+        "course_title": course.title,
+        "certificate_code": cert.code,
+        "certificate_was_new": cert_new,
+        "already_completed_previously": already,
+    }
+
+
 @xapi_router.post("/statements", status_code=200)
 def receive_statement(
     body: XApiStatementIn,
@@ -243,7 +323,28 @@ def receive_statement(
     db.add(stmt)
     db.commit()
     db.refresh(stmt)
-    return {"id": stmt.id, "stored_at": stmt.stored_at.isoformat()}
+
+    response: dict = {"id": stmt.id, "stored_at": stmt.stored_at.isoformat()}
+
+    # Auto-completion hook (Iter 21) — only when:
+    #  - verb is in our completion set
+    #  - statement object resolves to a known IFPI course
+    #  - feature flag XAPI_AUTO_COMPLETE != "false"  (default ON since it's
+    #    behind a course-id resolver and idempotent)
+    if (body.verb.id in _COMPLETION_VERBS
+            and os.environ.get("XAPI_AUTO_COMPLETE", "true").lower() != "false"):
+        course_id = _resolve_course_id_from_statement(db, org_id, body.object.id or "")
+        if course_id:
+            try:
+                response["auto_complete"] = _maybe_auto_complete(db, user, course_id)
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Auto-completion failed for statement %s", stmt.id)
+                response["auto_complete"] = {"completed": False, "error": str(e)}
+        else:
+            response["auto_complete"] = {"completed": False,
+                                          "reason": "object_id did not resolve to a course"}
+
+    return response
 
 
 @xapi_router.get("/statements")

@@ -22,6 +22,7 @@ import AuditLogPage from 'pages/dashboard/AuditLogPage'
 import BadgeTiersPage from 'pages/dashboard/BadgeTiersPage'
 import WebhooksPage from 'pages/dashboard/WebhooksPage'
 import ImportsPage from 'pages/dashboard/ImportsPage'
+import ApiTokensPage from 'pages/dashboard/ApiTokensPage'
 import PortalPage from 'pages/PortalPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
+        <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />

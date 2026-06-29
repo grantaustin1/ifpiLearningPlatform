@@ -54,6 +54,15 @@ def get_current_user(
     token: str = Depends(extract_token),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
+    # Iter 21 — API token path. Tokens are prefixed `ifpi_` so we can route
+    # them past the JWT decoder without paying its CPU cost.
+    if token.startswith("ifpi_"):
+        from auth.api_tokens import authenticate_api_token
+        principal = authenticate_api_token(db, token)
+        if not principal:
+            raise HTTPException(status_code=401, detail="Invalid API token")
+        return principal
+
     try:
         payload = decode_token(token)
     except JWTError:

@@ -71,3 +71,7 @@ def register_all(app: FastAPI) -> None:
     app.include_router(scorm_xapi.scorm_router)
     app.include_router(scorm_xapi.scorm_public_router)
     app.include_router(scorm_xapi.xapi_router)
+
+    # ── Iter 21: API tokens for external integrations ────────────────
+    from routers import api_tokens
+    app.include_router(api_tokens.router)
