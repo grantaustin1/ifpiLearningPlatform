@@ -189,6 +189,15 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
+## Iteration 17 — Foundations (Feb 2026)
+- ✅ Fixed stale alembic-head assertions in `test_iteration3/4.py` (now accept any head through Iter 17)
+- ✅ Multi-process SSO replay store — new `SsoJtiSeen` model + Alembic migration `f1a2b3c4d5e6_sso_jti_seen.py`; `sso_service._check_replay()` now commits to SQL (survives across worker pods / DB sessions, proven via cross-session unit test)
+- ✅ S3 storage backend already implemented (`services/storage_service.py`); added admin diagnostic `GET /api/admin/storage/info` with live write/exists/delete probe to make config flips visible
+- ✅ Drag-and-drop ZIP uploader on `/imports`:
+  - Backend: `POST /api/admin/imports/upload-zip` extracts safely to `/tmp/ifpi_import_staging/<uuid>/`, rejects path-traversal + non-zip + >200 MB, auto-unwraps single-root zips, then kicks off the same background importer
+  - Frontend: tabbed modal — "Upload .zip" (dropzone + Choose file) vs "Server path"
+- ✅ `tests/test_iteration17.py` — 7 passing, 1 skipped (full SSO handshake requires SSO_ENABLED=true on the running server)
+
 ## Iteration 16 — Bulk Content Migration (Feb 2026)
 - ✅ `ImportJob` model + Alembic head `e7a3b9c4d816_import_jobs`
 - ✅ HTML sanitizer at `core/sanitizer.py` (bleach + plain-text helper)

@@ -78,6 +78,7 @@ app.include_router(iter8_router.router)
 app.include_router(webhooks_router.router)
 app.include_router(imports_router.media_router)
 app.include_router(imports_router.jobs_router)
+app.include_router(imports_router.storage_router)
 
 
 @app.get("/api")

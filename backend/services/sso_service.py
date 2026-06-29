@@ -21,14 +21,16 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
 from jose import JWTError, jwt
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.config import settings
-from models import LifecycleStage, Organization, Person, User, UserRole
+from models import LifecycleStage, Organization, Person, SsoJtiSeen, User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -49,23 +51,34 @@ ERP360_TO_IFPI_ROLE = {
 # to defend against badly-skewed clocks producing very-old tokens.
 MAX_TOKEN_AGE_SECONDS = 300
 
-# In-memory jti → first-seen-ts cache. Sufficient for single-process v1.
-# When IFPI moves to multi-worker, swap for Redis or a tiny SQL table.
-_SEEN_JTI: dict[str, float] = {}
-_REPLAY_TTL = 600  # purge jti entries older than 10 min
+# Replay-protection TTL — purge SsoJtiSeen rows older than this on each new
+# token. 10 min comfortably overlaps the MAX_TOKEN_AGE window above.
+_REPLAY_TTL_SECONDS = 600
 
 
-def _check_replay(jti: str) -> None:
-    """Raises 401 if jti was seen before within the replay window."""
-    now = time.time()
-    # opportunistic GC
-    if len(_SEEN_JTI) > 1024:
-        cutoff = now - _REPLAY_TTL
-        for k in [k for k, v in _SEEN_JTI.items() if v < cutoff]:
-            _SEEN_JTI.pop(k, None)
-    if jti in _SEEN_JTI:
+def _check_replay(db: Session, jti: str) -> None:
+    """Raises 401 if jti has been seen before. Multi-process safe via the
+    `sso_jti_seen` SQL table — survives across worker pods, unlike the
+    previous in-memory dict.
+    """
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    # Opportunistic GC of expired rows. Tiny query — cheap even at scale
+    # because the table is bounded by traffic over the last ~10 min.
+    cutoff = now - timedelta(seconds=_REPLAY_TTL_SECONDS)
+    db.query(SsoJtiSeen).filter(SsoJtiSeen.seen_at < cutoff).delete()
+
+    if db.query(SsoJtiSeen).filter(SsoJtiSeen.jti == jti).first():
         raise HTTPException(status_code=401, detail="SSO token already used (replay)")
-    _SEEN_JTI[jti] = now
+    db.add(SsoJtiSeen(jti=jti, seen_at=now))
+    try:
+        # Commit immediately so a later rollback in jit_provision can't
+        # erase the replay marker and re-open the token for reuse.
+        db.commit()
+    except IntegrityError:
+        # Race: another worker just inserted the same jti. That's a replay.
+        db.rollback()
+        raise HTTPException(status_code=401, detail="SSO token already used (replay)")
 
 
 class SSOService:
@@ -98,7 +111,7 @@ class SSOService:
         jti = payload.get("jti")
         if not jti or not isinstance(jti, str):
             raise HTTPException(status_code=401, detail="SSO token missing jti")
-        _check_replay(jti)
+        _check_replay(self.db, jti)
         return payload
 
     def jit_provision(self, claims: dict) -> tuple[User, bool]:

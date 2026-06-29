@@ -58,8 +58,13 @@ def second_course(admin):
 def test_alembic_head_is_iteration3():
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
-    # Iteration 4 raised head — accept both
-    assert ("feb2000f209a" in out) or ("7497425df8bc" in out) or ("9acf884483b9" in out) or ("c1f29b3e9d04" in out) or ("e5a721f43b18" in out), out
+    # Iteration 4+ raised head — accept any recent revision through Iter 16.
+    accepted = (
+        "feb2000f209a", "7497425df8bc", "9acf884483b9", "c1f29b3e9d04",
+        "e5a721f43b18", "f6b832c5a4e1", "a9c2470b8e15", "b3d8915cef27",
+        "c4f9826dfe44", "d5f0a3bc7e91", "e7a3b9c4d816", "f1a2b3c4d5e6",
+    )
+    assert any(h in out for h in accepted), out
 
 
 def test_new_tables_exist():
