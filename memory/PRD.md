@@ -22,6 +22,14 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-06-29 — iteration 14)
+- ✅ **ERP360 SSO drop-in (HS256, fully hardened)** — `/api/auth/sso-exchange` accepts an ERP360-minted JWT (`iss=erp360`, `aud=ifpi-lms`, `sub`, `email`, `iat`, `exp`, `jti`, `name`, `roles[]`, optional `person_id`). Verifies signature via `ERP360_SSO_SHARED_SECRET` (HS256). Hardening: required claims (`exp`/`iat`/`sub`), issuer check, audience check, `iat` freshness (max 5 min old), `jti` replay-prevention via in-memory TTL set.
+- ✅ **JIT provisioning** — first SSO login auto-creates the IFPI User + Person rows linked by `erp360_user_id` / `erp360_person_id`; subsequent logins idempotently reuse them. Role map: `OWNER/MANAGER/HEAD_OF_ADMIN→ADMIN`, `PLATFORM_ADMIN/SUPER_ADMIN→SUPER_ADMIN`, `TRAINER/HR_ADMIN→INSTRUCTOR`, `ACCOUNTANT/BILLING_USER→BILLING_VIEWER`, everyone else → `LEARNER`. (Bug fix: skip role-registry pre-normalisation so the ERP360-specific keys win.)
+- ✅ **Status endpoint** — `GET /api/auth/sso-status` (public) returns `{enabled, initiate_url}` so the login page conditionally renders a "Continue with ERP360" button. `initiate_url` composes ERP360's mint endpoint URL + return_to=/sso/return.
+- ✅ **Frontend SSO button** — LoginPage probes `/sso-status` on mount; when enabled shows pill button above the email/password form with "OR SIGN IN DIRECTLY" divider. URL param `?erp_token=…` auto-triggers `/sso-exchange` and lands on the right dashboard route based on role.
+- ✅ **Audit** — both `SSO_LOGIN_SUCCESS` (every exchange) and `SSO_USER_PROVISIONED` (first-time JIT) rows are written with IP + email + role metadata.
+- ✅ Tests: **iter14 12/12 PASS** — happy path, idempotent reuse, unknown role → LEARNER fallback, bad signature, wrong issuer, wrong audience, expired token, iat-too-old, missing jti, replay prevention, audit-row verification. Full regression: **68/68 across iter9-14**.
+
 ## What's been implemented (2026-06-29 — iteration 13)
 - ✅ **Weekly cohort digest** — new APScheduler cron job (`Mon 09:00 UTC`) calls `services.cohort_digest.send_weekly_digests()`. For each org with `cohort_digest_enabled=True`, composes a single HTML email per admin bucketing cohorts into **past threshold / nudge zone (within 15pp) / early progress**. Nudge rows show "N more completions to celebrate". Idempotent — `cohort_digest_last_sent_at` + 6-day dedupe window guarantees ≤1 send/week even on misfire.
 - ✅ Migration `c4f9826dfe44` — adds `organizations.cohort_digest_enabled` (Boolean, default True) + `cohort_digest_last_sent_at` (DateTime nullable).
