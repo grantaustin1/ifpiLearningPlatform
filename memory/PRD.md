@@ -22,6 +22,16 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-06-29 — iteration 15)
+- ✅ **Outgoing webhooks (HMAC-SHA256 signed) — companion to iter14 SSO**. New `WebhookSubscription` + `WebhookDelivery` models (migration `d5f0a3bc7e91`). `services/webhook_service.py` exposes `sign(secret, body)`, `emit_event(db, org_id, event_type, payload)`, `drain_failed(db)`. Headers on every POST: `X-IFPI-Signature` (hex HMAC), `X-IFPI-Signature-Algorithm: HMAC-SHA256`, `X-IFPI-Event-Id` (UUID for receiver dedup), `X-IFPI-Event-Type`. Body is a stable envelope `{event_type, event_id, organization_id, occurred_at, data}`.
+- ✅ **Retry pipeline** — 3 attempts with backoff `[30s, 5min, 30min]` then `DEAD_LETTER`. New APScheduler tick `_webhook_retry_tick` runs every 30s draining FAILED rows whose `next_attempt_at` is due.
+- ✅ **Emit hooks wired**:
+  - `course.completed` + `certificate.issued` after successful `POST /api/courses/{id}/complete` (only when actually first-time — idempotent re-completes do NOT re-fire).
+  - `cohort.milestone_reached` after the cohort celebration audit + email + Slack/Discord ping.
+- ✅ **Admin CRUD** — `GET/POST/PUT/DELETE /api/admin/webhooks` + `POST /api/admin/webhooks/{id}/test` + `GET /api/admin/webhooks/{id}/deliveries`. Auto-generates a 32-byte URL-safe secret if not supplied. Writes `WEBHOOK_SUBSCRIPTION_CREATED/UPDATED/DELETED` and `WEBHOOK_TEST_FIRED` audit rows.
+- ✅ **Admin UI** — new `/webhooks` page in sidebar: list cards with pulse status dot, event-tag pills, masked secret with reveal/copy buttons, last-success/failure timestamps. Inline expandable delivery log per sub showing status pills (DELIVERED/FAILED/DEAD_LETTER), attempt count, error truncated. "Add subscription" modal with target URL, event toggles (or `*` wildcard), description, optional custom secret. Audit log gets cyan/sky/rose/violet pills for the new actions.
+- ✅ Tests: **iter15 9/9 PASS** — CRUD + LEARNER 403 + 5xx-marks-FAILED + HMAC signature deterministic-and-verifiable + envelope shape + event filter narrowing + E2E course completion fires `course.completed` to capture server. Regression: **77/77 across iter9-15**.
+
 ## What's been implemented (2026-06-29 — iteration 14)
 - ✅ **ERP360 SSO drop-in (HS256, fully hardened)** — `/api/auth/sso-exchange` accepts an ERP360-minted JWT (`iss=erp360`, `aud=ifpi-lms`, `sub`, `email`, `iat`, `exp`, `jti`, `name`, `roles[]`, optional `person_id`). Verifies signature via `ERP360_SSO_SHARED_SECRET` (HS256). Hardening: required claims (`exp`/`iat`/`sub`), issuer check, audience check, `iat` freshness (max 5 min old), `jti` replay-prevention via in-memory TTL set.
 - ✅ **JIT provisioning** — first SSO login auto-creates the IFPI User + Person rows linked by `erp360_user_id` / `erp360_person_id`; subsequent logins idempotently reuse them. Role map: `OWNER/MANAGER/HEAD_OF_ADMIN→ADMIN`, `PLATFORM_ADMIN/SUPER_ADMIN→SUPER_ADMIN`, `TRAINER/HR_ADMIN→INSTRUCTOR`, `ACCOUNTANT/BILLING_USER→BILLING_VIEWER`, everyone else → `LEARNER`. (Bug fix: skip role-registry pre-normalisation so the ERP360-specific keys win.)

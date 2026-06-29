@@ -20,6 +20,7 @@ import OrganizationSettingsPage from 'pages/dashboard/OrganizationSettingsPage'
 import AcademiesPage from 'pages/dashboard/AcademiesPage'
 import AuditLogPage from 'pages/dashboard/AuditLogPage'
 import BadgeTiersPage from 'pages/dashboard/BadgeTiersPage'
+import WebhooksPage from 'pages/dashboard/WebhooksPage'
 import PortalPage from 'pages/PortalPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="/academies" element={<Protected adminOnly><AcademiesPage /></Protected>} />
         <Route path="/badge-tiers" element={<Protected adminOnly><BadgeTiersPage /></Protected>} />
         <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
+        <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />

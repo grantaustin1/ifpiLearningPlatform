@@ -571,3 +571,44 @@ class AuditLog(Base):
     audit_metadata = Column(JSON)
     ip_address = Column(String(45))
     created_at = Column(DateTime, default=_utcnow, index=True)
+
+
+# ── Outgoing webhooks (HMAC-signed events to ERP360 et al.) ──────────
+class WebhookSubscription(Base):
+    """A target URL that receives HMAC-signed event POSTs.
+
+    `events` is a JSON list of event_type strings (or `["*"]` for all).
+    `secret` is shared with the receiver — they reproduce the HMAC-SHA256
+    of the raw request body using this secret and reject mismatches.
+    """
+    __tablename__ = "webhook_subscriptions"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    target_url = Column(String(500), nullable=False)
+    secret = Column(String(120), nullable=False)
+    events = Column(Text, nullable=False)  # JSON list
+    description = Column(String(200))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    last_success_at = Column(DateTime)
+    last_failure_at = Column(DateTime)
+
+
+class WebhookDelivery(Base):
+    """One row per dispatch attempt. Used for retries + audit + UI inspection."""
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (Index("ix_webhook_deliveries_next", "next_attempt_at"),)
+    id = Column(Integer, primary_key=True)
+    subscription_id = Column(Integer, ForeignKey("webhook_subscriptions.id"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    event_type = Column(String(80), nullable=False, index=True)
+    event_id = Column(String(80), nullable=False)  # uuid for receiver-side dedup
+    payload = Column(Text, nullable=False)
+    signature = Column(String(80), nullable=False)
+    status = Column(String(20), nullable=False, default="QUEUED")
+    status_code = Column(Integer)
+    attempt_count = Column(Integer, default=0, nullable=False)
+    error = Column(Text)
+    next_attempt_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    delivered_at = Column(DateTime)

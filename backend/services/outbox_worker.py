@@ -146,6 +146,18 @@ def _digest_tick():
         logger.exception("cohort digest tick failed: %s", e)
 
 
+def _webhook_retry_tick():
+    """Retry FAILED outgoing webhook deliveries whose next_attempt_at is due."""
+    try:
+        with SessionLocal() as db:
+            from services.webhook_service import drain_failed
+            n = drain_failed(db)
+            if n:
+                logger.info("Retried %s webhook delivery row(s)", n)
+    except Exception as e:
+        logger.exception("webhook retry tick failed: %s", e)
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -165,10 +177,16 @@ def start_scheduler() -> None:
         id="cohort_weekly_digest", max_instances=1, coalesce=True,
         misfire_grace_time=3600,
     )
+    sched.add_job(
+        _webhook_retry_tick, "interval", seconds=30,
+        id="webhook_retry", max_instances=1, coalesce=True,
+        misfire_grace_time=120,
+    )
     sched.start()
     _scheduler = sched
     logger.info("Outbox worker scheduled every %ss (max %s attempts), "
-                "cohort celebrator every 60s, weekly digest Mon 09:00 UTC",
+                "cohort celebrator every 60s, weekly digest Mon 09:00 UTC, "
+                "webhook retry every 30s",
                 WORKER_INTERVAL_SECONDS, MAX_ATTEMPTS)
 
 

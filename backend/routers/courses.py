@@ -448,6 +448,25 @@ def complete_course(course_id: int, request: Request, db: Session = Depends(get_
             import logging
             logging.getLogger(__name__).warning("Cert email queue failed: %s", ex)
     db.commit()
+
+    # Outgoing webhooks — fire AFTER commit so the receiver never sees an
+    # event for a row that subsequently rolled back. emit_safely never raises.
+    from services.webhook_service import emit_safely
+    emit_safely(db, current.organization_id, "course.completed", {
+        "user_id": current.id, "user_email": current.email,
+        "erp360_user_id": getattr(current, "erp360_user_id", None),
+        "course_id": c.id, "course_title": c.title,
+        "completed_at": (e.completed_at or datetime.now(timezone.utc)).isoformat(),
+        "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges,
+    })
+    if cert_is_new:
+        emit_safely(db, current.organization_id, "certificate.issued", {
+            "user_id": current.id, "user_email": current.email,
+            "erp360_user_id": getattr(current, "erp360_user_id", None),
+            "course_id": c.id, "course_title": c.title,
+            "certificate_code": cert.code,
+            "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
+        })
     return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges}
 
 
