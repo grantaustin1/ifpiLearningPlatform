@@ -72,6 +72,9 @@ export default function LearnPage() {
               <h1 className="text-2xl font-bold text-slate-900 mb-6 font-display">{slide.title}</h1>
               {slide.slide_type === 'VIDEO' && slide.media_url && <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allowFullScreen title="video" /></div>}
               {slide.slide_type === 'IMAGE' && slide.media_url && <img src={slide.media_url} alt="" className="mb-6 rounded-xl w-full" />}
+              {slide.slide_type === 'AUDIO' && slide.media_url && <audio src={slide.media_url} controls className="w-full mb-6" />}
+              {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
+              {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
               {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: slide.content }} />}
               <CommentsPanel slideId={slide.id} />
             </div>

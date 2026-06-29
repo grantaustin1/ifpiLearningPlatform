@@ -276,6 +276,14 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Slide not found")
+    # Iter 19 — snapshot the PREVIOUS state for rollback before mutating
+    from services.versioning_service import snapshot_slide
+    changed = (s.title != body.title or (s.content or "") != (body.content or "")
+               or s.media_url != body.media_url
+               or (body.slide_type in SlideType.__members__
+                   and s.slide_type != SlideType(body.slide_type)))
+    if changed:
+        snapshot_slide(db, s, changed_by_id=current.id, change_summary="Pre-edit snapshot")
     s.title = body.title
     s.content = body.content or ""
     s.media_url = body.media_url
@@ -291,6 +299,88 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
     )
+
+
+# ── Iter 19: Slide versioning endpoints ───────────────────────────────
+@router.get("/{course_id}/slides/{slide_id}/versions")
+def list_slide_versions(course_id: int, slide_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles(
+                            "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import list_versions
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    return {"items": list_versions(db, slide_id)}
+
+
+@router.get("/{course_id}/slides/{slide_id}/versions/{version_number}")
+def get_slide_version(course_id: int, slide_id: int, version_number: int,
+                      db: Session = Depends(get_db),
+                      current: CurrentUser = Depends(requires_roles(
+                          "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import get_version
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    v = get_version(db, slide_id, version_number)
+    if not v:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return {
+        "id": v.id, "version_number": v.version_number,
+        "title": v.title, "content": v.content,
+        "slide_type": v.slide_type, "media_url": v.media_url,
+        "change_summary": v.change_summary,
+        "changed_by_id": v.changed_by_id,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+
+
+@router.post("/{course_id}/slides/{slide_id}/versions/{version_number}/restore")
+def restore_slide_version(course_id: int, slide_id: int, version_number: int,
+                          db: Session = Depends(get_db),
+                          current: CurrentUser = Depends(requires_roles(
+                              "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import get_version, restore_version
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    target = get_version(db, slide_id, version_number)
+    if not target:
+        raise HTTPException(status_code=404, detail="Version not found")
+    restore_version(db, s, target, changed_by_id=current.id)
+    db.commit()
+    db.refresh(s)
+    return {
+        "ok": True, "restored_to_version": version_number,
+        "slide": {"id": s.id, "title": s.title, "media_url": s.media_url,
+                  "slide_type": s.slide_type.value if s.slide_type else None},
+    }
+
+
+# ── Iter 19: Rich-text editor helper (separate prefix to avoid colliding
+# with `/api/courses/{course_id}` paths) ──────────────────────────────
+richtext_router = APIRouter(prefix="/api/rich-text", tags=["Rich Text"])
+
+
+@richtext_router.post("/sanitize")
+def sanitize_html_payload(body: dict,
+                          _current: CurrentUser = Depends(requires_roles(
+                              "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Server-side HTML sanitizer for the rich-text editor preview.
+    Strips dangerous tags/attrs while preserving formatting + media tags.
+    """
+    from core.sanitizer import sanitize_course_html
+    raw = body.get("html") or ""
+    return {"sanitized": sanitize_course_html(raw), "input_length": len(raw)}
 
 
 @router.delete("/{course_id}/slides/{slide_id}")

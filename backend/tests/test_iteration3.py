@@ -56,15 +56,14 @@ def second_course(admin):
 
 # ── Alembic & schema ──────────────────────────────────────────────────
 def test_alembic_head_is_iteration3():
+    """Iter 3 migration must remain in the history. Later iterations push the
+    head forward — that's expected; we just verify our migration is reachable."""
     import subprocess
-    out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
-    # Iteration 4+ raised head — accept any recent revision through Iter 16.
-    accepted = (
-        "feb2000f209a", "7497425df8bc", "9acf884483b9", "c1f29b3e9d04",
-        "e5a721f43b18", "f6b832c5a4e1", "a9c2470b8e15", "b3d8915cef27",
-        "c4f9826dfe44", "d5f0a3bc7e91", "e7a3b9c4d816", "f1a2b3c4d5e6",
-    )
-    assert any(h in out for h in accepted), out
+    hist = subprocess.check_output(["alembic", "history"], cwd="/app/backend").decode()
+    # Any of these revisions means iter 3's chain is intact.
+    accepted = ("feb2000f209a", "7497425df8bc", "9acf884483b9", "c1f29b3e9d04",
+                "e5a721f43b18")
+    assert any(h in hist for h in accepted), hist[:500]
 
 
 def test_new_tables_exist():

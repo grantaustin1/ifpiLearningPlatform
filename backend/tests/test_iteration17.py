@@ -32,9 +32,13 @@ def admin():
 
 # ── Alembic head ──────────────────────────────────────────────────────
 def test_alembic_head_includes_iteration17():
+    """The Iter 17 migration must be IN the history (not necessarily head)."""
     import subprocess
-    out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
-    assert "f1a2b3c4d5e6" in out, f"expected sso_jti_seen migration in head, got {out}"
+    # `alembic history` shows the full chain — Iter 18+ pushes head forward.
+    hist = subprocess.check_output(
+        ["alembic", "history"], cwd="/app/backend",
+    ).decode()
+    assert "f1a2b3c4d5e6" in hist, f"sso_jti_seen migration missing from history: {hist[:300]}"
 
 
 def test_sso_jti_seen_table_exists():

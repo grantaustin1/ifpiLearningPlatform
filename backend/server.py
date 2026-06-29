@@ -1,4 +1,8 @@
-"""IFPI LMS — FastAPI entry point."""
+"""IFPI LMS — FastAPI entry point.
+
+Router registration is delegated to `routers.register_all` (Iter 20 refactor).
+This file owns: app construction, CORS, lifecycle hooks, root + health.
+"""
 from __future__ import annotations
 
 import logging
@@ -8,18 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.database import Base, engine
-from routers import auth as auth_router
-from routers import badge_tiers as badge_tiers_router
-from routers import courses as courses_router
-from routers import exams as exams_router
-from routers import extras as extras_router
-from routers import invitations as invitations_router
-from routers import iter5 as iter5_router
-from routers import iter8 as iter8_router
-from routers import learning_paths as paths_router
-from routers import misc as misc_router
-from routers import webhooks as webhooks_router
-from routers import imports as imports_router
+from routers import register_all
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,10 +20,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ifpi")
 
-# Schema is managed by Alembic (`alembic upgrade head`).
-# In dev we also auto-create any tables that don't exist yet (e.g. before
-# you've run migrations on a fresh checkout). In production this is a no-op
-# because Alembic has already created everything.
+# Schema is managed by Alembic (`alembic upgrade head`). We also auto-create
+# any missing tables on fresh checkouts; in production Alembic has already
+# created everything so this is a no-op.
 import models  # noqa: F401  — ensures all models register on metadata
 Base.metadata.create_all(bind=engine, checkfirst=True)
 
@@ -49,36 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers (prefix-scoped to /api) ───────────────────────────────────
-app.include_router(auth_router.router)
-app.include_router(courses_router.router)
-app.include_router(exams_router.router)
-app.include_router(paths_router.router)
-app.include_router(misc_router.ai_router)
-app.include_router(misc_router.enroll_router)
-app.include_router(misc_router.cert_router)
-app.include_router(misc_router.notif_router)
-app.include_router(misc_router.gam_router)
-app.include_router(misc_router.admin_router)
-app.include_router(misc_router.billing_router)
-app.include_router(misc_router.catalog_router)
-app.include_router(invitations_router.admin_router)
-app.include_router(invitations_router.public_router)
-app.include_router(extras_router.leads_router)
-app.include_router(extras_router.org_router)
-app.include_router(extras_router.outbox_router)
-app.include_router(extras_router.paths_extra_router)
-app.include_router(iter5_router.preview_router)
-app.include_router(iter5_router.uploads_router)
-app.include_router(iter5_router.comments_router)
-app.include_router(iter5_router.academies_router)
-app.include_router(iter5_router.portal_router)
-app.include_router(badge_tiers_router.router)
-app.include_router(iter8_router.router)
-app.include_router(webhooks_router.router)
-app.include_router(imports_router.media_router)
-app.include_router(imports_router.jobs_router)
-app.include_router(imports_router.storage_router)
+register_all(app)
 
 
 @app.get("/api")
