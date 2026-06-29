@@ -634,3 +634,16 @@ class ImportJob(Base):
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── SSO replay protection (multi-process safe) ───────────────────────
+class SsoJtiSeen(Base):
+    """One row per inbound SSO token jti we've seen. Replaces the in-memory
+    `_SEEN_JTI` dict so replay protection works across multiple FastAPI
+    workers / pods. A small background sweeper purges rows older than the
+    replay TTL (10 min by default)."""
+    __tablename__ = "sso_jti_seen"
+    __table_args__ = (Index("ix_sso_jti_seen_at", "seen_at"),)
+    jti = Column(String(120), primary_key=True)
+    seen_at = Column(DateTime, default=_utcnow, nullable=False)

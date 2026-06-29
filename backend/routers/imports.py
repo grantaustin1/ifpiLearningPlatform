@@ -11,6 +11,7 @@ import re
 import traceback
 import uuid
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import List, Optional
 
@@ -273,3 +274,152 @@ def run_import(body: ImportRunIn, background_tasks: BackgroundTasks,
         _run_import_in_bg, job.id, org.id, str(src), body.publish_on_import,
     )
     return _job_to_dict(job)
+
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 3) Drag-and-drop ZIP upload — extract into staging, then run import
+# ─────────────────────────────────────────────────────────────────────
+import shutil
+import tempfile
+import zipfile
+
+# Hard cap on uploaded ZIP size (defensive — bigger trees should be SCP'd in)
+MAX_ZIP_SIZE = 200 * 1024 * 1024  # 200 MB
+# Staging root for extracted content. Lives outside the storage backend
+# on purpose — these are transient working dirs the importer consumes.
+STAGING_ROOT = Path("/tmp/ifpi_import_staging")
+
+
+def _safe_extract_zip(zf: zipfile.ZipFile, dest: Path) -> int:
+    """Path-traversal-safe extraction. Returns extracted file count."""
+    dest = dest.resolve()
+    count = 0
+    for member in zf.infolist():
+        # Reject absolute paths and ".." escapes
+        target = (dest / member.filename).resolve()
+        if not str(target).startswith(str(dest)):
+            raise HTTPException(status_code=400,
+                detail=f"ZIP contains unsafe path: {member.filename}")
+        if member.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zf.open(member) as src, open(target, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        count += 1
+    return count
+
+
+@jobs_router.post("/upload-zip", status_code=202)
+async def upload_zip_and_run(
+    file: UploadFile = File(...),
+    publish_on_import: bool = False,
+    job_type: str = "FULL_MIGRATION",
+    background_tasks: BackgroundTasks = None,  # type: ignore[assignment]
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Drag-and-drop a content-tree ZIP. We extract it to a temp staging
+    directory and immediately kick off a bulk-import job pointing at the
+    extracted root. The frontend `ImportsPage` polls for progress."""
+    if not (file.filename or "").lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="File must be a .zip archive")
+
+    data = await file.read()
+    if len(data) > MAX_ZIP_SIZE:
+        raise HTTPException(status_code=413,
+            detail=f"ZIP too large — max {MAX_ZIP_SIZE // (1024 * 1024)} MB")
+
+    STAGING_ROOT.mkdir(parents=True, exist_ok=True)
+    extract_dir = STAGING_ROOT / f"{current.organization_id}_{uuid.uuid4().hex[:10]}"
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as zf:
+            extracted = _safe_extract_zip(zf, extract_dir)
+    except zipfile.BadZipFile:
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail="Not a valid ZIP archive")
+
+    if extracted == 0:
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail="ZIP archive is empty")
+
+    # If the ZIP wraps the content under a single top-level dir (the common
+    # case when you right-click → "Compress" on macOS / Finder), unwrap it
+    # so the importer sees the expected `courses/` / `paths/` structure.
+    entries = [p for p in extract_dir.iterdir() if not p.name.startswith(".")]
+    root_dir = entries[0] if len(entries) == 1 and entries[0].is_dir() else extract_dir
+
+    org = db.query(Organization).filter(
+        Organization.id == current.organization_id,
+    ).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    job = ImportJob(
+        organization_id=org.id,
+        created_by_id=current.id,
+        job_type=job_type or "FULL_MIGRATION",
+        source_path=str(root_dir),
+        status="PENDING",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    from services import audit_service
+    audit_service.record(
+        db, current, "IMPORT_JOB_STARTED",
+        target_type="import_job", target_id=str(job.id),
+        metadata={"source_path": str(root_dir), "job_type": job.job_type,
+                  "publish_on_import": publish_on_import,
+                  "upload_filename": file.filename,
+                  "upload_bytes": len(data), "files_extracted": extracted},
+    )
+    db.commit()
+
+    if background_tasks is not None:
+        background_tasks.add_task(
+            _run_import_in_bg, job.id, org.id, str(root_dir), publish_on_import,
+        )
+    return _job_to_dict(job)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 4) Storage backend diagnostics (admin-only)
+# ─────────────────────────────────────────────────────────────────────
+from core.config import settings as _settings
+
+storage_router = APIRouter(prefix="/api/admin/storage", tags=["Storage"])
+
+
+@storage_router.get("/info")
+def storage_info(
+    _current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Return the currently active storage backend + a probe result so admins
+    can confirm a config flip (e.g. STORAGE_BACKEND=s3) actually took effect.
+    No secrets returned — only what's safe to display."""
+    backend = (_settings.storage_backend or "local").lower()
+    info: dict = {"backend": backend}
+    if backend == "s3":
+        info["bucket"] = _settings.s3_bucket
+        info["region"] = _settings.s3_region
+    elif backend == "gcs":
+        info["bucket"] = _settings.gcs_bucket
+        info["project"] = _settings.gcs_project
+    else:
+        info["path"] = _settings.storage_path
+
+    # Live probe — write & delete a 1-byte file to confirm credentials work.
+    probe_key = f"_probe/{uuid.uuid4().hex}.tmp"
+    try:
+        store = get_storage()
+        store.save(b"x", probe_key, content_type="application/octet-stream")
+        ok = store.exists(probe_key)
+        store.delete(probe_key)
+        info["probe"] = {"ok": bool(ok)}
+    except Exception as e:  # noqa: BLE001
+        info["probe"] = {"ok": False, "error": str(e)}
+    return info

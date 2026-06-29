@@ -75,7 +75,7 @@ export default function ImportsPage() {
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-10 text-center">
           <Upload className="h-10 w-10 text-slate-300 mx-auto mb-2" />
           <p className="text-sm text-slate-600 font-medium">No imports yet</p>
-          <p className="text-xs text-slate-400 mt-1">Upload a content tree onto the server, then click "Run import" with the directory path.</p>
+          <p className="text-xs text-slate-400 mt-1">Upload a content tree onto the server, then click &quot;Run import&quot; with the directory path.</p>
         </div>
       ) : (
         <div className="space-y-3" data-testid="imports-list">
@@ -180,11 +180,14 @@ export default function ImportsPage() {
 
 
 function RunImportModal({ onClose, onStarted }: { onClose: () => void; onStarted: () => void }) {
+  const [tab, setTab] = useState<'zip' | 'path'>('zip')
   const [path, setPath] = useState('/app/migration-staging')
   const [publish, setPublish] = useState(false)
   const [running, setRunning] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [dragging, setDragging] = useState(false)
 
-  const run = async () => {
+  const runPath = async () => {
     if (!path.trim()) { toast.error('Enter a server-side directory path'); return }
     setRunning(true)
     try {
@@ -200,29 +203,100 @@ function RunImportModal({ onClose, onStarted }: { onClose: () => void; onStarted
     } finally { setRunning(false) }
   }
 
+  const runZip = async () => {
+    if (!file) { toast.error('Drop or choose a .zip file first'); return }
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      toast.error('Only .zip archives are accepted'); return
+    }
+    setRunning(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      await api.post(
+        `/admin/imports/upload-zip?publish_on_import=${publish}&job_type=FULL_MIGRATION`,
+        fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      toast.success(`Uploaded ${file.name} — extracting & importing now`)
+      onStarted()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Upload failed')
+    } finally { setRunning(false) }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} data-testid="run-import-modal">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-slate-900 mb-1">Run bulk import</h2>
-        <p className="text-xs text-slate-500 mb-4">Make sure the content tree is already uploaded to the server (SCP or mounted volume), then point to its absolute path.</p>
-        <div className="space-y-4">
+        <p className="text-xs text-slate-500 mb-4">Drop a zipped content tree from your computer, or point to a server-side directory.</p>
+
+        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 mb-4 text-xs">
+          <button onClick={() => setTab('zip')} data-testid="tab-zip"
+            className={`px-3 py-1.5 rounded-md font-semibold ${tab === 'zip' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+            Upload .zip
+          </button>
+          <button onClick={() => setTab('path')} data-testid="tab-path"
+            className={`px-3 py-1.5 rounded-md font-semibold ${tab === 'path' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+            Server path
+          </button>
+        </div>
+
+        {tab === 'zip' ? (
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={e => {
+              e.preventDefault(); setDragging(false)
+              const f = e.dataTransfer.files?.[0]
+              if (f) setFile(f)
+            }}
+            data-testid="zip-dropzone"
+            className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+              dragging ? 'border-indigo-500 bg-indigo-50/60' : 'border-slate-300 bg-slate-50/40'
+            }`}>
+            <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+            {file ? (
+              <>
+                <p className="text-sm font-semibold text-slate-800">{file.name}</p>
+                <p className="text-[11px] text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <button onClick={() => setFile(null)} className="text-xs text-rose-600 hover:underline mt-1">Remove</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-700 font-medium">Drag a .zip file here</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">…or click below to choose</p>
+              </>
+            )}
+            <input type="file" accept=".zip,application/zip" id="zip-file-input"
+              data-testid="zip-file-input"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) setFile(f) }} />
+            <label htmlFor="zip-file-input"
+              className="inline-block mt-3 text-xs font-semibold border border-slate-200 hover:bg-white px-3 py-1.5 rounded-lg cursor-pointer">
+              Choose file
+            </label>
+            <p className="text-[10px] text-slate-400 mt-2">Max 200 MB. Use SCP/mount for larger trees.</p>
+          </div>
+        ) : (
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Server-side path *</label>
             <input value={path} onChange={e => setPath(e.target.value)} placeholder="/app/migration-staging"
               data-testid="import-source-path"
               className="w-full font-mono text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
-            <p className="text-[10px] text-slate-400 mt-1">Must contain `courses/` and/or `paths/` subdirectories. See docs for the exact directory contract.</p>
+            <p className="text-[10px] text-slate-400 mt-1">Must contain `courses/` and/or `paths/` subdirectories.</p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={publish} onChange={e => setPublish(e.target.checked)}
-              data-testid="import-publish-toggle"
-              className="rounded accent-indigo-500 h-4 w-4" />
-            <span className="text-sm text-slate-700">Publish courses + paths immediately (otherwise: DRAFT)</span>
-          </label>
-        </div>
+        )}
+
+        <label className="flex items-center gap-2 cursor-pointer mt-4">
+          <input type="checkbox" checked={publish} onChange={e => setPublish(e.target.checked)}
+            data-testid="import-publish-toggle"
+            className="rounded accent-indigo-500 h-4 w-4" />
+          <span className="text-sm text-slate-700">Publish courses + paths immediately (otherwise: DRAFT)</span>
+        </label>
+
         <div className="flex justify-end gap-2 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button onClick={run} disabled={running} data-testid="import-start-btn"
+          <button onClick={tab === 'zip' ? runZip : runPath} disabled={running} data-testid="import-start-btn"
             className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg">
             {running ? 'Starting…' : <><Play className="h-4 w-4" /> Start import</>}
           </button>
