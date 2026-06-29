@@ -1,3 +1,7 @@
+# IFPI backend deps.
+# `emergentintegrations` is hosted on Emergent's private package index — add the
+# extra-index-url so pip can resolve it. Public PyPI is still searched first.
+--extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 alembic==1.14.0
 apscheduler==3.10.4
 bcrypt==4.2.1
