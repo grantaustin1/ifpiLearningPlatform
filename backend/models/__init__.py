@@ -612,3 +612,25 @@ class WebhookDelivery(Base):
     next_attempt_at = Column(DateTime)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     delivered_at = Column(DateTime)
+
+
+# ── Bulk import jobs (tracks long-running content migrations) ────────
+class ImportJob(Base):
+    """Status row for one bulk content import. Workers UPDATE this as they
+    progress so the admin UI can poll for live progress + error reports."""
+    __tablename__ = "import_jobs"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    job_type = Column(String(50), nullable=False)  # BULK_COURSE | FULL_MIGRATION
+    source_path = Column(String(500))
+    status = Column(String(20), nullable=False, default="PENDING", index=True)
+    # PENDING → RUNNING → COMPLETED | FAILED | PARTIAL
+    total_items = Column(Integer, default=0, nullable=False)
+    processed_items = Column(Integer, default=0, nullable=False)
+    failed_items = Column(Integer, default=0, nullable=False)
+    results = Column(JSON)        # {courses:[…], exams:[…], errors:[…]}
+    error_log = Column(Text)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
