@@ -18,6 +18,7 @@ from routers import iter5 as iter5_router
 from routers import iter8 as iter8_router
 from routers import learning_paths as paths_router
 from routers import misc as misc_router
+from routers import webhooks as webhooks_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +74,7 @@ app.include_router(iter5_router.academies_router)
 app.include_router(iter5_router.portal_router)
 app.include_router(badge_tiers_router.router)
 app.include_router(iter8_router.router)
+app.include_router(webhooks_router.router)
 
 
 @app.get("/api")
