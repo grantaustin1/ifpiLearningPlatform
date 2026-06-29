@@ -5,7 +5,7 @@
 alembic==1.14.0
 apscheduler==3.10.4
 bcrypt==4.2.1
-emergentintegrations
+emergentintegrations==0.2.0
 fastapi==0.115.5
 httpx==0.28.0
 pillow==12.2.0
