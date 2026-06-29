@@ -205,6 +205,83 @@ def get_job(job_id: int,
     return _job_to_dict(j)
 
 
+@jobs_router.post("/{job_id}/rollback")
+def rollback_import(job_id: int, db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Undo an import job — deletes every course / learning path it created.
+    Only works on COMPLETED or PARTIAL jobs and only within the same org.
+
+    The results JSON captured at import time tells us exactly which rows
+    were created. We don't touch rows that pre-existed and were updated
+    (idempotent imports can't tell the two apart safely), so this is
+    conservative: only rows whose IDs appear in `results.courses[].id` /
+    `results.paths[].id` are deleted.
+    """
+    from models import Course, LearningPath, LearningPathItem
+    j = db.query(ImportJob).filter(
+        ImportJob.id == job_id,
+        ImportJob.organization_id == current.organization_id,
+    ).first()
+    if not j:
+        raise HTTPException(status_code=404, detail="Import job not found")
+    if j.status not in ("COMPLETED", "PARTIAL"):
+        raise HTTPException(status_code=400,
+            detail=f"Cannot rollback a job in status {j.status}")
+
+    results = j.results or {}
+    deleted_courses, deleted_paths = 0, 0
+
+    for c in results.get("courses", []):
+        cid = c.get("id")
+        if not cid:
+            continue
+        row = db.query(Course).filter(
+            Course.id == cid,
+            Course.organization_id == current.organization_id,
+        ).first()
+        if row:
+            db.delete(row)
+            deleted_courses += 1
+
+    for p in results.get("paths", []):
+        pid = p.get("id")
+        if not pid:
+            continue
+        # Wipe items first to dodge FK constraints on dialects without cascades
+        db.query(LearningPathItem).filter(LearningPathItem.path_id == pid).delete()
+        row = db.query(LearningPath).filter(
+            LearningPath.id == pid,
+            LearningPath.organization_id == current.organization_id,
+        ).first()
+        if row:
+            db.delete(row)
+            deleted_paths += 1
+
+    j.status = "ROLLED_BACK"
+    j.error_log = (
+        f"{(j.error_log or '').strip()}\nRolled back by user {current.id} at "
+        f"{datetime.now(timezone.utc).isoformat()} — "
+        f"deleted {deleted_courses} courses, {deleted_paths} paths."
+    ).strip()
+    db.commit()
+
+    from services import audit_service
+    audit_service.record(
+        db, current, "IMPORT_JOB_ROLLED_BACK",
+        target_type="import_job", target_id=str(j.id),
+        metadata={"deleted_courses": deleted_courses,
+                  "deleted_paths": deleted_paths},
+    )
+    db.commit()
+
+    return {
+        "ok": True, "job_id": j.id,
+        "deleted_courses": deleted_courses,
+        "deleted_paths": deleted_paths,
+    }
+
+
+
 def _run_import_in_bg(job_id: int, org_id: int, source_path: str,
                       publish_on_import: bool) -> None:
     """Background task — opens its own DB session so it doesn't borrow

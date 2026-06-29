@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
-import { Upload, Play, RefreshCw, FolderInput, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react'
+import { Upload, Play, RefreshCw, FolderInput, CheckCircle2, XCircle, AlertCircle, Clock, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ImportJob {
   id: number
   job_type: string
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED'
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'ROLLED_BACK'
   source_path: string | null
   total_items: number
   processed_items: number
@@ -20,11 +20,12 @@ interface ImportJob {
 }
 
 const STATUS_META: Record<string, { icon: any; cls: string; label: string }> = {
-  PENDING:   { icon: Clock,         cls: 'bg-slate-100 text-slate-700 border-slate-200',     label: 'Pending' },
-  RUNNING:   { icon: RefreshCw,     cls: 'bg-indigo-50 text-indigo-700 border-indigo-200',   label: 'Running' },
-  COMPLETED: { icon: CheckCircle2,  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Completed' },
-  PARTIAL:   { icon: AlertCircle,   cls: 'bg-amber-50 text-amber-700 border-amber-200',      label: 'Partial' },
-  FAILED:    { icon: XCircle,       cls: 'bg-rose-50 text-rose-700 border-rose-200',         label: 'Failed' },
+  PENDING:     { icon: Clock,         cls: 'bg-slate-100 text-slate-700 border-slate-200',     label: 'Pending' },
+  RUNNING:     { icon: RefreshCw,     cls: 'bg-indigo-50 text-indigo-700 border-indigo-200',   label: 'Running' },
+  COMPLETED:   { icon: CheckCircle2,  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Completed' },
+  PARTIAL:     { icon: AlertCircle,   cls: 'bg-amber-50 text-amber-700 border-amber-200',      label: 'Partial' },
+  FAILED:      { icon: XCircle,       cls: 'bg-rose-50 text-rose-700 border-rose-200',         label: 'Failed' },
+  ROLLED_BACK: { icon: Undo2,         cls: 'bg-slate-100 text-slate-500 border-slate-200 line-through', label: 'Rolled back' },
 }
 
 export default function ImportsPage() {
@@ -39,6 +40,17 @@ export default function ImportsPage() {
       const r = await api.get('/admin/imports')
       setJobs(r.data.items)
     } finally { setLoading(false) }
+  }
+
+  const rollback = async (jobId: number) => {
+    if (!window.confirm('Roll back this import? All courses and learning paths it created will be permanently deleted. This cannot be undone.')) return
+    try {
+      const r = await api.post(`/admin/imports/${jobId}/rollback`)
+      toast.success(`Rolled back — deleted ${r.data.deleted_courses} courses, ${r.data.deleted_paths} paths`)
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Rollback failed')
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -117,6 +129,15 @@ export default function ImportsPage() {
                     className="text-xs border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
                     {expandedJob === j.id ? 'Hide details' : 'Show details'}
                   </button>
+                  {(j.status === 'COMPLETED' || j.status === 'PARTIAL') &&
+                    ((j.results?.courses?.length || 0) + (j.results?.paths?.length || 0)) > 0 && (
+                    <button onClick={() => rollback(j.id)}
+                      data-testid={`import-rollback-${j.id}`}
+                      title="Delete every course and path this import created"
+                      className="inline-flex items-center gap-1 text-xs border border-rose-200 text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                      <Undo2 className="h-3.5 w-3.5" /> Roll back
+                    </button>
+                  )}
                 </div>
                 {expandedJob === j.id && (
                   <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/40 text-xs space-y-2">

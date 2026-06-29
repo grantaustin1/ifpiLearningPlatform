@@ -46,6 +46,7 @@ class SlideType(str, enum.Enum):
     AUDIO = "AUDIO"
     IMAGE = "IMAGE"
     PDF = "PDF"
+    SCORM = "SCORM"  # SCORM 1.2 / 2004 package launched via iframe
 
 
 class QuestionType(str, enum.Enum):
@@ -647,3 +648,69 @@ class SsoJtiSeen(Base):
     __table_args__ = (Index("ix_sso_jti_seen_at", "seen_at"),)
     jti = Column(String(120), primary_key=True)
     seen_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── SCORM packages (Iter 18) ─────────────────────────────────────────
+class ScormPackage(Base):
+    """One row per uploaded SCORM package. The actual ZIP contents are
+    extracted to disk under STORAGE_PATH/scorm/<org>/<uuid>/ and served as
+    static files. `launch_url` is the public URL of the entry HTML.
+
+    Linked to a Course (1—1) so a course can launch a SCORM payload as a
+    slide alongside normal TEXT/VIDEO slides.
+    """
+    __tablename__ = "scorm_packages"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"), nullable=True, index=True)
+    manifest_title = Column(String(300))
+    launch_url = Column(String(800), nullable=False)
+    scorm_version = Column(String(16))           # "1.2" | "2004" | "unknown"
+    package_dir = Column(String(800), nullable=False)  # absolute or storage key root
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"))
+    uploaded_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class XApiStatement(Base):
+    """xAPI (Tin Can) statement receiver — stores incoming statements for
+    audit + completion-tracking. Minimal viable LRS: we store the raw
+    statement JSON and surface common fields for indexing.
+    """
+    __tablename__ = "xapi_statements"
+    __table_args__ = (
+        Index("ix_xapi_org_user_stored", "organization_id", "user_id", "stored_at"),
+        Index("ix_xapi_verb_stored", "verb", "stored_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_email = Column(String(200), index=True)
+    verb = Column(String(120), nullable=False)    # e.g. "http://adlnet.gov/expapi/verbs/completed"
+    object_id = Column(String(500))               # iri of the activity
+    result = Column(JSON)                          # {score, success, completion, …}
+    raw = Column(JSON, nullable=False)            # full original statement
+    stored_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── Slide versioning (Iter 19) ───────────────────────────────────────
+class SlideVersion(Base):
+    """Immutable snapshot of a CourseSlide at the moment of save. Created on
+    every content/title/media_url change so admins can roll back accidental
+    edits. The latest live row stays in `course_slides`; this table is
+    append-only history.
+    """
+    __tablename__ = "slide_versions"
+    __table_args__ = (Index("ix_slide_versions_slide_ver", "slide_id", "version_number"),)
+    id = Column(Integer, primary_key=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id", ondelete="CASCADE"),
+                      nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text)
+    slide_type = Column(String(20))               # store as string for forward-compat
+    media_url = Column(String(500))
+    changed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    change_summary = Column(String(200))          # optional admin note
+    created_at = Column(DateTime, default=_utcnow, nullable=False)

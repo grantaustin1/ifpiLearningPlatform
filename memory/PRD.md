@@ -189,6 +189,33 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
+## Iteration 18-20 — SCORM/xAPI, Versioning, server.py refactor (Feb 2026)
+
+**Iter 18 — SCORM 1.2/2004 + xAPI receiver**
+- ✅ `services/scorm_service.py` — stdlib-only manifest parser (zipfile + xml.etree); path-traversal safe; version detection via `schemaversion` or xmlns sniff
+- ✅ Models: `ScormPackage`, `XApiStatement` + Alembic `a8b4c9d3e7f2`
+- ✅ `routers/scorm_xapi.py` — `POST /api/admin/scorm/upload`, `GET /api/admin/scorm`, `GET /api/scorm/files/<id>/<rel>` static server, `POST /api/xapi/statements`, `GET /api/xapi/statements`
+- ✅ New `SlideType.SCORM` enum + iframe renderer in `LearnPage` (also added missing AUDIO/PDF renderers)
+- ✅ Live e2e: uploaded SCORM 2004 zip → parsed manifest → course created → /api/scorm/files serves content
+
+**Iter 19 — Slide versioning + rich-text sanitizer endpoint**
+- ✅ `SlideVersion` model + Alembic migration (same `a8b4c9d3e7f2`)
+- ✅ `services/versioning_service.py` — `snapshot_slide`, `list_versions`, `restore_version` (restore itself records a new version, making it undo-able)
+- ✅ Hooked into `PATCH /api/courses/{cid}/slides/{sid}` — auto-snapshots ONLY on actual content change
+- ✅ Endpoints: `GET /versions`, `GET /versions/{n}`, `POST /versions/{n}/restore`
+- ✅ `POST /api/rich-text/sanitize` — bleach-backed preview helper for the editor
+
+**Iter 20 — server.py refactor**
+- ✅ New `routers/__init__.py` exports `register_all(app)` — groups all 26 routers by domain (Auth, Core LMS, Misc, Onboarding, Iter5, Iter6+, Webhooks, Imports, SCORM/xAPI)
+- ✅ `server.py` shrunk from 114 → 76 lines, single `register_all(app)` call
+- ✅ OpenAPI smoke test asserts every critical path is still mounted (no routes lost)
+
+**Improvement — ImportJob rollback**
+- ✅ `POST /api/admin/imports/{id}/rollback` — deletes every course/path the job created (uses captured `results.courses[].id`), marks job `ROLLED_BACK`, records audit entry
+- ✅ Frontend "Roll back" button on each completed/partial row + `window.confirm` guard + strike-through "ROLLED BACK" badge after the fact
+
+**Tests:** `tests/test_iteration18_20.py` + Iter14-17 regressions — **53/53 passing, 2 expected skips** (SSO disabled, no PENDING job to test rollback rejection path)
+
 ## Iteration 17 — Foundations (Feb 2026)
 - ✅ Fixed stale alembic-head assertions in `test_iteration3/4.py` (now accept any head through Iter 17)
 - ✅ Multi-process SSO replay store — new `SsoJtiSeen` model + Alembic migration `f1a2b3c4d5e6_sso_jti_seen.py`; `sso_service._check_replay()` now commits to SQL (survives across worker pods / DB sessions, proven via cross-session unit test)
