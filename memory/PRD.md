@@ -189,6 +189,28 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
+## Iteration 21 — xAPI auto-completion, version sidebar, API tokens (Feb 2026)
+
+**xAPI → IFPI auto-completion (Iter 21a)**
+- When an xAPI statement arrives with `verb=completed` or `verb=passed` AND `object.id` resolves to a known course (via `ifpi://course/<id>` URI scheme OR by matching a SCORM package's `launch_url`), the learner's enrollment is marked COMPLETED and a Certificate row is issued — idempotent, returns full status in the response under `auto_complete`.
+- Resolver tries: explicit `ifpi://course/<id>` → SCORM package `launch_url` substring match.
+- Env flag `XAPI_AUTO_COMPLETE=false` to disable. Default ON because the resolver is conservative (no course id = no-op).
+- Live proof: created fresh course → POST xAPI with `ifpi://course/<id>` via API token → enrollment COMPLETED, cert created (`certificate_was_new=true`).
+
+**Slide version sidebar (Iter 21b)**
+- `CourseEditPage` now has a "History" pill next to slide-type buttons. Opens `SlideHistoryModal` that lists every version with timestamp + change-summary + "Restore" button.
+- Restore flow is idempotent: it snapshots the CURRENT state before restoring, so even a restore is undo-able.
+- Also added missing SCORM/AUDIO/PDF renderers in LearnPage and SCORM in the slide-type chip set.
+
+**API tokens (improvement)**
+- New `ApiToken` model + Alembic `b1c2d3e4f5a6`. Token format `ifpi_<8-char-prefix>_<24-char-secret>` (~45 chars).
+- `auth/api_tokens.py` mints via `secrets.token_urlsafe`; stores SHA-256 hash + plaintext prefix; verifies via the standard `Authorization: Bearer` header.
+- `auth/dependencies.get_current_user` routes any token starting with `ifpi_` past the JWT decoder to `authenticate_api_token`. Synthetic `CurrentUser` has negative id so it can't accidentally be confused with a real user row.
+- Endpoints: `GET /api/admin/api-tokens`, `POST /api/admin/api-tokens` (returns plaintext ONCE), `POST /{id}/revoke`, `DELETE /{id}`. Audit-logged.
+- Frontend `/tokens` admin page (NOT `/api-tokens` — that prefix collides with the ingress) — table of tokens + create modal + reveal-once modal with copy-to-clipboard.
+
+**Tests:** `tests/test_iteration21.py` + full Iter14-21 suite — **58 passing, 2 expected skips**.
+
 ## Iteration 18-20 — SCORM/xAPI, Versioning, server.py refactor (Feb 2026)
 
 **Iter 18 — SCORM 1.2/2004 + xAPI receiver**

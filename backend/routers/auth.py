@@ -78,6 +78,14 @@ def logout(response: Response, current: CurrentUser = Depends(get_current_user),
 @router.get("/me", response_model=UserOut)
 def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import User
+    # API tokens (Iter 21) carry a negative `id` and don't have a User row —
+    # return the synthetic principal data directly.
+    if current.id < 0:
+        return UserOut(
+            id=current.id, email=current.email, name=current.name,
+            organization_id=current.organization_id, roles=current.roles,
+            points=0,
+        )
     user = db.query(User).filter(User.id == current.id).first()
     return _to_user_out(user)
 

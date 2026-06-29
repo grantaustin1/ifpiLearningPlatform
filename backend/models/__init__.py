@@ -714,3 +714,28 @@ class SlideVersion(Base):
     changed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     change_summary = Column(String(200))          # optional admin note
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── API tokens (Iter 21 — programmatic auth for external integrations) ──
+class ApiToken(Base):
+    """Long-lived bearer token for server-to-server access. Created by an
+    admin via the dashboard; the secret is only revealed at creation time
+    (we store a SHA-256 hash + a short prefix for visibility in the UI).
+
+    Scopes are kept simple in v1 — a list of role strings the token can
+    assume (e.g. `["LEARNER"]` for an LRS that only fires xAPI statements).
+    """
+    __tablename__ = "api_tokens"
+    __table_args__ = (Index("ix_api_tokens_org_active", "organization_id", "is_active"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)        # human label, e.g. "LRS bridge"
+    prefix = Column(String(12), nullable=False, index=True)   # first 8 chars of plaintext, displayed in UI
+    token_hash = Column(String(80), nullable=False, unique=True, index=True)
+    scopes = Column(JSON)                              # list[str] of role names
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_used_at = Column(DateTime)
+    expires_at = Column(DateTime)                      # nullable = no expiry
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
