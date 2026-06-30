@@ -1,11 +1,2 @@
-import os
-import pathlib
-
-_HERE = pathlib.Path(__file__).resolve().parent
-
-# Skip integration test files that require a running backend when the URL is absent.
-collect_ignore: list[str] = []
-if not os.environ.get("REACT_APP_BACKEND_URL"):
-    collect_ignore = [str(p.resolve()) for p in _HERE.glob("test_iteration*.py")] + [
-        str((_HERE / "test_ifpi_api.py").resolve())
-    ]
+# collect_ignore is defined in the root backend/conftest.py (rootdir level) so that
+# pytest respects it.  Nothing else is needed in this file for the current test suite.
