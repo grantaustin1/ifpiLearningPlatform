@@ -48,9 +48,11 @@ def learner():
 # ── Alembic head and new columns ────────────────────────────────────
 def test_alembic_head_iteration4():
     import subprocess
-    out = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode()
-    # Iter 4 head was 7497425df8bc; iter 5+ added more — accept any later head.
-    assert any(h in out for h in ("7497425df8bc", "9acf884483b9", "c1f29b3e9d04", "e5a721f43b18")) or "(head)" in out, out
+    current = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode().strip()
+    heads = subprocess.check_output(["alembic", "heads"], cwd=_BACKEND_DIR).decode()
+    assert current, current
+    current_rev = current.split()[0]
+    assert current_rev in heads, f"Current revision {current_rev} is not in alembic heads: {heads}"
 
 
 def test_org_cert_branding_columns_exist():

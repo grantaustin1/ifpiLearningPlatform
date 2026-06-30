@@ -65,9 +65,11 @@ def second_course(admin):
 # ── Alembic & schema ──────────────────────────────────────────────────
 def test_alembic_head_is_iteration3():
     import subprocess
-    out = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode()
-    # Iteration 4 raised head — accept both
-    assert ("feb2000f209a" in out) or ("7497425df8bc" in out) or ("9acf884483b9" in out) or ("c1f29b3e9d04" in out) or ("e5a721f43b18" in out) or ("(head)" in out), out
+    current = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode().strip()
+    heads = subprocess.check_output(["alembic", "heads"], cwd=_BACKEND_DIR).decode()
+    assert current, current
+    current_rev = current.split()[0]
+    assert current_rev in heads, f"Current revision {current_rev} is not in alembic heads: {heads}"
 
 
 def test_new_tables_exist():
