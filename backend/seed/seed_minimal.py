@@ -3,17 +3,27 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
 from core.security import get_password_hash
 from models import (
-    Course, CourseSlide, CourseStatus, Exam, ExamQuestion, LifecycleStage,
-    Organization, Person, QuestionType, SlideType, User, UserRole,
+    BadgeTier, Course, CourseSlide, CourseStatus, Enrollment, EnrollmentStatus,
+    Exam, ExamQuestion, LifecycleStage, Organization, Person, QuestionType,
+    SlideType, User, UserRole,
 )
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_BADGE_TIERS = [
+    ("FIRST_ENROLLMENT", "First Step",    "🎯", "Enrolled in your first course",  10, 0),
+    ("FIRST_COURSE",     "Graduate",      "🎓", "Completed your first course",    50, 1),
+    ("EXAM_PASSER",      "Scholar",       "📚", "Passed your first exam",        100, 2),
+    ("PERFECT_SCORE",    "Perfectionist", "💯", "Scored 100% on an exam",        200, 3),
+    ("COURSE_MASTER",    "Course Master", "🏆", "Completed 5 courses",           500, 4),
+]
 
 
 def seed(db: Session) -> None:
@@ -40,10 +50,20 @@ def seed(db: Session) -> None:
         db.add(admin)
         db.flush()
         db.add(UserRole(user_id=admin.id, role="ADMIN"))
+        db.add(UserRole(user_id=admin.id, role="SUPER_ADMIN"))
         db.add(Person(user_id=admin.id, organization_id=org.id,
                       email=admin.email, name=admin.name,
                       lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
         logger.info("Seeded admin: %s / admin123", admin.email)
+    else:
+        # Ensure SUPER_ADMIN role exists for existing admin (idempotent)
+        has_super = db.query(UserRole).filter(
+            UserRole.user_id == admin.id, UserRole.role == "SUPER_ADMIN"
+        ).first()
+        if not has_super:
+            db.add(UserRole(user_id=admin.id, role="SUPER_ADMIN"))
+            db.flush()
+            logger.info("Added SUPER_ADMIN role to existing admin")
 
     # 3. Learner user
     learner = db.query(User).filter(User.email == "learner@ifpi.org").first()
@@ -60,6 +80,24 @@ def seed(db: Session) -> None:
                       email=learner.email, name=learner.name,
                       lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
         logger.info("Seeded learner: %s / learner123", learner.email)
+
+    # 3b. AGENT008 cohort learner (required for leaderboard cohort-filter tests)
+    agent_learner = db.query(User).filter(User.email == "agent008@ifpi.org").first()
+    if not agent_learner:
+        agent_learner = User(
+            email="agent008@ifpi.org", name="Agent008 Learner",
+            password_hash=get_password_hash("learner123"),
+            organization_id=org.id, is_active=True,
+            cohort="AGENT008",
+        )
+        db.add(agent_learner)
+        db.flush()
+        db.add(UserRole(user_id=agent_learner.id, role="LEARNER"))
+        db.add(Person(user_id=agent_learner.id, organization_id=org.id,
+                      email=agent_learner.email, name=agent_learner.name,
+                      lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
+        logger.info("Seeded AGENT008 cohort learner: %s", agent_learner.email)
+        db.flush()
 
     # 4. Sample course
     course = db.query(Course).filter(Course.title == "IFPI Fundamentals").first()
@@ -93,6 +131,20 @@ def seed(db: Session) -> None:
             ))
         logger.info("Seeded course: %s", course.title)
 
+    # 4b. Completed enrollment for AGENT008 learner (needed for cohort-stats and
+    # cohort celebration tests which require completion_rate >= threshold).
+    if not db.query(Enrollment).filter(
+        Enrollment.user_id == agent_learner.id,
+        Enrollment.course_id == course.id,
+    ).first():
+        _now = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.add(Enrollment(
+            user_id=agent_learner.id, course_id=course.id,
+            status=EnrollmentStatus.COMPLETED,
+            enrolled_at=_now, completed_at=_now,
+        ))
+        logger.info("Seeded completed enrollment for AGENT008 learner")
+
     # 5. Sample exam
     exam = db.query(Exam).filter(Exam.title == "IFPI Fundamentals Assessment").first()
     if not exam:
@@ -124,6 +176,43 @@ def seed(db: Session) -> None:
                 correct_answer=correct, points=1, order_index=i,
             ))
         logger.info("Seeded exam: %s", exam.title)
+
+    # 6. Two extra published courses (required for course-reorder test: >= 3 courses)
+    for extra_title, extra_desc in [
+        ("Copyright Essentials", "Key concepts in music copyright law and licensing."),
+        ("Digital Distribution 101", "How recorded music reaches streaming platforms globally."),
+    ]:
+        if not db.query(Course).filter(Course.title == extra_title).first():
+            extra = Course(
+                organization_id=org.id, title=extra_title,
+                description=extra_desc, category="Foundation",
+                status=CourseStatus.PUBLISHED, passing_score=70,
+                duration_minutes=30, price_cents=0, currency="ZAR",
+                created_by_id=admin.id, cover_color="bg-purple-500",
+            )
+            db.add(extra)
+            db.flush()
+            db.add(CourseSlide(
+                course_id=extra.id, title="Introduction",
+                content=f"<h2>{extra_title}</h2><p>{extra_desc}</p>",
+                slide_type=SlideType.TEXT, order_index=1,
+            ))
+            logger.info("Seeded extra course: %s", extra_title)
+
+    # 7. Default badge tiers for the org (idempotent — skip if already present)
+    existing_slugs = {
+        r.slug for r in db.query(BadgeTier).filter(BadgeTier.organization_id == org.id).all()
+    }
+    for slug, label, emoji, description, threshold_xp, order_index in _DEFAULT_BADGE_TIERS:
+        if slug not in existing_slugs:
+            db.add(BadgeTier(
+                organization_id=org.id, slug=slug, label=label,
+                emoji=emoji, description=description,
+                threshold_xp=threshold_xp, order_index=order_index,
+                is_active=True,
+            ))
+    if existing_slugs != {t[0] for t in _DEFAULT_BADGE_TIERS}:
+        logger.info("Seeded default badge tiers for org %s", org.id)
 
     db.commit()
 

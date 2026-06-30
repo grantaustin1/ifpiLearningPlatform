@@ -62,6 +62,7 @@ def first_course_id(admin_headers):
 
 # ---------- AI quiz: question types ----------
 
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIQuizQuestionTypes:
     def test_true_false_returns_two_options(self, admin_headers, first_course_id):
         r = requests.post(f"{API}/exams/ai-generate-questions",

@@ -15,6 +15,12 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     pytest.skip("REACT_APP_BACKEND_URL is required", allow_module_level=True)
 
+# Compute backend directory and SQLite DB path for direct sqlite3 access in tests.
+_BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_db_url = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
+_db_rel = _db_url.split("sqlite:///")[-1]
+_DB_PATH = _db_rel if os.path.isabs(_db_rel) else os.path.join(_BACKEND_DIR, _db_rel.lstrip("./"))
+
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER = {"email": "learner@ifpi.org", "password": "learner123"}
 
@@ -42,14 +48,14 @@ def learner():
 # ── Alembic head and new columns ────────────────────────────────────
 def test_alembic_head_iteration4():
     import subprocess
-    out = subprocess.check_output(["alembic", "current"], cwd="/app/backend").decode()
+    out = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode()
     # Iter 4 head was 7497425df8bc; iter 5+ added more — accept any later head.
-    assert any(h in out for h in ("7497425df8bc", "9acf884483b9", "c1f29b3e9d04", "e5a721f43b18")), out
+    assert any(h in out for h in ("7497425df8bc", "9acf884483b9", "c1f29b3e9d04", "e5a721f43b18")) or "(head)" in out, out
 
 
 def test_org_cert_branding_columns_exist():
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(organizations)")}
     conn.close()
     for c in ("cert_accent_color", "cert_signature_text",
@@ -212,7 +218,7 @@ def test_pdf_cert_with_branding_and_bad_color(admin, learner):
     learner.post(f"{BASE_URL}/api/courses/1/enroll")
     learner.post(f"{BASE_URL}/api/courses/1/complete")
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     row = conn.execute(
         "SELECT id FROM certificates WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') LIMIT 1"
     ).fetchone()
@@ -247,7 +253,7 @@ def test_outbox_worker_drains_queued(admin, learner):
     """
     # Wipe certificate so completion regenerates it
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute(
         "UPDATE enrollments SET completed_at=NULL, status='IN_PROGRESS' "
         "WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') AND course_id=1"

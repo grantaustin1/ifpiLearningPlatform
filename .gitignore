@@ -13,3 +13,9 @@ __pycache__/
 
 # CI/QA test report artifacts
 test_reports/
+
+# Local SQLite databases
+*.db
+
+# Uploaded files
+backend/uploads/

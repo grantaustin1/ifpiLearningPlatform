@@ -294,6 +294,7 @@ class TestBilling:
 
 
 # ── AI builder ──────────────────────────────────────────────────────
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIBuilder:
     def test_ai_course_builder(self, admin_session):
         payload = {"topic": "Python basics", "num_slides": 3,
