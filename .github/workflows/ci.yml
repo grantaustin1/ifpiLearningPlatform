@@ -47,7 +47,7 @@ jobs:
           DB_NAME: ifpi_test
         run: |
           alembic upgrade head
-          python -c "from seed_data import seed; seed()" || true
+          python -m seed.seed_minimal || true
       - name: Run pytest
         working-directory: backend
         env:
