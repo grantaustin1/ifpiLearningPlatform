@@ -2,6 +2,7 @@
 import os
 import uuid
 import time
+import importlib.util
 
 import pytest
 import requests
@@ -19,6 +20,9 @@ if not BASE_URL:
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
+AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
+    importlib.util.find_spec("emergentintegrations") is not None
+)
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
@@ -296,6 +300,8 @@ class TestBilling:
 # ── AI builder ──────────────────────────────────────────────────────
 class TestAIBuilder:
     def test_ai_course_builder(self, admin_session):
+        if not AI_INTEGRATION_AVAILABLE:
+            pytest.skip("AI integration unavailable (EMERGENT_LLM_KEY and package required)")
         payload = {"topic": "Python basics", "num_slides": 3,
                    "include_quiz": True, "num_questions": 2}
         t0 = time.time()

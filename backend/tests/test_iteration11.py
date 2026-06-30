@@ -8,11 +8,15 @@
 import os
 import subprocess
 import sys
+import importlib.util
 import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
+AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
+    importlib.util.find_spec("emergentintegrations") is not None
+)
 
 
 @pytest.fixture(scope="module")
@@ -62,6 +66,10 @@ def first_course_id(admin_headers):
 
 # ---------- AI quiz: question types ----------
 
+@pytest.mark.skipif(
+    not AI_INTEGRATION_AVAILABLE,
+    reason="AI integration unavailable (EMERGENT_LLM_KEY and package required)",
+)
 class TestAIQuizQuestionTypes:
     def test_true_false_returns_two_options(self, admin_headers, first_course_id):
         r = requests.post(f"{API}/exams/ai-generate-questions",
