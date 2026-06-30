@@ -1,7 +1,7 @@
 import os
 import pathlib
 
-_HERE = pathlib.Path(__file__).parent
+_HERE = pathlib.Path(__file__).resolve().parent
 
 # Skip integration test files that require a running backend when the URL is absent.
 collect_ignore: list[str] = (
