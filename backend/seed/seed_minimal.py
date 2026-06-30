@@ -97,7 +97,6 @@ def seed(db: Session) -> None:
                       email=agent_learner.email, name=agent_learner.name,
                       lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
         logger.info("Seeded AGENT008 cohort learner: %s", agent_learner.email)
-        db.flush()
 
     # 4. Sample course
     course = db.query(Course).filter(Course.title == "IFPI Fundamentals").first()
