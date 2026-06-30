@@ -1,4 +1,9 @@
+from pathlib import Path
+import sys
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.qa_agents import agent_007_invariants, agent_008_e2e_journey, agent_010_infra_sentry
 
