@@ -121,6 +121,7 @@ class TestLeaderboardCohort:
 
 
 # ──────────────────── AI quiz generator ────────────────────
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIQuiz:
     course_id = 1
 
@@ -223,7 +224,8 @@ class TestAppendQuestions:
 # ──────────────────── GH Actions workflow YAML ────────────────────
 class TestWorkflowYaml:
     def test_workflow_file_exists_and_valid(self):
-        path = "/app/.github/workflows/pr-agent-comments.yml"
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        path = os.path.join(repo_root, ".github", "workflows", "pr-agent-comments.yml")
         assert os.path.exists(path), f"missing: {path}"
         with open(path) as f:
             doc = yaml.safe_load(f)
