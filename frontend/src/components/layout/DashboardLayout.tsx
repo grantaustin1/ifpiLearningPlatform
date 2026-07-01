@@ -46,8 +46,17 @@ export default function DashboardLayout() {
   const initials = (user?.name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   const [org, setOrg] = useState<{ name?: string; logo_url?: string | null }>({})
+  const [streak, setStreak] = useState<{ current_streak: number; longest_streak: number; reviewed_today: boolean } | null>(null)
   useEffect(() => {
     api.get('/organization').then(r => setOrg(r.data || {})).catch(() => {})
+    // Fetch flashcard streak — every user has one, staff included (they can review too).
+    // Polls once per mount + every 60s in case user reviews in another tab.
+    const fetchStreak = () => {
+      api.get('/learn/flashcards/streak').then(r => setStreak(r.data)).catch(() => {})
+    }
+    fetchStreak()
+    const id = window.setInterval(fetchStreak, 60_000)
+    return () => window.clearInterval(id)
   }, [])
   const brandName = org.name || 'IFPI Learning'
   const backend = (import.meta as any).env?.VITE_API_URL
@@ -94,6 +103,23 @@ export default function DashboardLayout() {
           ))}
         </nav>
         <div className="border-t border-white/5 p-3">
+          {streak && streak.current_streak > 0 && (
+            <div
+              className="flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-lg bg-orange-500/15 border border-orange-500/25"
+              data-testid="sidebar-streak-pill"
+              title={`Longest streak: ${streak.longest_streak} days`}
+            >
+              <span className="text-base leading-none">🔥</span>
+              <div className="text-[11px] leading-tight">
+                <div className="font-bold text-orange-300 tabular-nums">
+                  {streak.current_streak}-day streak
+                </div>
+                <div className="text-[10px] text-orange-300/70">
+                  {streak.reviewed_today ? 'Locked in today ✓' : 'Review to keep alive'}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2.5 px-2 py-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
               <span className="text-[10px] font-bold text-white">{initials}</span>

@@ -202,6 +202,8 @@ export default function CourseEditPage() {
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
               )}
               <NarrationEditor slide={activeSlide} onUpdated={load} />
+              <VisualEditor slide={activeSlide} onUpdated={load} />
+              <VideoEditor slide={activeSlide} onUpdated={load} />
             </div>
           </div>
         ) : <div className="flex-1 flex items-center justify-center text-slate-400">Select or add a slide to start</div>}
@@ -423,4 +425,135 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
     </div>
   )
 }
+
+// ── Visuals editor (Iter 27a) — Nano Banana infographic ─────────────
+function VisualEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const gen = async () => {
+    if (prompt.trim().length < 8) return toast.error('Describe the visual in at least 8 characters')
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/visuals/generate', {
+        prompt: prompt.trim(), slide_id: slide.id, attach_to_slide: true,
+      })
+      toast.success(`Image generated · ${(r.data.size_bytes / 1024).toFixed(0)} KB`)
+      setPrompt('')
+      onUpdated()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Image generation failed')
+    } finally { setBusy(false) }
+  }
+
+  const isImage = slide.slide_type === 'IMAGE' && slide.media_url
+  return (
+    <div className="mt-3 rounded-xl border border-pink-100 bg-pink-50/40 p-3 space-y-2" data-testid="visual-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-pink-800">
+        🎨 AI infographic <span className="text-slate-500 font-normal">(Nano Banana)</span>
+      </div>
+      {isImage && (
+        <img src={slide.media_url} alt="Slide visual" className="rounded-lg max-h-40 object-contain bg-white border border-pink-100" data-testid="visual-preview" />
+      )}
+      <textarea rows={2} value={prompt} onChange={e => setPrompt(e.target.value)}
+        placeholder="Describe the diagram or infographic to generate…"
+        className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400"
+        data-testid="visual-prompt-input" />
+      <button onClick={gen} disabled={busy}
+        data-testid="visual-generate-btn"
+        className="text-xs bg-pink-600 hover:bg-pink-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+        {busy ? 'Generating…' : isImage ? 'Re-generate visual' : 'Generate visual'}
+      </button>
+    </div>
+  )
+}
+
+// ── Video editor (Iter 26b) — Sora 2 async ─────────────────────────
+function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2')
+  const [duration, setDuration] = useState<4 | 8 | 12>(4)
+  const [size, setSize] = useState('1280x720')
+  const [job, setJob] = useState<any>(null)
+  const [busy, setBusy] = useState(false)
+
+  const start = async () => {
+    if (prompt.trim().length < 8) return toast.error('Describe the video in at least 8 characters')
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/video/generate', {
+        prompt: prompt.trim(), slide_id: slide.id, model, size, duration,
+      })
+      toast.success(`Job started · est. ${Math.round(r.data.estimated_wait_seconds / 60)} min · ${r.data.estimated_cost_cents}¢`)
+      setJob({ id: r.data.job_id, status: 'PENDING' })
+      poll(r.data.job_id)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Video job failed to start')
+    } finally { setBusy(false) }
+  }
+
+  const poll = async (id: number) => {
+    for (let i = 0; i < 200; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        const r = await api.get(`/authoring/video/${id}`)
+        setJob(r.data)
+        if (r.data.status === 'COMPLETED') { onUpdated(); toast.success('Video ready!'); break }
+        if (r.data.status === 'FAILED') { toast.error(r.data.error_log || 'Job failed'); break }
+      } catch { /* keep polling */ }
+    }
+  }
+
+  const isVideo = slide.slide_type === 'VIDEO' && slide.media_url
+  return (
+    <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50/40 p-3 space-y-2" data-testid="video-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-purple-800">
+        🎬 AI video overview <span className="text-slate-500 font-normal">(Sora 2 · 2-6 min)</span>
+      </div>
+      {isVideo && (
+        <video src={slide.media_url} controls className="rounded-lg max-h-40 w-full bg-black" data-testid="video-preview" />
+      )}
+      <textarea rows={2} value={prompt} onChange={e => setPrompt(e.target.value)}
+        placeholder="Describe the video scene / topic…"
+        className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-400"
+        data-testid="video-prompt-input" />
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={model} onChange={e => setModel(e.target.value as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-model-select">
+          <option value="sora-2">sora-2</option>
+          <option value="sora-2-pro">sora-2-pro (higher quality)</option>
+        </select>
+        <select value={duration} onChange={e => setDuration(Number(e.target.value) as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-duration-select">
+          <option value={4}>4s</option>
+          <option value={8}>8s</option>
+          <option value={12}>12s</option>
+        </select>
+        <select value={size} onChange={e => setSize(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-size-select">
+          <option value="1280x720">1280×720 (HD)</option>
+          <option value="1792x1024">1792×1024 (wide)</option>
+          <option value="1024x1792">1024×1792 (portrait)</option>
+          <option value="1024x1024">1024×1024 (square)</option>
+        </select>
+        <button onClick={start} disabled={busy || (job && ['PENDING', 'RUNNING'].includes(job.status))}
+          data-testid="video-generate-btn"
+          className="text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+          {busy ? 'Starting…' : (job && ['PENDING', 'RUNNING'].includes(job.status)) ? 'Generating…' : isVideo ? 'Re-generate video' : 'Generate video'}
+        </button>
+      </div>
+      {job && (
+        <p className="text-[11px] text-purple-700" data-testid="video-job-status">
+          Job #{job.id} · <span className="font-semibold">{job.status}</span>
+          {job.status === 'RUNNING' && ' · rendering — safe to leave and come back'}
+          {job.error_log && ` · ${job.error_log.slice(0, 100)}`}
+        </p>
+      )}
+    </div>
+  )
+}
+
 

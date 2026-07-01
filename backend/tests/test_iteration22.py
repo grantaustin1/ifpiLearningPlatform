@@ -77,11 +77,12 @@ def test_authoring_status_admin_can_access(admin):
     assert flags["flashcards_enabled"] is True
     # deep_research_enabled tracks TAVILY_API_KEY presence
     assert isinstance(flags["deep_research_enabled"], bool)
-    for k in ("video_overview_enabled", "visuals_enabled",
-              "pptx_export_enabled"):
+    for k in ("pptx_export_enabled",):
         assert flags[k] is False, f"{k} should be off (future iter)"
-    # tts_enabled flipped True in Iter 26a
+    # tts_enabled (Iter 26a), video_overview_enabled (Iter 26b), visuals_enabled (Iter 27a) flipped True
     assert flags["tts_enabled"] is True
+    assert flags["video_overview_enabled"] is True
+    assert flags["visuals_enabled"] is True
 
 
 def test_authoring_status_learner_blocked(learner):
