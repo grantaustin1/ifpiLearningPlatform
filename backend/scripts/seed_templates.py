@@ -206,7 +206,10 @@ def seed_org(org_id: int, admin_id: int | None = None) -> dict:
                         order_index=idx,
                         is_required=True,
                     ))
-                db.flush()
+                # Commit each template independently so a later failure
+                # doesn't silently discard successful earlier iterations
+                # (reviewer note from Iter 22 gap-closure QA).
+                db.commit()
                 summary["created"].append({
                     "title": title, "course_id": c.id,
                     "slides": len(slides),
@@ -217,8 +220,6 @@ def seed_org(org_id: int, admin_id: int | None = None) -> dict:
                 logger.exception("Failed to create template '%s'", title)
                 summary["errors"].append({"title": title, "error": str(e)})
                 db.rollback()
-
-        db.commit()
     finally:
         db.close()
     return summary
