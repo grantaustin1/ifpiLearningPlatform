@@ -78,5 +78,7 @@ def register_all(app: FastAPI) -> None:
     app.include_router(api_tokens.router)
 
     # ── Iter 22: AI authoring suite (shared infra + gates) ───────────
-    from routers import authoring
+    from routers import authoring, authoring_tutor
     app.include_router(authoring.authoring_router)
+    # ── Iter 23-24: source-grounded tutor + Tavily research ──────────
+    app.include_router(authoring_tutor.router)
