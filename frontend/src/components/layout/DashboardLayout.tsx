@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuth } from 'contexts/AuthContext'
+import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
   GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound,
@@ -42,18 +44,36 @@ export default function DashboardLayout() {
   const items = isAdmin ? ADMIN_NAV : LEARNER_NAV
   const initials = (user?.name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
+  const [org, setOrg] = useState<{ name?: string; logo_url?: string | null }>({})
+  useEffect(() => {
+    api.get('/organization').then(r => setOrg(r.data || {})).catch(() => {})
+  }, [])
+  const brandName = org.name || 'IFPI Learning'
+  const backend = (import.meta as any).env?.VITE_API_URL
+    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
+    || ''
+  const resolvedLogo = org.logo_url
+    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
+    : null
+
   const handleLogout = async () => { await logout(); nav('/login') }
 
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="w-60 flex-shrink-0 bg-ink-900 text-slate-300 flex flex-col">
         <div className="px-5 py-5 border-b border-white/5">
-          <Link to={isAdmin ? '/dashboard' : '/courses'} className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <GraduationCap className="text-white h-4 w-4" />
-            </div>
+          <Link to={isAdmin ? '/dashboard' : '/courses'} className="flex items-center gap-3" data-testid="sidebar-brand">
+            {resolvedLogo ? (
+              <div className="w-9 h-9 rounded-lg bg-white/95 flex items-center justify-center overflow-hidden shadow-lg shadow-black/40" data-testid="sidebar-org-logo">
+                <img src={resolvedLogo} alt={brandName} className="max-w-[80%] max-h-[80%] object-contain" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <GraduationCap className="text-white h-4 w-4" />
+              </div>
+            )}
             <div>
-              <p className="text-white font-semibold text-sm">IFPI Learning</p>
+              <p className="text-white font-semibold text-sm">{brandName}</p>
               <p className="text-[10px] text-slate-500 mt-0.5">{isAdmin ? 'Admin Portal' : 'Learner Portal'}</p>
             </div>
           </Link>
