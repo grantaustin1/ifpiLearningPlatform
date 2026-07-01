@@ -91,3 +91,7 @@ def register_all(app: FastAPI) -> None:
     # ── Iter 26a: TTS slide narration ────────────────────────────────
     from routers import narration
     app.include_router(narration.router)
+
+    # ── Iter 26b + 27a: Sora 2 video + Nano Banana infographics ─────
+    from routers import authoring_media
+    app.include_router(authoring_media.router)

@@ -51,9 +51,9 @@ def authoring_status(
             "tutor_enabled": True,
             "deep_research_enabled": bool(settings.tavily_api_key),
             "flashcards_enabled": True,
-            "video_overview_enabled": False,
+            "video_overview_enabled": True,
             "tts_enabled": True,
-            "visuals_enabled": False,
+            "visuals_enabled": True,
             "pptx_export_enabled": False,
         },
         "pii_redaction": {

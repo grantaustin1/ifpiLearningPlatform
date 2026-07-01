@@ -271,6 +271,13 @@ def reorder_slides_early(course_id: int, body: dict, db: Session = Depends(get_d
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="slide_ids must be a list")
     slides = {s.id: s for s in c.slides}
+    # Two-pass update to satisfy the (course_id, order_index) UNIQUE
+    # constraint (Iter 25b): first move every affected row into a negative
+    # index (guaranteed non-colliding), then set the final positive index.
+    for i, sid in enumerate(ids, start=1):
+        if sid in slides:
+            slides[sid].order_index = -i
+    db.flush()
     for i, sid in enumerate(ids, start=1):
         if sid in slides:
             slides[sid].order_index = i
