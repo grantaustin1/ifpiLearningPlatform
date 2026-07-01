@@ -822,3 +822,52 @@ class AIUsageLedger(Base):
     cost_cents = Column(Integer, default=0, nullable=False)
     billing_month = Column(String(7), nullable=False)     # "2026-02"
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── Flashcards (Iter 25 — AI-generated cards + SM-2 spaced repetition) ─
+class Flashcard(Base):
+    """One AI-generated flashcard. Belongs to a course (org-scoped via that
+    course). `source_chunk_ids` records provenance so we can show citations
+    on the review UI + guarantee no hallucinated cards enter the pack."""
+    __tablename__ = "flashcards"
+    __table_args__ = (
+        Index("ix_flashcards_org_course", "organization_id", "course_id"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"), nullable=True)
+    front = Column(String(500), nullable=False)          # question / prompt
+    back = Column(Text, nullable=False)                    # answer
+    hint = Column(String(300))
+    difficulty = Column(Integer, default=2, nullable=False)  # 1-easy .. 5-hard
+    tags = Column(JSON)                                     # list[str]
+    generated_by_ai = Column(Boolean, default=True, nullable=False)
+    source_chunk_ids = Column(JSON)                        # list[int] — provenance
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class FlashcardReview(Base):
+    """Learner-side SM-2 spaced-repetition state. One row per (user, card)
+    — first review INSERTs it, subsequent reviews UPDATE. Learners see cards
+    where `next_review_at <= now`.
+    """
+    __tablename__ = "flashcard_reviews"
+    __table_args__ = (
+        UniqueConstraint("user_id", "flashcard_id", name="uq_review_user_card"),
+        Index("ix_reviews_user_next", "user_id", "next_review_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    flashcard_id = Column(Integer, ForeignKey("flashcards.id", ondelete="CASCADE"),
+                          nullable=False, index=True)
+    ease_factor = Column(Float, default=2.5, nullable=False)   # SM-2 EF
+    interval_days = Column(Integer, default=0, nullable=False)  # days until next review
+    repetitions = Column(Integer, default=0, nullable=False)   # consecutive successful reps
+    next_review_at = Column(DateTime, nullable=False)
+    last_quality = Column(Integer)                              # last 0-5 rating
+    last_reviewed_at = Column(DateTime)
+    review_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)

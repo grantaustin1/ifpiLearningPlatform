@@ -174,15 +174,20 @@ def test_tutor_pii_redact_disable_admin_ok(admin, uploaded_doc):
     assert r.status_code == 200
 
 
-# ── Iter 24: Tavily skeleton ─────────────────────────────────────────
-def test_research_start_returns_503_without_tavily_key(admin):
+# ── Iter 24: Tavily deep research ─────────────────────────────────────
+def test_research_start_returns_job_id_when_tavily_key_present(admin):
+    """Once TAVILY_API_KEY is set in backend/.env, /research/start accepts
+    the request and returns 202 with a job_id. If the key is missing this
+    returns 503 with `tavily_key_missing` — kept as a skip below."""
     r = admin.post(f"{BASE_URL}/api/authoring/research/start",
-                   json={"query": "protein research 2026", "depth": "quick"},
+                   json={"query": "music industry trends 2026", "depth": "quick"},
                    timeout=10)
-    assert r.status_code == 503
-    detail = r.json()["detail"]
-    assert detail["code"] == "tavily_key_missing"
-    assert "TAVILY_API_KEY" in detail["message"]
+    if r.status_code == 503:
+        detail = r.json()["detail"]
+        assert detail["code"] == "tavily_key_missing"
+        return
+    assert r.status_code == 202
+    assert isinstance(r.json().get("job_id"), int)
 
 
 def test_research_start_learner_blocked(learner):

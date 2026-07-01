@@ -253,11 +253,19 @@ class ResearchStartIn(BaseModel):
 
 def _run_research_job(job_id: int, org_id: int, query: str, depth: str,
                        course_id: Optional[int], user_id: int) -> None:
-    """Background dispatcher — runs Tavily search + LLM synthesis, then
-    creates a SourceDocument of type RESEARCH_NOTE. On any failure marks
-    the job FAILED with error_log populated.
-    """
+    """Sync wrapper — spins up its own event loop so FastAPI's BackgroundTasks
+    (which runs coroutines in the main loop and sync callables in a worker
+    thread) can call this without loop conflicts."""
     import asyncio
+    try:
+        asyncio.run(_run_research_job_async(job_id, org_id, query, depth,
+                                              course_id, user_id))
+    except Exception:   # noqa: BLE001
+        logger.exception("Research job runner crashed (job_id=%s)", job_id)
+
+
+async def _run_research_job_async(job_id: int, org_id: int, query: str, depth: str,
+                                    course_id: Optional[int], user_id: int) -> None:
     db = SessionLocal()
     try:
         job = db.query(AIJob).filter(AIJob.id == job_id).first()
@@ -277,20 +285,19 @@ def _run_research_job(job_id: int, org_id: int, query: str, depth: str,
             db.commit()
             return
 
-        # Tavily call — synchronous httpx to keep this thread-safe
         import httpx
         max_results = 10 if depth == "deep" else 5
         try:
-            r = httpx.post(
-                "https://api.tavily.com/search",
-                json={
-                    "api_key": settings.tavily_api_key, "query": query,
-                    "max_results": max_results,
-                    "search_depth": "advanced" if depth == "deep" else "basic",
-                    "include_answer": True, "include_raw_content": True,
-                },
-                timeout=90,
-            )
+            async with httpx.AsyncClient(timeout=90) as client:
+                r = await client.post(
+                    "https://api.tavily.com/search",
+                    json={
+                        "api_key": settings.tavily_api_key, "query": query,
+                        "max_results": max_results,
+                        "search_depth": "advanced" if depth == "deep" else "basic",
+                        "include_answer": True, "include_raw_content": True,
+                    },
+                )
             r.raise_for_status()
             tavily_data = r.json()
         except Exception as e:   # noqa: BLE001
@@ -300,7 +307,6 @@ def _run_research_job(job_id: int, org_id: int, query: str, depth: str,
             db.commit()
             return
 
-        # Synthesize briefing from Tavily's answer + raw content of top results
         answer = tavily_data.get("answer") or ""
         results = tavily_data.get("results", [])
         briefing = f"# Research briefing: {query}\n\n{answer}\n\n---\n\n## Sources\n\n"
@@ -311,20 +317,29 @@ def _run_research_job(job_id: int, org_id: int, query: str, depth: str,
                 f"{(res.get('content') or res.get('raw_content') or '')[:1500]}\n\n"
             )
 
-        # Persist as a SourceDocument the tutor can retrieve from
         title = f"Research: {query[:80]}"
-        # Run inside an async context because ingest_document is async
-        doc = asyncio.new_event_loop().run_until_complete(
-            embedding_service.ingest_document(
-                db,
-                organization_id=org_id, uploaded_by_id=user_id,
-                title=title, text=briefing,
-                source_type="RESEARCH_NOTE",
-                course_id=course_id,
-                metadata={"query": query, "depth": depth,
-                          "sources": [r.get("url") for r in results]},
-            )
+        doc = await embedding_service.ingest_document(
+            db,
+            organization_id=org_id, uploaded_by_id=user_id,
+            title=title, text=briefing,
+            source_type="RESEARCH_NOTE",
+            course_id=course_id,
+            metadata={"query": query, "depth": depth,
+                      "sources": [r.get("url") for r in results]},
         )
+
+        # Record cost — Tavily is not on the Emergent LLM key; approximate
+        # spend per docs.tavily.com pricing (~$0.008/basic, $0.03/advanced).
+        try:
+            from services import ai_budget_service
+            cost_cents = 3 if depth == "deep" else 1
+            ai_budget_service.record_spend(
+                db, organization_id=org_id, user_id=user_id, job_id=job_id,
+                provider="tavily", model=f"search-{depth}",
+                cost_cents=cost_cents,
+            )
+        except Exception:   # noqa: BLE001
+            logger.exception("Failed to record tavily spend")
 
         job.status = "COMPLETED"
         job.output_json = {
@@ -415,4 +430,29 @@ def research_status(
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+    }
+
+
+@router.get("/research")
+def list_research_jobs(
+    limit: int = 30,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_staff()),
+):
+    """List recent research jobs for the org's history view."""
+    jobs = db.query(AIJob).filter(
+        AIJob.organization_id == current.organization_id,
+        AIJob.job_type == "DEEP_RESEARCH",
+    ).order_by(AIJob.id.desc()).limit(min(limit, 100)).all()
+    return {
+        "items": [
+            {
+                "id": j.id, "status": j.status,
+                "input": j.input_json, "output": j.output_json,
+                "error_log": j.error_log,
+                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+            }
+            for j in jobs
+        ],
     }

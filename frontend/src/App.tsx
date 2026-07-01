@@ -23,6 +23,9 @@ import BadgeTiersPage from 'pages/dashboard/BadgeTiersPage'
 import WebhooksPage from 'pages/dashboard/WebhooksPage'
 import ImportsPage from 'pages/dashboard/ImportsPage'
 import ApiTokensPage from 'pages/dashboard/ApiTokensPage'
+import ResearchPage from 'pages/dashboard/ResearchPage'
+import FlashcardsAuthoringPage from 'pages/dashboard/FlashcardsAuthoringPage'
+import LearnerFlashcardsPage from 'pages/learn/LearnerFlashcardsPage'
 import PortalPage from 'pages/PortalPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
@@ -79,9 +82,12 @@ export default function App() {
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
+        <Route path="/research" element={<Protected adminOnly><ResearchPage /></Protected>} />
+        <Route path="/courses/:courseId/flashcards" element={<Protected adminOnly><FlashcardsAuthoringPage /></Protected>} />
       </Route>
 
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
+      <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
