@@ -485,11 +485,18 @@ For each feature above, "shipped" means ALL of:
 
 ## 8 · Product owner decisions (locked in Feb 2026)
 
-1. **Research API:** ✅ **Tavily** (~$0.08/deep-search, faster than Perplexity for our depth).
-2. **Video provider:** ✅ **Sora 2** via Emergent LLM Key. Per-org monthly cap: **to be set per tenant** — default $200 (~400 seconds of video/month).
-3. **Flashcards learner UX:** ✅ **Full SM-2 spaced-repetition** — daily due queue + 0-5 quality rating.
-4. **PPTX brand master:** No file supplied yet. Export will auto-derive brand from each org's existing `Organization.theme_json` (logo URL + primary/secondary hex colours). A real `.pptx` master can be dropped in later at `/app/backend/assets/{org_slug}_brand_master.pptx`.
-5. **PII redaction:** _pending confirmation — recommendation is redact-by-default with a per-question staff toggle._
+1. **Research API:** ✅ **Tavily** (~$0.08/deep-search, faster than Perplexity for our depth). Requires user-supplied `TAVILY_API_KEY` env var.
+2. **Video provider:** ✅ **Sora 2** via Emergent LLM Key. **Per-org monthly cap: $200** (~400 seconds of video/month at ~$0.50/min). Enforced via `AIUsageLedger` before every Sora dispatch.
+3. **Flashcards learner UX:** ✅ **Full SM-2 spaced-repetition** — daily due queue + 0-5 quality rating, next-review scheduling per learner.
+4. **Brand assets:** ✅ **IFPI logo uploaded** at `/app/backend/assets/ifpi_logo.png` + served at `/uploads/ifpi_brand_logo.png`. Org id=1 configured with:
+   - `logo_url = "/uploads/ifpi_brand_logo.png"`
+   - `primary_color = "#262262"` (deep navy from wordmark)
+   - `cert_accent_color = "#F5A500"` (gradient underline midpoint)
+   - PPTX exports + AI-generated infographics + mind maps will pull these values automatically. A full `.pptx` brand master can be dropped in later at `/app/backend/assets/ifpi_brand_master.pptx` for tighter design control.
+5. **PII redaction:** ✅ **Option (b) — redact by default, staff can toggle off per-question.**
+   - Default behaviour on every `/api/authoring/tutor/ask` + related endpoint: run `services/pii_redactor.py` over the incoming prompt AND retrieved chunks. Replace emails, names, IDs with `<learner_N>` placeholders. Send to LLM. When response comes back, un-redact for the *staff viewer* (so they see real names in the UI) but keep the LLM prompt/response pair in the audit log with redacted form.
+   - Per-question override: request payload gains `pii_redact: bool = True`. Setting to `false` requires the caller to have `ADMIN` or `SUPER_ADMIN` role (not INSTRUCTOR) AND writes an `AuditLog` entry with `action="AI_PII_REDACT_DISABLED"` for compliance.
+   - Every response includes `redaction_applied: bool` so the UI can display a "PII redacted" chip.
 
 ---
 
