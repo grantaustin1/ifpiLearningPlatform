@@ -71,9 +71,15 @@ def test_authoring_status_admin_can_access(admin):
     assert body["budget"]["budget_cents"] == 20000    # locked default: $200
     assert body["pii_redaction"]["default_on"] is True
     assert body["pii_redaction"]["user_can_disable"] is True     # admin can toggle
-    # Every feature flag must be OFF at this stage (infra-only iter)
-    for k, v in body["feature_flags"].items():
-        assert v is False, f"{k} should be off"
+    # Iter 23/24/25 flipped these on. Others still gated behind future iters.
+    flags = body["feature_flags"]
+    assert flags["tutor_enabled"] is True
+    assert flags["flashcards_enabled"] is True
+    # deep_research_enabled tracks TAVILY_API_KEY presence
+    assert isinstance(flags["deep_research_enabled"], bool)
+    for k in ("video_overview_enabled", "tts_enabled", "visuals_enabled",
+              "pptx_export_enabled"):
+        assert flags[k] is False, f"{k} should be off (future iter)"
 
 
 def test_authoring_status_learner_blocked(learner):
