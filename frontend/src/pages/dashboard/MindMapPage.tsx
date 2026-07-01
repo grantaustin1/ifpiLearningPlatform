@@ -109,7 +109,7 @@ export default function MindMapPage() {
           </button>
         </div>
       </div>
-      <div className="flex-1 relative" data-testid="mm-canvas">
+      <div className="flex-1 relative" style={{ minHeight: 500, height: 'calc(100vh - 80px)' }} data-testid="mm-canvas">
         {loading && !map && (
           <div className="absolute inset-0 flex items-center justify-center text-slate-500 gap-2">
             <Loader2 className="h-6 w-6 animate-spin" /> Analysing course…
