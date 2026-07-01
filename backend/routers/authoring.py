@@ -54,7 +54,7 @@ def authoring_status(
             "video_overview_enabled": True,
             "tts_enabled": True,
             "visuals_enabled": True,
-            "pptx_export_enabled": False,
+            "pptx_export_enabled": True,
         },
         "pii_redaction": {
             "default_on": True,     # locked policy (b)

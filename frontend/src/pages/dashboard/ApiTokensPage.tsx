@@ -14,7 +14,7 @@ interface Token {
   created_at: string | null
 }
 
-const SCOPES = ['LEARNER', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN']
+const SCOPES = ['LEARNER', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN', 'read:catalog']
 
 export default function ApiTokensPage() {
   const [tokens, setTokens] = useState<Token[]>([])
@@ -70,7 +70,8 @@ export default function ApiTokensPage() {
           <p className="text-sm text-slate-600 font-medium">No API tokens yet</p>
           <p className="text-xs text-slate-400 mt-1">Create one to authenticate external systems.</p>
         </div>
-      ) : (
+      ) : (<>
+        <UsageChart />
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden" data-testid="tokens-list">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
@@ -122,10 +123,68 @@ export default function ApiTokensPage() {
             </tbody>
           </table>
         </div>
-      )}
+      </>)}
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={(t) => { setJustCreated(t); setShowCreate(false); load() }} />}
       {justCreated && <RevealModal token={justCreated.token} name={justCreated.name} onClose={() => setJustCreated(null)} />}
+    </div>
+  )
+}
+
+
+// ── Inline SVG usage chart (Iter P2) ──────────────────────────────
+function UsageChart() {
+  const [data, setData] = useState<{ series: any[]; by_token: any[]; total_calls: number; total_errors: number } | null>(null)
+  useEffect(() => {
+    api.get('/admin/api-tokens/analytics/usage?days=30')
+      .then(r => setData(r.data))
+      .catch(() => setData({ series: [], by_token: [], total_calls: 0, total_errors: 0 }))
+  }, [])
+  if (!data) return null
+  const max = Math.max(1, ...data.series.map((d: any) => d.count))
+  const W = 720, H = 140, PAD = 20
+  const bw = (W - PAD * 2) / (data.series.length || 1)
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3" data-testid="tokens-usage-chart">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold text-slate-700">Requests (last 30 days)</h2>
+        <div className="text-xs text-slate-500 flex gap-4">
+          <span data-testid="tokens-total-calls"><span className="font-bold text-slate-800">{data.total_calls}</span> total</span>
+          <span data-testid="tokens-total-errors" className={data.total_errors > 0 ? 'text-rose-600 font-semibold' : ''}>
+            {data.total_errors} errors
+          </span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[140px]" preserveAspectRatio="none">
+        {data.series.map((d: any, i: number) => {
+          const h = (d.count / max) * (H - PAD * 2)
+          const x = PAD + i * bw
+          const y = H - PAD - h
+          return (
+            <g key={d.date}>
+              <rect x={x + 1} y={y} width={Math.max(1, bw - 2)} height={Math.max(0, h)}
+                fill={d.errors > 0 ? '#f43f5e' : '#4f46e5'} opacity={d.count === 0 ? 0.15 : 0.85}>
+                <title>{d.date}: {d.count} calls, {d.errors} errors</title>
+              </rect>
+            </g>
+          )
+        })}
+        <line x1={PAD} x2={W - PAD} y1={H - PAD} y2={H - PAD} stroke="#e2e8f0" />
+      </svg>
+      {data.by_token.length > 0 && (
+        <div className="pt-2">
+          <p className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide mb-2">Top tokens (30d)</p>
+          <ul className="space-y-1.5">
+            {data.by_token.slice(0, 5).map((t: any) => (
+              <li key={t.token_id} className="text-xs flex items-center gap-2" data-testid={`tokens-top-${t.token_id}`}>
+                <span className="font-mono text-slate-500 w-20 truncate">{t.prefix}</span>
+                <span className="flex-1 truncate text-slate-700">{t.name}</span>
+                <span className="tabular-nums font-semibold text-slate-800">{t.count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
