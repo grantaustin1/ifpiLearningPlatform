@@ -23,6 +23,9 @@ interface Card {
 interface Stats {
   total: number; new: number; learning: number; mastered: number; due_now: number
 }
+interface Streak {
+  current_streak: number; longest_streak: number; reviewed_today: boolean
+}
 
 const QUALITY_LABELS: Array<{ q: number; label: string; color: string; hint: string }> = [
   { q: 0, label: 'Blackout', color: 'bg-rose-600 hover:bg-rose-700', hint: 'No idea' },
@@ -39,6 +42,8 @@ export default function LearnerFlashcardsPage() {
   const cid = Number(courseId)
   const [cards, setCards] = useState<Card[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [streak, setStreak] = useState<Streak | null>(null)
+  const [lastXp, setLastXp] = useState<{ xp: number; bonus: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<'swipe' | 'list'>('swipe')
   const [i, setI] = useState(0)
@@ -48,12 +53,14 @@ export default function LearnerFlashcardsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [d, s] = await Promise.all([
+      const [d, s, st] = await Promise.all([
         api.get(`/learn/flashcards/courses/${cid}/due`),
         api.get(`/learn/flashcards/courses/${cid}/stats`),
+        api.get('/learn/flashcards/streak'),
       ])
       setCards(d.data.cards || [])
       setStats(s.data)
+      setStreak(st.data)
       setI(0); setFlipped(false)
     } finally { setLoading(false) }
   }
@@ -66,7 +73,13 @@ export default function LearnerFlashcardsPage() {
     if (!current || submitting) return
     setSubmitting(true)
     try {
-      await api.post(`/learn/flashcards/${current.id}/review`, { quality })
+      const r = await api.post(`/learn/flashcards/${current.id}/review`, { quality })
+      const xp = r.data.xp_awarded || 0
+      if (xp > 0) {
+        setLastXp({ xp, bonus: !!r.data.streak_bonus_applied })
+        setTimeout(() => setLastXp(null), 2500)
+      }
+      if (r.data.streak) setStreak(r.data.streak)
       // Advance
       if (i + 1 >= cards.length) {
         setI(cards.length)
@@ -121,6 +134,23 @@ export default function LearnerFlashcardsPage() {
             </button>
           </div>
         </div>
+
+        {streak && (
+          <div className="flex items-center gap-3" data-testid="lfc-streak">
+            <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 border-2 ${streak.current_streak > 0 ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-2xl">{streak.current_streak > 0 ? '🔥' : '💤'}</span>
+              <div>
+                <div className="text-xl font-bold tabular-nums text-slate-800">{streak.current_streak}-day streak</div>
+                <div className="text-[11px] text-slate-500">Longest: {streak.longest_streak} · {streak.reviewed_today ? 'Reviewed today ✓' : 'Review one card to keep it alive'}</div>
+              </div>
+            </div>
+            {lastXp && (
+              <div className="rounded-full px-3 py-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold animate-pulse" data-testid="lfc-xp-flash">
+                +{lastXp.xp} XP {lastXp.bonus ? '· 🔥 streak bonus!' : ''}
+              </div>
+            )}
+          </div>
+        )}
 
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-testid="lfc-stats">

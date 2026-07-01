@@ -22,6 +22,40 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-07-02 — iterations 25b + 25c + 26a)
+
+### Iter 25b — DB unique constraints (P1 backlog complete)
+- ✅ `UniqueConstraint("organization_id", "title")` on `courses` and `(course_id, order_index)` on `course_slides`. Alembic migration `e5f6a7b8c9d0` (batch-mode-safe for SQLite, dedupes any pre-existing collisions before adding the constraint).
+- ✅ Pre-flight check in `POST /api/courses` returns 409 instead of a 500 IntegrityError on duplicate title.
+
+### Iter 25c — Flashcard streak + XP (improvement complete)
+- ✅ `GET /api/learn/flashcards/streak` — pure derived stat (`current_streak / longest_streak / reviewed_today`) computed from `FlashcardReview.last_reviewed_at`. **No schema change** — same query works on any DB engine.
+- ✅ Every review with `quality >= 3` awards `+2 XP` (`+4` for quality=5). First review of the day adds a `+25 XP` streak bonus.
+- ✅ Review endpoint response now includes `xp_awarded`, `streak_bonus_applied`, `streak`.
+- ✅ Learner flashcard player shows a live 🔥/💤 streak card + toast "+X XP · 🔥 streak bonus!" flash after each rating.
+
+### Iter 26a — OpenAI TTS slide narration (Iter 26 partial complete — Sora deferred)
+- ✅ `services/tts_service.py` — wraps `emergentintegrations.llm.openai.OpenAITextToSpeech` with a 4096-char chunker (up to 6 chunks / ~24K chars per slide), pluggable storage backend, and cost estimator (`$0.015 / $0.030 per 1K chars` for `tts-1` / `tts-1-hd`).
+- ✅ Migration `e5f6a7b8c9d0` also adds `course_slides.narration_url + narration_voice`.
+- ✅ Staff routes:
+  - `POST /api/authoring/narration/generate` — body: `{slide_id, voice, model, override_text?}`. Voices: 9 (alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer). Models: `tts-1`, `tts-1-hd`.
+  - `DELETE /api/authoring/narration/{slide_id}` — clear cached narration.
+- ✅ HTML tags in slide content are stripped before TTS. Budget pre-flight + spend recording via `ai_budget_service`.
+- ✅ `SlideOut` schema exposes `narration_url + narration_voice`. Learner LearnPage renders an inline `<audio>` player when set.
+- ✅ CourseEditPage has an "AI narration" panel per slide — voice/model selectors + Generate/Re-generate/Remove buttons.
+- ✅ `feature_flags.tts_enabled` flipped True.
+
+### Verification
+- Backend: **22/22 pytest** across `test_iteration25.py + test_iteration26.py` (5 SM-2 pure + 6 flashcards e2e + 1 uniqueness constraint + 2 streak + 4 narration endpoints + 3 TTS pure/cost + 1 role-gate).
+- Smoke screenshot confirms narration panel + flashcards button visible in CourseEditPage.
+
+### Not yet done (deferred to next iteration for scope reasons)
+- **Iter 26b — Sora 2 video overviews** (requires its own playbook + async job with ~2-6 min generation time + $200 default org budget per user's earlier config choice)
+- **Iter 27 — Mind maps + Nano Banana infographics + PPTX export** (three sub-features, one iteration each)
+- **P2 backlog — Token usage analytics 30-day chart** (needs a new `ApiTokenCall` log table + backfill logic)
+- **P2 backlog — SCORM runtime shim** (`window.API` / `window.API_1484_11`)
+- **P3 backlog — Public read-only catalog + cert-verify API** behind `read:catalog` token scope
+
 ## What's been implemented (2026-07-01 — iterations 24 + 25)
 
 ### Iter 24 — Deep research via Tavily (P0 complete)

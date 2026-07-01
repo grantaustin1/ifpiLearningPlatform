@@ -201,6 +201,7 @@ export default function CourseEditPage() {
                   placeholder="Media URL (video, audio, image, PDF)"
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
               )}
+              <NarrationEditor slide={activeSlide} onUpdated={load} />
             </div>
           </div>
         ) : <div className="flex-1 flex items-center justify-center text-slate-400">Select or add a slide to start</div>}
@@ -357,3 +358,69 @@ function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
 function Field({ label, children }: any) {
   return <div className="mb-4"><label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>{children}</div>
 }
+
+// ── Narration editor (Iter 26a) ────────────────────────────────────
+const NARRATION_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+
+function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [voice, setVoice] = useState(slide.narration_voice || 'nova')
+  const [model, setModel] = useState<'tts-1' | 'tts-1-hd'>('tts-1')
+  const [busy, setBusy] = useState(false)
+
+  const gen = async () => {
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/narration/generate', {
+        slide_id: slide.id, voice, model,
+      })
+      toast.success(`Narration ready · ${r.data.chunk_count} chunk(s) · ${(r.data.size_bytes / 1024).toFixed(1)} KB`)
+      onUpdated()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Narration failed')
+    } finally { setBusy(false) }
+  }
+
+  const clear = async () => {
+    if (!window.confirm('Remove this narration? You can regenerate anytime.')) return
+    await api.delete(`/authoring/narration/${slide.id}`)
+    toast.success('Narration cleared')
+    onUpdated()
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-2" data-testid="narration-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-indigo-800">
+        🔊 AI narration <span className="text-slate-500 font-normal">(OpenAI TTS)</span>
+      </div>
+      {slide.narration_url ? (
+        <div className="flex items-center gap-3">
+          <audio src={slide.narration_url} controls className="h-9 flex-1" data-testid="narration-audio" />
+          <button onClick={clear} className="text-xs text-rose-600 hover:underline" data-testid="narration-clear-btn">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">No narration yet. Pick a voice, hit generate.</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <select value={voice} onChange={e => setVoice(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-voice-select">
+          {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <select value={model} onChange={e => setModel(e.target.value as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-model-select">
+          <option value="tts-1">tts-1 (fast)</option>
+          <option value="tts-1-hd">tts-1-hd (higher quality)</option>
+        </select>
+        <button onClick={gen} disabled={busy}
+          data-testid="narration-generate-btn"
+          className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+          {busy ? 'Generating…' : slide.narration_url ? 'Re-generate' : 'Generate narration'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
