@@ -440,10 +440,12 @@ function VisualEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void 
       })
       toast.success(`Image generated · ${(r.data.size_bytes / 1024).toFixed(0)} KB`)
       setPrompt('')
-      onUpdated()
+      setBusy(false)         // reset before async reload to keep the button snappy
+      await onUpdated()
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Image generation failed')
-    } finally { setBusy(false) }
+      setBusy(false)
+    }
   }
 
   const isImage = slide.slide_type === 'IMAGE' && slide.media_url

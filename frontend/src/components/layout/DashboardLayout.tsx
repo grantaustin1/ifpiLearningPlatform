@@ -107,7 +107,7 @@ export default function DashboardLayout() {
             <div
               className="flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-lg bg-orange-500/15 border border-orange-500/25"
               data-testid="sidebar-streak-pill"
-              title={`Longest streak: ${streak.longest_streak} days`}
+              title={`Longest streak: ${streak.longest_streak} day${streak.longest_streak === 1 ? '' : 's'}`}
             >
               <span className="text-base leading-none">🔥</span>
               <div className="text-[11px] leading-tight">
