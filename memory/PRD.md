@@ -200,6 +200,25 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 
 **Testing:** testing_agent report `iteration_15.json` — 10/10 checklist PASS, no regressions. Combined pytest run 13/13 green in 5.26s.
 
+## Iteration 22 — AI Authoring Suite foundation + branded login (Feb 2026)
+
+**Shared AI infra (Iter 22a):**
+- ✅ 4 new models + Alembic `c9d2e1f4a5b6`: `SourceDocument`, `SourceChunk`, `AIJob`, `AIUsageLedger` + `Organization.ai_monthly_budget_cents` (default 20000c = $200)
+- ✅ `auth.dependencies.requires_staff()` semantic alias (INSTRUCTOR + ADMIN + SUPER_ADMIN) — locked policy per roadmap §2
+- ✅ `auth.dependencies.requires_admin()` — stricter gate for PII toggle + budget updates
+- ✅ `services/ai_budget_service.py` — `check_budget`, `record_spend`, `month_to_date_spend_cents`, `get_budget_status`. Raises HTTP 429 with actionable detail on over-budget.
+- ✅ `services/pii_redactor.py` — locked policy (b). Catches emails, phones, ID numbers, first-last name pairs. Lossless round-trip via mapping. Dedup — same value reuses placeholder.
+- ✅ `routers/authoring.py` — `GET /api/authoring/status` (budget + feature-flag map), `POST /api/authoring/redaction/preview`, `GET/PUT /api/authoring/budget`
+
+**Public branding endpoint (unlocks branded login):**
+- ✅ `GET /api/branding/public` — no auth. Returns only `{name, slug, logo_url, primary_color, accent_color}`. Never leaks SMTP, budgets, IDs.
+
+**Improvement — branded login page:**
+- ✅ `LoginPage.tsx` now fetches `/api/branding/public` on mount and renders the IFPI logo + deep navy `#262262` hero + yellow-orange `#F5A500` accent glow + "IFPI Main Academy" wordmark. Fallbacks preserved for orgs with no branding set.
+- ✅ Sign-in button, register link + accent icons all use the org's `primary_color`. Live-verified: hero_bg = rgb(38, 34, 98) confirmed via computed style.
+
+**Tests:** `test_iteration22.py` — 13 new tests covering schema, staff-gate 403, PII round-trip + dedup, budget update flow, over-budget 429, public branding no-leak. Full Iter 14-22 suite: **65 passing, 1 expected skip.**
+
 ## Iteration 21 — xAPI auto-completion, version sidebar, API tokens (Feb 2026)
 
 **xAPI → IFPI auto-completion (Iter 21a)**

@@ -97,6 +97,9 @@ class Organization(Base):
     cert_signature_image_url = Column(String(500))       # signature PNG/SVG
     cert_footer_text = Column(Text)                      # disclaimer / contact line
     theme_preset = Column(String(40))                    # nullable — e.g. "conservatoire" | "music_school"
+    # AI authoring budget (Iter 22 — see docs/AI_AUTHORING_SUITE_ROADMAP.md).
+    # Enforced by services/ai_budget_service before every LLM/media dispatch.
+    ai_monthly_budget_cents = Column(Integer, default=20000, nullable=False)  # default $200 (Sora cap)
     # Per-tenant SMTP override (nullable — when populated, outbox worker
     # dispatches via this server instead of falling back to the global stub
     # / ERP360 bridge). smtp_password_enc is encrypted at rest with Fernet.
@@ -738,4 +741,84 @@ class ApiToken(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     last_used_at = Column(DateTime)
     expires_at = Column(DateTime)                      # nullable = no expiry
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── AI authoring suite shared infra (Iter 22 — see docs/AI_AUTHORING_SUITE_ROADMAP.md) ──
+
+class SourceDocument(Base):
+    """Per-org reference material — PDFs, DOCXs, URLs scraped by deep-research.
+    Used as the retrieval corpus for the source-grounded AI tutor. Full-text
+    plus per-chunk embeddings (see `SourceChunk`) enable semantic search."""
+    __tablename__ = "source_documents"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)
+    title = Column(String(300), nullable=False)
+    source_type = Column(String(20), nullable=False)     # PDF | DOCX | URL | RESEARCH_NOTE | MANUAL
+    original_url = Column(String(800))                    # populated when scraped from URL
+    storage_key = Column(String(400))                     # storage_service key of raw file
+    extracted_text = Column(Text)                         # plain-text — the RAG input
+    metadata_json = Column(JSON)                          # {authors, published_date, checksum, page_count}
+    chunk_count = Column(Integer, default=0, nullable=False)
+    embedded_at = Column(DateTime)                        # nullable — set once embeddings finished
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class SourceChunk(Base):
+    """Retrieval-ready ~800-token chunk of a SourceDocument, with a vector
+    embedding stored as raw JSON list[float]. No pgvector needed at MVP
+    scale (<10k chunks/org)."""
+    __tablename__ = "source_chunks"
+    __table_args__ = (Index("ix_chunk_doc_ord", "document_id", "chunk_index"),)
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey("source_documents.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding = Column(JSON)                              # list[float] — 1536 dims (OpenAI ada-2)
+    token_count = Column(Integer)
+
+
+class AIJob(Base):
+    """Async LLM/media dispatch — mirrors the ImportJob pattern (Iter 16).
+    A background worker will poll `status=PENDING` and dispatch by job_type.
+    """
+    __tablename__ = "ai_jobs"
+    __table_args__ = (Index("ix_ai_jobs_org_status", "organization_id", "status"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    job_type = Column(String(40), nullable=False, index=True)
+    # TUTOR_ANSWER | DEEP_RESEARCH | AUTO_QUIZ | FLASHCARDS | VIDEO_OVERVIEW
+    # TTS_NARRATION | MIND_MAP | INFOGRAPHIC | PPTX_EXPORT
+    status = Column(String(20), default="PENDING", nullable=False, index=True)
+    # PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+    input_json = Column(JSON)
+    output_json = Column(JSON)
+    artefact_url = Column(String(600))
+    cost_cents = Column(Integer, default=0, nullable=False)
+    error_log = Column(Text)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class AIUsageLedger(Base):
+    """Per-call cost tracking. Aggregated per (org, billing_month) by
+    services/ai_budget_service to enforce Organization.ai_monthly_budget_cents.
+    """
+    __tablename__ = "ai_usage_ledger"
+    __table_args__ = (Index("ix_ai_usage_org_month", "organization_id", "billing_month"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    job_id = Column(Integer, ForeignKey("ai_jobs.id"), nullable=True)
+    provider = Column(String(30), nullable=False)         # claude | openai | gemini | sora | tavily
+    model = Column(String(60))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_cents = Column(Integer, default=0, nullable=False)
+    billing_month = Column(String(7), nullable=False)     # "2026-02"
     created_at = Column(DateTime, default=_utcnow, nullable=False)

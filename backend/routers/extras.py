@@ -146,6 +146,38 @@ def embed_widget(organization: Optional[str] = None,
 org_router = APIRouter(prefix="/api/organization", tags=["Organization"])
 
 
+# ── Public branding (no auth — for login / signup pages, embed widgets) ──
+# Returns ONLY the safe-to-display fields. Never returns SMTP config, budgets,
+# or any auth-related data. Cached at edge for 5 min.
+public_branding_router = APIRouter(prefix="/api/branding", tags=["Public Branding"])
+
+
+@public_branding_router.get("/public")
+def public_branding(slug: Optional[str] = None, db: Session = Depends(get_db)):
+    """Fetch org branding by slug (query param). If no slug is passed, we
+    return the FIRST org in the DB — sensible for single-tenant deployments
+    like IFPI's initial rollout. The response is intentionally minimal:
+    just brand name, logo URL, primary colour, accent colour."""
+    from models import Organization
+    q = db.query(Organization)
+    if slug:
+        q = q.filter(Organization.slug == slug)
+    else:
+        q = q.order_by(Organization.id.asc())
+    org = q.first()
+    if not org:
+        return {"name": "Learning Platform", "logo_url": None,
+                "primary_color": "#6366f1", "accent_color": "#F5A500",
+                "slug": None}
+    return {
+        "name": org.name,
+        "slug": org.slug,
+        "logo_url": org.logo_url,
+        "primary_color": org.primary_color or "#6366f1",
+        "accent_color": org.cert_accent_color or org.primary_color or "#F5A500",
+    }
+
+
 class OrgUpdate(BaseModel):
     name: Optional[str] = None
     logo_url: Optional[str] = None

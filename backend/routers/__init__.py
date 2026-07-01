@@ -40,6 +40,7 @@ def register_all(app: FastAPI) -> None:
     app.include_router(invitations.public_router)
     app.include_router(extras.leads_router)
     app.include_router(extras.org_router)
+    app.include_router(extras.public_branding_router)
     app.include_router(extras.outbox_router)
     app.include_router(extras.paths_extra_router)
 
@@ -75,3 +76,7 @@ def register_all(app: FastAPI) -> None:
     # ── Iter 21: API tokens for external integrations ────────────────
     from routers import api_tokens
     app.include_router(api_tokens.router)
+
+    # ── Iter 22: AI authoring suite (shared infra + gates) ───────────
+    from routers import authoring
+    app.include_router(authoring.authoring_router)
