@@ -81,6 +81,14 @@ export default function LearnPage() {
               {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
               {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
               {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: slide.content }} />}
+              {slide.narration_url && (
+                <div className="mt-6 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3" data-testid="learn-slide-narration">
+                  <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                    🔊 Narration {slide.narration_voice ? `· ${slide.narration_voice}` : ''}
+                  </span>
+                  <audio src={slide.narration_url} controls className="flex-1 h-9" />
+                </div>
+              )}
               <CommentsPanel slideId={slide.id} />
             </div>
           ) : (

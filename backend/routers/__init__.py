@@ -87,3 +87,7 @@ def register_all(app: FastAPI) -> None:
     from routers import flashcards
     app.include_router(flashcards.authoring_router)
     app.include_router(flashcards.learner_router)
+
+    # ── Iter 26a: TTS slide narration ────────────────────────────────
+    from routers import narration
+    app.include_router(narration.router)

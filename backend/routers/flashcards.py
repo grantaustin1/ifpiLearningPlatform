@@ -413,8 +413,47 @@ def review_flashcard(
             last_reviewed_at=now, review_count=1,
         )
         db.add(review)
+
+    # ── Gamification: XP + streak bonus (Iter 25c) ──────────────────
+    from services.gamification_service import (
+        GamificationService, XP_FLASHCARD_CORRECT, XP_FLASHCARD_PERFECT,
+        XP_DAILY_STREAK_BONUS,
+    )
+    gam = GamificationService(db)
+    xp_awarded = 0
+    streak_bonus = False
+    if body.quality >= 3:
+        xp_awarded = XP_FLASHCARD_PERFECT if body.quality == 5 else XP_FLASHCARD_CORRECT
+        # Is this the user's first review today? If yes, add streak bonus.
+        # Because we haven't committed yet, `reviewed_today` reflects state
+        # BEFORE this review — perfect for detecting the first-of-day.
+        streak_info_pre = gam.compute_flashcard_streak(current.id)
+        if not streak_info_pre["reviewed_today"]:
+            xp_awarded += XP_DAILY_STREAK_BONUS
+            streak_bonus = True
+        gam.award_xp(current.id, xp_awarded)
+
     db.commit(); db.refresh(review)
-    return {"card_id": card.id, "review": _card_with_review(card, review)["review"]}
+
+    streak_info = gam.compute_flashcard_streak(current.id)
+    return {
+        "card_id": card.id,
+        "review": _card_with_review(card, review)["review"],
+        "xp_awarded": xp_awarded,
+        "streak_bonus_applied": streak_bonus,
+        "streak": streak_info,
+    }
+
+
+@learner_router.get("/streak")
+def flashcard_streak(
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Learner's current + longest flashcard streak. Computed from
+    FlashcardReview.last_reviewed_at (no schema/migration cost)."""
+    from services.gamification_service import GamificationService
+    return GamificationService(db).compute_flashcard_streak(current.id)
 
 
 @learner_router.get("/courses/{course_id}/stats")

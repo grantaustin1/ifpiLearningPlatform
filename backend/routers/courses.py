@@ -78,6 +78,15 @@ def create_course(
     body: CourseCreate, db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
 ):
+    # Pre-flight duplicate check so we return 409 instead of a 500 from the
+    # DB unique constraint (uq_courses_org_title, Iter 25b).
+    dup = db.query(Course).filter(
+        Course.organization_id == current.organization_id,
+        Course.title == body.title,
+    ).first()
+    if dup:
+        raise HTTPException(status_code=409,
+                            detail=f'A course titled "{body.title}" already exists')
     course = Course(
         organization_id=current.organization_id,
         title=body.title, description=body.description, category=body.category,
@@ -104,6 +113,7 @@ def _detail(c: Course) -> CourseDetail:
             id=s.id, title=s.title, content=s.content or "",
             slide_type=s.slide_type.value, media_url=s.media_url,
             order_index=s.order_index, is_required=s.is_required,
+            narration_url=s.narration_url, narration_voice=s.narration_voice,
         ) for s in c.slides],
     )
 
@@ -244,6 +254,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         id=s.id, title=s.title, content=s.content or "",
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
+        narration_url=s.narration_url, narration_voice=s.narration_voice,
     )
 
 
@@ -298,6 +309,7 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         id=s.id, title=s.title, content=s.content or "",
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
+        narration_url=s.narration_url, narration_voice=s.narration_voice,
     )
 
 

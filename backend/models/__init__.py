@@ -184,7 +184,10 @@ class RefreshToken(Base):
 # ── Course & slides ──────────────────────────────────────────────────
 class Course(Base):
     __tablename__ = "courses"
-    __table_args__ = (Index("ix_courses_org_status", "organization_id", "status"),)
+    __table_args__ = (
+        Index("ix_courses_org_status", "organization_id", "status"),
+        UniqueConstraint("organization_id", "title", name="uq_courses_org_title"),
+    )
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     title = Column(String(200), nullable=False)
@@ -210,12 +213,17 @@ class Course(Base):
 
 class CourseSlide(Base):
     __tablename__ = "course_slides"
+    __table_args__ = (
+        UniqueConstraint("course_id", "order_index", name="uq_course_slides_order"),
+    )
     id = Column(Integer, primary_key=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     title = Column(String(200), nullable=False)
     content = Column(Text)
     slide_type = Column(SQLEnum(SlideType), default=SlideType.TEXT)
     media_url = Column(String(500))
+    narration_url = Column(String(500))       # cached TTS narration (Iter 26)
+    narration_voice = Column(String(30))       # last-used voice — for re-runs
     order_index = Column(Integer, default=0)
     is_required = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)

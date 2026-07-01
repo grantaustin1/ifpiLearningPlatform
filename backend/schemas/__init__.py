@@ -49,6 +49,8 @@ class SlideIn(BaseModel):
 class SlideOut(SlideIn):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    narration_url: Optional[str] = None
+    narration_voice: Optional[str] = None
 
 
 class CourseCreate(BaseModel):

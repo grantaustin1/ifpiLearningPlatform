@@ -52,7 +52,7 @@ def authoring_status(
             "deep_research_enabled": bool(settings.tavily_api_key),
             "flashcards_enabled": True,
             "video_overview_enabled": False,
-            "tts_enabled": False,
+            "tts_enabled": True,
             "visuals_enabled": False,
             "pptx_export_enabled": False,
         },
