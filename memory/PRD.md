@@ -189,6 +189,17 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
 
+## Iteration 22 — Gap closure + AI authoring suite spec (Feb 2026)
+
+**Two Kimi-doc gaps closed:**
+- ✅ Pinned 5 missing deps in `backend/requirements.txt`: `bleach==6.4.0`, `markdown==3.10.2`, `openpyxl==3.1.5`, `pandas==3.0.3`, `python-docx==1.2.0`. Fresh-venv `pip install` now succeeds; sanitizer confirmed bleach-backed (not silently fallback).
+- ✅ New `scripts/seed_templates.py` — CLI + importable `seed_org(org_id, admin_id?)`. Creates 3 template courses ([TEMPLATE] Foundation 5 slides, Practical 5, Assessment 4) — status=DRAFT, category=TEMPLATE. Idempotent. Commits per-template so mid-loop failure can't discard earlier successes (post-QA fix).
+
+**AI authoring suite roadmap authored:**
+- ✅ `/app/docs/AI_AUTHORING_SUITE_ROADMAP.md` (496 lines) — master spec for 7 P0/P1 features: source-grounded tutor, deep research, quiz+flashcards, video overviews, TTS, mind maps/infographics, PPTX export. Includes staff-only access control architecture, `SourceDocument`/`AIJob`/`AIUsageLedger` shared infra design, 6-iter roadmap (Iter 22-27, ~16 engineering days), Definition of Done, and product-owner decisions (Tavily / Sora 2 / full SM-2 confirmed).
+
+**Testing:** testing_agent report `iteration_15.json` — 10/10 checklist PASS, no regressions. Combined pytest run 13/13 green in 5.26s.
+
 ## Iteration 21 — xAPI auto-completion, version sidebar, API tokens (Feb 2026)
 
 **xAPI → IFPI auto-completion (Iter 21a)**
