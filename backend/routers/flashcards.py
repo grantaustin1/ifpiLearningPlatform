@@ -272,6 +272,9 @@ def delete_card(
     ).first()
     if not card:
         raise HTTPException(status_code=404, detail="Flashcard not found")
+    # Explicit cleanup of learner review rows — belt-and-braces so this
+    # works on any DB engine irrespective of FK enforcement.
+    db.query(FlashcardReview).filter(FlashcardReview.flashcard_id == card.id).delete()
     db.delete(card)
     db.commit()
     return {"ok": True, "id": card_id}

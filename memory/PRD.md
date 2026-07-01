@@ -22,6 +22,39 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-07-01 — iterations 24 + 25)
+
+### Iter 24 — Deep research via Tavily (P0 complete)
+- ✅ `POST /api/authoring/research/start` — accepts `{query, depth: quick|deep, course_id?}`, returns 202 + `AIJob.id`. Background task runs asynchronously via `asyncio.run()` (previous version used `asyncio.new_event_loop().run_until_complete()` which crashed under FastAPI's BackgroundTasks — fixed).
+- ✅ Tavily `POST /search` — `search_depth=basic` for quick, `advanced` for deep. Uses `include_answer=True + include_raw_content=True` to get citation-rich results.
+- ✅ Synthesised briefings become `SourceDocument(source_type='RESEARCH_NOTE')` — retrievable by the AI tutor for grounded QA.
+- ✅ `GET /api/authoring/research/{job_id}` + `GET /api/authoring/research` for history view. Both `requires_staff()`.
+- ✅ Cost recorded via `ai_budget_service.record_spend` — Tavily is separate provider from the Emergent LLM key.
+- ✅ Frontend `/research` (admin-only) — form + polling + history list at `pages/dashboard/ResearchPage.tsx`. Sidebar entry with Sparkles icon.
+
+### Iter 25 — Auto flashcards + SM-2 spaced repetition (P0 complete)
+- ✅ New models: `Flashcard` (course-scoped, org-scoped, tracks provenance via `source_chunk_ids`) and `FlashcardReview` (per-user SM-2 state — ease_factor, interval_days, repetitions, next_review_at). Alembic migration `d4e5f6a7b8c9`.
+- ✅ `services/flashcard_service.py` — LLM generation (Emergent LLM key, model `settings.ai_builder_model`) + pure `apply_sm2(quality 0-5, ease, interval, reps)` returning `(new_ease, new_interval, new_reps, next_review_at)`. Ease floor 1.3 per SuperMemo-2 spec.
+- ✅ Staff routes at `/api/authoring/flashcards/*`:
+  - `POST /generate` — preview batch (does not persist), augments with RAG chunks when `use_sources=True`.
+  - `POST /bulk-save` — persist reviewed set.
+  - `GET /by-course/{id}` — list saved cards.
+  - `PATCH /{id}` / `DELETE /{id}` — edit + delete (delete cascades to reviews explicitly).
+- ✅ Learner routes at `/api/learn/flashcards/*`:
+  - `GET /courses/{id}/due` — SM-2 due queue (overdue reviews first, then unseen cards to backfill).
+  - `POST /{id}/review` with `{quality: 0-5}` — creates/updates review row.
+  - `GET /courses/{id}/stats` — total / new / learning / mastered / due_now.
+- ✅ Frontend `/courses/:id/flashcards` (admin) — full preview + edit + bulk-save UI + saved-card list.
+- ✅ Frontend `/learn/:courseId/flashcards` — **swipeable primary + list secondary** (per user choice). Keyboard shortcuts: Space to flip, 1-5 to rate. Stats bar at top (Total, Due now, New, Learning, Mastered). Session-complete state.
+- ✅ Nav: `Sparkles` "Flashcards" button on `CourseEditPage`; "Practice flashcards" pill on the learner course sidebar.
+- ✅ **Fixed SQLite FK enforcement bug** — added `PRAGMA foreign_keys=ON` event hook in `core/database.py`. Belt-and-braces: explicit review cleanup in the DELETE endpoint too.
+- ✅ 11 new tests in `tests/test_iteration25.py` (5 pure SM-2 units + 6 endpoint/e2e). Also updated `tests/test_iteration22.py::test_authoring_status_admin_can_access` to expect `tutor_enabled=True, flashcards_enabled=True` (stale assertion from infra-only iter).
+- ✅ `feature_flags.deep_research_enabled` reflects `TAVILY_API_KEY` presence, `flashcards_enabled=True`, `tutor_enabled=True`.
+
+### Verification
+- Backend: **40/40 pytest** across `tests/test_iteration22.py + test_iteration23.py + test_iteration25.py`.
+- Frontend: verified via `testing_agent_v3_fork` iteration_16 — Deep research page renders, learner flow (flip → rate → session-done) works, admin flashcards-btn navigates correctly, learner `/learn/:id/flashcards` link works, learner correctly blocked from `/research` and `/courses/:id/flashcards` (redirects).
+
 ## What's been implemented (2026-06-29 — iteration 15)
 - ✅ **Outgoing webhooks (HMAC-SHA256 signed) — companion to iter14 SSO**. New `WebhookSubscription` + `WebhookDelivery` models (migration `d5f0a3bc7e91`). `services/webhook_service.py` exposes `sign(secret, body)`, `emit_event(db, org_id, event_type, payload)`, `drain_failed(db)`. Headers on every POST: `X-IFPI-Signature` (hex HMAC), `X-IFPI-Signature-Algorithm: HMAC-SHA256`, `X-IFPI-Event-Id` (UUID for receiver dedup), `X-IFPI-Event-Type`. Body is a stable envelope `{event_type, event_id, organization_id, occurred_at, data}`.
 - ✅ **Retry pipeline** — 3 attempts with backoff `[30s, 5min, 30min]` then `DEAD_LETTER`. New APScheduler tick `_webhook_retry_tick` runs every 30s draining FAILED rows whose `next_attempt_at` is due.
