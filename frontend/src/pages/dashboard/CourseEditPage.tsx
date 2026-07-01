@@ -161,6 +161,30 @@ export default function CourseEditPage() {
               className="inline-flex items-center gap-1.5 text-xs border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg px-3 py-1.5 font-medium">
               <Sparkles className="h-3.5 w-3.5" /> Flashcards
             </button>
+            <button onClick={() => nav(`/courses/${course.id}/mindmap`)} data-testid="mindmap-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-pink-300 text-pink-700 hover:bg-pink-50 rounded-lg px-3 py-1.5 font-medium">
+              <Sparkles className="h-3.5 w-3.5" /> Mind map
+            </button>
+            <a
+              href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+              onClick={(e) => {
+                // Attach auth token as query fallback isn't safe; fetch + blob download instead.
+                e.preventDefault()
+                const tok = localStorage.getItem('ifpi_access_token') || ''
+                api.get(`/authoring/pptx/${course.id}`, { responseType: 'blob' }).then(r => {
+                  const url = URL.createObjectURL(r.data)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `${course.title || 'course'}.pptx`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                }).catch(() => toast.error('PPTX export failed'))
+                void tok
+              }}
+              data-testid="pptx-download-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium cursor-pointer">
+              <Send className="h-3.5 w-3.5" /> PPTX
+            </a>
             {course.status === 'PUBLISHED' ? (
               <button onClick={unpublish} data-testid="unpublish-btn"
                 className="inline-flex items-center gap-1.5 text-xs border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg px-3 py-1.5 font-medium">

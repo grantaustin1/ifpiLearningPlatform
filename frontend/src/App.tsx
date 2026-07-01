@@ -26,6 +26,8 @@ import ApiTokensPage from 'pages/dashboard/ApiTokensPage'
 import ResearchPage from 'pages/dashboard/ResearchPage'
 import FlashcardsAuthoringPage from 'pages/dashboard/FlashcardsAuthoringPage'
 import LearnerFlashcardsPage from 'pages/learn/LearnerFlashcardsPage'
+import MindMapPage from 'pages/dashboard/MindMapPage'
+import PublicCatalogPage from 'pages/PublicCatalogPage'
 import PortalPage from 'pages/PortalPage'
 import LearningPathsPage from 'pages/dashboard/LearningPathsPage'
 import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
@@ -84,8 +86,12 @@ export default function App() {
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
         <Route path="/research" element={<Protected adminOnly><ResearchPage /></Protected>} />
         <Route path="/courses/:courseId/flashcards" element={<Protected adminOnly><FlashcardsAuthoringPage /></Protected>} />
+        <Route path="/courses/:courseId/mindmap" element={<Protected adminOnly><MindMapPage /></Protected>} />
       </Route>
 
+      <Route path="/public" element={<PublicCatalogPage />} />
+      <Route path="/verify" element={<PublicCatalogPage />} />
+      <Route path="/verify/:code" element={<PublicCatalogPage />} />
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
       <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />

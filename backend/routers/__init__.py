@@ -95,3 +95,11 @@ def register_all(app: FastAPI) -> None:
     # ── Iter 26b + 27a: Sora 2 video + Nano Banana infographics ─────
     from routers import authoring_media
     app.include_router(authoring_media.router)
+
+    # ── Iter 27b + 27c: Mind maps + PPTX export ─────────────────────
+    from routers import authoring_extras
+    app.include_router(authoring_extras.router)
+
+    # ── P3: Public catalog + cert verify ────────────────────────────
+    from routers import public_catalog
+    app.include_router(public_catalog.router)

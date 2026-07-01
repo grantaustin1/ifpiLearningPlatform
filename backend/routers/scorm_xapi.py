@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -170,6 +170,137 @@ def serve_scorm_file(
         pass
 
     return FileResponse(target)
+
+
+# ── SCORM runtime shim (Iter P2 backlog) ─────────────────────────────
+# A tiny JS payload that authored SCORM content can `<script src>` to get
+# a working `window.API` (SCORM 1.2) + `window.API_1484_11` (SCORM 2004)
+# without hardcoding our xAPI endpoint. Every SCORM API call is translated
+# to a POST /api/xapi/statements so the LMS records completion / score
+# without special hooks in the content.
+_SCORM_RUNTIME_JS = r"""// IFPI SCORM runtime shim v1
+// Provides window.API (SCORM 1.2) and window.API_1484_11 (SCORM 2004)
+// bridged to /api/xapi/statements. Auto-detects the LMS origin from the
+// enclosing iframe's location, so authored content doesn't hardcode URLs.
+(function () {
+  var LMS_ORIGIN = (function () {
+    try { return new URL(document.currentScript.src).origin; }
+    catch (_) { return window.location.origin; }
+  })();
+  var XAPI_URL = LMS_ORIGIN + '/api/xapi/statements';
+  var learner = { id: 'anonymous', name: 'Learner', mbox: null };
+  try {
+    var meta = document.querySelector('meta[name="ifpi-learner"]');
+    if (meta) learner = JSON.parse(meta.getAttribute('content'));
+  } catch (_) {}
+
+  function post(statement) {
+    try {
+      // No-await, fire-and-forget. Uses beacon so it survives page unload.
+      var body = JSON.stringify(statement);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(XAPI_URL, new Blob([body], { type: 'application/json' }));
+      } else {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', XAPI_URL, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(body);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function actor() {
+    return { name: learner.name, mbox: learner.mbox || undefined,
+             account: learner.mbox ? undefined : { homePage: LMS_ORIGIN, name: learner.id } };
+  }
+  function activity(id) { return { id: id || (LMS_ORIGIN + '/scorm/course'),
+                                    objectType: 'Activity' }; }
+
+  var VERBS = {
+    initialized: { id: 'http://adlnet.gov/expapi/verbs/initialized', display: { 'en-US': 'initialized' } },
+    completed:   { id: 'http://adlnet.gov/expapi/verbs/completed',   display: { 'en-US': 'completed' } },
+    passed:      { id: 'http://adlnet.gov/expapi/verbs/passed',      display: { 'en-US': 'passed' } },
+    failed:      { id: 'http://adlnet.gov/expapi/verbs/failed',      display: { 'en-US': 'failed' } },
+    experienced: { id: 'http://adlnet.gov/expapi/verbs/experienced', display: { 'en-US': 'experienced' } },
+    terminated:  { id: 'http://adlnet.gov/expapi/verbs/terminated',  display: { 'en-US': 'terminated' } },
+  };
+
+  // ── SCORM 1.2 (window.API) ──────────────────────────────────────
+  var scoreRaw = null;
+  var lessonStatus = 'not attempted';
+  window.API = {
+    LMSInitialize: function () {
+      post({ actor: actor(), verb: VERBS.initialized, object: activity() });
+      return 'true';
+    },
+    LMSFinish: function () {
+      post({ actor: actor(), verb: VERBS.terminated, object: activity() });
+      return 'true';
+    },
+    LMSGetValue: function (key) {
+      if (key === 'cmi.core.student_id') return learner.id;
+      if (key === 'cmi.core.student_name') return learner.name;
+      if (key === 'cmi.core.lesson_status') return lessonStatus;
+      return '';
+    },
+    LMSSetValue: function (key, value) {
+      if (key === 'cmi.core.score.raw') scoreRaw = parseFloat(value);
+      if (key === 'cmi.core.lesson_status') {
+        lessonStatus = value;
+        var verb = VERBS.experienced;
+        if (value === 'completed' || value === 'passed') verb = VERBS.passed;
+        else if (value === 'failed')                       verb = VERBS.failed;
+        var stmt = { actor: actor(), verb: verb, object: activity() };
+        if (scoreRaw != null && !isNaN(scoreRaw)) stmt.result = { score: { raw: scoreRaw } };
+        post(stmt);
+      }
+      return 'true';
+    },
+    LMSCommit: function () { return 'true'; },
+    LMSGetLastError: function () { return '0'; },
+    LMSGetErrorString: function () { return 'No error'; },
+    LMSGetDiagnostic: function () { return ''; },
+  };
+
+  // ── SCORM 2004 (window.API_1484_11) ─────────────────────────────
+  window.API_1484_11 = {
+    Initialize: function () { return window.API.LMSInitialize(); },
+    Terminate: function () { return window.API.LMSFinish(); },
+    GetValue: function (k) {
+      if (k === 'cmi.completion_status') return lessonStatus;
+      if (k === 'cmi.learner_id') return learner.id;
+      if (k === 'cmi.learner_name') return learner.name;
+      return '';
+    },
+    SetValue: function (k, v) {
+      if (k === 'cmi.score.raw') scoreRaw = parseFloat(v);
+      if (k === 'cmi.completion_status' || k === 'cmi.success_status') {
+        return window.API.LMSSetValue('cmi.core.lesson_status', v);
+      }
+      return 'true';
+    },
+    Commit: function () { return 'true'; },
+    GetLastError: function () { return '0'; },
+    GetErrorString: function () { return 'No error'; },
+    GetDiagnostic: function () { return ''; },
+  };
+})();
+"""
+
+
+@scorm_public_router.get("/runtime.js")
+def scorm_runtime_shim():
+    """Serve the IFPI SCORM runtime bridge as a static JS payload.
+
+    SCORM content can include this via
+    `<script src="/api/scorm/runtime.js"></script>` and immediately have
+    working `window.API` + `window.API_1484_11` bridged to our xAPI store.
+    """
+    return Response(
+        content=_SCORM_RUNTIME_JS,
+        media_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=600"},
+    )
 
 
 # ── xAPI statement receiver ──────────────────────────────────────────

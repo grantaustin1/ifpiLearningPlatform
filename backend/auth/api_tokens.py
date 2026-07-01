@@ -79,7 +79,13 @@ def authenticate_api_token(db: Session, plaintext: str) -> Optional[CurrentUser]
     if not org:
         return None
 
-    scopes = normalize_role_names(list(row.scopes or [])) or ["LEARNER"]
+    # Roles come out UPPER-cased; but permission scopes like `read:catalog`
+    # (contain a colon) are preserved verbatim so scope-aware endpoints can
+    # match on them directly.
+    raw = list(row.scopes or [])
+    scope_tokens = [s for s in raw if isinstance(s, str) and ":" in s]
+    role_tokens = normalize_role_names([s for s in raw if isinstance(s, str) and ":" not in s])
+    scopes = role_tokens + scope_tokens or ["LEARNER"]
 
     # Negative id distinguishes synthetic API-token principals from real users.
     return CurrentUser(

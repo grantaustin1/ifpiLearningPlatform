@@ -832,7 +832,27 @@ class AIUsageLedger(Base):
     created_at = Column(DateTime, default=_utcnow, nullable=False)
 
 
-# ── Flashcards (Iter 25 — AI-generated cards + SM-2 spaced repetition) ─
+# ── API token analytics (Iter P2 — 30-day request chart) ───────────
+class ApiTokenCall(Base):
+    """Every HTTP call authenticated with an API token is recorded here.
+    Aggregated per-day by the /tokens/analytics endpoint for the chart."""
+    __tablename__ = "api_token_calls"
+    __table_args__ = (
+        Index("ix_token_calls_token_day", "api_token_id", "created_at"),
+        Index("ix_token_calls_org_day", "organization_id", "created_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                              nullable=False, index=True)
+    api_token_id = Column(Integer, ForeignKey("api_tokens.id", ondelete="CASCADE"),
+                          nullable=False, index=True)
+    path = Column(String(300), nullable=False)      # request path, no query
+    method = Column(String(10), nullable=False)     # GET / POST / …
+    status_code = Column(Integer, nullable=False)
+    duration_ms = Column(Integer)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
 class Flashcard(Base):
     """One AI-generated flashcard. Belongs to a course (org-scoped via that
     course). `source_chunk_ids` records provenance so we can show citations
