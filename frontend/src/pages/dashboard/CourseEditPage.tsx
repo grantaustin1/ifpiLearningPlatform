@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 
@@ -9,6 +9,7 @@ const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 
 export default function CourseEditPage() {
   const { id } = useParams()
+  const nav = useNavigate()
   const [course, setCourse] = useState<any>(null)
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
@@ -155,6 +156,10 @@ export default function CourseEditPage() {
             <button onClick={save} disabled={saving} data-testid="save-course-btn"
               className="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">
               <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={() => nav(`/courses/${course.id}/flashcards`)} data-testid="flashcards-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg px-3 py-1.5 font-medium">
+              <Sparkles className="h-3.5 w-3.5" /> Flashcards
             </button>
             {course.status === 'PUBLISHED' ? (
               <button onClick={unpublish} data-testid="unpublish-btn"

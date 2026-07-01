@@ -82,3 +82,8 @@ def register_all(app: FastAPI) -> None:
     app.include_router(authoring.authoring_router)
     # ── Iter 23-24: source-grounded tutor + Tavily research ──────────
     app.include_router(authoring_tutor.router)
+
+    # ── Iter 25: AI flashcards (staff authoring + learner SM-2) ──────
+    from routers import flashcards
+    app.include_router(flashcards.authoring_router)
+    app.include_router(flashcards.learner_router)

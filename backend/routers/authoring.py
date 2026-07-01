@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin, requires_staff
+from core.config import settings
 from core.database import get_db
 from models import Organization
 from services import ai_budget_service
@@ -45,10 +46,11 @@ def authoring_status(
         },
         "budget": ai_budget_service.get_budget_status(db, current.organization_id),
         "feature_flags": {
-            # Iter 22 = infra only. Features flip on per-iteration.
-            "tutor_enabled": False,
-            "deep_research_enabled": False,
-            "flashcards_enabled": False,
+            # Iter 23 = tutor live; Iter 24 = research live (needs TAVILY_API_KEY);
+            # Iter 25 = flashcards live. Others flip on per-iteration.
+            "tutor_enabled": True,
+            "deep_research_enabled": bool(settings.tavily_api_key),
+            "flashcards_enabled": True,
             "video_overview_enabled": False,
             "tts_enabled": False,
             "visuals_enabled": False,

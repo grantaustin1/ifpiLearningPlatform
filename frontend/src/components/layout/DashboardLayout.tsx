@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -24,6 +24,7 @@ const ADMIN_NAV = [
   { href: '/audit',         label: 'Audit log',    icon: Shield },
   { href: '/webhooks',      label: 'Webhooks',     icon: Webhook },
   { href: '/imports',       label: 'Content imports', icon: FolderInput },
+  { href: '/research',      label: 'Deep research', icon: Sparkles },
   { href: '/tokens',        label: 'API tokens',   icon: KeyRound },
   { href: '/academies',     label: 'Academies',    icon: Building2 },
   { href: '/catalog',       label: 'Public Catalog', icon: Globe },

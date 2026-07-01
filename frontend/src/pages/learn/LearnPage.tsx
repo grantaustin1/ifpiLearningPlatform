@@ -50,6 +50,11 @@ export default function LearnPage() {
           <h2 className="font-semibold text-slate-900 text-sm">{course.title}</h2>
           <div className="mt-2 h-1.5 bg-slate-100 rounded-full"><div className="h-1.5 bg-indigo-600 rounded-full" style={{ width: `${progress}%` }} /></div>
           <p className="text-xs text-slate-500 mt-1">{Math.round(progress)}% complete</p>
+          <button onClick={() => nav(`/learn/${courseId}/flashcards`)}
+            data-testid="learn-flashcards-link"
+            className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg py-2">
+            ✨ Practice flashcards
+          </button>
         </div>
         <nav className="p-2">
           {course.slides.map((s: any, i: number) => (
