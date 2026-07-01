@@ -234,6 +234,24 @@ def test_cohort_webhook(body: WebhookTestIn, db: Session = Depends(get_db),
     if not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=422, detail="Webhook URL must start with http:// or https://")
 
+    # Prevent SSRF by resolving the hostname and rejecting private/loopback IPs.
+    try:
+        import ipaddress
+        import socket
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        resolved = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise HTTPException(status_code=422,
+                    detail="Webhook URL resolves to a private or reserved address")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=422, detail="Webhook URL hostname could not be resolved")
+
     provider = _detect_provider(url)
     sample_text = (
         f"🎉 *{o.name}* — Test celebration ping from IFPI Learning. "

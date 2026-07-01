@@ -60,7 +60,7 @@ def sanitize_course_html(raw: Optional[str]) -> str:
         logger.warning("bleach not installed — returning escaped fallback")
         # Last-resort: strip ALL tags so nothing dangerous lands in the DB.
         import re
-        return re.sub(r"<[^>]+>", "", raw)
+        return re.sub(r"<[^<>]+>", "", raw)
     return _bleach.clean(
         raw,
         tags=ALLOWED_TAGS,
@@ -76,5 +76,5 @@ def sanitize_plain_text(raw: Optional[str]) -> str:
         return ""
     if not _BLEACH:
         import re
-        return re.sub(r"<[^>]+>", "", raw).strip()
+        return re.sub(r"<[^<>]+>", "", raw).strip()
     return _bleach.clean(raw, tags=[], attributes={}, strip=True).strip()

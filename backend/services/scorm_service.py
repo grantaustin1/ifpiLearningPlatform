@@ -13,6 +13,7 @@ create the on-disk package + the Course/SlideVersion rows.
 """
 from __future__ import annotations
 
+import io
 import logging
 import re
 import shutil
@@ -28,6 +29,32 @@ logger = logging.getLogger("ifpi.scorm")
 # Common SCORM XML namespaces. We strip them on parse so XPath is simple.
 _NS_RE = re.compile(r"^\{[^}]+\}")
 
+# Maximum size for imsmanifest.xml to guard against resource exhaustion.
+_MAX_MANIFEST_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+class ScormParseError(Exception):
+    """Raised on invalid / unsupported SCORM package."""
+
+
+def _safe_parse_xml(path: Path) -> ET.ElementTree:
+    """Parse an XML file with protection against XML-bomb / entity-expansion attacks.
+
+    Strips DOCTYPE declarations before parsing so internal entity references
+    cannot be exploited to exhaust memory or CPU (CWE-776).
+    """
+    content = path.read_bytes()
+    if len(content) > _MAX_MANIFEST_BYTES:
+        raise ScormParseError("imsmanifest.xml exceeds size limit")
+    # Remove DOCTYPE sections (including internal subsets) to deny entity expansion.
+    content = re.sub(
+        rb"<!DOCTYPE\b[^[>]*(?:\[[^\]]*\])?\s*>",
+        b"",
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    return ET.parse(io.BytesIO(content))
+
 
 @dataclass
 class ParsedScorm:
@@ -36,10 +63,6 @@ class ParsedScorm:
     scorm_version: str              # "1.2" | "2004" | "unknown"
     extracted_dir: Path             # absolute path on disk where the package lives
     manifest_path: Path
-
-
-class ScormParseError(Exception):
-    """Raised on invalid / unsupported SCORM package."""
 
 
 def _strip_ns(tag: str) -> str:
@@ -66,7 +89,7 @@ def _detect_version(manifest_root: ET.Element) -> str:
 def parse_manifest(manifest_path: Path) -> tuple[str, str, str]:
     """Return (title, launch_href, scorm_version) from imsmanifest.xml."""
     try:
-        tree = ET.parse(manifest_path)
+        tree = _safe_parse_xml(manifest_path)
     except ET.ParseError as e:
         raise ScormParseError(f"Invalid imsmanifest.xml: {e}") from e
 
