@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from 'contexts/AuthContext'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -20,6 +20,9 @@ const ADMIN_NAV = [
   { href: '/billing',       label: 'Billing',      icon: CreditCard },
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
+  { href: '/webhooks',      label: 'Webhooks',     icon: Webhook },
+  { href: '/imports',       label: 'Content imports', icon: FolderInput },
+  { href: '/tokens',        label: 'API tokens',   icon: KeyRound },
   { href: '/academies',     label: 'Academies',    icon: Building2 },
   { href: '/catalog',       label: 'Public Catalog', icon: Globe },
 ]

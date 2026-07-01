@@ -1,17 +1,51 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from 'contexts/AuthContext'
-import { GraduationCap, Eye, EyeOff, ArrowRight, BookOpen, Award, Users } from 'lucide-react'
+import { api } from 'lib/api'
+import { GraduationCap, Eye, EyeOff, ArrowRight, BookOpen, Award, Users, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
   const nav = useNavigate()
-  const { login } = useAuth()
+  const { login, ssoExchange } = useAuth()
+  const [params] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [ssoEnabled, setSsoEnabled] = useState(false)
+  const [ssoInitiateUrl, setSsoInitiateUrl] = useState<string | null>(null)
+  const [ssoExchanging, setSsoExchanging] = useState(false)
+
+  // Probe SSO availability on mount
+  useEffect(() => {
+    api.get('/auth/sso-status', { validateStatus: (s) => s < 500 })
+      .then(r => {
+        if (r.status === 200) {
+          setSsoEnabled(!!r.data?.enabled)
+          setSsoInitiateUrl(r.data?.initiate_url || null)
+        }
+      })
+      .catch(() => { /* silent */ })
+  }, [])
+
+  // If we arrived back from ERP360 with ?erp_token=…, complete the exchange
+  useEffect(() => {
+    const erpToken = params.get('erp_token')
+    if (!erpToken) return
+    setSsoExchanging(true)
+    ssoExchange(erpToken)
+      .then(u => {
+        toast.success(`Signed in via ERP360 — welcome, ${u.name || u.email}`)
+        nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
+      })
+      .catch(err => {
+        setError(err?.response?.data?.detail || 'SSO exchange failed — please try logging in directly')
+        setSsoExchanging(false)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('')
@@ -22,6 +56,15 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Invalid email or password')
       setLoading(false)
+    }
+  }
+
+  const onSsoClick = () => {
+    if (ssoInitiateUrl) {
+      // Full redirect — ERP360 will bounce back with ?erp_token=…
+      window.location.href = ssoInitiateUrl
+    } else {
+      toast.error('ERP360 URL not configured — set ERP360_BASE_URL on the backend')
     }
   }
 
@@ -71,6 +114,28 @@ export default function LoginPage() {
             <div className="mb-5 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm" data-testid="login-error">
               {error}
             </div>
+          )}
+
+          {ssoExchanging && (
+            <div data-testid="sso-exchanging" className="mb-5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+              <span className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+              Completing ERP360 sign-in…
+            </div>
+          )}
+
+          {ssoEnabled && !ssoExchanging && (
+            <>
+              <button type="button" onClick={onSsoClick} data-testid="sso-login-button"
+                className="w-full mb-4 flex items-center justify-center gap-2 bg-white border border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/40 text-slate-800 font-semibold py-3 rounded-xl transition-all">
+                <Building2 className="h-4 w-4 text-indigo-600" />
+                Continue with ERP360
+              </button>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">or sign in directly</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+            </>
           )}
 
           <form onSubmit={onSubmit} className="space-y-4" data-testid="login-form">

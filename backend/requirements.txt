@@ -1,19 +1,21 @@
-# NOTE: `emergentintegrations` is intentionally omitted here because it is not
-# published on PyPI; AI services lazy-import it and return 503 if unavailable.
+# IFPI backend deps.
+# `emergentintegrations` is hosted on Emergent's private package index — add the
+# extra-index-url so pip can resolve it. Public PyPI is still searched first.
+--extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 alembic==1.14.0
 apscheduler==3.10.4
 bcrypt==4.2.1
+emergentintegrations==0.2.0
 fastapi==0.115.5
 httpx==0.28.0
 pillow==12.2.0
 psycopg2-binary==2.9.10
 pydantic-settings==2.6.1
 pydantic[email]==2.10.3
-python-dotenv==1.2.2
-python-jose[cryptography]==3.4.0
-python-multipart==0.0.31
+python-dotenv==1.0.1
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.18
 qrcode[pil]==8.0
 reportlab==4.2.5
-requests==2.33.0
 sqlalchemy==2.0.36
 uvicorn[standard]==0.32.1
