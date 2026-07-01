@@ -483,13 +483,13 @@ For each feature above, "shipped" means ALL of:
 
 ---
 
-## 8 · Open questions for the IFPI product owner
+## 8 · Product owner decisions (locked in Feb 2026)
 
-1. **Research API budget** — Tavily is ~$0.08/deep-search. Confirm which key IFPI will supply (Tavily is cheaper + faster than Perplexity for our use case).
-2. **Sora 2 monthly cap** — Sora is the most expensive line item (~$0.50/min of video). What's the org-level monthly cap you want to enforce?
-3. **Learner exposure of flashcards** — flashcards are learner-facing, but the *authoring* is staff-only. Confirm you want the learner-side auto-review scheduler (SM-2) or just static browse.
-4. **PPTX brand template** — do you have a `.pptx` master already? If yes, drop it at `/app/backend/assets/ifpi_brand_master.pptx` and we'll wire it in.
-5. **PII redaction scope** — should we redact learner data before it hits the LLM even when the author explicitly asks a question about a learner's progress? (Default: yes, replace with `<learner_1>` placeholders.)
+1. **Research API:** ✅ **Tavily** (~$0.08/deep-search, faster than Perplexity for our depth).
+2. **Video provider:** ✅ **Sora 2** via Emergent LLM Key. Per-org monthly cap: **to be set per tenant** — default $200 (~400 seconds of video/month).
+3. **Flashcards learner UX:** ✅ **Full SM-2 spaced-repetition** — daily due queue + 0-5 quality rating.
+4. **PPTX brand master:** No file supplied yet. Export will auto-derive brand from each org's existing `Organization.theme_json` (logo URL + primary/secondary hex colours). A real `.pptx` master can be dropped in later at `/app/backend/assets/{org_slug}_brand_master.pptx`.
+5. **PII redaction:** _pending confirmation — recommendation is redact-by-default with a per-question staff toggle._
 
 ---
 
