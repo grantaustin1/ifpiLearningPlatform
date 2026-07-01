@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 
-const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF']
+const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 
 export default function CourseEditPage() {
   const { id } = useParams()
@@ -17,6 +17,7 @@ export default function CourseEditPage() {
   const [prereqs, setPrereqs] = useState<any[]>([])
   const [allCourses, setAllCourses] = useState<any[]>([])
   const [showAddPrereq, setShowAddPrereq] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const load = useCallback(async () => {
     const [r, p, all] = await Promise.all([
@@ -174,11 +175,17 @@ export default function CourseEditPage() {
               <input value={activeSlide.title || ''} onChange={e => update(activeSlide.id, { title: e.target.value })}
                 placeholder="Slide title" data-testid="slide-title"
                 className="w-full text-xl font-semibold border-b border-slate-200 focus:border-indigo-400 focus:outline-none pb-1 bg-transparent" />
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap items-center">
                 {SLIDE_TYPES.map(t => (
                   <button key={t} onClick={() => update(activeSlide.id, { slide_type: t })}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium ${activeSlide.slide_type === t ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400' : 'bg-slate-100 text-slate-500'}`}>{t}</button>
                 ))}
+                {!activeSlide._local && (
+                  <button onClick={() => setShowHistory(true)} data-testid="slide-history-btn"
+                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    <History className="h-3 w-3" /> History
+                  </button>
+                )}
               </div>
               <textarea value={activeSlide.content || ''} onChange={e => update(activeSlide.id, { content: e.target.value })}
                 rows={14} data-testid="slide-content"
@@ -265,6 +272,79 @@ export default function CourseEditPage() {
           </div>
         </div>
       )}
+
+      {showHistory && activeSlide && (
+        <SlideHistoryModal
+          courseId={Number(id)} slideId={activeSlide.id}
+          onClose={() => setShowHistory(false)}
+          onRestored={async () => { setShowHistory(false); await load(); toast.success('Slide restored') }}
+        />
+      )}
+    </div>
+  )
+}
+
+function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
+  { courseId: number; slideId: number; onClose: () => void; onRestored: () => void }) {
+  const [versions, setVersions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [restoring, setRestoring] = useState<number | null>(null)
+
+  useEffect(() => {
+    api.get(`/courses/${courseId}/slides/${slideId}/versions`)
+      .then(r => setVersions(r.data.items))
+      .finally(() => setLoading(false))
+  }, [courseId, slideId])
+
+  const restore = async (n: number) => {
+    if (!window.confirm(`Restore this slide to version ${n}? Your current content will be saved as a new version first, so nothing is lost.`)) return
+    setRestoring(n)
+    try {
+      await api.post(`/courses/${courseId}/slides/${slideId}/versions/${n}/restore`)
+      onRestored()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Restore failed')
+    } finally { setRestoring(null) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="slide-history-modal">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900 flex items-center gap-2"><History className="h-4 w-4 text-indigo-600" /> Slide version history</h3>
+          <button onClick={onClose}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <p className="text-sm text-slate-400">Loading…</p>
+          ) : versions.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-6">No previous versions yet — versions are created automatically every time you save a change.</p>
+          ) : (
+            <ul className="space-y-2" data-testid="version-list">
+              {versions.map(v => (
+                <li key={v.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3"
+                    data-testid={`version-row-${v.version_number}`}>
+                  <div className="text-xs font-mono font-bold text-slate-400 w-8 mt-0.5">v{v.version_number}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{v.title || '(untitled)'}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {v.slide_type || '—'} · {v.change_summary || 'edit'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {v.created_at ? new Date(v.created_at).toLocaleString() : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => restore(v.version_number)} disabled={restoring === v.version_number}
+                    data-testid={`restore-v${v.version_number}`}
+                    className="inline-flex items-center gap-1 text-xs border border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2.5 py-1 rounded-lg disabled:opacity-50">
+                    <RotateCcw className="h-3 w-3" /> {restoring === v.version_number ? 'Restoring…' : 'Restore'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

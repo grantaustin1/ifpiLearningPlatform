@@ -47,6 +47,8 @@ def learner():
 
 # ── Alembic head and new columns ────────────────────────────────────
 def test_alembic_head_iteration4():
+    """Iter 4 migration must remain in the history. Later iterations push the
+    head forward — that's expected; we just verify our chain is intact."""
     import subprocess
     current = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode().strip()
     heads = subprocess.check_output(["alembic", "heads"], cwd=_BACKEND_DIR).decode()

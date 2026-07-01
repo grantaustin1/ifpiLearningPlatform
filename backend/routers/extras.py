@@ -174,12 +174,15 @@ def get_org(db: Session = Depends(get_db),
         "theme_preset": o.theme_preset,
         "cohort_threshold": o.cohort_threshold or 75,
         "cohort_celebration_webhook_url": o.cohort_celebration_webhook_url,
+        "cohort_digest_enabled": bool(o.cohort_digest_enabled) if o.cohort_digest_enabled is not None else True,
+        "cohort_digest_last_sent_at": o.cohort_digest_last_sent_at.isoformat() if o.cohort_digest_last_sent_at else None,
     }
 
 
 class CohortSettingsIn(BaseModel):
     cohort_threshold: int = Field(ge=1, le=100, default=75)
     cohort_celebration_webhook_url: Optional[str] = None
+    cohort_digest_enabled: Optional[bool] = None  # None = leave unchanged
 
 
 @org_router.put("/cohort-settings")
@@ -190,13 +193,99 @@ def update_cohort_settings(body: CohortSettingsIn, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="Organisation not found")
     o.cohort_threshold = body.cohort_threshold
     o.cohort_celebration_webhook_url = (body.cohort_celebration_webhook_url or "").strip() or None
+    if body.cohort_digest_enabled is not None:
+        o.cohort_digest_enabled = bool(body.cohort_digest_enabled)
     from services import audit_service
     audit_service.record(db, current, "COHORT_SETTINGS_UPDATED",
         target_type="organization", target_id=str(o.id),
         metadata={"threshold": body.cohort_threshold,
-                  "webhook": bool(o.cohort_celebration_webhook_url)})
+                  "webhook": bool(o.cohort_celebration_webhook_url),
+                  "digest_enabled": bool(o.cohort_digest_enabled)})
     db.commit()
     return {"ok": True}
+
+
+class WebhookTestIn(BaseModel):
+    webhook_url: str = Field(min_length=8, max_length=500)
+
+
+def _detect_provider(url: str) -> str:
+    u = (url or "").lower()
+    if "discord.com/api/webhooks" in u or "discordapp.com/api/webhooks" in u:
+        return "discord"
+    if "hooks.slack.com" in u:
+        return "slack"
+    return "generic"
+
+
+@org_router.post("/cohort-settings/test-webhook")
+def test_cohort_webhook(body: WebhookTestIn, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Send a sample celebration message to verify the configured webhook.
+
+    Returns the upstream HTTP status so the admin sees whether Discord/Slack
+    accepted the payload. Records an audit row either way.
+    """
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+
+    url = (body.webhook_url or "").strip()
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=422, detail="Webhook URL must start with http:// or https://")
+
+    provider = _detect_provider(url)
+    sample_text = (
+        f"🎉 *{o.name}* — Test celebration ping from IFPI Learning. "
+        f"If you can see this, your milestone webhook is wired correctly."
+    )
+    status_code: Optional[int] = None
+    ok = False
+    err: Optional[str] = None
+    try:
+        import requests as _r
+        resp = _r.post(url, json={
+            "text": sample_text,
+            "content": sample_text,
+            "username": "IFPI Learning",
+        }, timeout=8)
+        status_code = resp.status_code
+        ok = 200 <= resp.status_code < 300
+        if not ok:
+            err = (resp.text or "")[:300]
+    except Exception as e:  # network / DNS / timeout
+        err = f"{type(e).__name__}: {e}"[:300]
+
+    from services import audit_service
+    audit_service.record(db, current, "COHORT_WEBHOOK_TESTED",
+        target_type="organization", target_id=str(o.id),
+        metadata={"provider": provider, "status_code": status_code, "ok": ok,
+                  "error": err})
+    db.commit()
+    return {"ok": ok, "status_code": status_code, "provider": provider, "error": err}
+
+
+@org_router.post("/cohort-digest/send-now")
+def send_cohort_digest_now(db: Session = Depends(get_db),
+                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Manual trigger — queues the weekly cohort digest immediately for this
+    org. Unlike the scheduled job this ignores the 6-day dedupe window so an
+    admin can preview the email on demand.
+    """
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    from services.cohort_digest import send_digest_for_org, compute_org_digest
+    queued = send_digest_for_org(db, o, actor=current)
+    db.commit()
+    preview = compute_org_digest(db, o)
+    return {
+        "queued": queued,
+        "total_cohorts": preview["total_cohorts"],
+        "past": len(preview["past"]),
+        "nudge": len(preview["nudge"]),
+        "threshold": preview["threshold"],
+    }
 
 
 @org_router.get("/themes")

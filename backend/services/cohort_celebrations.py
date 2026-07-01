@@ -156,6 +156,14 @@ def check_cohorts(db: Session) -> int:
                              f"avg score {stats['avg_exam_score']}%, "
                              f"{stats['certificates']} certs)"),
                 })
+            # Outgoing event-bus webhook (separate from the Slack/Discord ping)
+            try:
+                from services.webhook_service import emit_safely
+                emit_safely(db, org.id, "cohort.milestone_reached", {
+                    "cohort": cohort, "threshold": threshold, **stats,
+                })
+            except Exception:
+                logger.exception("cohort.milestone_reached webhook emit failed")
             db.commit()
             fired += 1
             logger.info("Celebrated cohort %s/%s at %.1f%%", org.slug, cohort, stats["completion_rate"])

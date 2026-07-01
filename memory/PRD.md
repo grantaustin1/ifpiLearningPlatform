@@ -22,6 +22,36 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-06-29 — iteration 15)
+- ✅ **Outgoing webhooks (HMAC-SHA256 signed) — companion to iter14 SSO**. New `WebhookSubscription` + `WebhookDelivery` models (migration `d5f0a3bc7e91`). `services/webhook_service.py` exposes `sign(secret, body)`, `emit_event(db, org_id, event_type, payload)`, `drain_failed(db)`. Headers on every POST: `X-IFPI-Signature` (hex HMAC), `X-IFPI-Signature-Algorithm: HMAC-SHA256`, `X-IFPI-Event-Id` (UUID for receiver dedup), `X-IFPI-Event-Type`. Body is a stable envelope `{event_type, event_id, organization_id, occurred_at, data}`.
+- ✅ **Retry pipeline** — 3 attempts with backoff `[30s, 5min, 30min]` then `DEAD_LETTER`. New APScheduler tick `_webhook_retry_tick` runs every 30s draining FAILED rows whose `next_attempt_at` is due.
+- ✅ **Emit hooks wired**:
+  - `course.completed` + `certificate.issued` after successful `POST /api/courses/{id}/complete` (only when actually first-time — idempotent re-completes do NOT re-fire).
+  - `cohort.milestone_reached` after the cohort celebration audit + email + Slack/Discord ping.
+- ✅ **Admin CRUD** — `GET/POST/PUT/DELETE /api/admin/webhooks` + `POST /api/admin/webhooks/{id}/test` + `GET /api/admin/webhooks/{id}/deliveries`. Auto-generates a 32-byte URL-safe secret if not supplied. Writes `WEBHOOK_SUBSCRIPTION_CREATED/UPDATED/DELETED` and `WEBHOOK_TEST_FIRED` audit rows.
+- ✅ **Admin UI** — new `/webhooks` page in sidebar: list cards with pulse status dot, event-tag pills, masked secret with reveal/copy buttons, last-success/failure timestamps. Inline expandable delivery log per sub showing status pills (DELIVERED/FAILED/DEAD_LETTER), attempt count, error truncated. "Add subscription" modal with target URL, event toggles (or `*` wildcard), description, optional custom secret. Audit log gets cyan/sky/rose/violet pills for the new actions.
+- ✅ Tests: **iter15 9/9 PASS** — CRUD + LEARNER 403 + 5xx-marks-FAILED + HMAC signature deterministic-and-verifiable + envelope shape + event filter narrowing + E2E course completion fires `course.completed` to capture server. Regression: **77/77 across iter9-15**.
+
+## What's been implemented (2026-06-29 — iteration 14)
+- ✅ **ERP360 SSO drop-in (HS256, fully hardened)** — `/api/auth/sso-exchange` accepts an ERP360-minted JWT (`iss=erp360`, `aud=ifpi-lms`, `sub`, `email`, `iat`, `exp`, `jti`, `name`, `roles[]`, optional `person_id`). Verifies signature via `ERP360_SSO_SHARED_SECRET` (HS256). Hardening: required claims (`exp`/`iat`/`sub`), issuer check, audience check, `iat` freshness (max 5 min old), `jti` replay-prevention via in-memory TTL set.
+- ✅ **JIT provisioning** — first SSO login auto-creates the IFPI User + Person rows linked by `erp360_user_id` / `erp360_person_id`; subsequent logins idempotently reuse them. Role map: `OWNER/MANAGER/HEAD_OF_ADMIN→ADMIN`, `PLATFORM_ADMIN/SUPER_ADMIN→SUPER_ADMIN`, `TRAINER/HR_ADMIN→INSTRUCTOR`, `ACCOUNTANT/BILLING_USER→BILLING_VIEWER`, everyone else → `LEARNER`. (Bug fix: skip role-registry pre-normalisation so the ERP360-specific keys win.)
+- ✅ **Status endpoint** — `GET /api/auth/sso-status` (public) returns `{enabled, initiate_url}` so the login page conditionally renders a "Continue with ERP360" button. `initiate_url` composes ERP360's mint endpoint URL + return_to=/sso/return.
+- ✅ **Frontend SSO button** — LoginPage probes `/sso-status` on mount; when enabled shows pill button above the email/password form with "OR SIGN IN DIRECTLY" divider. URL param `?erp_token=…` auto-triggers `/sso-exchange` and lands on the right dashboard route based on role.
+- ✅ **Audit** — both `SSO_LOGIN_SUCCESS` (every exchange) and `SSO_USER_PROVISIONED` (first-time JIT) rows are written with IP + email + role metadata.
+- ✅ Tests: **iter14 12/12 PASS** — happy path, idempotent reuse, unknown role → LEARNER fallback, bad signature, wrong issuer, wrong audience, expired token, iat-too-old, missing jti, replay prevention, audit-row verification. Full regression: **68/68 across iter9-14**.
+
+## What's been implemented (2026-06-29 — iteration 13)
+- ✅ **Weekly cohort digest** — new APScheduler cron job (`Mon 09:00 UTC`) calls `services.cohort_digest.send_weekly_digests()`. For each org with `cohort_digest_enabled=True`, composes a single HTML email per admin bucketing cohorts into **past threshold / nudge zone (within 15pp) / early progress**. Nudge rows show "N more completions to celebrate". Idempotent — `cohort_digest_last_sent_at` + 6-day dedupe window guarantees ≤1 send/week even on misfire.
+- ✅ Migration `c4f9826dfe44` — adds `organizations.cohort_digest_enabled` (Boolean, default True) + `cohort_digest_last_sent_at` (DateTime nullable).
+- ✅ New endpoint `POST /api/organization/cohort-digest/send-now` (admin only) — manual trigger that bypasses dedupe so admins can preview. Returns `{queued, total_cohorts, past, nudge, threshold}`. Writes `COHORT_DIGEST_SENT` audit row.
+- ✅ PUT `/cohort-settings` now accepts optional `cohort_digest_enabled` (omitted = unchanged).
+- ✅ Frontend Settings → Cohort celebrations: new gradient "Weekly cohort digest" card with ON/OFF status pill, enabled checkbox, last-sent timestamp (`Last sent: Jun 29, 2026, 11:56 AM`), and "Send digest now" button. `COHORT_DIGEST_SENT` gets indigo pill in `/audit`.
+- ✅ Tests: **iter13 10/10 PASS**, iter12 7/7, iter11 14/14, iter10 14/14, iter9 11/11 — **56/56 across all iterations**. Updated iter9 alembic head test to accept new revision id.
+
+## What's been implemented (2026-02-08 — iteration 12)
+- ✅ **Cohort celebration webhook — "Send test ping" + provider auto-detect** — new `POST /api/organization/cohort-settings/test-webhook` endpoint sends a sample celebration payload (`{text, content, username}`) to the supplied URL, returns `{ok, status_code, provider, error}` so the UI surfaces the upstream response inline. Provider is auto-detected from URL (`discord` | `slack` | `generic`) and shown as a colored pill above the input. Inline result card renders green ✓ on 2xx, red ✗ with HTTP code + Discord/Slack error body on failure. Collapsible "Preview celebration message" panel shows what the message will look like before saving. Every test writes a `COHORT_WEBHOOK_TESTED` audit row (with provider + status_code metadata), surfaced with teal pill in `/audit`.
+- ✅ Tests: **iter12 7/7 PASS** (422 on bad URL, 403 for learner, network failure → ok=false structured response, Discord/Slack provider detection, audit row written). Regression: iter9/10/11 = 39/39 PASS.
+
 ## What's been implemented (2026-02-08 — iteration 11)
 - ✅ **AI quiz: regenerate one question** — per-card `RefreshCw` button calls `/ai-generate-questions` with `num_questions=1` + `avoid_topics=<all current question_texts>`. Replaces only that card; spin animation while pending; isolated update verified.
 - ✅ **AI quiz: TRUE_FALSE + SHORT_ANSWER + MIXED** — `_TYPE_RULES` dict in `ai_quiz_service.py` drives the LLM prompt; per-question `question_type` is preserved and validated (TRUE_FALSE coerces `True/T/Yes` → `True`, false-equivalents → `False`; SHORT_ANSWER forces `options=[]`; MIXED lets the model choose). Frontend renders type pill + format-aware preview (✓ option / Expected: …).
@@ -158,6 +188,73 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 ## Deliberately deferred (not forgotten)
 - ERP360 SSO bridge — opt-in via `SSO_ENABLED=true`. IFPI works standalone.
 - ERP360 webhook receiver — code at `/app/docs/ERP360_INTEGRATION.md`.
+
+## Iteration 21 — xAPI auto-completion, version sidebar, API tokens (Feb 2026)
+
+**xAPI → IFPI auto-completion (Iter 21a)**
+- When an xAPI statement arrives with `verb=completed` or `verb=passed` AND `object.id` resolves to a known course (via `ifpi://course/<id>` URI scheme OR by matching a SCORM package's `launch_url`), the learner's enrollment is marked COMPLETED and a Certificate row is issued — idempotent, returns full status in the response under `auto_complete`.
+- Resolver tries: explicit `ifpi://course/<id>` → SCORM package `launch_url` substring match.
+- Env flag `XAPI_AUTO_COMPLETE=false` to disable. Default ON because the resolver is conservative (no course id = no-op).
+- Live proof: created fresh course → POST xAPI with `ifpi://course/<id>` via API token → enrollment COMPLETED, cert created (`certificate_was_new=true`).
+
+**Slide version sidebar (Iter 21b)**
+- `CourseEditPage` now has a "History" pill next to slide-type buttons. Opens `SlideHistoryModal` that lists every version with timestamp + change-summary + "Restore" button.
+- Restore flow is idempotent: it snapshots the CURRENT state before restoring, so even a restore is undo-able.
+- Also added missing SCORM/AUDIO/PDF renderers in LearnPage and SCORM in the slide-type chip set.
+
+**API tokens (improvement)**
+- New `ApiToken` model + Alembic `b1c2d3e4f5a6`. Token format `ifpi_<8-char-prefix>_<24-char-secret>` (~45 chars).
+- `auth/api_tokens.py` mints via `secrets.token_urlsafe`; stores SHA-256 hash + plaintext prefix; verifies via the standard `Authorization: Bearer` header.
+- `auth/dependencies.get_current_user` routes any token starting with `ifpi_` past the JWT decoder to `authenticate_api_token`. Synthetic `CurrentUser` has negative id so it can't accidentally be confused with a real user row.
+- Endpoints: `GET /api/admin/api-tokens`, `POST /api/admin/api-tokens` (returns plaintext ONCE), `POST /{id}/revoke`, `DELETE /{id}`. Audit-logged.
+- Frontend `/tokens` admin page (NOT `/api-tokens` — that prefix collides with the ingress) — table of tokens + create modal + reveal-once modal with copy-to-clipboard.
+
+**Tests:** `tests/test_iteration21.py` + full Iter14-21 suite — **58 passing, 2 expected skips**.
+
+## Iteration 18-20 — SCORM/xAPI, Versioning, server.py refactor (Feb 2026)
+
+**Iter 18 — SCORM 1.2/2004 + xAPI receiver**
+- ✅ `services/scorm_service.py` — stdlib-only manifest parser (zipfile + xml.etree); path-traversal safe; version detection via `schemaversion` or xmlns sniff
+- ✅ Models: `ScormPackage`, `XApiStatement` + Alembic `a8b4c9d3e7f2`
+- ✅ `routers/scorm_xapi.py` — `POST /api/admin/scorm/upload`, `GET /api/admin/scorm`, `GET /api/scorm/files/<id>/<rel>` static server, `POST /api/xapi/statements`, `GET /api/xapi/statements`
+- ✅ New `SlideType.SCORM` enum + iframe renderer in `LearnPage` (also added missing AUDIO/PDF renderers)
+- ✅ Live e2e: uploaded SCORM 2004 zip → parsed manifest → course created → /api/scorm/files serves content
+
+**Iter 19 — Slide versioning + rich-text sanitizer endpoint**
+- ✅ `SlideVersion` model + Alembic migration (same `a8b4c9d3e7f2`)
+- ✅ `services/versioning_service.py` — `snapshot_slide`, `list_versions`, `restore_version` (restore itself records a new version, making it undo-able)
+- ✅ Hooked into `PATCH /api/courses/{cid}/slides/{sid}` — auto-snapshots ONLY on actual content change
+- ✅ Endpoints: `GET /versions`, `GET /versions/{n}`, `POST /versions/{n}/restore`
+- ✅ `POST /api/rich-text/sanitize` — bleach-backed preview helper for the editor
+
+**Iter 20 — server.py refactor**
+- ✅ New `routers/__init__.py` exports `register_all(app)` — groups all 26 routers by domain (Auth, Core LMS, Misc, Onboarding, Iter5, Iter6+, Webhooks, Imports, SCORM/xAPI)
+- ✅ `server.py` shrunk from 114 → 76 lines, single `register_all(app)` call
+- ✅ OpenAPI smoke test asserts every critical path is still mounted (no routes lost)
+
+**Improvement — ImportJob rollback**
+- ✅ `POST /api/admin/imports/{id}/rollback` — deletes every course/path the job created (uses captured `results.courses[].id`), marks job `ROLLED_BACK`, records audit entry
+- ✅ Frontend "Roll back" button on each completed/partial row + `window.confirm` guard + strike-through "ROLLED BACK" badge after the fact
+
+**Tests:** `tests/test_iteration18_20.py` + Iter14-17 regressions — **53/53 passing, 2 expected skips** (SSO disabled, no PENDING job to test rollback rejection path)
+
+## Iteration 17 — Foundations (Feb 2026)
+- ✅ Fixed stale alembic-head assertions in `test_iteration3/4.py` (now accept any head through Iter 17)
+- ✅ Multi-process SSO replay store — new `SsoJtiSeen` model + Alembic migration `f1a2b3c4d5e6_sso_jti_seen.py`; `sso_service._check_replay()` now commits to SQL (survives across worker pods / DB sessions, proven via cross-session unit test)
+- ✅ S3 storage backend already implemented (`services/storage_service.py`); added admin diagnostic `GET /api/admin/storage/info` with live write/exists/delete probe to make config flips visible
+- ✅ Drag-and-drop ZIP uploader on `/imports`:
+  - Backend: `POST /api/admin/imports/upload-zip` extracts safely to `/tmp/ifpi_import_staging/<uuid>/`, rejects path-traversal + non-zip + >200 MB, auto-unwraps single-root zips, then kicks off the same background importer
+  - Frontend: tabbed modal — "Upload .zip" (dropzone + Choose file) vs "Server path"
+- ✅ `tests/test_iteration17.py` — 7 passing, 1 skipped (full SSO handshake requires SSO_ENABLED=true on the running server)
+
+## Iteration 16 — Bulk Content Migration (Feb 2026)
+- ✅ `ImportJob` model + Alembic head `e7a3b9c4d816_import_jobs`
+- ✅ HTML sanitizer at `core/sanitizer.py` (bleach + plain-text helper)
+- ✅ Extended media uploads (video/audio/PDF) → `POST /api/uploads/media`, `/bulk-media`
+- ✅ Bulk migration script `scripts/bulk_import.py` + background runner
+- ✅ Endpoints `GET /api/admin/imports`, `/{id}`, `POST /run`
+- ✅ Frontend `pages/dashboard/ImportsPage.tsx` wired into `/imports` route + admin sidebar ("Content imports")
+- ✅ `tests/test_iteration16.py` — 14/14 passing
 
 ## Iteration 5 completed items (was backlog)
 - ✅ Discussion / comments on slides → `/api/slides/{id}/comments`, mounted on `LearnPage`.

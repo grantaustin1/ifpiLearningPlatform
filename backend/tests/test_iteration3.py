@@ -64,6 +64,8 @@ def second_course(admin):
 
 # ── Alembic & schema ──────────────────────────────────────────────────
 def test_alembic_head_is_iteration3():
+    """Iter 3 migration must remain in the history. Later iterations push the
+    head forward — that's expected; we just verify our migration is reachable."""
     import subprocess
     current = subprocess.check_output(["alembic", "current"], cwd=_BACKEND_DIR).decode().strip()
     heads = subprocess.check_output(["alembic", "heads"], cwd=_BACKEND_DIR).decode()
