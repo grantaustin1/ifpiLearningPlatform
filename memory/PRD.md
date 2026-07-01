@@ -22,6 +22,42 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-07-04 — iterations 27b + 27c + P2 + P3)
+
+### Iter 27b — Mind maps (P1 complete)
+- ✅ `services/mindmap_service.py` — LLM-driven extraction (1 root + N topics + 3 children/topic). Returns strict `{root, topics}` JSON with schema validation.
+- ✅ `POST /api/authoring/mindmap/{course_id}?max_topics=6` — staff-only; ~1¢ per generation.
+- ✅ Frontend `/courses/:id/mindmap` — **react-flow** (v11.11.4) with radial layout: indigo root centre, pink topic ring (R=260px), white sub-topic ring (R=130px). MiniMap + controls + regenerate button + topics dropdown (3/4/5/6/8/10/12).
+- ✅ `Mind map` button added to CourseEditPage next to Flashcards.
+
+### Iter 27c — PPTX export (P1 complete)
+- ✅ `services/pptx_export_service.py` — `python-pptx` renderer with 16:9 aspect + title slide + one content slide per course slide (HTML-stripped body, media URL annotation).
+- ✅ `GET /api/authoring/pptx/{course_id}` — staff-only; returns MP4-style Content-Disposition attachment.
+- ✅ Frontend "PPTX" button on CourseEditPage — uses `blob` responseType + programmatic click for auth-safe download.
+- ✅ `feature_flags.pptx_export_enabled` flipped True.
+
+### P2 — API token 30-day analytics
+- ✅ New model `ApiTokenCall` + migration `f6a7b8c9d0e1`. Middleware on `server.py::_api_token_call_logger` records one row per API-token-authenticated call (path, method, status, duration_ms).
+- ✅ `GET /api/admin/api-tokens/analytics/usage?days=30` — returns per-day series (with zero-fill), by-token breakdown, total_calls, total_errors.
+- ✅ Frontend inline SVG `UsageChart` (no chart-lib dep added) rendered above the tokens table. Red bars for days with errors.
+
+### P2 — SCORM runtime shim
+- ✅ `GET /api/scorm/runtime.js` — anonymous, served with 10-min cache. Provides `window.API` (SCORM 1.2) + `window.API_1484_11` (SCORM 2004) — both bridge to `POST /api/xapi/statements` via `navigator.sendBeacon` (survives unload). Auto-detects LMS origin from `document.currentScript.src` — no hardcoded URLs.
+
+### P3 — Public catalog + cert-verify + `read:catalog` scope
+- ✅ New scope-aware auth: `auth/api_tokens.py` now preserves any scope containing `:` (e.g. `read:catalog`) verbatim through `authenticate_api_token` and the create endpoint. Role tokens (LEARNER, ADMIN…) continue to be normalized uppercase.
+- ✅ `GET /api/public/catalog` — PUBLISHED courses only, no PII. Requires either a login session OR an API token with `read:catalog` scope (regular tokens get 403).
+- ✅ `GET /api/public/certificates/verify/{code}` — anonymous, returns `{holder_name, course_title, issued_at, score, type, organization_name}` (no email, no learner user_id).
+- ✅ Frontend `/public` + `/verify` + `/verify/:code` — unauthenticated page with two tabs (Catalog / Verify certificate). Catalog accepts an API token pasted into the UI; Verify accepts a certificate code.
+- ✅ `/tokens` CreateModal now shows `read:catalog` as a selectable scope.
+
+### Verification
+- Backend: **50/50 pytest** on new `tests/test_iteration28.py`, **63/63** across iter22-28 full recent surface.
+- `testing_agent_v3_fork` iteration_19 verified all UI flows live: /public + /verify, mind map, PPTX download, token analytics chart, scope-gated catalog. Zero critical/major issues.
+
+### Feature flags — every one is ON
+tutor · deep_research (Tavily) · flashcards · tts · video_overview (Sora 2) · visuals (Nano Banana) · pptx_export. The full AI Authoring Suite roadmap is functionally complete.
+
 ## What's been implemented (2026-07-03 — iterations 26b + 27a + streak-pill + stale-test cleanup)
 
 ### Iter 26b — Sora 2 video overviews (P1 complete)
