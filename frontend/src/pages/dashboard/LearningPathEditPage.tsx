@@ -23,7 +23,7 @@ export default function LearningPathEditPage() {
     setAllCourses(c.data)
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     setSaving(true)
