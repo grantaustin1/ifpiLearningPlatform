@@ -10,7 +10,7 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
-BACKEND_DIR = Path(__file__).resolve().parents[1]
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ── Shared fixtures ──────────────────────────────────────────────────
@@ -174,7 +174,7 @@ def test_academies_list_as_super_admin(admin_session):
     _require_super_admin(admin_session)
     r = admin_session.get(f"{API}/academies")
     if r.status_code == 403:
-        pytest.skip("seed admin lacks SUPER_ADMIN in this environment")
+        pytest.skip("admin seed user is not SUPER_ADMIN in this environment")
     assert r.status_code == 200, r.text
     rows = r.json()
     assert isinstance(rows, list)
@@ -192,7 +192,7 @@ def test_create_academy_queues_invitation(admin_session):
     slug = f"test-acad-{suffix}"
     email = f"TEST_acad_admin_{suffix}@example.com"
     import sys
-    sys.path.insert(0, str(BACKEND_DIR))
+    sys.path.insert(0, BACKEND_DIR)
     from core.database import SessionLocal
     from models import OutboxMessage
 
@@ -203,7 +203,7 @@ def test_create_academy_queues_invitation(admin_session):
         "admin_name": "Test Admin",
     })
     if r.status_code == 403:
-        pytest.skip("seed admin lacks SUPER_ADMIN in this environment")
+        pytest.skip("admin seed user is not SUPER_ADMIN in this environment")
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["slug"] == slug
@@ -239,7 +239,7 @@ def test_outbox_retry_and_worker_drains(admin_session):
     """Tests POST /api/admin/outbox/{id}/retry (resets FAILED→QUEUED) + worker drain."""
     # Find or force a FAILED row by manipulating DB directly
     import sys
-    sys.path.insert(0, str(BACKEND_DIR))
+    sys.path.insert(0, BACKEND_DIR)
     from core.database import SessionLocal
     from models import OutboxMessage
 

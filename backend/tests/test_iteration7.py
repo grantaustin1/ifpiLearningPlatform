@@ -106,7 +106,7 @@ class TestBadgeTiers:
     def test_reorder_changes_order_index(self, admin_client):
         tiers = admin_client.get(f"{BASE_URL}/api/badge-tiers").json()
         if len(tiers) < 2:
-            pytest.skip("need at least 2 badge tiers in this environment")
+            pytest.skip("Need at least two badge tiers to validate reorder")
         original = [t["id"] for t in tiers]
         reversed_ids = list(reversed(original))
         # include a cross-org/unknown id which should be silently ignored
@@ -260,7 +260,7 @@ class TestAcademySeedsTiers:
         if r.status_code == 404:
             pytest.skip("/api/academies create endpoint not present")
         if r.status_code == 403:
-            pytest.skip("seed admin lacks SUPER_ADMIN in this environment")
+            pytest.skip("admin seed user is not SUPER_ADMIN in this environment")
         assert r.status_code in (200, 201), r.text
         # Can't directly query other org's tiers (cross-org isolation), but we
         # can assert at minimum the response shape if available
