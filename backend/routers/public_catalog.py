@@ -28,9 +28,15 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user
 from core.database import get_db
 from models import Certificate, Course, CourseStatus, Organization, User
+from services import rate_limit_service
 
 
 router = APIRouter(prefix="/api/public", tags=["Public catalog"])
+
+# Anonymous /verify — 30 hits per IP per minute (shared across replicas
+# via Redis when available; per-process fallback otherwise).
+_VERIFY_MAX_REQUESTS = 30
+_VERIFY_WINDOW_SECS = 60.0
 
 
 def _client_ip(request: Request) -> str:
@@ -48,43 +54,22 @@ def _client_ip(request: Request) -> str:
     return getattr(request.client, "host", "0.0.0.0") or "0.0.0.0"
 
 
-# ── Simple in-memory sliding-window rate limiter ────────────────────
-# 30 requests / minute per IP for anonymous cert verify. Reset per
-# process — good enough since we're single-container behind ingress
-# and the endpoint's only threat model is enumeration bots.
-import threading
-import time
-from collections import deque, defaultdict
-
-_RATE_WINDOW_SECS = 60.0
-_RATE_MAX_REQUESTS = 30
-_rate_buckets: dict[str, deque] = defaultdict(deque)
-_rate_lock = threading.Lock()
-
-
 def _ratelimit(ip: str) -> None:
-    """Raise 429 if `ip` has exceeded RATE_MAX_REQUESTS in the last window."""
-    now = time.monotonic()
-    with _rate_lock:
-        bucket = _rate_buckets[ip]
-        while bucket and now - bucket[0] > _RATE_WINDOW_SECS:
-            bucket.popleft()
-        if len(bucket) >= _RATE_MAX_REQUESTS:
-            retry_after = int(_RATE_WINDOW_SECS - (now - bucket[0])) + 1
-            raise HTTPException(
-                status_code=429,
-                detail="Too many verification attempts — try again shortly",
-                headers={"Retry-After": str(retry_after)},
-            )
-        bucket.append(now)
+    """Raise 429 if `ip` has exceeded the anonymous verify budget."""
+    rate_limit_service.check(
+        f"verify:{ip}",
+        max_requests=_VERIFY_MAX_REQUESTS,
+        window_secs=_VERIFY_WINDOW_SECS,
+    )
 
 
 # ─── Anonymous certificate verify ────────────────────────────────────
 @router.get("/certificates/verify/{code}")
 def verify_certificate(code: str, request: Request, db: Session = Depends(get_db)):
-    """Anonymous verification. Rate-limited to 30/min per IP (in-memory
-    sliding window) so bots can't enumerate. Returns the minimum a
-    verifier needs — no PII beyond the holder's display name."""
+    """Anonymous verification. Rate-limited to 30/min per IP (Redis
+    sliding window shared across replicas; degrades to per-process
+    memory if Redis is down) so bots can't enumerate. Returns the
+    minimum a verifier needs — no PII beyond the holder's display name."""
     _ratelimit(_client_ip(request))
     code = (code or "").strip()
     if not code or len(code) < 4:

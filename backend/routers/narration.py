@@ -33,6 +33,52 @@ router = APIRouter(prefix="/api/authoring/narration", tags=["AI Authoring"])
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
+# OpenAI TTS languages (from api reference — auto-detected but we surface
+# a picker so admins can produce multi-lingual variants of the same slide).
+NARRATION_LANGUAGES = [
+    ("en", "English"),
+    ("es", "Spanish"),
+    ("fr", "French"),
+    ("de", "German"),
+    ("it", "Italian"),
+    ("pt", "Portuguese"),
+    ("nl", "Dutch"),
+    ("ja", "Japanese"),
+    ("ko", "Korean"),
+    ("zh", "Chinese"),
+    ("hi", "Hindi"),
+]
+_LANG_CODES = {code for code, _ in NARRATION_LANGUAGES}
+_LANG_NAMES = dict(NARRATION_LANGUAGES)
+
+
+async def _translate(text: str, target_lang_name: str) -> str:
+    """Translate `text` into `target_lang_name` using the emergent LLM key
+    (same provider as the tutor). Falls back to the original text on any
+    failure — we never want a broken translation to block narration.
+    """
+    from core.config import settings
+    if not settings.emergent_llm_key:
+        return text
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        import uuid
+        chat = LlmChat(
+            api_key=settings.emergent_llm_key,
+            session_id=f"translate-{uuid.uuid4().hex}",
+            system_message=(
+                "You are a professional translator. Reply with ONLY the "
+                "translated text — no notes, no quotes, no commentary."
+            ),
+        ).with_model(settings.ai_builder_provider, settings.ai_builder_model)
+        raw = await chat.send_message(UserMessage(
+            text=f"Translate the following into {target_lang_name}:\n\n{text}"
+        ))
+        out = (raw if isinstance(raw, str) else getattr(raw, "content", str(raw))).strip()
+        return out or text
+    except Exception:   # noqa: BLE001
+        return text
+
 
 def _plain_text(html_or_text: str) -> str:
     """Strip HTML tags for TTS — course slides may store rich text."""
@@ -55,6 +101,14 @@ class NarrationIn(BaseModel):
     voice: str = Field(default="nova", max_length=20)
     model: str = Field(default="tts-1", max_length=20)
     override_text: Optional[str] = Field(default=None, max_length=25000)
+    language: str = Field(default="en", max_length=5)         # Iter 30
+    translate_first: bool = False                              # Iter 30
+
+
+@router.get("/languages")
+def narration_languages():
+    """Static list of supported TTS languages — surfaced in the picker."""
+    return {"languages": [{"code": c, "name": n} for c, n in NARRATION_LANGUAGES]}
 
 
 @router.post("/generate")
@@ -80,6 +134,13 @@ async def generate_narration(
             status_code=400,
             detail="Slide has too little text to narrate (need at least 20 chars)",
         )
+
+    # ── Iter 30 · Multi-language ──────────────────────────────────
+    if body.language not in _LANG_CODES:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid language. Use one of {sorted(_LANG_CODES)}")
+    if body.translate_first and body.language != "en":
+        text = await _translate(text, _LANG_NAMES[body.language])
 
     # Budget pre-flight — narration billed per 1K chars
     est = tts_service.estimated_cost_cents(text, model=body.model)

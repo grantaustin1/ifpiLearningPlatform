@@ -90,6 +90,7 @@ class CourseSummary(BaseModel):
     slide_count: int = 0
     enrollment_count: int = 0
     created_at: datetime
+    mindmap_thumbnail_svg: Optional[str] = None  # Iter 30b
 
 
 class CourseDetail(CourseSummary):

@@ -7,6 +7,7 @@ Two related "course-shape" outputs in one router:
 from __future__ import annotations
 
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -116,6 +117,10 @@ class MindMapLayoutIn(BaseModel):
     without re-running the LLM."""
     graph: dict = Field(..., description="{root, topics} shape from the LLM")
     positions: dict = Field(..., description="{node_id: {x, y}}")
+    thumbnail_svg: Optional[str] = Field(
+        default=None, max_length=200_000,
+        description="Base64-encoded SVG snapshot for course card preview (Iter 30b)",
+    )
 
 
 @router.get("/mindmap/{course_id}/layout")
@@ -158,11 +163,16 @@ def save_mindmap_layout(
         "saved_by_id": current.id,
         "saved_at": datetime.now(timezone.utc).isoformat(),
     }
+    # Persist optional SVG thumbnail so course cards can render a small
+    # preview without re-running the LLM or reactflow (Iter 30b).
+    if body.thumbnail_svg:
+        meta["mindmap_thumbnail_svg"] = body.thumbnail_svg
     course.metadata_json = meta
     audit_service.record(
         db, current, "MINDMAP_LAYOUT_SAVED",
         target_type="course", target_id=str(course.id),
-        metadata={"node_count": len(body.positions)},
+        metadata={"node_count": len(body.positions),
+                  "has_thumbnail": bool(body.thumbnail_svg)},
     )
     db.commit()
     return {"ok": True, "saved_at": meta["mindmap_layout"]["saved_at"]}
@@ -182,6 +192,7 @@ def clear_mindmap_layout(
         raise HTTPException(status_code=404, detail="Course not found")
     meta = dict(course.metadata_json or {})
     meta.pop("mindmap_layout", None)
+    meta.pop("mindmap_thumbnail_svg", None)
     course.metadata_json = meta
     db.commit()
     return {"ok": True}

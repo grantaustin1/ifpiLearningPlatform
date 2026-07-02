@@ -107,8 +107,16 @@ export default function CoursesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(c => (
             <div key={c.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow" data-testid={`course-card-${c.id}`}>
-              <div className={`h-32 ${c.cover_color} flex items-end p-4`}>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${c.status === 'PUBLISHED' ? 'bg-white/20 text-white' : 'bg-black/20 text-white/80'}`}>
+              <div className={`h-32 ${c.cover_color} flex items-end p-4 relative overflow-hidden`}>
+                {isAdmin && c.mindmap_thumbnail_svg && (
+                  <img
+                    alt="Mind map preview"
+                    src={`data:image/svg+xml;base64,${c.mindmap_thumbnail_svg}`}
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity pointer-events-none"
+                    data-testid={`mindmap-thumb-${c.id}`}
+                  />
+                )}
+                <span className={`relative z-10 text-[10px] font-medium px-2 py-0.5 rounded-full ${c.status === 'PUBLISHED' ? 'bg-white/20 text-white' : 'bg-black/20 text-white/80'}`}>
                   {c.status}
                 </span>
               </div>
