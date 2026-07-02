@@ -70,7 +70,7 @@ def test_alembic_head_is_iteration3():
 
 def test_new_tables_exist():
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
     assert "invitations" in tables
@@ -95,7 +95,7 @@ def test_prereq_enforcement_412(admin, learner, second_course):
 
     # 2) Reset learner state: nuke any prior completions/enrollments via DB direct
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute("DELETE FROM enrollments WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org')")
     conn.commit()
     conn.close()
@@ -114,7 +114,7 @@ def test_prereq_cleared_after_completion(admin, learner, second_course):
     admin.post(f"{BASE_URL}/api/courses/1/prerequisites/{second_course}")
     # Reset learner enrollments
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute(
         "DELETE FROM enrollments WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org')"
     )
@@ -192,7 +192,7 @@ def test_invitation_accept_flow(admin):
     assert r.status_code == 200
     # Fetch token from DB (it's not returned over the API for security)
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     row = conn.execute(
         "SELECT token FROM invitations WHERE email=? AND accepted_at IS NULL AND revoked_at IS NULL "
         "ORDER BY id DESC LIMIT 1", (email,)
@@ -230,7 +230,7 @@ def test_cert_email_outbox_no_duplicate(admin, learner):
     learner.post(f"{BASE_URL}/api/courses/1/enroll")
     # Wipe completions to guarantee a fresh complete event
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute(
         "UPDATE enrollments SET completed_at=NULL, status='IN_PROGRESS' WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') AND course_id=1"
     )
@@ -277,7 +277,7 @@ def test_org_get_and_patch_logo(admin):
     assert g2["logo_url"] == "https://does-not-exist-9999.invalid/logo.png"
     # PDF should still work — find a cert for learner course 1
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     row = conn.execute(
         "SELECT id FROM certificates WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') LIMIT 1"
     ).fetchone()
