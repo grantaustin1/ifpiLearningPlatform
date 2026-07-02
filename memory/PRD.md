@@ -22,6 +22,30 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-07-02 — iteration 30b · P0 hardening → user QA)
+
+### 1 · Redis-backed rate limiter (shared across replicas)
+- ✅ New `services/rate_limit_service.py` — sorted-set sliding window in Redis with graceful in-memory fallback if `REDIS_URL` is unset or Redis is down. Public API: `check(key, max_requests, window_secs)` raises HTTPException(429) with `Retry-After`.
+- ✅ Redis is now managed by supervisor (`/etc/supervisor/conf.d/redis.conf`), auto-restart, port 6379, no persistence.
+- ✅ `REDIS_URL=redis://localhost:6379/0` added to `backend/.env`; `redis==8.0.1` frozen into `requirements.txt`.
+- ✅ `routers/public_catalog.py::_ratelimit` rewritten to delegate to the new service. Verified: 45 rapid-fire anonymous verify calls trigger 429 with valid Retry-After header, works from multi-pod replicas.
+
+### 2 · Clickable verify link inside PDF certs
+- ✅ `services/pdf_certificate_service.py` — added `c.linkURL()` overlay under the QR so PDFs now have a "Verify online →" clickable link annotation (embeds `/URI` in the raw PDF stream). Also renders the truncated URL as offline-readable text.
+- ✅ ReportLab-native — no extra deps. Cert file size grew from ~4.7 KB to ~5 KB.
+
+### 3 · Mind-map preview thumbnails on course cards
+- ✅ `MindMapPage.tsx::save()` now snapshots `.react-flow__viewport` SVG via `XMLSerializer`, base64-encodes it, sends as `thumbnail_svg` on the layout PUT (max 200 KB pydantic-enforced).
+- ✅ `routers/authoring_extras.py` — `MindMapLayoutIn.thumbnail_svg` optional field persists into `course.metadata_json.mindmap_thumbnail_svg`; DELETE clears both layout + thumbnail.
+- ✅ `schemas.CourseSummary` + `CourseDetail` now surface `mindmap_thumbnail_svg`.
+- ✅ `CoursesPage.tsx` — admin-only overlay renders the thumb as a full-bleed background on the card cover with a "Mind map" chip + dark gradient scrim for legibility. Testid `mindmap-thumb-{id}`.
+
+### 4 · Testing
+- ✅ New `tests/test_iteration30b.py` — mind-map thumbnail round-trip + oversize rejection + PDF /URI link annotation. 3/3 pass.
+- ✅ Testing subagent Iter 20 report: 23/23 backend tests + all critical frontend flows green. No regressions.
+
+---
+
 ## What's been implemented (2026-07-05 — iteration 28 · production hardening)
 
 ### 1 · Dedicated worker pool for long AI jobs
