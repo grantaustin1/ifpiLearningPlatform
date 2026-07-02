@@ -26,12 +26,14 @@ def _can_manage(user: CurrentUser) -> bool:
 
 
 def _summary(c: Course) -> CourseSummary:
+    meta = c.metadata_json or {}
     return CourseSummary(
         id=c.id, title=c.title, description=c.description, category=c.category,
         cover_color=c.cover_color, status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
         currency=c.currency, slide_count=len(c.slides),
         enrollment_count=len(c.enrollments), created_at=c.created_at,
+        mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
     )
 
 
@@ -78,6 +80,15 @@ def create_course(
     body: CourseCreate, db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
 ):
+    # Pre-flight duplicate check so we return 409 instead of a 500 from the
+    # DB unique constraint (uq_courses_org_title, Iter 25b).
+    dup = db.query(Course).filter(
+        Course.organization_id == current.organization_id,
+        Course.title == body.title,
+    ).first()
+    if dup:
+        raise HTTPException(status_code=409,
+                            detail=f'A course titled "{body.title}" already exists')
     course = Course(
         organization_id=current.organization_id,
         title=body.title, description=body.description, category=body.category,
@@ -93,6 +104,7 @@ def create_course(
 
 
 def _detail(c: Course) -> CourseDetail:
+    meta = c.metadata_json or {}
     return CourseDetail(
         id=c.id, title=c.title, description=c.description, category=c.category,
         cover_color=c.cover_color, status=c.status.value,
@@ -100,10 +112,12 @@ def _detail(c: Course) -> CourseDetail:
         currency=c.currency, passing_score=c.passing_score,
         slide_count=len(c.slides), enrollment_count=len(c.enrollments),
         created_at=c.created_at,
+        mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
         slides=[SlideOut(
             id=s.id, title=s.title, content=s.content or "",
             slide_type=s.slide_type.value, media_url=s.media_url,
             order_index=s.order_index, is_required=s.is_required,
+            narration_url=s.narration_url, narration_voice=s.narration_voice,
         ) for s in c.slides],
     )
 
@@ -244,6 +258,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         id=s.id, title=s.title, content=s.content or "",
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
+        narration_url=s.narration_url, narration_voice=s.narration_voice,
     )
 
 
@@ -260,6 +275,13 @@ def reorder_slides_early(course_id: int, body: dict, db: Session = Depends(get_d
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="slide_ids must be a list")
     slides = {s.id: s for s in c.slides}
+    # Two-pass update to satisfy the (course_id, order_index) UNIQUE
+    # constraint (Iter 25b): first move every affected row into a negative
+    # index (guaranteed non-colliding), then set the final positive index.
+    for i, sid in enumerate(ids, start=1):
+        if sid in slides:
+            slides[sid].order_index = -i
+    db.flush()
     for i, sid in enumerate(ids, start=1):
         if sid in slides:
             slides[sid].order_index = i
@@ -276,6 +298,14 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Slide not found")
+    # Iter 19 — snapshot the PREVIOUS state for rollback before mutating
+    from services.versioning_service import snapshot_slide
+    changed = (s.title != body.title or (s.content or "") != (body.content or "")
+               or s.media_url != body.media_url
+               or (body.slide_type in SlideType.__members__
+                   and s.slide_type != SlideType(body.slide_type)))
+    if changed:
+        snapshot_slide(db, s, changed_by_id=current.id, change_summary="Pre-edit snapshot")
     s.title = body.title
     s.content = body.content or ""
     s.media_url = body.media_url
@@ -290,7 +320,90 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         id=s.id, title=s.title, content=s.content or "",
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
+        narration_url=s.narration_url, narration_voice=s.narration_voice,
     )
+
+
+# ── Iter 19: Slide versioning endpoints ───────────────────────────────
+@router.get("/{course_id}/slides/{slide_id}/versions")
+def list_slide_versions(course_id: int, slide_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles(
+                            "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import list_versions
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    return {"items": list_versions(db, slide_id)}
+
+
+@router.get("/{course_id}/slides/{slide_id}/versions/{version_number}")
+def get_slide_version(course_id: int, slide_id: int, version_number: int,
+                      db: Session = Depends(get_db),
+                      current: CurrentUser = Depends(requires_roles(
+                          "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import get_version
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    v = get_version(db, slide_id, version_number)
+    if not v:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return {
+        "id": v.id, "version_number": v.version_number,
+        "title": v.title, "content": v.content,
+        "slide_type": v.slide_type, "media_url": v.media_url,
+        "change_summary": v.change_summary,
+        "changed_by_id": v.changed_by_id,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+
+
+@router.post("/{course_id}/slides/{slide_id}/versions/{version_number}/restore")
+def restore_slide_version(course_id: int, slide_id: int, version_number: int,
+                          db: Session = Depends(get_db),
+                          current: CurrentUser = Depends(requires_roles(
+                              "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    from services.versioning_service import get_version, restore_version
+    s = db.query(CourseSlide).join(Course).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    target = get_version(db, slide_id, version_number)
+    if not target:
+        raise HTTPException(status_code=404, detail="Version not found")
+    restore_version(db, s, target, changed_by_id=current.id)
+    db.commit()
+    db.refresh(s)
+    return {
+        "ok": True, "restored_to_version": version_number,
+        "slide": {"id": s.id, "title": s.title, "media_url": s.media_url,
+                  "slide_type": s.slide_type.value if s.slide_type else None},
+    }
+
+
+# ── Iter 19: Rich-text editor helper (separate prefix to avoid colliding
+# with `/api/courses/{course_id}` paths) ──────────────────────────────
+richtext_router = APIRouter(prefix="/api/rich-text", tags=["Rich Text"])
+
+
+@richtext_router.post("/sanitize")
+def sanitize_html_payload(body: dict,
+                          _current: CurrentUser = Depends(requires_roles(
+                              "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Server-side HTML sanitizer for the rich-text editor preview.
+    Strips dangerous tags/attrs while preserving formatting + media tags.
+    """
+    from core.sanitizer import sanitize_course_html
+    raw = body.get("html") or ""
+    return {"sanitized": sanitize_course_html(raw), "input_length": len(raw)}
 
 
 @router.delete("/{course_id}/slides/{slide_id}")
@@ -448,6 +561,25 @@ def complete_course(course_id: int, request: Request, db: Session = Depends(get_
             import logging
             logging.getLogger(__name__).warning("Cert email queue failed: %s", ex)
     db.commit()
+
+    # Outgoing webhooks — fire AFTER commit so the receiver never sees an
+    # event for a row that subsequently rolled back. emit_safely never raises.
+    from services.webhook_service import emit_safely
+    emit_safely(db, current.organization_id, "course.completed", {
+        "user_id": current.id, "user_email": current.email,
+        "erp360_user_id": getattr(current, "erp360_user_id", None),
+        "course_id": c.id, "course_title": c.title,
+        "completed_at": (e.completed_at or datetime.now(timezone.utc)).isoformat(),
+        "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges,
+    })
+    if cert_is_new:
+        emit_safely(db, current.organization_id, "certificate.issued", {
+            "user_id": current.id, "user_email": current.email,
+            "erp360_user_id": getattr(current, "erp360_user_id", None),
+            "course_id": c.id, "course_title": c.title,
+            "certificate_code": cert.code,
+            "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
+        })
     return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges}
 
 
