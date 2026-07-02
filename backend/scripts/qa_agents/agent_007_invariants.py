@@ -18,11 +18,12 @@ Invariants checked:
 - I-009  No Invitation that's both accepted_at and revoked_at populated
 
 Exit code 0 if clean, 1 if any violation found. JSON report written to
-/app/test_reports/agent_007.json for CI artefact upload.
+test_reports/agent_007.json (or AGENT_REPORT_DIR override) for CI artifact upload.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -36,6 +37,21 @@ from models import (  # noqa: E402
     AuditLog, BadgeTier, Certificate, Course, CourseStatus, Enrollment,
     Invitation, Organization, OutboxMessage, SlideComment, User,
 )
+
+
+def _report_path(name: str) -> Path:
+    report_dir = os.environ.get("AGENT_REPORT_DIR")
+    if report_dir:
+        candidate = Path(report_dir)
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            if os.access(candidate, os.W_OK):
+                return candidate / name
+        except OSError:
+            pass
+    fallback = Path(__file__).absolute().parents[3] / "test_reports"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback / name
 
 
 def main() -> int:
@@ -122,7 +138,8 @@ def main() -> int:
         "generated_at": now.isoformat(), "invariants_checked": 9,
         "violations": len(failures), "failures": failures,
     }
-    out = Path("/app/test_reports/agent_007.json")
+    _repo_root = Path(__file__).resolve().parents[3]
+    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_007.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str))
 

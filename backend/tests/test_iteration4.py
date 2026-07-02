@@ -51,7 +51,7 @@ def test_alembic_head_iteration4():
 
 def test_org_cert_branding_columns_exist():
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(organizations)")}
     conn.close()
     for c in ("cert_accent_color", "cert_signature_text",
@@ -214,7 +214,7 @@ def test_pdf_cert_with_branding_and_bad_color(admin, learner):
     learner.post(f"{BASE_URL}/api/courses/1/enroll")
     learner.post(f"{BASE_URL}/api/courses/1/complete")
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     row = conn.execute(
         "SELECT id FROM certificates WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') LIMIT 1"
     ).fetchone()
@@ -249,7 +249,7 @@ def test_outbox_worker_drains_queued(admin, learner):
     """
     # Wipe certificate so completion regenerates it
     import sqlite3
-    conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute(
         "UPDATE enrollments SET completed_at=NULL, status='IN_PROGRESS' "
         "WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') AND course_id=1"

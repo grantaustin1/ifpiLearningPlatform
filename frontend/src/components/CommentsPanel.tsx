@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
 import { MessageCircle, Send, Trash2 } from 'lucide-react'
