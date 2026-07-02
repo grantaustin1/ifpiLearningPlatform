@@ -12,8 +12,8 @@ export default function CommentsPanel({ slideId }: { slideId: number }) {
   const [posting, setPosting] = useState(false)
   const isMod = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
 
-  const load = useCallback(() => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data)), [slideId])
-  useEffect(() => { load() }, [load])
+  const load = () => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data))
+  useEffect(() => { load() }, [slideId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()

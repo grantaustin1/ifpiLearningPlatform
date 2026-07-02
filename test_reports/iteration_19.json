@@ -1,0 +1,28 @@
+{
+  "summary": "Iter 27b/27c/P2/P3 end-to-end verified. Backend pytest 16/16 green on test_iteration28.py, and full regression across iter22/23/25/26/27 passes 63/63 with PYTHONPATH=/app/backend. Frontend flows all confirmed live via Playwright on the preview URL: /public + /verify unauth pages, cert-verify with the seeded code returns valid-green result and junk code returns invalid, admin mind map at /courses/1/mindmap renders a react-flow radial graph (25 nodes, Regenerate + Topics dropdown + Back button work, toast 'Generated 6 topics'), CourseEditPage exposes mindmap-btn + green pptx-download-btn, PPTX download produced a valid 33KB .pptx (PK zip magic), /tokens shows the 30-day SVG usage chart with total_calls / total_errors indicators + Top tokens list, and the CreateModal SCOPE dropdown offers 'read:catalog'. Learner properly redirected away from /courses/1/mindmap (never reached /mindmap URL, no canvas rendered).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "MindMapPage", "issues": ["React Flow logs a warning 'parent container needs a width and a height' on initial mount before layout settles. Non-blocking (nodes still render), but could be silenced by setting explicit h/w on the ReactFlowProvider wrapper."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration28.py",
+    "/app/test_reports/pytest/iter28_results.xml",
+    "/app/test_reports/pytest/iter22to27_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Regression pytest suites (test_iteration22/23/25/26/27) require PYTHONPATH=/app/backend to run because they import 'services.*' directly. Consider adding a conftest.py at /app/backend/tests that inserts /app/backend into sys.path, or a pytest.ini rootdir setting, so future CI/testing agents don't hit ModuleNotFoundError. Not a functional bug, but a test-infra papercut."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@ifpi.org/admin123, learner@ifpi.org/learner123, seeded cert code d16204dd4b1e4de398c7350bc5daabc4 (verified valid)",
+  "seed_data_creation": "None - reused existing seeded course id=1, cert code, and admin/learner users. A handful of API tokens were minted by the analytics tests (TEST_/analytics test/no-scope test/catalog test) but they auto-expire in 1 day.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 5 new features (mindmap, pptx, token analytics, SCORM shim, public catalog + read:catalog scope) are working end-to-end. When running regression pytest, either cd into /app/backend or export PYTHONPATH=/app/backend so 'services.*' imports resolve. The mindmap endpoint hits a real LLM (~2-3s, ~$0.01/call) — avoid unnecessary re-runs.",
+  "rca of the issue": "N/A - no bugs found in this iteration."
+}
