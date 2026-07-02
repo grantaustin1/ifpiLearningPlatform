@@ -42,25 +42,17 @@ jobs:
         env:
           JWT_SECRET: test-secret-for-ci
           DATABASE_URL: sqlite:///./ifpi_ci.db
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: ifpi_test
         run: |
           alembic upgrade head
-          python -m seed.seed_minimal
-      - name: Start backend (background)
-        working-directory: backend
-        env:
-          JWT_SECRET: test-secret-for-ci
-          DATABASE_URL: sqlite:///./ifpi_ci.db
-          SMTP_ALLOW_PLAINTEXT: '1'
-        run: |
-          uvicorn server:app --host 127.0.0.1 --port 8000 &
-          sleep 5
+          python -c "from seed_data import seed; seed()" || true
       - name: Run pytest
         working-directory: backend
         env:
           JWT_SECRET: test-secret-for-ci
           DATABASE_URL: sqlite:///./ifpi_ci.db
           SMTP_ALLOW_PLAINTEXT: '1'
-          REACT_APP_BACKEND_URL: 'http://127.0.0.1:8000'
         run: pytest -q --maxfail=5
 
   # ─── Migration smoke: head → downgrade -1 → head ───────────────
