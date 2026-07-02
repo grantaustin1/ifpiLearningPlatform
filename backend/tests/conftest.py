@@ -16,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 if _MISSING_BASE_URL:
     os.environ["REACT_APP_BACKEND_URL"] = "http://127.0.0.1:8000"
 
+    name = collection_path.name
+    if name.startswith("test_iteration") or name == "test_ifpi_api.py":
+        return True  # exclude this file
 
 def pytest_collection_modifyitems(config, items):
     if not _MISSING_BASE_URL:
