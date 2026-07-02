@@ -2,6 +2,7 @@
 import os
 import uuid
 import time
+import importlib.util
 
 import pytest
 import requests
@@ -22,6 +23,9 @@ if not BASE_URL:
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
+AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
+    importlib.util.find_spec("emergentintegrations") is not None
+)
 
 
 def _ai_tests_enabled() -> bool:
@@ -217,12 +221,8 @@ class TestExams:
         answers = {str(q["id"]): q.get("correct_answer", "") for q in qs}
         rs = learner_session.post(f"{BASE_URL}/api/exams/1/attempts",
                                   json={"answers": answers}, timeout=15)
-        # Learner may have used all attempts on this seeded exam in prior
-        # test runs. If so, that's a valid product state — skip rather than
-        # fail. We already assert grading via other tests / test_iteration25.
-        if rs.status_code == 400 and "attempt" in rs.text.lower():
-            import pytest
-            pytest.skip("Learner has consumed all attempts for seeded exam")
+        if rs.status_code == 400 and "Maximum attempts reached" in rs.text:
+            pytest.skip("Exam attempts already exhausted in this environment")
         assert rs.status_code == 200, rs.text
         result = rs.json()
         assert "score" in result
@@ -317,6 +317,8 @@ class TestBilling:
 class TestAIBuilder:
     @pytest.mark.skipif(not _ai_tests_enabled(), reason="AI builder tests require EMERGENT_LLM_KEY and emergentintegrations")
     def test_ai_course_builder(self, admin_session):
+        if not AI_INTEGRATION_AVAILABLE:
+            pytest.skip("AI integration unavailable (EMERGENT_LLM_KEY and package required)")
         payload = {"topic": "Python basics", "num_slides": 3,
                    "include_quiz": True, "num_questions": 2}
         t0 = time.time()
