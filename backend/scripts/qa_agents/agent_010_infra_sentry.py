@@ -46,6 +46,21 @@ def check(name: str):
     return _decorator
 
 
+def _report_path(filename: str) -> Path:
+    report_dir = os.environ.get("AGENT_REPORT_DIR")
+    if report_dir:
+        candidate = Path(report_dir)
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            if os.access(candidate, os.W_OK):
+                return candidate / filename
+        except OSError:
+            pass
+    base = Path(__file__).absolute().parents[3] / "test_reports"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / filename
+
+
 @check("C-1 backend http healthcheck")
 def c1():
     import requests
