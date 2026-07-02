@@ -352,14 +352,21 @@ function SmtpSection({ inputCls }: { inputCls: string }) {
 function CohortSettingsSection({ inputCls }: { inputCls: string }) {
   const [threshold, setThreshold] = useState(75)
   const [webhook, setWebhook] = useState('')
+  const [digestEnabled, setDigestEnabled] = useState(true)
+  const [digestLastSent, setDigestLastSent] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [sendingDigest, setSendingDigest] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; status_code: number | null; provider: string; error: string | null } | null>(null)
 
-  useEffect(() => {
-    api.get('/organization').then(r => {
-      setThreshold(r.data.cohort_threshold || 75)
-      setWebhook(r.data.cohort_celebration_webhook_url || '')
-    })
-  }, [])
+  const loadOrg = () => api.get('/organization').then(r => {
+    setThreshold(r.data.cohort_threshold || 75)
+    setWebhook(r.data.cohort_celebration_webhook_url || '')
+    setDigestEnabled(r.data.cohort_digest_enabled !== false)
+    setDigestLastSent(r.data.cohort_digest_last_sent_at || null)
+  })
+
+  useEffect(() => { loadOrg() }, [])
 
   const save = async () => {
     setSaving(true)
@@ -367,28 +374,149 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
       await api.put('/organization/cohort-settings', {
         cohort_threshold: threshold,
         cohort_celebration_webhook_url: webhook.trim() || null,
+        cohort_digest_enabled: digestEnabled,
       })
       toast.success('Cohort settings saved')
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
     finally { setSaving(false) }
   }
 
+  const detectProvider = (url: string): 'discord' | 'slack' | 'generic' | 'none' => {
+    const u = (url || '').toLowerCase()
+    if (!u) return 'none'
+    if (u.includes('discord.com/api/webhooks') || u.includes('discordapp.com/api/webhooks')) return 'discord'
+    if (u.includes('hooks.slack.com')) return 'slack'
+    return 'generic'
+  }
+  const provider = detectProvider(webhook)
+  const providerBadge: Record<string, { label: string; cls: string }> = {
+    discord: { label: 'Discord', cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    slack:   { label: 'Slack',   cls: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
+    generic: { label: 'Custom',  cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+    none:    { label: 'None',    cls: 'bg-slate-50 text-slate-400 border-slate-200' },
+  }
+  const pb = providerBadge[provider]
+
+  const sendTestPing = async () => {
+    const url = webhook.trim()
+    if (!url) { toast.error('Paste a webhook URL first'); return }
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const r = await api.post('/organization/cohort-settings/test-webhook', { webhook_url: url })
+      setTestResult(r.data)
+      if (r.data.ok) toast.success(`Ping delivered (${r.data.provider} · ${r.data.status_code})`)
+      else toast.error(`Webhook responded ${r.data.status_code ?? 'no-status'} — see details below`)
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || 'Request failed'
+      setTestResult({ ok: false, status_code: null, provider, error: detail })
+      toast.error(detail)
+    } finally { setTesting(false) }
+  }
+
+  const sendDigestNow = async () => {
+    setSendingDigest(true)
+    try {
+      const r = await api.post('/organization/cohort-digest/send-now')
+      toast.success(`Digest queued to ${r.data.queued} admin${r.data.queued === 1 ? '' : 's'} — ${r.data.total_cohorts} cohort${r.data.total_cohorts === 1 ? '' : 's'} (${r.data.past} past · ${r.data.nudge} nudge)`)
+      await loadOrg()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Send failed')
+    } finally { setSendingDigest(false) }
+  }
+
+  const fmtLastSent = (iso: string | null): string => {
+    if (!iso) return 'never'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return 'never'
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  }
+
   return (
     <Section icon={Trophy} title="Cohort milestone celebrations" help="When a cohort hits this completion %, IFPI emails every admin + (optionally) pings a Discord/Slack channel. Idempotent — fires once per cohort.">
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Completion threshold: <span className="text-indigo-600">{threshold}%</span></label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Completion threshold: <span className="text-indigo-600" data-testid="cohort-threshold-value">{threshold}%</span></label>
           <input type="range" min={1} max={100} value={threshold} onChange={e => setThreshold(Number(e.target.value))}
             data-testid="cohort-threshold-slider"
             className="w-full accent-indigo-500" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Discord / Slack webhook (optional)</label>
-          <input value={webhook} onChange={e => setWebhook(e.target.value)} placeholder="https://discord.com/api/webhooks/… or https://hooks.slack.com/…"
-            data-testid="cohort-webhook"
-            className={`${inputCls} font-mono text-xs`} />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">Discord / Slack webhook (optional)</label>
+            <span data-testid="cohort-webhook-provider" className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${pb.cls}`}>{pb.label}</span>
+          </div>
+          <div className="flex gap-2">
+            <input value={webhook} onChange={e => { setWebhook(e.target.value); setTestResult(null) }} placeholder="https://discord.com/api/webhooks/… or https://hooks.slack.com/…"
+              data-testid="cohort-webhook"
+              className={`${inputCls} font-mono text-xs flex-1`} />
+            <button type="button" onClick={sendTestPing} disabled={testing || !webhook.trim()}
+              data-testid="cohort-webhook-test"
+              className="inline-flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-xs font-medium px-3 py-2 rounded-lg whitespace-nowrap">
+              <Send className="h-3.5 w-3.5" /> {testing ? 'Pinging…' : 'Send test ping'}
+            </button>
+          </div>
           <p className="text-[11px] text-slate-400 mt-1">Slack/Discord both accept the same payload — paste the incoming-webhook URL from your channel settings.</p>
+          {testResult && (
+            <div data-testid="cohort-webhook-test-result"
+              className={`mt-2 text-xs rounded-lg border px-3 py-2 ${testResult.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+              {testResult.ok ? (
+                <><Check className="inline h-3.5 w-3.5 mr-1" /> Delivered to <span className="font-semibold capitalize">{testResult.provider}</span> · HTTP {testResult.status_code}</>
+              ) : (
+                <>✗ Failed{testResult.status_code ? ` (HTTP ${testResult.status_code})` : ''}{testResult.error ? ` — ${testResult.error}` : ''}</>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Preview card — shows what the celebration message will look like */}
+        <details className="rounded-lg border border-slate-200 bg-slate-50/50 group" data-testid="cohort-preview-toggle">
+          <summary className="cursor-pointer select-none text-xs font-semibold text-slate-600 px-3 py-2 flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" /> Preview celebration message
+          </summary>
+          <div className="px-3 pb-3 pt-1" data-testid="cohort-preview-content">
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-[11px] text-slate-700 leading-relaxed">
+              🎉 <strong>Your Academy</strong> cohort <strong>Spring-2026</strong> hit <strong>{threshold}%</strong> completion!
+              <br />
+              <span className="text-slate-500">(24/30 enrolments, avg score 87.4%, 12 certs)</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1.5">Same payload sent to both Slack (`text`) and Discord (`content`) — works with either provider.</p>
+          </div>
+        </details>
+
+        {/* Weekly digest — predictive nudge */}
+        <div className="rounded-lg border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-white px-4 py-3" data-testid="cohort-digest-block">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-indigo-600" />
+                <span className="text-sm font-semibold text-slate-800">Weekly cohort digest</span>
+                <span data-testid="cohort-digest-status" className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${digestEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                  {digestEnabled ? 'ON' : 'OFF'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Every Monday 09:00 UTC, every admin gets a recap of cohorts past the threshold + a nudge for any within 15pp of it.
+                <br />
+                Last sent: <span className="font-mono text-slate-700" data-testid="cohort-digest-last-sent">{fmtLastSent(digestLastSent)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 items-end">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={digestEnabled} onChange={e => setDigestEnabled(e.target.checked)}
+                  data-testid="cohort-digest-toggle"
+                  className="rounded accent-indigo-500 h-4 w-4" />
+                <span className="text-xs font-medium text-slate-700">{digestEnabled ? 'Enabled' : 'Disabled'}</span>
+              </label>
+              <button type="button" onClick={sendDigestNow} disabled={sendingDigest}
+                data-testid="cohort-digest-send-now"
+                className="inline-flex items-center gap-1.5 border border-indigo-200 hover:bg-indigo-50 disabled:opacity-40 text-xs font-medium px-3 py-1.5 rounded-lg whitespace-nowrap text-indigo-700">
+                <Send className="h-3.5 w-3.5" /> {sendingDigest ? 'Sending…' : 'Send digest now'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-end">
           <button onClick={save} disabled={saving} data-testid="cohort-save"
             className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50">

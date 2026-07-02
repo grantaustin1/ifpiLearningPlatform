@@ -50,6 +50,11 @@ export default function LearnPage() {
           <h2 className="font-semibold text-slate-900 text-sm">{course.title}</h2>
           <div className="mt-2 h-1.5 bg-slate-100 rounded-full"><div className="h-1.5 bg-indigo-600 rounded-full" style={{ width: `${progress}%` }} /></div>
           <p className="text-xs text-slate-500 mt-1">{Math.round(progress)}% complete</p>
+          <button onClick={() => nav(`/learn/${courseId}/flashcards`)}
+            data-testid="learn-flashcards-link"
+            className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg py-2">
+            ✨ Practice flashcards
+          </button>
         </div>
         <nav className="p-2">
           {course.slides.map((s: any, i: number) => (
@@ -72,7 +77,18 @@ export default function LearnPage() {
               <h1 className="text-2xl font-bold text-slate-900 mb-6 font-display">{slide.title}</h1>
               {slide.slide_type === 'VIDEO' && slide.media_url && <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allowFullScreen title="video" /></div>}
               {slide.slide_type === 'IMAGE' && slide.media_url && <img src={slide.media_url} alt="" className="mb-6 rounded-xl w-full" />}
+              {slide.slide_type === 'AUDIO' && slide.media_url && <audio src={slide.media_url} controls className="w-full mb-6" />}
+              {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
+              {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
               {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: slide.content }} />}
+              {slide.narration_url && (
+                <div className="mt-6 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3" data-testid="learn-slide-narration">
+                  <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                    🔊 Narration {slide.narration_voice ? `· ${slide.narration_voice}` : ''}
+                  </span>
+                  <audio src={slide.narration_url} controls className="flex-1 h-9" />
+                </div>
+              )}
               <CommentsPanel slideId={slide.id} />
             </div>
           ) : (
