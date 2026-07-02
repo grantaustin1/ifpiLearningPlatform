@@ -103,12 +103,12 @@ class TestCohortCelebrationsIdempotency:
         from services.cohort_celebrations import check_cohorts
         db = SessionLocal()
         try:
-            fired_first = check_cohorts(db)
+            # Fresh seeds may not have an existing milestone audit yet, so
+            # first invocation may fire. Idempotency guarantee is that a
+            # consecutive invocation should not fire again.
+            check_cohorts(db)
             fired_second = check_cohorts(db)
-            assert fired_second == 0, (
-                f"Expected second consecutive run to be idempotent (0), got {fired_second} "
-                f"(first run fired {fired_first})"
-            )
+            assert fired_second == 0, f"Expected idempotent second run to be 0, got {fired_second}"
         finally:
             db.close()
 
