@@ -125,7 +125,15 @@ def c8():
 
 
 def main() -> int:
-    out = Path("/app/test_reports/agent_010.json")
+    env_dir = os.environ.get("QA_REPORT_DIR")
+    if env_dir:
+        out = Path(env_dir) / "agent_010.json"
+    else:
+        try:
+            Path("/app/test_reports").mkdir(parents=True, exist_ok=True)
+            out = Path("/app/test_reports/agent_010.json")
+        except (PermissionError, OSError):
+            out = Path(__file__).resolve().parents[3] / "test_reports" / "agent_010.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     failed = [r for r in RESULTS if not r["ok"]]
     out.write_text(json.dumps({

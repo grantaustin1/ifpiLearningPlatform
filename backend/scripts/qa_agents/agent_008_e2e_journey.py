@@ -60,7 +60,15 @@ def step(name: str, ok: bool, detail: str = "") -> None:
 
 
 def _write_report(ok: bool) -> None:
-    out = Path("/app/test_reports/agent_008.json")
+    env_dir = os.environ.get("QA_REPORT_DIR")
+    if env_dir:
+        out = Path(env_dir) / "agent_008.json"
+    else:
+        try:
+            Path("/app/test_reports").mkdir(parents=True, exist_ok=True)
+            out = Path("/app/test_reports/agent_008.json")
+        except (PermissionError, OSError):
+            out = Path(__file__).resolve().parents[3] / "test_reports" / "agent_008.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"ok": ok, "steps": LOG}, indent=2))
 
