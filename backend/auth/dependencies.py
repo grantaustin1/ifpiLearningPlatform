@@ -54,6 +54,15 @@ def get_current_user(
     token: str = Depends(extract_token),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
+    # Iter 21 — API token path. Tokens are prefixed `ifpi_` so we can route
+    # them past the JWT decoder without paying its CPU cost.
+    if token.startswith("ifpi_"):
+        from auth.api_tokens import authenticate_api_token
+        principal = authenticate_api_token(db, token)
+        if not principal:
+            raise HTTPException(status_code=401, detail="Invalid API token")
+        return principal
+
     try:
         payload = decode_token(token)
     except JWTError:
@@ -93,3 +102,19 @@ def requires_roles(*allowed: str):
         return current_user
 
     return _check
+
+
+
+# ── Iter 22 — semantic gate for the AI authoring suite ─────────────────
+# Every /api/authoring/* endpoint MUST use `requires_staff()` (not
+# requires_roles directly) so the intent is scannable and future role
+# additions land in one place.
+def requires_staff():
+    """IFPI staff-only gate: INSTRUCTOR + ADMIN + SUPER_ADMIN. Learners get 403."""
+    return requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")
+
+
+def requires_admin():
+    """Stricter gate — ADMIN + SUPER_ADMIN only. Used for PII-redaction toggle
+    and other high-impact operations."""
+    return requires_roles("ADMIN", "SUPER_ADMIN")
