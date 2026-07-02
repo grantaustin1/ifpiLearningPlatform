@@ -1,4 +1,5 @@
 # IFPI Learning Platform — Product Requirements & Status
+<!-- lockfile-sync: 2026-07-02 -->
 
 ## Original problem statement (verbatim)
 > "Build IFPI as a sibling app that is pre-made to 'drop into' ERP360 at a later stage and borrow all patterns, reuse APIs if this can be done and won't affect ERP360 now with an easy method to bolt it onto ERP360 when we are ready to do so."
