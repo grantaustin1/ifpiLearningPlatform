@@ -2,6 +2,7 @@
 import os
 import uuid
 import time
+import importlib.util
 
 import pytest
 import requests
@@ -16,6 +17,9 @@ if not BASE_URL:
                     BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
     except Exception:
         pass
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests",
+                allow_module_level=True)
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
@@ -304,9 +308,12 @@ class TestBilling:
 
 
 # ── AI builder ──────────────────────────────────────────────────────
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIBuilder:
     @pytest.mark.skipif(not HAS_EMERGENT_LLM_KEY, reason="EMERGENT_LLM_KEY is required for AI builder tests")
     def test_ai_course_builder(self, admin_session):
+        if not AI_INTEGRATION_AVAILABLE:
+            pytest.skip("AI integration unavailable (EMERGENT_LLM_KEY and package required)")
         payload = {"topic": "Python basics", "num_slides": 3,
                    "include_quiz": True, "num_questions": 2}
         t0 = time.time()

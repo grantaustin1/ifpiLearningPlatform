@@ -8,6 +8,7 @@
 import os
 import subprocess
 import sys
+import importlib.util
 import pytest
 import requests
 
