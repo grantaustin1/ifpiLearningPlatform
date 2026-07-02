@@ -10,7 +10,9 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-assert BASE_URL, "REACT_APP_BACKEND_URL required"
+if not BASE_URL:
+    import pytest
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests", allow_module_level=True)
 
 
 def _login(email: str, password: str) -> requests.Session:

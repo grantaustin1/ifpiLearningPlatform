@@ -9,10 +9,16 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    with open("/app/frontend/.env") as f:
-        for line in f:
-            if line.startswith("REACT_APP_BACKEND_URL="):
-                BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+    try:
+        with open("/app/frontend/.env") as f:
+            for line in f:
+                if line.startswith("REACT_APP_BACKEND_URL="):
+                    BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+    except FileNotFoundError:
+        pass
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests",
+                allow_module_level=True)
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
