@@ -49,6 +49,8 @@ class SlideIn(BaseModel):
 class SlideOut(SlideIn):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    narration_url: Optional[str] = None
+    narration_voice: Optional[str] = None
 
 
 class CourseCreate(BaseModel):
@@ -88,6 +90,7 @@ class CourseSummary(BaseModel):
     slide_count: int = 0
     enrollment_count: int = 0
     created_at: datetime
+    mindmap_thumbnail_svg: Optional[str] = None  # Iter 30b
 
 
 class CourseDetail(CourseSummary):
