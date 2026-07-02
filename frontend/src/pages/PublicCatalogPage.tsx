@@ -63,7 +63,7 @@ function CatalogTab() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveToken = () => {
     localStorage.setItem('ifpi_public_token', tokenInput)
@@ -144,7 +144,7 @@ function VerifyTab() {
     } finally { setBusy(false) }
   }
 
-  useEffect(() => { if (initialCode) verify() /* eslint-disable-next-line */ }, [])
+  useEffect(() => { if (initialCode) verify() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

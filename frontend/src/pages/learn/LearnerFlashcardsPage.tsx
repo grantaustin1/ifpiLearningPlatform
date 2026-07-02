@@ -64,7 +64,7 @@ export default function LearnerFlashcardsPage() {
       setI(0); setFlipped(false)
     } finally { setLoading(false) }
   }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [cid])
+  useEffect(() => { load() }, [cid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const current = cards[i]
   const done = !loading && cards.length > 0 && i >= cards.length

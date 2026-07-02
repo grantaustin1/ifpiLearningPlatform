@@ -32,7 +32,7 @@ export default function CourseEditPage() {
     setPrereqs(p.data)
     setAllCourses(all.data)
   }
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!course) return

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
-import { Sparkles, Loader2, Plus, Trash2, Save, ArrowLeft, Wand2 } from 'lucide-react'
+import { Sparkles, Loader2, Trash2, Save, ArrowLeft, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Card {
@@ -40,7 +40,7 @@ export default function FlashcardsAuthoringPage() {
       setExisting(r.data.items)
     } catch { setExisting([]) }
   }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [cid])
+  useEffect(() => { load() }, [cid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const generate = async () => {
     setGenerating(true)
