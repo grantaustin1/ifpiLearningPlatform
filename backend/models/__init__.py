@@ -46,6 +46,7 @@ class SlideType(str, enum.Enum):
     AUDIO = "AUDIO"
     IMAGE = "IMAGE"
     PDF = "PDF"
+    SCORM = "SCORM"  # SCORM 1.2 / 2004 package launched via iframe
 
 
 class QuestionType(str, enum.Enum):
@@ -96,6 +97,9 @@ class Organization(Base):
     cert_signature_image_url = Column(String(500))       # signature PNG/SVG
     cert_footer_text = Column(Text)                      # disclaimer / contact line
     theme_preset = Column(String(40))                    # nullable — e.g. "conservatoire" | "music_school"
+    # AI authoring budget (Iter 22 — see docs/AI_AUTHORING_SUITE_ROADMAP.md).
+    # Enforced by services/ai_budget_service before every LLM/media dispatch.
+    ai_monthly_budget_cents = Column(Integer, default=20000, nullable=False)  # default $200 (Sora cap)
     # Per-tenant SMTP override (nullable — when populated, outbox worker
     # dispatches via this server instead of falling back to the global stub
     # / ERP360 bridge). smtp_password_enc is encrypted at rest with Fernet.
@@ -109,6 +113,10 @@ class Organization(Base):
     # Cohort milestone celebrations (per-tenant tuneable)
     cohort_threshold = Column(Integer, default=75)         # % completion required to fire
     cohort_celebration_webhook_url = Column(Text)          # optional Discord/Slack URL
+    # Weekly cohort digest (Monday 09:00 UTC) — predictive nudge for cohorts
+    # approaching the threshold + recap of those past it.
+    cohort_digest_enabled = Column(Boolean, default=True, nullable=False)
+    cohort_digest_last_sent_at = Column(DateTime)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -176,7 +184,10 @@ class RefreshToken(Base):
 # ── Course & slides ──────────────────────────────────────────────────
 class Course(Base):
     __tablename__ = "courses"
-    __table_args__ = (Index("ix_courses_org_status", "organization_id", "status"),)
+    __table_args__ = (
+        Index("ix_courses_org_status", "organization_id", "status"),
+        UniqueConstraint("organization_id", "title", name="uq_courses_org_title"),
+    )
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     title = Column(String(200), nullable=False)
@@ -190,6 +201,7 @@ class Course(Base):
     price_cents = Column(Integer, default=0)            # 0 = free
     currency = Column(String(3), default="ZAR")
     display_order = Column(Integer, default=0, index=True)  # catalog ordering
+    metadata_json = Column(JSON)                              # {mindmap_layout, ...}
     created_by_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -202,12 +214,17 @@ class Course(Base):
 
 class CourseSlide(Base):
     __tablename__ = "course_slides"
+    __table_args__ = (
+        UniqueConstraint("course_id", "order_index", name="uq_course_slides_order"),
+    )
     id = Column(Integer, primary_key=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     title = Column(String(200), nullable=False)
     content = Column(Text)
     slide_type = Column(SQLEnum(SlideType), default=SlideType.TEXT)
     media_url = Column(String(500))
+    narration_url = Column(String(500))       # cached TTS narration (Iter 26)
+    narration_voice = Column(String(30))       # last-used voice — for re-runs
     order_index = Column(Integer, default=0)
     is_required = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)
@@ -567,3 +584,319 @@ class AuditLog(Base):
     audit_metadata = Column(JSON)
     ip_address = Column(String(45))
     created_at = Column(DateTime, default=_utcnow, index=True)
+
+
+# ── Outgoing webhooks (HMAC-signed events to ERP360 et al.) ──────────
+class WebhookSubscription(Base):
+    """A target URL that receives HMAC-signed event POSTs.
+
+    `events` is a JSON list of event_type strings (or `["*"]` for all).
+    `secret` is shared with the receiver — they reproduce the HMAC-SHA256
+    of the raw request body using this secret and reject mismatches.
+    """
+    __tablename__ = "webhook_subscriptions"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    target_url = Column(String(500), nullable=False)
+    secret = Column(String(120), nullable=False)
+    events = Column(Text, nullable=False)  # JSON list
+    description = Column(String(200))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    last_success_at = Column(DateTime)
+    last_failure_at = Column(DateTime)
+
+
+class WebhookDelivery(Base):
+    """One row per dispatch attempt. Used for retries + audit + UI inspection."""
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (Index("ix_webhook_deliveries_next", "next_attempt_at"),)
+    id = Column(Integer, primary_key=True)
+    subscription_id = Column(Integer, ForeignKey("webhook_subscriptions.id"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    event_type = Column(String(80), nullable=False, index=True)
+    event_id = Column(String(80), nullable=False)  # uuid for receiver-side dedup
+    payload = Column(Text, nullable=False)
+    signature = Column(String(80), nullable=False)
+    status = Column(String(20), nullable=False, default="QUEUED")
+    status_code = Column(Integer)
+    attempt_count = Column(Integer, default=0, nullable=False)
+    error = Column(Text)
+    next_attempt_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    delivered_at = Column(DateTime)
+
+
+# ── Bulk import jobs (tracks long-running content migrations) ────────
+class ImportJob(Base):
+    """Status row for one bulk content import. Workers UPDATE this as they
+    progress so the admin UI can poll for live progress + error reports."""
+    __tablename__ = "import_jobs"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    job_type = Column(String(50), nullable=False)  # BULK_COURSE | FULL_MIGRATION
+    source_path = Column(String(500))
+    status = Column(String(20), nullable=False, default="PENDING", index=True)
+    # PENDING → RUNNING → COMPLETED | FAILED | PARTIAL
+    total_items = Column(Integer, default=0, nullable=False)
+    processed_items = Column(Integer, default=0, nullable=False)
+    failed_items = Column(Integer, default=0, nullable=False)
+    results = Column(JSON)        # {courses:[…], exams:[…], errors:[…]}
+    error_log = Column(Text)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── SSO replay protection (multi-process safe) ───────────────────────
+class SsoJtiSeen(Base):
+    """One row per inbound SSO token jti we've seen. Replaces the in-memory
+    `_SEEN_JTI` dict so replay protection works across multiple FastAPI
+    workers / pods. A small background sweeper purges rows older than the
+    replay TTL (10 min by default)."""
+    __tablename__ = "sso_jti_seen"
+    __table_args__ = (Index("ix_sso_jti_seen_at", "seen_at"),)
+    jti = Column(String(120), primary_key=True)
+    seen_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── SCORM packages (Iter 18) ─────────────────────────────────────────
+class ScormPackage(Base):
+    """One row per uploaded SCORM package. The actual ZIP contents are
+    extracted to disk under STORAGE_PATH/scorm/<org>/<uuid>/ and served as
+    static files. `launch_url` is the public URL of the entry HTML.
+
+    Linked to a Course (1—1) so a course can launch a SCORM payload as a
+    slide alongside normal TEXT/VIDEO slides.
+    """
+    __tablename__ = "scorm_packages"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"), nullable=True, index=True)
+    manifest_title = Column(String(300))
+    launch_url = Column(String(800), nullable=False)
+    scorm_version = Column(String(16))           # "1.2" | "2004" | "unknown"
+    package_dir = Column(String(800), nullable=False)  # absolute or storage key root
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"))
+    uploaded_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class XApiStatement(Base):
+    """xAPI (Tin Can) statement receiver — stores incoming statements for
+    audit + completion-tracking. Minimal viable LRS: we store the raw
+    statement JSON and surface common fields for indexing.
+    """
+    __tablename__ = "xapi_statements"
+    __table_args__ = (
+        Index("ix_xapi_org_user_stored", "organization_id", "user_id", "stored_at"),
+        Index("ix_xapi_verb_stored", "verb", "stored_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_email = Column(String(200), index=True)
+    verb = Column(String(120), nullable=False)    # e.g. "http://adlnet.gov/expapi/verbs/completed"
+    object_id = Column(String(500))               # iri of the activity
+    result = Column(JSON)                          # {score, success, completion, …}
+    raw = Column(JSON, nullable=False)            # full original statement
+    stored_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── Slide versioning (Iter 19) ───────────────────────────────────────
+class SlideVersion(Base):
+    """Immutable snapshot of a CourseSlide at the moment of save. Created on
+    every content/title/media_url change so admins can roll back accidental
+    edits. The latest live row stays in `course_slides`; this table is
+    append-only history.
+    """
+    __tablename__ = "slide_versions"
+    __table_args__ = (Index("ix_slide_versions_slide_ver", "slide_id", "version_number"),)
+    id = Column(Integer, primary_key=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id", ondelete="CASCADE"),
+                      nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text)
+    slide_type = Column(String(20))               # store as string for forward-compat
+    media_url = Column(String(500))
+    changed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    change_summary = Column(String(200))          # optional admin note
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ── API tokens (Iter 21 — programmatic auth for external integrations) ──
+class ApiToken(Base):
+    """Long-lived bearer token for server-to-server access. Created by an
+    admin via the dashboard; the secret is only revealed at creation time
+    (we store a SHA-256 hash + a short prefix for visibility in the UI).
+
+    Scopes are kept simple in v1 — a list of role strings the token can
+    assume (e.g. `["LEARNER"]` for an LRS that only fires xAPI statements).
+    """
+    __tablename__ = "api_tokens"
+    __table_args__ = (Index("ix_api_tokens_org_active", "organization_id", "is_active"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)        # human label, e.g. "LRS bridge"
+    prefix = Column(String(12), nullable=False, index=True)   # first 8 chars of plaintext, displayed in UI
+    token_hash = Column(String(80), nullable=False, unique=True, index=True)
+    scopes = Column(JSON)                              # list[str] of role names
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_used_at = Column(DateTime)
+    expires_at = Column(DateTime)                      # nullable = no expiry
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── AI authoring suite shared infra (Iter 22 — see docs/AI_AUTHORING_SUITE_ROADMAP.md) ──
+
+class SourceDocument(Base):
+    """Per-org reference material — PDFs, DOCXs, URLs scraped by deep-research.
+    Used as the retrieval corpus for the source-grounded AI tutor. Full-text
+    plus per-chunk embeddings (see `SourceChunk`) enable semantic search."""
+    __tablename__ = "source_documents"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)
+    title = Column(String(300), nullable=False)
+    source_type = Column(String(20), nullable=False)     # PDF | DOCX | URL | RESEARCH_NOTE | MANUAL
+    original_url = Column(String(800))                    # populated when scraped from URL
+    storage_key = Column(String(400))                     # storage_service key of raw file
+    extracted_text = Column(Text)                         # plain-text — the RAG input
+    metadata_json = Column(JSON)                          # {authors, published_date, checksum, page_count}
+    chunk_count = Column(Integer, default=0, nullable=False)
+    embedded_at = Column(DateTime)                        # nullable — set once embeddings finished
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class SourceChunk(Base):
+    """Retrieval-ready ~800-token chunk of a SourceDocument, with a vector
+    embedding stored as raw JSON list[float]. No pgvector needed at MVP
+    scale (<10k chunks/org)."""
+    __tablename__ = "source_chunks"
+    __table_args__ = (Index("ix_chunk_doc_ord", "document_id", "chunk_index"),)
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey("source_documents.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding = Column(JSON)                              # list[float] — 1536 dims (OpenAI ada-2)
+    token_count = Column(Integer)
+
+
+class AIJob(Base):
+    """Async LLM/media dispatch — mirrors the ImportJob pattern (Iter 16).
+    A background worker will poll `status=PENDING` and dispatch by job_type.
+    """
+    __tablename__ = "ai_jobs"
+    __table_args__ = (Index("ix_ai_jobs_org_status", "organization_id", "status"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    job_type = Column(String(40), nullable=False, index=True)
+    # TUTOR_ANSWER | DEEP_RESEARCH | AUTO_QUIZ | FLASHCARDS | VIDEO_OVERVIEW
+    # TTS_NARRATION | MIND_MAP | INFOGRAPHIC | PPTX_EXPORT
+    status = Column(String(20), default="PENDING", nullable=False, index=True)
+    # PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+    input_json = Column(JSON)
+    output_json = Column(JSON)
+    artefact_url = Column(String(600))
+    cost_cents = Column(Integer, default=0, nullable=False)
+    error_log = Column(Text)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class AIUsageLedger(Base):
+    """Per-call cost tracking. Aggregated per (org, billing_month) by
+    services/ai_budget_service to enforce Organization.ai_monthly_budget_cents.
+    """
+    __tablename__ = "ai_usage_ledger"
+    __table_args__ = (Index("ix_ai_usage_org_month", "organization_id", "billing_month"),)
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    job_id = Column(Integer, ForeignKey("ai_jobs.id"), nullable=True)
+    provider = Column(String(30), nullable=False)         # claude | openai | gemini | sora | tavily
+    model = Column(String(60))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_cents = Column(Integer, default=0, nullable=False)
+    billing_month = Column(String(7), nullable=False)     # "2026-02"
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+# ── API token analytics (Iter P2 — 30-day request chart) ───────────
+class ApiTokenCall(Base):
+    """Every HTTP call authenticated with an API token is recorded here.
+    Aggregated per-day by the /tokens/analytics endpoint for the chart."""
+    __tablename__ = "api_token_calls"
+    __table_args__ = (
+        Index("ix_token_calls_token_day", "api_token_id", "created_at"),
+        Index("ix_token_calls_org_day", "organization_id", "created_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                              nullable=False, index=True)
+    api_token_id = Column(Integer, ForeignKey("api_tokens.id", ondelete="CASCADE"),
+                          nullable=False, index=True)
+    path = Column(String(300), nullable=False)      # request path, no query
+    method = Column(String(10), nullable=False)     # GET / POST / …
+    status_code = Column(Integer, nullable=False)
+    duration_ms = Column(Integer)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class Flashcard(Base):
+    """One AI-generated flashcard. Belongs to a course (org-scoped via that
+    course). `source_chunk_ids` records provenance so we can show citations
+    on the review UI + guarantee no hallucinated cards enter the pack."""
+    __tablename__ = "flashcards"
+    __table_args__ = (
+        Index("ix_flashcards_org_course", "organization_id", "course_id"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"), nullable=True)
+    front = Column(String(500), nullable=False)          # question / prompt
+    back = Column(Text, nullable=False)                    # answer
+    hint = Column(String(300))
+    difficulty = Column(Integer, default=2, nullable=False)  # 1-easy .. 5-hard
+    tags = Column(JSON)                                     # list[str]
+    generated_by_ai = Column(Boolean, default=True, nullable=False)
+    source_chunk_ids = Column(JSON)                        # list[int] — provenance
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class FlashcardReview(Base):
+    """Learner-side SM-2 spaced-repetition state. One row per (user, card)
+    — first review INSERTs it, subsequent reviews UPDATE. Learners see cards
+    where `next_review_at <= now`.
+    """
+    __tablename__ = "flashcard_reviews"
+    __table_args__ = (
+        UniqueConstraint("user_id", "flashcard_id", name="uq_review_user_card"),
+        Index("ix_reviews_user_next", "user_id", "next_review_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    flashcard_id = Column(Integer, ForeignKey("flashcards.id", ondelete="CASCADE"),
+                          nullable=False, index=True)
+    ease_factor = Column(Float, default=2.5, nullable=False)   # SM-2 EF
+    interval_days = Column(Integer, default=0, nullable=False)  # days until next review
+    repetitions = Column(Integer, default=0, nullable=False)   # consecutive successful reps
+    next_review_at = Column(DateTime, nullable=False)
+    last_quality = Column(Integer)                              # last 0-5 rating
+    last_reviewed_at = Column(DateTime)
+    review_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
