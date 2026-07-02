@@ -1,0 +1,44 @@
+{
+  "summary": "Iter 26b (Sora 2 video) + Iter 27a (Nano Banana infographics) + streak-pill improvement + stale-test cleanup fully verified. Backend pytest 311 passed / 3 skipped (up from the previous 262/263 baseline — 262/263 refers to a narrower subset; the full suite is 311/314). All 11 new tests in test_iteration27.py pass. test_iteration3::test_slides_reorder (reorder regression) passes. test_iteration22::test_authoring_status_admin_can_access (stale tts_enabled drift called out in iteration_17) now passes. test_iteration6/9/ifpi_api all green after cleanup. Video validation covered via curl: bad model/duration/size → 400 with clean allowed-value error, learner → 403, GET /video/history admin → 200 with items array (running job #16 + failed #14 visible; did NOT trigger a fresh Sora job per E1 cost-safety note). Nano Banana visual generation exercised fully end-to-end via UI on course 1 / slide 1: image generated, saved to /api/uploads/files/visuals/1/*.jpg, attached to slide (slide_type flipped from TEXT to IMAGE tab, media_url populated). Prompt <8 chars → 422, learner → 403, all correct. CourseEditPage renders all 3 inline panels per slide (narration-editor + visual-editor + video-editor) with every documented data-testid (video-prompt-input, video-model-select, video-duration-select, video-size-select, video-generate-btn, visual-prompt-input, visual-generate-btn) present. Sidebar streak pill: absent when current_streak=0 (learner+admin both), appears after learner rates a flashcard as quality=5 with text '🔥 1-day streak · Locked in today ✓' and tooltip 'Longest streak: 1 days'. Feature flags on /authoring/status now show tutor_enabled=true, deep_research_enabled=true, flashcards_enabled=true, video_overview_enabled=true, tts_enabled=true, visuals_enabled=true, pptx_export_enabled=false — matches spec exactly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VisualEditor (CourseEditPage)", "issue": "After a successful Nano Banana generation, the Generate button stays labelled 'Generating...' and disabled instead of resetting back to 'Generate visual'. The preview image itself renders correctly and the slide media_url is updated, but the loading state does not clear until a full re-fetch/navigation. Cosmetic — user can still work.", "selector": "[data-testid=\"visual-generate-btn\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar streak pill", "issues": ["Tooltip grammar: 'Longest streak: 1 days' — should be pluralised properly ('1 day' vs 'N days'). Very minor copy polish."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration27.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/test_iteration22.py",
+    "/app/test_reports/pytest/iteration18_results.xml"
+  ],
+  "action_items": [
+    "(LOW) In CourseEditPage VisualEditor, reset the isGenerating state (setIsGenerating(false)) inside the .finally() branch OR right after setting the preview URL so the button label reverts to 'Generate visual' when the request completes.",
+    "(NIT) Fix pluralisation in the sidebar-streak-pill tooltip (DashboardLayout.tsx line ~110) — use `${streak.longest_streak} day${streak.longest_streak === 1 ? '' : 's'}`.",
+    "(OPTIONAL) Consider surfacing budget_cents in the visual/video editor cards so admins see cost-per-generation before hitting Generate (Nano Banana ~4c, Sora-2 4s ~10c, Sora-2-pro 12s ~1.20$). Would help avoid accidental Sora job cost blow-outs."
+  ],
+  "critical_code_review_comments": [
+    "authoring_media.py cleanly separates video (async job → JobQueue) from visuals (sync fetch → base64 → static file). Correct choice — Sora is 3-5 min blocking so it MUST be async; Nano Banana is ~10s so sync is fine.",
+    "video_service.py validates model/duration/size against explicit whitelists before any expensive call — clean 400 responses with the allowed set echoed in the detail. Good UX for API consumers.",
+    "visuals_service.py Pydantic schema pins min_length=8 on prompt — 422 comes for free from FastAPI validation instead of hand-written 400. Cleaner and self-documenting via /docs.",
+    "reorder_slides_early uses a two-pass negative-index trick to work around the uq_course_slides_order unique constraint — this is a known SQLite/Postgres pattern and correct. Alternative would be `DEFERRABLE INITIALLY DEFERRED` but that's Postgres-only, so this approach is portable. Well-chosen.",
+    "attach_to_slide=true correctly updates both slide.media_url AND slide.slide_type=IMAGE inside a single transaction — verified by UI test (tab flipped from TEXT to IMAGE after generation). No race window.",
+    "DashboardLayout.tsx sidebar-streak-pill: polls every 60s via setInterval — good pace, won't hammer the streak endpoint. Conditional render `streak && streak.current_streak > 0` is exactly what the spec asks for. Fetch error is swallowed with .catch(() => {}) which is fine here (fail-quiet, hide pill).",
+    "Feature-flag drift now clean — every test_iteration22 assertion matches the current /authoring/status shape."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (311/311 non-skipped)", "frontend": "98% (Visual editor button-state polish is the only nit)"},
+  "test_credentials": "admin@ifpi.org / admin123 · learner@ifpi.org / learner123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Rated 1 flashcard on course 1 as learner (quality=5) to build streak from 0 → 1 for sidebar-pill verification. This persisted a FlashcardReview row + updated learner XP. Also created 1 Nano Banana visual attached to course 1 slide 1 (media_url=/api/uploads/files/visuals/1/1a23fe5c19c1b4792babee9d106fdbf42.jpg, slide_type flipped to IMAGE). If a fully clean slide 1 is desired for the next run, either DELETE the Slide 1 media_url or reset via the CourseEditPage (there is no in-UI 'clear visual' — worth adding as a future enhancement).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration_18: Iter 26b + 27a + streak-pill + cleanup all shipped and verified. Backend 311/311 (3 unrelated skips — including 1 exam-attempts skip called out in iteration_17). Sora 2 (video) real generation is INTENTIONALLY untested end-to-end to avoid ~40c/job burn on shared EMERGENT_LLM_KEY — validation, RBAC, and history endpoints are all covered instead, plus test_iteration27 has a mocked-boundary test that confirms 202 + job creation. Nano Banana (visuals) is fully exercised (both API + UI) — no need to re-run cost-wise unless there's a regression. Sidebar streak pill only appears when current_streak > 0; verified both branches via login as learner (0 → 1 by rating a card). Slide 1 on course 1 is now attached to a generated infographic (slide_type=IMAGE) — main agent may want to revert if a clean seed is desired. All documented data-testids present. Non-blocking polish items left: (a) VisualEditor Generating-button doesn't reset after success; (b) streak tooltip 'Longest streak: 1 days' grammar.",
+  "rca of the issue": "N/A — no bugs found this iteration. Only cosmetic polish items."
+}
