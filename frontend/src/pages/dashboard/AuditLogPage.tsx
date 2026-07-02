@@ -15,6 +15,12 @@ const ACTION_COLORS: Record<string, string> = {
   INVITATIONS_BULK_QUEUED: 'bg-pink-50 text-pink-700',
   COHORT_MILESTONE_REACHED: 'bg-yellow-100 text-yellow-800',
   COHORT_SETTINGS_UPDATED: 'bg-orange-50 text-orange-700',
+  COHORT_WEBHOOK_TESTED: 'bg-teal-50 text-teal-700',
+  COHORT_DIGEST_SENT: 'bg-indigo-50 text-indigo-700',
+  WEBHOOK_SUBSCRIPTION_CREATED: 'bg-cyan-50 text-cyan-700',
+  WEBHOOK_SUBSCRIPTION_UPDATED: 'bg-sky-50 text-sky-700',
+  WEBHOOK_SUBSCRIPTION_DELETED: 'bg-rose-50 text-rose-700',
+  WEBHOOK_TEST_FIRED: 'bg-violet-50 text-violet-700',
   AI_QUIZ_GENERATED: 'bg-amber-100 text-amber-800',
 }
 

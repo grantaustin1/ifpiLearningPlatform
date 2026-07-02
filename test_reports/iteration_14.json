@@ -1,0 +1,38 @@
+{
+  "summary": "Verified alembic migration chain fix for invitations_and_outbox (feb2000f209a). From a clean DB, `alembic upgrade head` now completes all 17 migrations through head b1c2d3e4f5a6 with exit 0. The previously-failing `9acf884483b9_comments_and_retry` ALTER TABLE outbox_messages ADD COLUMN attempt_count now runs to completion. All 12 required tables exist with all expected late-migration columns. Migration-smoke flow (head -> downgrade -1 -> upgrade head) passes. Idempotency check: when invitations + outbox_messages already exist (dev DB via create_all), the rewritten migration skips create cleanly. Iter 21 regression suite still 5/5 green against live preview backend. Secret scanner exits 0.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration21.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Migration feb2000f209a is correctly idempotent via inspector check (_has) so dev DBs created via Base.metadata.create_all continue to upgrade cleanly without 'table already exists' errors.",
+    "Column set in the rewritten migration deliberately omits attempt_count, next_attempt_at, and cohort — confirmed matches the historical state expected by the subsequent migrations (9acf884483b9 adds the first two, f6b832c5a4e1 adds cohort).",
+    "downgrade() in feb2000f209a unconditionally drops tables; would fail on a DB where create_all created them and they have FK refs from later-migration tables not dropped first. Not exercised by the CI migration-smoke (which only does downgrade -1 from head), so non-blocking, but worth flagging."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "n/a"},
+  "test_credentials": "Did not need; this is purely a migration / DDL test. Live-backend Iter 21 smoke uses its own seeded creds.",
+  "seed_data_creation": "Created and destroyed two transient SQLite DBs under /tmp/migration_check (check.db, idem.db); cleanup done — no residue in /app.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Migration chain is healthy at head b1c2d3e4f5a6 (17 migrations, 33 tables). To re-verify: `cp -r /app/backend /tmp/mc && cd /tmp/mc && rm -f *.db && DATABASE_URL='sqlite:///./check.db' alembic upgrade head`. For live-backend regression, set REACT_APP_BACKEND_URL from /app/frontend/.env and run pytest backend/tests/test_iteration21.py.",
+  "verification_evidence": {
+    "test_1_clean_upgrade": "PASS — all 17 migrations ran, exit 0, head=b1c2d3e4f5a6",
+    "test_2_critical_tables": "PASS — 33 tables total, 12/12 required present (outbox_messages, invitations, sso_jti_seen, api_tokens, scorm_packages, xapi_statements, slide_versions, import_jobs, webhook_subscriptions, webhook_deliveries, audit_logs, badge_tiers)",
+    "test_3_late_columns": "PASS — outbox_messages.attempt_count, outbox_messages.next_attempt_at, invitations.cohort all present",
+    "test_4_migration_smoke": "PASS — head -> downgrade -1 (b1c2d3e4f5a6->a8b4c9d3e7f2) -> upgrade head, both legs exit 0",
+    "test_5_attempt_count_alter": "PASS — migration 9acf884483b9_comments_and_retry executed cleanly during full upgrade chain",
+    "test_6_iter21_regression": "PASS — 5/5 in 2.37s against live preview backend",
+    "test_7_secret_scanner": "PASS — `scan-secrets.sh --ci` exits 0, 'OK — no hardcoded secrets detected.'",
+    "bonus_idempotency": "PASS — migration skips create when invitations + outbox_messages tables already exist (dev DB / create_all scenario)"
+  }
+}
