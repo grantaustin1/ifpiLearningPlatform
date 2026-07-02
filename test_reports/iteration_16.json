@@ -1,0 +1,47 @@
+{
+  "summary": "Iter 24+25 review — Deep Research (Tavily) + SM-2 Flashcards. Backend pytest 38/40 passing across iter22/23/25. UI verified end-to-end on live preview for admin + learner. All 3 new routes render, all documented data-testids present, learner correctly blocked from admin-only routes (redirects to /courses), full learner review flow (flip → rate 4 → session-done) works, sidebar 'Deep research' entry visible for admin between Content imports and API tokens, flashcards-btn on CourseEditPage present, learn-flashcards-link on LearnPage present. Deep research page already shows 3 completed COMPLETED/QUICK jobs from prior admin runs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "DELETE /api/authoring/flashcards/{card_id}",
+        "issue": "FlashcardReview rows are NOT deleted when parent Flashcard is deleted. Model declares ondelete=CASCADE but SQLite ignores FK constraints unless `PRAGMA foreign_keys = ON` is set per connection (missing in /app/backend/core/database.py). Combined with SQLite ROWID reuse, orphan reviews cling to newly-created cards, corrupting a learner's SM-2 state (a fresh card can appear already 'learning' with next_review 1d out). This caused test_bulk_save_and_learner_review_flow to fail intermittently on repeat runs — passes on clean state, fails after 2nd iteration."
+      },
+      {
+        "endpoint": "GET /api/authoring/status",
+        "issue": "test_iteration22::test_authoring_status_admin_can_access asserts tutor_enabled/deep_research_enabled/flashcards_enabled are all False, but authoring.py flips them True in Iter 22/23/24 (expected per roadmap). This iter22 test is stale and should be updated to reflect the new expected shape."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration25.py",
+    "/app/backend/tests/test_iteration23.py",
+    "/app/backend/tests/test_iteration22.py",
+    "/app/test_reports/pytest/iteration16_results.xml"
+  ],
+  "action_items": [
+    "Enable SQLite FK enforcement — in /app/backend/core/database.py add an @event.listens_for(engine, 'connect') hook that executes `PRAGMA foreign_keys=ON` when database_url starts with 'sqlite'. This turns the existing ondelete=CASCADE FKs into real cascades and prevents orphan FlashcardReview/AIJob rows from corrupting future data. (In Postgres this is already enforced.)",
+    "Alternatively (or additionally) — in routers/flashcards.py DELETE endpoint, explicitly `db.query(FlashcardReview).filter(flashcard_id==card_id).delete()` before deleting the Flashcard, so cleanup works regardless of DB engine.",
+    "Update /app/backend/tests/test_iteration22.py::test_authoring_status_admin_can_access to expect tutor_enabled=True, deep_research_enabled=True (when TAVILY_API_KEY present), flashcards_enabled=True. Currently a stale assertion left over from before Iter 22/23/24 flipped the flags.",
+    "Optional: Make test_iteration25::test_bulk_save_and_learner_review_flow use pytest addfinalizer/try-finally so the cleanup DELETE always runs even if an assertion fails mid-flight — reduces test-pollution risk."
+  ],
+  "critical_code_review_comments": [
+    "SQLite FK enforcement missing (see action_items #1). This is the single biggest data-integrity risk in the Iter 25 delivery; the correct model declaration masks the runtime behaviour and only surfaces on the E2E test.",
+    "ResearchPage / FlashcardsAuthoringPage / LearnerFlashcardsPage — all correctly use data-testid on every interactive element per the roadmap spec. No missing selectors observed during 15-minute UI walkthrough.",
+    "Protected-route redirect for LEARNER on /research and /courses/:id/flashcards routes to /courses silently — consider adding a toast so the learner knows why they were bounced (currently just silent redirect). Non-blocking UX polish.",
+    "The 3 completed 'music industry trends 2026' research runs on the live DB share the same query text — the RecentRuns list would benefit from a click-to-open source-doc-viewer or at least a status-only distinction. Non-blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "95%", "frontend": "100%"},
+  "test_credentials": "admin@ifpi.org / admin123 · learner@ifpi.org / learner123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Cleaned up 2 orphan test-created Flashcards (ids 2, 3) + 1 orphan FlashcardReview left over from prior test runs. Temporarily backdated Flashcard 1's review to test the swipe-flow UI, then restored it (next_review = now+1d). Live DB back to a clean baseline: 1 seeded 'What is IFPI?' card with 1 learning review, ~3 completed research jobs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 3 new UI routes and every documented data-testid work. The only backend failure is test_iteration25::test_bulk_save_and_learner_review_flow which is DB-state-sensitive because SQLite doesn't enforce ondelete=CASCADE unless PRAGMA foreign_keys=ON is set on connect. Rerun after cleaning /app/backend/ifpi_lms.db of stray Flashcard rows (id > 1) and orphan FlashcardReview rows, OR add the PRAGMA in core/database.py — both make the test green. test_iteration22::test_authoring_status_admin_can_access is a known-stale assertion (documented in the review_request note). Learner E2E swipe/list flow, admin CourseEdit → Flashcards button, sidebar nav-research (admin-only), and Deep Research history list all render correctly on the live preview.",
+  "rca of the issue": "SM-2 E2E test failure RCA — sqlite3 default `PRAGMA foreign_keys=OFF` means SQLAlchemy's `ForeignKey(..., ondelete='CASCADE')` declaration is not enforced at the DB level. When the admin DELETE cleanup ran at the end of a prior test, only the Flashcard row was removed; the FlashcardReview row for that card survived. SQLite additionally reuses the highest-deleted rowid on the next INSERT (no AUTOINCREMENT keyword), so the next bulk-save created a new Flashcard row that inherited the deleted card's id and, therefore, the orphan review. The learner's /due endpoint then filtered the 'new' card out because it saw a matching FlashcardReview scheduled 1 day in the future. Reproduction: run test_bulk_save_and_learner_review_flow twice in a row → 2nd run fails at `assert card_id in ids`. Mitigation options (in order of preference): (1) add `@event.listens_for(engine, 'connect')` in core/database.py to execute `PRAGMA foreign_keys=ON` for SQLite engines; (2) explicitly cascade-delete FlashcardReview rows in the router's DELETE handler; (3) switch the dev DB to Postgres (already supported via DATABASE_URL) where FKs are enforced by default."
+}

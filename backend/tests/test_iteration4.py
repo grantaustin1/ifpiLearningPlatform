@@ -7,13 +7,15 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from pathlib import Path
 
 import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    pytest.skip("REACT_APP_BACKEND_URL is required", allow_module_level=True)
+    import pytest
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests", allow_module_level=True)
 
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER = {"email": "learner@ifpi.org", "password": "learner123"}
@@ -26,6 +28,17 @@ if DATABASE_URL.startswith("sqlite:///"):
 else:
     DB_PATH = os.path.join(BACKEND_DIR, "ifpi_lms.db")
 DB_PATH = os.path.abspath(DB_PATH)
+
+
+def _backend_dir() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _sqlite_db_path() -> Path:
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
+    if database_url.startswith("sqlite:///"):
+        return Path(database_url.replace("sqlite:///", "", 1)).resolve()
+    return (_backend_dir() / "ifpi_lms.db").resolve()
 
 
 def _login(email, password):
@@ -50,6 +63,8 @@ def learner():
 
 # ── Alembic head and new columns ────────────────────────────────────
 def test_alembic_head_iteration4():
+    """Iter 4 migration must remain in the history. Later iterations push the
+    head forward — that's expected; we just verify our chain is intact."""
     import subprocess
     out = subprocess.check_output(["alembic", "current"], cwd=BACKEND_DIR).decode()
     assert "(head)" in out, out
