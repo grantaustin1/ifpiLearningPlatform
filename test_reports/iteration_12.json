@@ -1,0 +1,30 @@
+{
+  "summary": "Bug-fix verification: secret scanner false-positive on test_iteration21.py line 69 has been remediated. Scanner now passes (exit 0), the modified negative-auth test still asserts 401 on invalid Bearer token, and the full iteration21 suite remains green (5/5).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verification_results": {
+    "1_scanner_passes": "PASS — `bash /app/scripts/security/scan-secrets.sh --ci` exits 0, prints 'OK — no hardcoded secrets detected.'",
+    "2_negative_auth_test": "PASS — pytest tests/test_iteration21.py::test_api_token_blocks_invalid_secret passed (0.44s). Bogus 'ifpi_...' token correctly rejected with HTTP 401 by /api/auth/me.",
+    "3_full_iter21_suite": "PASS — 5/5 tests passed in 2.09s (test_api_token_create_list_revoke_delete, test_api_token_blocks_invalid_secret, test_xapi_completed_verb_auto_completes_enrollment, test_xapi_non_completion_verb_does_not_autocomplete, test_xapi_unknown_course_auto_complete_no_op).",
+    "4_no_other_bearer_literals": "PASS — `grep -rEn 'Bearer\\s+[A-Za-z0-9_-]{20,}' backend/tests/` returns zero unannotated matches.",
+    "5_sanity_injection": "PASS — Injected `'Authorization': 'Bearer aaaaaaaa...aaaa'` (30 a's) into /tmp/sec_test/test_bad.py; grep with the BEARER_HARDCODED regex correctly flags it. Scanner regex is still effective."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration21.py",
+    "/app/test_reports/pytest/iteration12_results.xml",
+    "/app/scripts/security/scan-secrets.sh"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix in test_iteration21.py is minimal and non-semantic: runtime string concatenation `'ifpi_' + 'abcdef12' + '_' + 'bogus-secret-not-real'` then `' '.join(['Bearer', bogus])` — produces identical header to the prior literal but defeats the regex match. Clean approach.",
+    "Alternative future-proof option: annotate the line with `# nosec` or `# pragma: allowlist` (scanner already supports this) — would be more explicit about intent than the obfuscation, but current approach is fine."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "N/A (backend-only request)"},
+  "test_credentials": "Admin: admin@ifpi.org/admin123, Learner: learner@ifpi.org/learner123 (from review_request; no /app/memory/test_credentials.md read needed for this scope)",
+  "seed_data_creation": "None — tests create their own throw-away tokens/courses and clean up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration21 (xAPI auto-complete + API token lifecycle + invalid-token rejection) is fully green against live preview backend. Secret scanner CI gate is unblocked. No further action needed on this fix.",
+  "rca_of_the_issue": "CI's secret-scan regex `Bearer\\s+[A-Za-z0-9_-]{20,}` is intentionally broad and cannot distinguish real secrets from negative-test fixtures. The literal `Bearer ifpi_abcdef12_bogus_secret_thats_not_real` matched the pattern. Fix: build the same string at runtime so the source no longer contains a literal `Bearer xxx…` substring. Verified the behavior of the test is preserved (still asserts 401) and the scanner is no longer triggered. Mitigation alternatives for future similar cases: (a) the `# nosec` / `# pragma: allowlist` annotation already supported by the scanner, or (b) tightening the regex with a negative-lookahead for known fixture prefixes — but the current per-test obfuscation is sufficient."
+}

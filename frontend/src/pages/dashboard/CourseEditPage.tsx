@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 
-const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF']
+const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 
 export default function CourseEditPage() {
   const { id } = useParams()
+  const nav = useNavigate()
   const [course, setCourse] = useState<any>(null)
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
@@ -17,6 +18,7 @@ export default function CourseEditPage() {
   const [prereqs, setPrereqs] = useState<any[]>([])
   const [allCourses, setAllCourses] = useState<any[]>([])
   const [showAddPrereq, setShowAddPrereq] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const load = useCallback(async () => {
     const [r, p, all] = await Promise.all([
@@ -29,8 +31,8 @@ export default function CourseEditPage() {
     setActive(r.data.slides?.[0]?.id ?? null)
     setPrereqs(p.data)
     setAllCourses(all.data)
-  }, [id])
-  useEffect(() => { load() }, [load])
+  }
+  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!course) return
@@ -155,6 +157,34 @@ export default function CourseEditPage() {
               className="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">
               <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
             </button>
+            <button onClick={() => nav(`/courses/${course.id}/flashcards`)} data-testid="flashcards-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg px-3 py-1.5 font-medium">
+              <Sparkles className="h-3.5 w-3.5" /> Flashcards
+            </button>
+            <button onClick={() => nav(`/courses/${course.id}/mindmap`)} data-testid="mindmap-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-pink-300 text-pink-700 hover:bg-pink-50 rounded-lg px-3 py-1.5 font-medium">
+              <Sparkles className="h-3.5 w-3.5" /> Mind map
+            </button>
+            <a
+              href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+              onClick={(e) => {
+                // Attach auth token as query fallback isn't safe; fetch + blob download instead.
+                e.preventDefault()
+                const tok = localStorage.getItem('ifpi_access_token') || ''
+                api.get(`/authoring/pptx/${course.id}`, { responseType: 'blob' }).then(r => {
+                  const url = URL.createObjectURL(r.data)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `${course.title || 'course'}.pptx`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                }).catch(() => toast.error('PPTX export failed'))
+                void tok
+              }}
+              data-testid="pptx-download-btn"
+              className="inline-flex items-center gap-1.5 text-xs border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium cursor-pointer">
+              <Send className="h-3.5 w-3.5" /> PPTX
+            </a>
             {course.status === 'PUBLISHED' ? (
               <button onClick={unpublish} data-testid="unpublish-btn"
                 className="inline-flex items-center gap-1.5 text-xs border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg px-3 py-1.5 font-medium">
@@ -174,11 +204,17 @@ export default function CourseEditPage() {
               <input value={activeSlide.title || ''} onChange={e => update(activeSlide.id, { title: e.target.value })}
                 placeholder="Slide title" data-testid="slide-title"
                 className="w-full text-xl font-semibold border-b border-slate-200 focus:border-indigo-400 focus:outline-none pb-1 bg-transparent" />
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap items-center">
                 {SLIDE_TYPES.map(t => (
                   <button key={t} onClick={() => update(activeSlide.id, { slide_type: t })}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium ${activeSlide.slide_type === t ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400' : 'bg-slate-100 text-slate-500'}`}>{t}</button>
                 ))}
+                {!activeSlide._local && (
+                  <button onClick={() => setShowHistory(true)} data-testid="slide-history-btn"
+                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    <History className="h-3 w-3" /> History
+                  </button>
+                )}
               </div>
               <textarea value={activeSlide.content || ''} onChange={e => update(activeSlide.id, { content: e.target.value })}
                 rows={14} data-testid="slide-content"
@@ -189,6 +225,9 @@ export default function CourseEditPage() {
                   placeholder="Media URL (video, audio, image, PDF)"
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
               )}
+              <NarrationEditor slide={activeSlide} onUpdated={load} />
+              <VisualEditor slide={activeSlide} onUpdated={load} />
+              <VideoEditor slide={activeSlide} onUpdated={load} />
             </div>
           </div>
         ) : <div className="flex-1 flex items-center justify-center text-slate-400">Select or add a slide to start</div>}
@@ -265,6 +304,79 @@ export default function CourseEditPage() {
           </div>
         </div>
       )}
+
+      {showHistory && activeSlide && (
+        <SlideHistoryModal
+          courseId={Number(id)} slideId={activeSlide.id}
+          onClose={() => setShowHistory(false)}
+          onRestored={async () => { setShowHistory(false); await load(); toast.success('Slide restored') }}
+        />
+      )}
+    </div>
+  )
+}
+
+function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
+  { courseId: number; slideId: number; onClose: () => void; onRestored: () => void }) {
+  const [versions, setVersions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [restoring, setRestoring] = useState<number | null>(null)
+
+  useEffect(() => {
+    api.get(`/courses/${courseId}/slides/${slideId}/versions`)
+      .then(r => setVersions(r.data.items))
+      .finally(() => setLoading(false))
+  }, [courseId, slideId])
+
+  const restore = async (n: number) => {
+    if (!window.confirm(`Restore this slide to version ${n}? Your current content will be saved as a new version first, so nothing is lost.`)) return
+    setRestoring(n)
+    try {
+      await api.post(`/courses/${courseId}/slides/${slideId}/versions/${n}/restore`)
+      onRestored()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Restore failed')
+    } finally { setRestoring(null) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="slide-history-modal">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900 flex items-center gap-2"><History className="h-4 w-4 text-indigo-600" /> Slide version history</h3>
+          <button onClick={onClose}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <p className="text-sm text-slate-400">Loading…</p>
+          ) : versions.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-6">No previous versions yet — versions are created automatically every time you save a change.</p>
+          ) : (
+            <ul className="space-y-2" data-testid="version-list">
+              {versions.map(v => (
+                <li key={v.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3"
+                    data-testid={`version-row-${v.version_number}`}>
+                  <div className="text-xs font-mono font-bold text-slate-400 w-8 mt-0.5">v{v.version_number}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{v.title || '(untitled)'}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {v.slide_type || '—'} · {v.change_summary || 'edit'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {v.created_at ? new Date(v.created_at).toLocaleString() : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => restore(v.version_number)} disabled={restoring === v.version_number}
+                    data-testid={`restore-v${v.version_number}`}
+                    className="inline-flex items-center gap-1 text-xs border border-indigo-200 text-indigo-700 hover:bg-indigo-50 px-2.5 py-1 rounded-lg disabled:opacity-50">
+                    <RotateCcw className="h-3 w-3" /> {restoring === v.version_number ? 'Restoring…' : 'Restore'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -272,3 +384,286 @@ export default function CourseEditPage() {
 function Field({ label, children }: any) {
   return <div className="mb-4"><label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>{children}</div>
 }
+
+// ── Narration editor (Iter 26a + 30 multi-lang) ─────────────────────
+const NARRATION_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+const NARRATION_LANGS = [
+  ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'],
+  ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['ja', 'Japanese'],
+  ['ko', 'Korean'], ['zh', 'Chinese'], ['hi', 'Hindi'],
+] as const
+
+function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [voice, setVoice] = useState(slide.narration_voice || 'nova')
+  const [model, setModel] = useState<'tts-1' | 'tts-1-hd'>('tts-1')
+  const [language, setLanguage] = useState<string>('en')
+  const [translateFirst, setTranslateFirst] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const gen = async () => {
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/narration/generate', {
+        slide_id: slide.id, voice, model,
+        language, translate_first: translateFirst,
+      })
+      toast.success(`Narration ready · ${r.data.chunk_count} chunk(s) · ${(r.data.size_bytes / 1024).toFixed(1)} KB`)
+      onUpdated()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Narration failed')
+    } finally { setBusy(false) }
+  }
+
+  const clear = async () => {
+    if (!window.confirm('Remove this narration? You can regenerate anytime.')) return
+    await api.delete(`/authoring/narration/${slide.id}`)
+    toast.success('Narration cleared')
+    onUpdated()
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-2" data-testid="narration-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-indigo-800">
+        🔊 AI narration <span className="text-slate-500 font-normal">(OpenAI TTS)</span>
+      </div>
+      {slide.narration_url ? (
+        <div className="flex items-center gap-3">
+          <audio src={slide.narration_url} controls className="h-9 flex-1" data-testid="narration-audio" />
+          <button onClick={clear} className="text-xs text-rose-600 hover:underline" data-testid="narration-clear-btn">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">No narration yet. Pick a voice + language, hit generate.</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <select value={voice} onChange={e => setVoice(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-voice-select">
+          {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <select value={model} onChange={e => setModel(e.target.value as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-model-select">
+          <option value="tts-1">tts-1 (fast)</option>
+          <option value="tts-1-hd">tts-1-hd (higher quality)</option>
+        </select>
+        <select value={language} onChange={e => setLanguage(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-language-select">
+          {NARRATION_LANGS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+        </select>
+        {language !== 'en' && (
+          <label className="text-[11px] text-slate-600 inline-flex items-center gap-1" title="Translate the slide text to the target language before generating audio">
+            <input type="checkbox" checked={translateFirst} onChange={e => setTranslateFirst(e.target.checked)}
+              data-testid="narration-translate-first" />
+            translate first
+          </label>
+        )}
+        <button onClick={gen} disabled={busy}
+          data-testid="narration-generate-btn"
+          className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+          {busy ? 'Generating…' : slide.narration_url ? 'Re-generate' : 'Generate narration'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Visuals editor (Iter 27a) — Nano Banana infographic ─────────────
+function VisualEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const gen = async () => {
+    if (prompt.trim().length < 8) return toast.error('Describe the visual in at least 8 characters')
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/visuals/generate', {
+        prompt: prompt.trim(), slide_id: slide.id, attach_to_slide: true,
+      })
+      toast.success(`Image generated · ${(r.data.size_bytes / 1024).toFixed(0)} KB`)
+      setPrompt('')
+      setBusy(false)         // reset before async reload to keep the button snappy
+      await onUpdated()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Image generation failed')
+      setBusy(false)
+    }
+  }
+
+  const isImage = slide.slide_type === 'IMAGE' && slide.media_url
+  return (
+    <div className="mt-3 rounded-xl border border-pink-100 bg-pink-50/40 p-3 space-y-2" data-testid="visual-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-pink-800">
+        🎨 AI infographic <span className="text-slate-500 font-normal">(Nano Banana)</span>
+      </div>
+      {isImage && (
+        <img src={slide.media_url} alt="Slide visual" className="rounded-lg max-h-40 object-contain bg-white border border-pink-100" data-testid="visual-preview" />
+      )}
+      <textarea rows={2} value={prompt} onChange={e => setPrompt(e.target.value)}
+        placeholder="Describe the diagram or infographic to generate…"
+        className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-pink-400"
+        data-testid="visual-prompt-input" />
+      <button onClick={gen} disabled={busy}
+        data-testid="visual-generate-btn"
+        className="text-xs bg-pink-600 hover:bg-pink-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+        {busy ? 'Generating…' : isImage ? 'Re-generate visual' : 'Generate visual'}
+      </button>
+    </div>
+  )
+}
+
+// ── Video editor (Iter 26b) — Sora 2 async with spend preview (Iter 28) ─
+function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2')
+  const [duration, setDuration] = useState<4 | 8 | 12>(4)
+  const [size, setSize] = useState('1280x720')
+  const [job, setJob] = useState<any>(null)
+  const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState<any>(null)
+
+  const openPreview = async () => {
+    if (prompt.trim().length < 8) return toast.error('Describe the video in at least 8 characters')
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/video/preview', { model, duration })
+      setPreview(r.data)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Preview failed')
+    } finally { setBusy(false) }
+  }
+
+  const confirm = async () => {
+    setPreview(null)
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/video/generate', {
+        prompt: prompt.trim(), slide_id: slide.id, model, size, duration,
+      })
+      toast.success(`Job started · est. ${Math.round(r.data.estimated_wait_seconds / 60)} min`)
+      setJob({ id: r.data.job_id, status: 'PENDING' })
+      poll(r.data.job_id)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Video job failed to start')
+    } finally { setBusy(false) }
+  }
+
+  const poll = async (id: number) => {
+    for (let i = 0; i < 200; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        const r = await api.get(`/authoring/video/${id}`)
+        setJob(r.data)
+        if (r.data.status === 'COMPLETED') { onUpdated(); toast.success('Video ready!'); break }
+        if (r.data.status === 'FAILED') { toast.error(r.data.error_log || 'Job failed'); break }
+      } catch { /* keep polling */ }
+    }
+  }
+
+  const isVideo = slide.slide_type === 'VIDEO' && slide.media_url
+  return (
+    <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50/40 p-3 space-y-2" data-testid="video-editor">
+      <div className="flex items-center gap-2 text-xs font-semibold text-purple-800">
+        🎬 AI video overview <span className="text-slate-500 font-normal">(Sora 2 · 2-6 min)</span>
+      </div>
+      {isVideo && (
+        <video src={slide.media_url} controls className="rounded-lg max-h-40 w-full bg-black" data-testid="video-preview" />
+      )}
+      <textarea rows={2} value={prompt} onChange={e => setPrompt(e.target.value)}
+        placeholder="Describe the video scene / topic…"
+        className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-400"
+        data-testid="video-prompt-input" />
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={model} onChange={e => setModel(e.target.value as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-model-select">
+          <option value="sora-2">sora-2</option>
+          <option value="sora-2-pro">sora-2-pro (higher quality)</option>
+        </select>
+        <select value={duration} onChange={e => setDuration(Number(e.target.value) as any)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-duration-select">
+          <option value={4}>4s</option>
+          <option value={8}>8s</option>
+          <option value={12}>12s</option>
+        </select>
+        <select value={size} onChange={e => setSize(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="video-size-select">
+          <option value="1280x720">1280×720 (HD)</option>
+          <option value="1792x1024">1792×1024 (wide)</option>
+          <option value="1024x1792">1024×1792 (portrait)</option>
+          <option value="1024x1024">1024×1024 (square)</option>
+        </select>
+        <button onClick={openPreview} disabled={busy || (job && ['PENDING', 'RUNNING'].includes(job.status))}
+          data-testid="video-generate-btn"
+          className="text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
+          {busy ? 'Loading…' : (job && ['PENDING', 'RUNNING'].includes(job.status)) ? 'Generating…' : isVideo ? 'Re-generate video' : 'Generate video'}
+        </button>
+      </div>
+      {job && (
+        <p className="text-[11px] text-purple-700" data-testid="video-job-status">
+          Job #{job.id} · <span className="font-semibold">{job.status}</span>
+          {job.status === 'RUNNING' && ' · rendering — safe to leave and come back'}
+          {job.error_log && ` · ${job.error_log.slice(0, 100)}`}
+        </p>
+      )}
+      {preview && <SpendPreviewModal preview={preview} onCancel={() => setPreview(null)} onConfirm={confirm} />}
+    </div>
+  )
+}
+
+function SpendPreviewModal({ preview, onCancel, onConfirm }:
+  { preview: any; onCancel: () => void; onConfirm: () => void }) {
+  const cost = preview.estimated_cost_cents
+  const remaining = preview.budget?.remaining_cents ?? null
+  const willExceed = preview.will_exceed_budget
+  const cents = (c: number) => `${(c / 100).toFixed(2)}`
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4" data-testid="video-spend-modal">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div className="flex items-center gap-2 text-purple-800">
+          <span className="text-2xl">🎬</span>
+          <h3 className="text-lg font-bold">Confirm video generation</h3>
+        </div>
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-slate-500 uppercase tracking-wide">Estimated cost</span>
+            <span className="text-2xl font-bold text-purple-700 tabular-nums" data-testid="video-spend-cost">
+              ${cents(cost)}
+            </span>
+          </div>
+          {remaining != null && (
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-slate-500">Remaining this month</span>
+              <span className={`font-semibold tabular-nums ${willExceed ? 'text-rose-600' : 'text-emerald-700'}`}
+                data-testid="video-spend-remaining">
+                ${cents(remaining)}
+              </span>
+            </div>
+          )}
+          {willExceed && (
+            <div className="bg-rose-100 border border-rose-200 text-rose-800 rounded-lg p-2 text-xs" data-testid="video-spend-warning">
+              This generation will exceed your organization's monthly AI budget.
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-slate-500">
+          Renders take 2-6 minutes. You can safely close this page and come back — the job runs in the background.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} data-testid="video-spend-cancel"
+            className="text-sm border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium">Cancel</button>
+          <button onClick={onConfirm} disabled={willExceed} data-testid="video-spend-confirm"
+            className="text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2 rounded-lg font-semibold">
+            Generate for ${cents(cost)}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
