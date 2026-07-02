@@ -60,7 +60,8 @@ def step(name: str, ok: bool, detail: str = "") -> None:
 
 
 def _write_report(ok: bool) -> None:
-    out = Path("/app/test_reports/agent_008.json")
+    _repo_root = Path(__file__).resolve().parents[3]
+    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_008.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"ok": ok, "steps": LOG}, indent=2))
 
