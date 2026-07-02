@@ -22,6 +22,39 @@ User-confirmed choices (all option (a)):
   - `services/sso_service.py` — JIT-provisioning from ERP360 JWT; role map `OWNER→ADMIN`, `MANAGER→ADMIN`, `TRAINER→INSTRUCTOR` etc.
   - `services/billing_service.py` — STUB mode auto-activates; LIVE mode hands off to ERP360 `/api/lite-billing/profiles`.
 
+## What's been implemented (2026-07-05 — iteration 28 · production hardening)
+
+### 1 · Dedicated worker pool for long AI jobs
+- ✅ `services/background_worker.py` — a `ThreadPoolExecutor(max_workers=2, thread_name_prefix="ifpi-long-worker")` distinct from FastAPI's anyio pool. `submit_long_job(fn, *args)` submits and returns a Future with automatic exception logging.
+- ✅ `routers/authoring_media.py::start_video_generation` now uses `submit_long_job(_run_video_job, ...)` instead of `bg.add_task(...)`. A stuck 5-minute Sora render can no longer cascade into other sync endpoints timing out.
+- ✅ Shutdown hook drains the pool on server stop (`shutdown_long_workers(wait=False)` in `server.on_shutdown`).
+
+### 2 · Sora spend-preview modal
+- ✅ New endpoint `POST /api/authoring/video/preview` (staff-only) returns `{estimated_cost_cents, budget, will_exceed_budget}`.
+- ✅ Frontend `VideoEditor` now opens `SpendPreviewModal` on Generate → shows $X.XX cost + remaining budget + red warning if over-budget. Confirm button is disabled when it would exceed. Uses purple theme + testids `video-spend-modal / -cost / -remaining / -warning / -confirm / -cancel`.
+
+### 3 · Anonymous verify rate-limit
+- ✅ Started with `slowapi` but hit K8s ingress / IP-key resolution issues. Replaced with a simple in-memory sliding-window limiter in `routers/public_catalog.py::_ratelimit`. 30 requests/min per IP, sends `Retry-After` header. Verified live: request #31 returns 429.
+- ✅ IP resolver uses `X-Forwarded-For[0]` → `X-Real-IP` → `request.client.host`.
+
+### 4 · Mind-map layout persistence
+- ✅ New `courses.metadata_json` column (JSON) + migration `a1b2c3d4e5f6`. Layouts saved as `{"mindmap_layout": {graph, positions, saved_by_id, saved_at}}`.
+- ✅ New endpoints (staff-only, `/api/authoring/mindmap/{course_id}/layout`):
+  - `GET` → `{has_saved, graph, positions, saved_at}`
+  - `PUT` → save
+  - `DELETE` → clear
+- ✅ `MindMapPage.tsx` rewritten with drag-triggered dirty flag, "Save layout" button (indigo), "Unsaved changes" flag, "Clear saved" (rose). Auto-loads saved layout on open — regenerate button forces a fresh LLM call.
+
+### 5 · Login screen → public catalog
+- ✅ Login page now shows "📚 Browse the public catalog · verify a certificate" link below sign-up (`data-testid="login-browse-courses"`). Zero-auth funnel for new visitors.
+
+### Improvement · Shareable verify link
+- ✅ `VerifyCertPage.tsx` — new "🔗 Copy shareable verify link" emerald button copies `${origin}/verify/{code}` to clipboard with a fallback prompt. Now switches to `/api/public/certificates/verify/{code}` (rate-limited) instead of the legacy path.
+
+### Verification
+- Backend: **8/8** new tests in `tests/test_iteration29.py` (rate-limit + preview + mindmap layout + dedicated-worker enqueue). **50/50** regression across iter25-28.
+- Smoke: browse-courses link visible on login page.
+
 ## What's been implemented (2026-07-04 — iterations 27b + 27c + P2 + P3)
 
 ### Iter 27b — Mind maps (P1 complete)

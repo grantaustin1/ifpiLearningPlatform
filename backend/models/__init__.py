@@ -201,6 +201,7 @@ class Course(Base):
     price_cents = Column(Integer, default=0)            # 0 = free
     currency = Column(String(3), default="ZAR")
     display_order = Column(Integer, default=0, index=True)  # catalog ordering
+    metadata_json = Column(JSON)                              # {mindmap_layout, ...}
     created_by_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

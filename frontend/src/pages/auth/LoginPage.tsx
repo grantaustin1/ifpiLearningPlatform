@@ -210,6 +210,12 @@ export default function LoginPage() {
             <Link to="/register" style={{ color: brand.primary_color }}
                   className="hover:opacity-80 font-semibold">Sign up free</Link>
           </p>
+          <div className="text-center mt-3">
+            <Link to="/public" data-testid="login-browse-courses"
+              className="text-xs text-slate-500 hover:text-slate-700 inline-flex items-center gap-1.5">
+              <span>📚</span> Browse the public catalog · verify a certificate
+            </Link>
+          </div>
           <p className="text-center text-[11px] text-slate-400 mt-5">
             Demo: <code className="bg-slate-100 px-1.5 py-0.5 rounded">admin@ifpi.org / admin123</code><br />
             or <code className="bg-slate-100 px-1.5 py-0.5 rounded">learner@ifpi.org / learner123</code>

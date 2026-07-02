@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams } from 'react-router-dom'
 import axios from 'axios'
 import { BookOpen, CheckCircle2, XCircle, Search, ShieldCheck } from 'lucide-react'
 
@@ -12,7 +12,9 @@ interface Cert {
 }
 
 export default function PublicCatalogPage() {
-  const [tab, setTab] = useState<'catalog' | 'verify'>('catalog')
+  const params = useParams()
+  const isVerifyRoute = window.location.pathname.startsWith('/verify') || !!params.code
+  const [tab, setTab] = useState<'catalog' | 'verify'>(isVerifyRoute ? 'verify' : 'catalog')
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50/30">
       <header className="border-b border-slate-200 bg-white px-8 py-5 flex items-center justify-between">
@@ -123,7 +125,9 @@ function CatalogTab() {
 
 function VerifyTab() {
   const [search] = useSearchParams()
-  const [code, setCode] = useState(search.get('code') || '')
+  const params = useParams()
+  const initialCode = params.code || search.get('code') || ''
+  const [code, setCode] = useState(initialCode)
   const [cert, setCert] = useState<Cert | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -136,10 +140,11 @@ function VerifyTab() {
       setCert(r.data)
     } catch (e: any) {
       if (e?.response?.status === 404) setNotFound(true)
+      else if (e?.response?.status === 429) alert('Too many verification attempts — please try again in a minute.')
     } finally { setBusy(false) }
   }
 
-  useEffect(() => { if (search.get('code')) verify() /* eslint-disable-next-line */ }, [])
+  useEffect(() => { if (initialCode) verify() /* eslint-disable-next-line */ }, [])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -187,6 +192,22 @@ function VerifyTab() {
               </div>
             ))}
           </dl>
+          <div className="pt-3 flex items-center gap-2">
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/verify/${encodeURIComponent(cert.code)}`
+                navigator.clipboard?.writeText(url).then(
+                  () => alert(`Verify link copied:\n${url}`),
+                  () => window.prompt('Copy this link:', url),
+                )
+              }}
+              data-testid="pub-cert-copy-link"
+              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg inline-flex items-center gap-2"
+            >
+              🔗 Copy shareable verify link
+            </button>
+            <span className="text-[11px] text-slate-500">Send this to recruiters — they can verify without an IFPI account.</span>
+          </div>
         </div>
       )}
       {notFound && (

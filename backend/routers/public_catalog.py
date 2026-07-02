@@ -22,7 +22,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user
@@ -33,11 +33,59 @@ from models import Certificate, Course, CourseStatus, Organization, User
 router = APIRouter(prefix="/api/public", tags=["Public catalog"])
 
 
+def _client_ip(request: Request) -> str:
+    """Real client IP behind an ingress. Trusts the FIRST X-Forwarded-For
+    entry (the actual client); the rest are ingress hops that could be
+    spoofed. Falls back to request.client.host."""
+    fwd = request.headers.get("x-forwarded-for") or ""
+    if fwd:
+        first = fwd.split(",")[0].strip()
+        if first:
+            return first
+    real = request.headers.get("x-real-ip")
+    if real:
+        return real
+    return getattr(request.client, "host", "0.0.0.0") or "0.0.0.0"
+
+
+# ── Simple in-memory sliding-window rate limiter ────────────────────
+# 30 requests / minute per IP for anonymous cert verify. Reset per
+# process — good enough since we're single-container behind ingress
+# and the endpoint's only threat model is enumeration bots.
+import threading
+import time
+from collections import deque, defaultdict
+
+_RATE_WINDOW_SECS = 60.0
+_RATE_MAX_REQUESTS = 30
+_rate_buckets: dict[str, deque] = defaultdict(deque)
+_rate_lock = threading.Lock()
+
+
+def _ratelimit(ip: str) -> None:
+    """Raise 429 if `ip` has exceeded RATE_MAX_REQUESTS in the last window."""
+    now = time.monotonic()
+    with _rate_lock:
+        bucket = _rate_buckets[ip]
+        while bucket and now - bucket[0] > _RATE_WINDOW_SECS:
+            bucket.popleft()
+        if len(bucket) >= _RATE_MAX_REQUESTS:
+            retry_after = int(_RATE_WINDOW_SECS - (now - bucket[0])) + 1
+            raise HTTPException(
+                status_code=429,
+                detail="Too many verification attempts — try again shortly",
+                headers={"Retry-After": str(retry_after)},
+            )
+        bucket.append(now)
+
+
 # ─── Anonymous certificate verify ────────────────────────────────────
 @router.get("/certificates/verify/{code}")
-def verify_certificate(code: str, db: Session = Depends(get_db)):
-    """Anonymous verification. Returns the minimum a verifier needs:
-    holder name, course title, issue date, type. No email. No PII."""
+def verify_certificate(code: str, request: Request, db: Session = Depends(get_db)):
+    """Anonymous verification. Rate-limited to 30/min per IP (in-memory
+    sliding window) so bots can't enumerate. Returns the minimum a
+    verifier needs — no PII beyond the holder's display name."""
+    _ratelimit(_client_ip(request))
     code = (code or "").strip()
     if not code or len(code) < 4:
         raise HTTPException(status_code=400, detail="Invalid certificate code")

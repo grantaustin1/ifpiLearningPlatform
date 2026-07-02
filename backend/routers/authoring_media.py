@@ -26,6 +26,7 @@ from auth.dependencies import CurrentUser, requires_staff
 from core.database import SessionLocal, get_db
 from models import AIJob, Course, CourseSlide, SlideType
 from services import ai_budget_service, video_service, visuals_service, audit_service
+from services.background_worker import submit_long_job
 
 logger = logging.getLogger("ifpi.authoring.media")
 
@@ -39,6 +40,30 @@ class VideoStartIn(BaseModel):
     model: str = "sora-2"
     size: str = "1280x720"
     duration: int = 4
+
+
+class VideoPreviewIn(BaseModel):
+    model: str = "sora-2"
+    duration: int = 4
+
+
+@router.post("/video/preview")
+def video_cost_preview(
+    body: VideoPreviewIn,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_staff()),
+):
+    """Show the estimated cost + remaining budget BEFORE firing a Sora
+    render. Frontend shows this in the spend-preview modal."""
+    video_service.validate_params(body.model, "1280x720", body.duration)
+    est = video_service.estimated_cost_cents(body.model, body.duration)
+    status = ai_budget_service.get_budget_status(db, current.organization_id)
+    return {
+        "estimated_cost_cents": est,
+        "budget": status,
+        "will_exceed_budget": status["remaining_cents"] is not None
+            and status["remaining_cents"] < est,
+    }
 
 
 def _run_video_job(job_id: int, org_id: int, user_id: int,
@@ -146,10 +171,13 @@ def start_video_generation(
     )
     db.commit()
 
-    bg.add_task(
+    # Off-load to the dedicated long-worker pool so FastAPI's anyio pool
+    # isn't saturated by 3-5 minute Sora renders (Iter 28 fix).
+    submit_long_job(
         _run_video_job, job.id, current.organization_id, current.id,
         body.prompt, body.model, body.size, body.duration, body.slide_id,
     )
+    _ = bg   # BackgroundTasks kept in signature for now (unused after the switch)
     return {
         "job_id": job.id, "status": job.status,
         "estimated_cost_cents": est,
