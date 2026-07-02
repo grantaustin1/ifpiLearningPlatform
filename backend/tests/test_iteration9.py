@@ -15,7 +15,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
-BACKEND_DIR = str(Path(__file__).resolve().parents[1])
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +51,7 @@ class TestCohortReportEndpoints:
         # AGENT008 seeded from prior agent_008 run
         names = [c.get("cohort") for c in body]
         if "AGENT008" not in names:
-            pytest.skip(f"AGENT008 cohort is not seeded in this environment: {names}")
+            pytest.skip(f"AGENT008 cohort not present in this environment: {names}")
         ag = next(c for c in body if c["cohort"] == "AGENT008")
         assert ag.get("learner_count", 0) >= 1
 
@@ -74,7 +74,7 @@ class TestCohortReportEndpoints:
         assert r.status_code == 200, r.text
         b = r.json()
         if b["learners"] == 0:
-            pytest.skip("AGENT008 cohort has no learners in this seeded dataset")
+            pytest.skip("AGENT008 cohort has no learners in this environment")
         assert b["learners"] >= 1
         assert b["enrollments"] >= 1
         assert b["completion_rate"] >= 0
@@ -113,9 +113,10 @@ class TestCohortCelebrations:
         from models import AuditLog, OutboxMessage, User
 
         with SessionLocal() as db:
+            from models import User
             cohort_users = db.query(User).filter(User.cohort == "AGENT008").count()
             if cohort_users == 0:
-                pytest.skip("AGENT008 cohort has no users in this seeded dataset")
+                pytest.skip("AGENT008 cohort users not present in this environment")
             prior = db.query(AuditLog).filter(
                 AuditLog.action == "COHORT_MILESTONE_REACHED",
                 AuditLog.target_id == "AGENT008",

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 import time
-import importlib.util
 from pathlib import Path
 import requests
 import pytest
@@ -18,19 +17,8 @@ import yaml
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
-AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
-    importlib.util.find_spec("emergentintegrations") is not None
-)
-
-
-def _ai_tests_enabled() -> bool:
-    if not os.environ.get("EMERGENT_LLM_KEY"):
-        return False
-    try:
-        import emergentintegrations  # noqa: F401
-    except Exception:
-        return False
-    return True
+HAS_EMERGENT_LLM_KEY = bool(os.environ.get("EMERGENT_LLM_KEY", "").strip())
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ──────────────────── Fixtures ────────────────────
@@ -100,7 +88,7 @@ class TestCohortCelebrationsIdempotency:
                          json={"cohort_threshold": 60})
         # Invoke check_cohorts directly via the in-process DB
         import sys
-        sys.path.insert(0, "/app/backend")
+        sys.path.insert(0, BACKEND_DIR)
         from core.database import SessionLocal
         from services.cohort_celebrations import check_cohorts
         db = SessionLocal()
@@ -132,16 +120,12 @@ class TestLeaderboardCohort:
             pass
         all_rows = admin_client.get(f"{BASE_URL}/api/gamification/leaderboard").json()
         assert len(rows) <= len(all_rows)
-        if len(rows) == 0:
-            pytest.skip("AGENT008 cohort is not seeded in this environment")
-        # Sanity: filter returns at least 1 when AGENT008 exists
-        assert len(rows) >= 1
 
 
 # ──────────────────── AI quiz generator ────────────────────
 @pytest.mark.skipif(
-    not AI_INTEGRATION_AVAILABLE,
-    reason="AI integration unavailable (EMERGENT_LLM_KEY and package required)",
+    not HAS_EMERGENT_LLM_KEY,
+    reason="EMERGENT_LLM_KEY is required for AI quiz generation tests",
 )
 class TestAIQuiz:
     course_id = 1
@@ -245,7 +229,11 @@ class TestAppendQuestions:
 # ──────────────────── GH Actions workflow YAML ────────────────────
 class TestWorkflowYaml:
     def test_workflow_file_exists_and_valid(self):
-        path = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "pr-agent-comments.yml"
+        repo_root = next((p for p in Path(__file__).resolve().parents if (p / ".git").exists()), None)
+        if repo_root is None:
+            repo_root = next((p for p in Path(__file__).resolve().parents if (p / ".github").exists()), None)
+        assert repo_root is not None, "could not locate repository root"
+        path = repo_root / ".github/workflows/pr-agent-comments.yml"
         assert path.exists(), f"missing: {path}"
         with path.open() as f:
             doc = yaml.safe_load(f)
