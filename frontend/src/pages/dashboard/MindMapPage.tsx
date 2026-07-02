@@ -114,7 +114,7 @@ export default function MindMapPage() {
     } finally { setLoading(false) }
   }, [cid, maxTopics, applyGraph, loadSaved])
 
-  useEffect(() => { generate(false) /* eslint-disable-next-line */ }, [cid])
+  useEffect(() => { generate(false) }, [cid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(ns => {
@@ -136,8 +136,25 @@ export default function MindMapPage() {
     if (!map) return
     setSaving(true)
     try {
+      // Snapshot the current React-Flow viewport as a base64 SVG so the
+      // course card can render a preview without re-running the LLM.
+      let thumbnail_svg: string | null = null
+      try {
+        const svgEl = document.querySelector('.react-flow__viewport')?.closest('svg') as SVGElement | null
+        if (svgEl) {
+          const clone = svgEl.cloneNode(true) as SVGElement
+          clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+          clone.setAttribute('width', '400')
+          clone.setAttribute('height', '260')
+          const raw = new XMLSerializer().serializeToString(clone)
+          if (raw.length < 180_000) {
+            thumbnail_svg = btoa(unescape(encodeURIComponent(raw)))
+          }
+        }
+      } catch { /* thumbnail is best-effort */ }
+
       await api.put(`/authoring/mindmap/${cid}/layout`, {
-        graph: map, positions,
+        graph: map, positions, thumbnail_svg,
       })
       toast.success('Layout saved')
       setDirty(false); setHasSaved(true)

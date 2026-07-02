@@ -385,12 +385,19 @@ function Field({ label, children }: any) {
   return <div className="mb-4"><label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>{children}</div>
 }
 
-// ── Narration editor (Iter 26a) ────────────────────────────────────
+// ── Narration editor (Iter 26a + 30 multi-lang) ─────────────────────
 const NARRATION_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+const NARRATION_LANGS = [
+  ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'],
+  ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['ja', 'Japanese'],
+  ['ko', 'Korean'], ['zh', 'Chinese'], ['hi', 'Hindi'],
+] as const
 
 function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
   const [voice, setVoice] = useState(slide.narration_voice || 'nova')
   const [model, setModel] = useState<'tts-1' | 'tts-1-hd'>('tts-1')
+  const [language, setLanguage] = useState<string>('en')
+  const [translateFirst, setTranslateFirst] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const gen = async () => {
@@ -398,6 +405,7 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
     try {
       const r = await api.post('/authoring/narration/generate', {
         slide_id: slide.id, voice, model,
+        language, translate_first: translateFirst,
       })
       toast.success(`Narration ready · ${r.data.chunk_count} chunk(s) · ${(r.data.size_bytes / 1024).toFixed(1)} KB`)
       onUpdated()
@@ -426,7 +434,7 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
           </button>
         </div>
       ) : (
-        <p className="text-xs text-slate-500">No narration yet. Pick a voice, hit generate.</p>
+        <p className="text-xs text-slate-500">No narration yet. Pick a voice + language, hit generate.</p>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <select value={voice} onChange={e => setVoice(e.target.value)}
@@ -440,6 +448,18 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
           <option value="tts-1">tts-1 (fast)</option>
           <option value="tts-1-hd">tts-1-hd (higher quality)</option>
         </select>
+        <select value={language} onChange={e => setLanguage(e.target.value)}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-language-select">
+          {NARRATION_LANGS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+        </select>
+        {language !== 'en' && (
+          <label className="text-[11px] text-slate-600 inline-flex items-center gap-1" title="Translate the slide text to the target language before generating audio">
+            <input type="checkbox" checked={translateFirst} onChange={e => setTranslateFirst(e.target.checked)}
+              data-testid="narration-translate-first" />
+            translate first
+          </label>
+        )}
         <button onClick={gen} disabled={busy}
           data-testid="narration-generate-btn"
           className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">

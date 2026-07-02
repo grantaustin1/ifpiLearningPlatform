@@ -26,12 +26,14 @@ def _can_manage(user: CurrentUser) -> bool:
 
 
 def _summary(c: Course) -> CourseSummary:
+    meta = c.metadata_json or {}
     return CourseSummary(
         id=c.id, title=c.title, description=c.description, category=c.category,
         cover_color=c.cover_color, status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
         currency=c.currency, slide_count=len(c.slides),
         enrollment_count=len(c.enrollments), created_at=c.created_at,
+        mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
     )
 
 
@@ -102,6 +104,7 @@ def create_course(
 
 
 def _detail(c: Course) -> CourseDetail:
+    meta = c.metadata_json or {}
     return CourseDetail(
         id=c.id, title=c.title, description=c.description, category=c.category,
         cover_color=c.cover_color, status=c.status.value,
@@ -109,6 +112,7 @@ def _detail(c: Course) -> CourseDetail:
         currency=c.currency, passing_score=c.passing_score,
         slide_count=len(c.slides), enrollment_count=len(c.enrollments),
         created_at=c.created_at,
+        mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
         slides=[SlideOut(
             id=s.id, title=s.title, content=s.content or "",
             slide_type=s.slide_type.value, media_url=s.media_url,

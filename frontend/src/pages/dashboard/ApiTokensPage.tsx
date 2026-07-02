@@ -135,54 +135,110 @@ export default function ApiTokensPage() {
 // ── Inline SVG usage chart (Iter P2) ──────────────────────────────
 function UsageChart() {
   const [data, setData] = useState<{ series: any[]; by_token: any[]; total_calls: number; total_errors: number } | null>(null)
+  const [spend, setSpend] = useState<{ series: any[]; providers: string[]; by_provider: any[]; total_cents: number; budget: any } | null>(null)
   useEffect(() => {
     api.get('/admin/api-tokens/analytics/usage?days=30')
       .then(r => setData(r.data))
       .catch(() => setData({ series: [], by_token: [], total_calls: 0, total_errors: 0 }))
+    api.get('/admin/api-tokens/analytics/spend?days=30')
+      .then(r => setSpend(r.data))
+      .catch(() => setSpend({ series: [], providers: [], by_provider: [], total_cents: 0, budget: null }))
   }, [])
   if (!data) return null
   const max = Math.max(1, ...data.series.map((d: any) => d.count))
   const W = 720, H = 140, PAD = 20
   const bw = (W - PAD * 2) / (data.series.length || 1)
+  const spendMax = Math.max(1, ...(spend?.series || []).map((d: any) => d.total_cents))
+  const providerColors: Record<string, string> = {
+    openai: '#10b981', gemini: '#8b5cf6', claude: '#f59e0b',
+    tavily: '#0ea5e9', anthropic: '#f97316',
+  }
+  const cents = (c: number) => `$${(c / 100).toFixed(2)}`
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3" data-testid="tokens-usage-chart">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-slate-700">Requests (last 30 days)</h2>
-        <div className="text-xs text-slate-500 flex gap-4">
-          <span data-testid="tokens-total-calls"><span className="font-bold text-slate-800">{data.total_calls}</span> total</span>
-          <span data-testid="tokens-total-errors" className={data.total_errors > 0 ? 'text-rose-600 font-semibold' : ''}>
-            {data.total_errors} errors
-          </span>
+    <div className="grid md:grid-cols-2 gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3" data-testid="tokens-usage-chart">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold text-slate-700">Requests (last 30 days)</h2>
+          <div className="text-xs text-slate-500 flex gap-4">
+            <span data-testid="tokens-total-calls"><span className="font-bold text-slate-800">{data.total_calls}</span> total</span>
+            <span data-testid="tokens-total-errors" className={data.total_errors > 0 ? 'text-rose-600 font-semibold' : ''}>
+              {data.total_errors} errors
+            </span>
+          </div>
         </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[140px]" preserveAspectRatio="none">
-        {data.series.map((d: any, i: number) => {
-          const h = (d.count / max) * (H - PAD * 2)
-          const x = PAD + i * bw
-          const y = H - PAD - h
-          return (
-            <g key={d.date}>
-              <rect x={x + 1} y={y} width={Math.max(1, bw - 2)} height={Math.max(0, h)}
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[140px]" preserveAspectRatio="none">
+          {data.series.map((d: any, i: number) => {
+            const h = (d.count / max) * (H - PAD * 2)
+            const x = PAD + i * bw
+            const y = H - PAD - h
+            return (
+              <rect key={d.date} x={x + 1} y={y} width={Math.max(1, bw - 2)} height={Math.max(0, h)}
                 fill={d.errors > 0 ? '#f43f5e' : '#4f46e5'} opacity={d.count === 0 ? 0.15 : 0.85}>
                 <title>{d.date}: {d.count} calls, {d.errors} errors</title>
               </rect>
-            </g>
-          )
-        })}
-        <line x1={PAD} x2={W - PAD} y1={H - PAD} y2={H - PAD} stroke="#e2e8f0" />
-      </svg>
-      {data.by_token.length > 0 && (
-        <div className="pt-2">
-          <p className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide mb-2">Top tokens (30d)</p>
-          <ul className="space-y-1.5">
-            {data.by_token.slice(0, 5).map((t: any) => (
-              <li key={t.token_id} className="text-xs flex items-center gap-2" data-testid={`tokens-top-${t.token_id}`}>
-                <span className="font-mono text-slate-500 w-20 truncate">{t.prefix}</span>
-                <span className="flex-1 truncate text-slate-700">{t.name}</span>
-                <span className="tabular-nums font-semibold text-slate-800">{t.count}</span>
-              </li>
-            ))}
-          </ul>
+            )
+          })}
+          <line x1={PAD} x2={W - PAD} y1={H - PAD} y2={H - PAD} stroke="#e2e8f0" />
+        </svg>
+        {data.by_token.length > 0 && (
+          <div className="pt-2">
+            <p className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide mb-2">Top tokens (30d)</p>
+            <ul className="space-y-1.5">
+              {data.by_token.slice(0, 5).map((t: any) => (
+                <li key={t.token_id} className="text-xs flex items-center gap-2" data-testid={`tokens-top-${t.token_id}`}>
+                  <span className="font-mono text-slate-500 w-20 truncate">{t.prefix}</span>
+                  <span className="flex-1 truncate text-slate-700">{t.name}</span>
+                  <span className="tabular-nums font-semibold text-slate-800">{t.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {spend && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3" data-testid="tokens-spend-chart">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">AI spend (last 30 days)</h2>
+            <div className="text-xs text-slate-500 flex gap-3 items-baseline">
+              <span data-testid="tokens-total-spend"><span className="font-bold text-slate-800">{cents(spend.total_cents)}</span> spent</span>
+              {spend.budget?.remaining_cents != null && (
+                <span data-testid="tokens-budget-remaining" className="text-emerald-700 font-semibold">{cents(spend.budget.remaining_cents)} left</span>
+              )}
+            </div>
+          </div>
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[140px]" preserveAspectRatio="none">
+            {spend.series.map((d: any, i: number) => {
+              const x = PAD + i * bw
+              let y = H - PAD
+              return (
+                <g key={d.date}>
+                  {spend.providers.map((p) => {
+                    const cs = d[p] || 0
+                    if (cs <= 0) return null
+                    const h = (cs / spendMax) * (H - PAD * 2)
+                    y -= h
+                    return <rect key={p} x={x + 1} y={y} width={Math.max(1, bw - 2)} height={h}
+                             fill={providerColors[p] || '#64748b'} opacity={0.85}>
+                             <title>{d.date} · {p}: {cents(cs)}</title>
+                           </rect>
+                  })}
+                </g>
+              )
+            })}
+            <line x1={PAD} x2={W - PAD} y1={H - PAD} y2={H - PAD} stroke="#e2e8f0" />
+          </svg>
+          {spend.by_provider.length > 0 && (
+            <div className="pt-2 flex flex-wrap gap-3" data-testid="tokens-spend-legend">
+              {spend.by_provider.map((p: any) => (
+                <div key={p.provider} className="text-[11px] inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: providerColors[p.provider] || '#64748b' }} />
+                  <span className="text-slate-500">{p.provider}</span>
+                  <span className="font-semibold text-slate-800 tabular-nums">{cents(p.cost_cents)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

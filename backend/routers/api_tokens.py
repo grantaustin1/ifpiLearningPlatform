@@ -213,3 +213,72 @@ def token_usage_analytics(
         "total_calls": total_calls,
         "total_errors": total_errors,
     }
+
+
+@router.get("/analytics/spend")
+def ai_spend_analytics(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Per-day $ spend across all AI providers for the last `days` days.
+    Sources: `ai_usage_ledger`. Grouped by provider for a stacked chart."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func
+    from models import AIUsageLedger
+
+    days = max(1, min(days, 90))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    date_col = func.date(AIUsageLedger.created_at)
+    rows = (
+        db.query(
+            date_col.label("d"),
+            AIUsageLedger.provider.label("p"),
+            func.sum(AIUsageLedger.cost_cents).label("cents"),
+        )
+        .filter(
+            AIUsageLedger.organization_id == current.organization_id,
+            AIUsageLedger.created_at >= cutoff,
+        )
+        .group_by(date_col, AIUsageLedger.provider)
+        .all()
+    )
+    # Zero-fill each day; keep per-provider breakdown
+    providers = sorted({r.p for r in rows})
+    day_map: dict[str, dict[str, int]] = {}
+    for r in rows:
+        d = str(r.d)
+        day_map.setdefault(d, {p: 0 for p in providers})[r.p] = int(r.cents or 0)
+
+    series = []
+    total_cents = 0
+    for i in range(days):
+        d = (datetime.now(timezone.utc) - timedelta(days=days - 1 - i)).date().isoformat()
+        entry = {"date": d, "total_cents": 0}
+        for p in providers:
+            v = day_map.get(d, {}).get(p, 0)
+            entry[p] = v
+            entry["total_cents"] += v
+        total_cents += entry["total_cents"]
+        series.append(entry)
+
+    # Per-provider totals for the doughnut / legend
+    by_provider = [
+        {"provider": p,
+         "cost_cents": sum(day_map.get(d, {}).get(p, 0) for d in day_map)}
+        for p in providers
+    ]
+
+    # Fetch org budget for context
+    from services import ai_budget_service
+    budget = ai_budget_service.get_budget_status(db, current.organization_id)
+
+    return {
+        "days": days,
+        "providers": providers,
+        "series": series,
+        "by_provider": by_provider,
+        "total_cents": total_cents,
+        "budget": budget,
+    }
