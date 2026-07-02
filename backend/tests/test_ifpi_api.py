@@ -17,12 +17,25 @@ if not BASE_URL:
                     BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
     except Exception:
         pass
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests",
+                allow_module_level=True)
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
 AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
     importlib.util.find_spec("emergentintegrations") is not None
 )
+
+
+def _ai_tests_enabled() -> bool:
+    if not os.environ.get("EMERGENT_LLM_KEY"):
+        return False
+    try:
+        import emergentintegrations  # noqa: F401
+    except Exception:
+        return False
+    return True
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
@@ -300,7 +313,9 @@ class TestBilling:
 
 
 # ── AI builder ──────────────────────────────────────────────────────
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIBuilder:
+    @pytest.mark.skipif(not _ai_tests_enabled(), reason="AI builder tests require EMERGENT_LLM_KEY and emergentintegrations")
     def test_ai_course_builder(self, admin_session):
         if not AI_INTEGRATION_AVAILABLE:
             pytest.skip("AI integration unavailable (EMERGENT_LLM_KEY and package required)")

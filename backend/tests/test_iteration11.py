@@ -19,6 +19,16 @@ AI_INTEGRATION_AVAILABLE = bool(os.environ.get("EMERGENT_LLM_KEY")) and (
 )
 
 
+def _ai_tests_enabled() -> bool:
+    if not os.environ.get("EMERGENT_LLM_KEY"):
+        return False
+    try:
+        import emergentintegrations  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
 @pytest.fixture(scope="module")
 def admin_token():
     r = requests.post(f"{API}/auth/login",

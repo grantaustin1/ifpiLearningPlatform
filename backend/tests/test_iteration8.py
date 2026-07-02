@@ -13,7 +13,8 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    pytest.skip("REACT_APP_BACKEND_URL is required", allow_module_level=True)
+    import pytest
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests", allow_module_level=True)
 SQLITE_PATH = "/app/backend/ifpi_lms.db"
 database_url = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
 if database_url.startswith("sqlite:///"):

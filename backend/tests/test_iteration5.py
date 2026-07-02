@@ -161,8 +161,17 @@ def test_image_upload_learner_forbidden(learner_session):
 
 
 # ── Academies (SUPER_ADMIN) ──────────────────────────────────────────
+def _require_super_admin(admin_session):
+    me = admin_session.get(f"{API}/auth/me")
+    if me.status_code != 200:
+        pytest.skip("Unable to verify admin roles")
+    roles = set(me.json().get("roles") or [])
+    if "SUPER_ADMIN" not in roles:
+        pytest.skip("SUPER_ADMIN role is not available in this seeded environment")
+
+
 def test_academies_list_as_super_admin(admin_session):
-    # admin@ifpi.org has both ADMIN and SUPER_ADMIN roles in this env
+    _require_super_admin(admin_session)
     r = admin_session.get(f"{API}/academies")
     if r.status_code == 403:
         pytest.skip("seed admin lacks SUPER_ADMIN in this environment")
@@ -178,6 +187,7 @@ def test_academies_list_as_learner_forbidden(learner_session):
 
 
 def test_create_academy_queues_invitation(admin_session):
+    _require_super_admin(admin_session)
     suffix = uuid.uuid4().hex[:8]
     slug = f"test-acad-{suffix}"
     email = f"TEST_acad_admin_{suffix}@example.com"
