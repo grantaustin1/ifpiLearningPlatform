@@ -91,22 +91,24 @@ class TestOrgCohortSettings:
 # ──────────────────── Cohort celebrations idempotency ────────────────────
 class TestCohortCelebrationsIdempotency:
     def test_lowering_threshold_does_not_refire_existing(self, admin_client):
-        # Lower threshold and verify celebration checks are idempotent.
-        admin_client.put(f"{BASE_URL}/api/organization/cohort-settings",
-                         json={"cohort_threshold": 60})
-        # Invoke check_cohorts directly via the in-process DB
-        import sys
-        backend_dir = str(Path(__file__).resolve().parents[1])
-        if backend_dir not in sys.path:
-            sys.path.insert(0, backend_dir)
+        # Set to 60 and verify idempotency regardless of existing seed/audit state.
+        r = admin_client.put(
+            f"{BASE_URL}/api/organization/cohort-settings",
+            json={"cohort_threshold": 60},
+        )
+        assert r.status_code == 200, r.text
+
+        # Invoke check_cohorts directly via the in-process DB.
         from core.database import SessionLocal
         from services.cohort_celebrations import check_cohorts
         db = SessionLocal()
         try:
             fired_first = check_cohorts(db)
             fired_second = check_cohorts(db)
-            assert fired_first >= 0
-            assert fired_second == 0, f"Expected idempotent second run to be 0, got {fired_second}"
+            assert fired_second == 0, (
+                f"Expected second consecutive run to be idempotent (0), got {fired_second} "
+                f"(first run fired {fired_first})"
+            )
         finally:
             db.close()
 
