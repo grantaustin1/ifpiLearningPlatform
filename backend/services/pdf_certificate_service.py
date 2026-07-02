@@ -211,6 +211,28 @@ def render_certificate(
     c.setFillColor(colors.HexColor("#475569"))
     c.drawRightString(page_w - inset - 12 * mm, bottom_y - 12, certificate_code)
 
+    # ── Clickable "Verify online" link under the QR (Iter 30b) ──────
+    # Uses reportlab's linkURL to overlay a live hyperlink so recruiters
+    # can click straight from the PDF instead of scanning the QR.
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(accent)
+    link_label = "Verify online →"
+    link_y = bottom_y - 22
+    c.drawRightString(page_w - inset - 12 * mm, link_y, link_label)
+    link_w = c.stringWidth(link_label, "Helvetica-Bold", 8)
+    link_rect = (
+        page_w - inset - 12 * mm - link_w,  # x1
+        link_y - 2,                          # y1
+        page_w - inset - 12 * mm,            # x2
+        link_y + 8,                          # y2
+    )
+    c.linkURL(verify_url, link_rect, relative=0, thickness=0)
+    # Also render the verify URL as small text for offline reference
+    c.setFont("Helvetica", 6)
+    c.setFillColor(colors.HexColor("#94a3b8"))
+    truncated = verify_url if len(verify_url) <= 60 else verify_url[:57] + "…"
+    c.drawRightString(page_w - inset - 12 * mm, link_y - 8, truncated)
+
     # ── Footer text (below the inner card) ─────────────────────────
     if footer_text:
         c.setFont("Helvetica", 7)

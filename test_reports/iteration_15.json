@@ -1,0 +1,36 @@
+{
+  "summary": "Gap-closure verification (deps pinning + seed_templates). All 10 checklist items PASS. Fresh venv `pip install -r requirements.txt` exits 0 and installs bleach 6.4.0, python-docx 1.2.0, pandas 3.0.3, openpyxl 3.1.5, markdown 3.10.2 at the exact pinned versions. Sanitizer confirmed bleach-backed (not fallback) — `<script>` tag stripped from HTML. seed_templates.py creates the 3 templates on first run and is fully idempotent (Created: 0 / Skipped: 3 on re-run) with correct titles [TEMPLATE] Foundation/Practical/Assessment, status=DRAFT, category=TEMPLATE, slide counts 5/5/4. Non-existent --org-id exits non-zero. Regression: test_iteration21 5/5 green, `alembic current` = b1c2d3e4f5a6 (head), secret scanner exits 0. Combined pytest run: 13/13 passed in 5.26s.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration15_gaps.py",
+    "/app/backend/tests/test_iteration21.py",
+    "/app/test_reports/pytest/iteration15_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "seed_templates.py flushes and continues on per-template failure but on exception it calls db.rollback() while other templates in the SAME session were already flushed — the rollback will roll back everything since the last commit(). In practice the commit() only happens at the end, so a mid-loop failure would silently discard successful earlier iterations. Consider committing after each successful template OR using SAVEPOINT/nested transactions. Non-blocking for current usage (all templates are static and equally valid) but worth a follow-up.",
+    "sanitizer.py falls back to a regex tag-stripper if bleach is missing — this is defensive but the regex `<[^>]+>` is naive and won't handle malformed HTML like `<img src=x onerror=alert(1)`. Given bleach is now pinned in requirements.txt, the fallback path should never fire in prod; still, the warning log is the right call.",
+    "bulk_import.py still catches ImportError for `docx` and `markdown` inside helper functions and logs a warning + degrades output. Now that both are pinned this dead code path can be removed for clarity, or converted into a hard import at module top since the pods must have them.",
+    "seed_templates service account `templates@system.local` is created with is_active=False (good — cannot log in) but there's no unique constraint check other than email+org_id filter. If the same script is run against two orgs and users.email is globally unique in the schema, the second call may fail. Verify the User model's unique constraint scope before running against a fresh org that doesn't already have the account."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration15_gaps.py"],
+  "success_rate": {"backend": "100%", "frontend": "n/a"},
+  "test_credentials": "admin@ifpi.org / admin123 (used for /api/courses verification)",
+  "seed_data_creation": "seed_templates already had courses 40/41/42 on org 1 from the main agent's local run; re-ran and confirmed idempotent skip. No new persistent data created by this test run; the transient venv at /tmp/fresh_venv was cleaned up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Gap-closure task fully green. To re-verify: (1) `cd /app/backend && REACT_APP_BACKEND_URL=<url> pytest tests/test_iteration15_gaps.py tests/test_iteration21.py -v` — should be 13/13. (2) Fresh-venv install: `python3 -m venv /tmp/v && /tmp/v/bin/pip install -r /app/backend/requirements.txt` — exit 0. (3) `alembic current` in /app/backend prints `b1c2d3e4f5a6 (head)`. (4) `bash /app/scripts/security/scan-secrets.sh --ci` prints OK exit 0. Note: the sanitizer test asserts <script> tag is removed but bleach's `strip=True` preserves the inner text (`alert(1)` remains as plain text) — this is expected sanitizer behaviour and matches the checklist wording (`script tag removed`), not text-content removal.",
+  "verification_evidence": {
+    "item_1_fresh_venv_install": "PASS — pip install exit 0 in clean venv, all 5 deps at pinned versions",
+    "item_2_imports_work": "PASS — `import bleach, docx, pandas, openpyxl, markdown` exits 0",
+    "item_3_sanitizer_removes_script": "PASS — <script> stripped, <p>ok</p> preserved, _BLEACH=True (not fallback)",
+    "item_4_seed_creates_3_templates": "PASS — Foundation/Practical/Assessment on org 1",
+    "item_5_idempotent_rerun": "PASS — Created: 0, Skipped: 3 on re-run, no duplicates",
+    "item_6_course_shape_via_api": "PASS — GET /api/courses/{id} confirms category=TEMPLATE, status=DRAFT, slides 5/5/4",
+    "item_7_unknown_org_exits_error": "PASS — --org-id 999999 exits non-zero with 'not found'",
+    "item_8_iter21_regression": "PASS — 5/5 in 5.26s combined run",
+    "item_9_secret_scanner": "PASS — scan-secrets.sh --ci exits 0",
+    "item_10_alembic_head": "PASS — alembic current = b1c2d3e4f5a6 (head)"
+  }
+}
