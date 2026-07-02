@@ -1,20 +1,31 @@
-"""pytest configuration for the backend test suite.
-
-Integration tests (test_iteration*.py, test_ifpi_api.py) require a live
-backend reachable at REACT_APP_BACKEND_URL.  When that variable is absent
-the whole file is excluded from collection so pytest does not crash with
-module-level AssertionError / FileNotFoundError during CI.
-"""
 import os
+from pathlib import Path
+import sys
+
+import pytest
 
 
-def pytest_ignore_collect(collection_path, config):  # noqa: ARG001
-    """Skip integration-test files when no backend URL is configured."""
-    if os.environ.get("REACT_APP_BACKEND_URL"):
-        return None  # URL present – collect normally
+_BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").strip()
+_MISSING_BASE_URL = not _BASE_URL
+
+# Ensure backend-root imports (e.g., scripts.qa_agents) work from pytest in CI.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Some integration modules assert BASE_URL during import. Ensure collection does
+# not hard-fail when CI intentionally runs without an API base URL.
+if _MISSING_BASE_URL:
+    os.environ["REACT_APP_BACKEND_URL"] = "http://127.0.0.1:8000"
 
     name = collection_path.name
     if name.startswith("test_iteration") or name == "test_ifpi_api.py":
         return True  # exclude this file
 
-    return None
+def pytest_collection_modifyitems(config, items):
+    if not _MISSING_BASE_URL:
+        return
+
+    skip_integration = pytest.mark.skip(reason="Integration API tests require REACT_APP_BACKEND_URL")
+    for item in items:
+        filename = Path(str(item.fspath)).name
+        if filename.startswith("test_iteration") or filename == "test_ifpi_api.py":
+            item.add_marker(skip_integration)
