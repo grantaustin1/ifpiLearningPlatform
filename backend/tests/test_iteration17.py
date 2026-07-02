@@ -149,7 +149,10 @@ def _mint_sso_token(jti: str, secret: str, email: str = "admin@ifpi.org",
 def test_sso_replay_protection_persists_across_sessions(sso_setup):
     # Read shared secret directly from .env (test-only convenience).
     from pathlib import Path
-    env = (Path("/app/backend/.env")).read_text()
+    env_path = Path("/app/backend/.env")
+    if not env_path.exists():
+        pytest.skip(".env missing — SSO replay test needs container runtime")
+    env = env_path.read_text()
     secret = next(
         (line.split("=", 1)[1].strip() for line in env.splitlines()
          if line.startswith("ERP360_SSO_SHARED_SECRET=")),
