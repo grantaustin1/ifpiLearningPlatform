@@ -15,6 +15,7 @@ interface AuthCtx {
   loading: boolean
   login: (email: string, password: string) => Promise<User>
   register: (email: string, password: string, name: string) => Promise<User>
+  ssoExchange: (erpToken: string) => Promise<User>
   logout: () => Promise<void>
   refresh: () => Promise<void>
   hasRole: (...allowed: string[]) => boolean
@@ -54,6 +55,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return r.data.user as User
   }
 
+  const ssoExchange = async (erpToken: string) => {
+    const r = await api.post('/auth/sso-exchange', { erp_token: erpToken })
+    if (r.data?.access_token) setAccessToken(r.data.access_token)
+    setUser(r.data.user)
+    return r.data.user as User
+  }
+
   const logout = async () => {
     try { await api.post('/auth/logout') } catch { /* swallow */ }
     setAccessToken(null)
@@ -66,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     !!user && allowed.some((r) => user.roles.includes(r))
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout, refresh, hasRole }}>
+    <Ctx.Provider value={{ user, loading, login, register, ssoExchange, logout, refresh, hasRole }}>
       {children}
     </Ctx.Provider>
   )
