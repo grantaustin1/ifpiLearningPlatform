@@ -23,6 +23,7 @@ Exit code 0 if clean, 1 if any violation found. JSON report written to
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -122,7 +123,8 @@ def main() -> int:
         "generated_at": now.isoformat(), "invariants_checked": 9,
         "violations": len(failures), "failures": failures,
     }
-    out = Path("/app/test_reports/agent_007.json")
+    _repo_root = Path(__file__).resolve().parents[3]
+    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_007.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str))
 
