@@ -138,7 +138,9 @@ def main() -> int:
         "generated_at": now.isoformat(), "invariants_checked": 9,
         "violations": len(failures), "failures": failures,
     }
-    out = _report_path("agent_007.json")
+    _repo_root = Path(__file__).resolve().parents[3]
+    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_007.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str))
 
     if failures:
