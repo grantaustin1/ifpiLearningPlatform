@@ -1,0 +1,41 @@
+{
+  "summary": "Iter 25b + 25c + 26a review (P1 unique constraints, flashcard streak+XP, OpenAI TTS narration). Backend pytest: 50/51 passing across iter22/23/25/26. New iter26 test file (11 tests) all green — 409 on duplicate title, streak endpoint shape, XP awards on quality=5 (with streak bonus), 0-XP on quality=1, TTS narration generate+clear+audio-retrieval, invalid voice → 400, short text → 400, learner blocked → 403, TTS chunker + cost estimator pure-function tests. iter25 (11/11) and iter23 (13/13) fully green — no regressions. Only failure is test_iteration22::test_authoring_status_admin_can_access which is stale (documented in iteration_16 report: it now needs to expect tts_enabled=True in addition to the flipped tutor/deep_research/flashcards flags). Frontend UI smoke on live preview: CourseEditPage narration editor (narration-editor + narration-voice-select + narration-model-select + narration-generate-btn) renders correctly; LearnerFlashcardsPage streak card (lfc-streak) shows 💤 empty state initially, flip-via-Space + rate-via-key-5 triggers +XP toast (lfc-xp-flash 'streak bonus') and streak jumps to '🔥 1-day streak · Longest: 1 · Reviewed today ✓'. All documented data-testids present. All 3 features delivered as spec'd.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/authoring/status",
+        "issue": "test_iteration22::test_authoring_status_admin_can_access still fails (stale) — asserts tts_enabled is False, but Iter 26 correctly flipped it to True. Same class of drift called out in iteration_16 for tutor/deep_research/flashcards flags. Update the stale asserts in tests/test_iteration22.py to expect the current shape (tutor_enabled, deep_research_enabled, flashcards_enabled, tts_enabled all True when their respective keys/features are enabled)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration26.py",
+    "/app/test_reports/pytest/iteration17_results.xml"
+  ],
+  "action_items": [
+    "Update /app/backend/tests/test_iteration22.py::test_authoring_status_admin_can_access — remove tts_enabled from the 'expected False' list. Same category of stale test as documented in iteration_16 (tutor/deep_research/flashcards were already flipped). Non-blocking, tests/logic drift only.",
+    "Optional polish: LearnerFlashcardsPage 💤 empty-state copy 'Review one card to keep it alive' — nice UX. No change needed. Consider surfacing streak+XP total in the top-right header once a learner is >0-day to give an ambient reward signal across all pages, not just /learn/:id/flashcards."
+  ],
+  "critical_code_review_comments": [
+    "TTS: services/tts_service.py cleanly separates _chunk_text / generate_narration / estimated_cost_cents; each is unit-testable and unit-tested. Good separation of concerns.",
+    "Narration router correctly enforces requires_staff on both POST /generate and DELETE /{slide_id}. Learner-blocked test (403) confirms.",
+    "Course POST returning 409 on duplicate title uses an application-side pre-check (before the DB UniqueConstraint fires) — good, since 409 is much more meaningful than a raw IntegrityError → 500. The Alembic migration also declares uq_courses_org_title as a defence-in-depth.",
+    "SQLite PRAGMA foreign_keys=ON is now in core/database.py (as recommended in iteration_16). Previous flashcard-review cascade issue is resolved — verified because the pytest test_bulk_save_and_learner_review_flow is now green.",
+    "Frontend NarrationEditor uses confirm() on delete — mildly heavy UX (browser-native dialog). Consider swapping for the existing sonner toast + inline confirm chip if you want to standardise on non-blocking dialogs. Non-blocking.",
+    "LearnPage renders inline <audio> only when slide.narration_url is truthy — clean conditional. Behaviour verified indirectly via pytest (course endpoint returns narration_url after generate + slide.narration_voice='nova')."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "98% (50/51, 1 stale pre-existing test)", "frontend": "100%"},
+  "test_credentials": "admin@ifpi.org / admin123 · learner@ifpi.org / learner123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Pytest-driven: created + deleted E2E test cards for streak/XP flow. UI smoke test rated one test flashcard which persisted a FlashcardReview row for the learner (current_streak now = 1, longest_streak = 1). Total 2 seed flashcards remain on course 1 (both unrated / due). If you want a truly clean state, delete card ids >1 and their reviews before next test cycle.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration_17: All 3 P1 + improvement + Iter 26a features shipped and verified end-to-end. Backend pytest 50/51 (the 1 failure is stale test_iteration22 assertion — same drift documented in iteration_16 which now includes tts_enabled). Every documented data-testid renders. Learner streak/XP flow confirmed via Space-to-flip + 5-to-rate keyboard flow (Perfect rating awards 29 XP with streak bonus, flash toast animates). Admin CourseEditPage narration editor visible with all 4 controls. Learner /learn/1 inline narration audio conditionally renders (only when narration_url populated — pytest cleanup removes it after the E2E generate test). Deferred to next iteration per PRD: Sora 2 video generation, Nano Banana mind maps, PPTX exporter, token analytics chart, SCORM shim, public catalog. Do NOT re-run test_narration_generate_and_clear with random text every time — it costs EMERGENT_LLM_KEY tokens.",
+  "rca of the issue": "N/A — no bugs found this iteration."
+}
