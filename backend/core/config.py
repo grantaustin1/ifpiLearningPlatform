@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     ai_builder_model: str = "gpt-4o-mini"
     ai_builder_provider: str = "openai"
 
+    # Iter 23 — Source-grounded tutor: RAG embeddings + Q&A model
+    tutor_llm_provider: str = "openai"
+    tutor_llm_model: str = "gpt-4o-mini"
+    embedding_provider: str = "openai"
+    embedding_model: str = "text-embedding-3-small"
+
+    # Iter 24 — Deep research via Tavily (user-supplied key required)
+    tavily_api_key: str = ""
+
     # ERP360 integration switches (off in v1 — flip to enable)
     billing_live_mode: bool = False
     erp360_base_url: str = ""
