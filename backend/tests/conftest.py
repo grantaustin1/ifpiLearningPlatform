@@ -1,2 +1,10 @@
-# collect_ignore is defined in the root backend/conftest.py (rootdir level) so that
-# pytest respects it.  Nothing else is needed in this file for the current test suite.
+import os
+
+
+collect_ignore_glob = []
+
+if not os.environ.get("REACT_APP_BACKEND_URL", "").strip():
+    collect_ignore_glob.extend([
+        "test_ifpi_api.py",
+        "test_iteration*.py",
+    ])
