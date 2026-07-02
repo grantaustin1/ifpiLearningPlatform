@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_staff
@@ -106,3 +107,81 @@ def export_course_pptx(
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.pptx"'},
     )
+
+
+# ─── Mind map layout persistence (Iter 28) ───────────────────────────
+class MindMapLayoutIn(BaseModel):
+    """React-flow positions per node id. We also snapshot the labelled
+    graph so a re-open shows the exact structure the admin last saved
+    without re-running the LLM."""
+    graph: dict = Field(..., description="{root, topics} shape from the LLM")
+    positions: dict = Field(..., description="{node_id: {x, y}}")
+
+
+@router.get("/mindmap/{course_id}/layout")
+def load_mindmap_layout(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_staff()),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    meta = course.metadata_json or {}
+    saved = meta.get("mindmap_layout")
+    if not saved:
+        return {"has_saved": False}
+    return {"has_saved": True, **saved}
+
+
+@router.put("/mindmap/{course_id}/layout")
+def save_mindmap_layout(
+    course_id: int, body: MindMapLayoutIn,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_staff()),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    from datetime import datetime, timezone
+    meta = dict(course.metadata_json or {})
+    meta["mindmap_layout"] = {
+        "graph": body.graph,
+        "positions": body.positions,
+        "saved_by_id": current.id,
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    course.metadata_json = meta
+    audit_service.record(
+        db, current, "MINDMAP_LAYOUT_SAVED",
+        target_type="course", target_id=str(course.id),
+        metadata={"node_count": len(body.positions)},
+    )
+    db.commit()
+    return {"ok": True, "saved_at": meta["mindmap_layout"]["saved_at"]}
+
+
+@router.delete("/mindmap/{course_id}/layout")
+def clear_mindmap_layout(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_staff()),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    meta = dict(course.metadata_json or {})
+    meta.pop("mindmap_layout", None)
+    course.metadata_json = meta
+    db.commit()
+    return {"ok": True}

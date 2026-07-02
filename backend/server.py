@@ -42,6 +42,10 @@ app.add_middleware(
 )
 
 
+# ── Iter 28 · Rate limiting is per-router (in-memory sliding window). ─
+# See routers/public_catalog.py::_ratelimit — no middleware needed.
+
+
 # ── Iter P2 · API token call logger ────────────────────────────────
 # Records one row in `api_token_calls` for every request authenticated
 # with a bearer starting with our TOKEN_PREFIX. Only applied to /api/*.
@@ -123,4 +127,6 @@ def on_startup():
 @app.on_event("shutdown")
 def on_shutdown():
     from services.outbox_worker import shutdown_scheduler
+    from services.background_worker import shutdown_long_workers
     shutdown_scheduler()
+    shutdown_long_workers(wait=False)

@@ -91,7 +91,6 @@ export default function App() {
 
       <Route path="/public" element={<PublicCatalogPage />} />
       <Route path="/verify" element={<PublicCatalogPage />} />
-      <Route path="/verify/:code" element={<PublicCatalogPage />} />
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
       <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />

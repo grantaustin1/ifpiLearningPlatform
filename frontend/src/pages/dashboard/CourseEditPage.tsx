@@ -494,7 +494,7 @@ function VisualEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void 
   )
 }
 
-// ── Video editor (Iter 26b) — Sora 2 async ─────────────────────────
+// ── Video editor (Iter 26b) — Sora 2 async with spend preview (Iter 28) ─
 function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
   const [prompt, setPrompt] = useState('')
   const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2')
@@ -502,15 +502,27 @@ function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }
   const [size, setSize] = useState('1280x720')
   const [job, setJob] = useState<any>(null)
   const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState<any>(null)
 
-  const start = async () => {
+  const openPreview = async () => {
     if (prompt.trim().length < 8) return toast.error('Describe the video in at least 8 characters')
+    setBusy(true)
+    try {
+      const r = await api.post('/authoring/video/preview', { model, duration })
+      setPreview(r.data)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Preview failed')
+    } finally { setBusy(false) }
+  }
+
+  const confirm = async () => {
+    setPreview(null)
     setBusy(true)
     try {
       const r = await api.post('/authoring/video/generate', {
         prompt: prompt.trim(), slide_id: slide.id, model, size, duration,
       })
-      toast.success(`Job started · est. ${Math.round(r.data.estimated_wait_seconds / 60)} min · ${r.data.estimated_cost_cents}¢`)
+      toast.success(`Job started · est. ${Math.round(r.data.estimated_wait_seconds / 60)} min`)
       setJob({ id: r.data.job_id, status: 'PENDING' })
       poll(r.data.job_id)
     } catch (e: any) {
@@ -565,10 +577,10 @@ function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }
           <option value="1024x1792">1024×1792 (portrait)</option>
           <option value="1024x1024">1024×1024 (square)</option>
         </select>
-        <button onClick={start} disabled={busy || (job && ['PENDING', 'RUNNING'].includes(job.status))}
+        <button onClick={openPreview} disabled={busy || (job && ['PENDING', 'RUNNING'].includes(job.status))}
           data-testid="video-generate-btn"
           className="text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg px-3 py-1.5 font-semibold">
-          {busy ? 'Starting…' : (job && ['PENDING', 'RUNNING'].includes(job.status)) ? 'Generating…' : isVideo ? 'Re-generate video' : 'Generate video'}
+          {busy ? 'Loading…' : (job && ['PENDING', 'RUNNING'].includes(job.status)) ? 'Generating…' : isVideo ? 'Re-generate video' : 'Generate video'}
         </button>
       </div>
       {job && (
@@ -578,6 +590,58 @@ function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }
           {job.error_log && ` · ${job.error_log.slice(0, 100)}`}
         </p>
       )}
+      {preview && <SpendPreviewModal preview={preview} onCancel={() => setPreview(null)} onConfirm={confirm} />}
+    </div>
+  )
+}
+
+function SpendPreviewModal({ preview, onCancel, onConfirm }:
+  { preview: any; onCancel: () => void; onConfirm: () => void }) {
+  const cost = preview.estimated_cost_cents
+  const remaining = preview.budget?.remaining_cents ?? null
+  const willExceed = preview.will_exceed_budget
+  const cents = (c: number) => `${(c / 100).toFixed(2)}`
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4" data-testid="video-spend-modal">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div className="flex items-center gap-2 text-purple-800">
+          <span className="text-2xl">🎬</span>
+          <h3 className="text-lg font-bold">Confirm video generation</h3>
+        </div>
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-slate-500 uppercase tracking-wide">Estimated cost</span>
+            <span className="text-2xl font-bold text-purple-700 tabular-nums" data-testid="video-spend-cost">
+              ${cents(cost)}
+            </span>
+          </div>
+          {remaining != null && (
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-slate-500">Remaining this month</span>
+              <span className={`font-semibold tabular-nums ${willExceed ? 'text-rose-600' : 'text-emerald-700'}`}
+                data-testid="video-spend-remaining">
+                ${cents(remaining)}
+              </span>
+            </div>
+          )}
+          {willExceed && (
+            <div className="bg-rose-100 border border-rose-200 text-rose-800 rounded-lg p-2 text-xs" data-testid="video-spend-warning">
+              This generation will exceed your organization's monthly AI budget.
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-slate-500">
+          Renders take 2-6 minutes. You can safely close this page and come back — the job runs in the background.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} data-testid="video-spend-cancel"
+            className="text-sm border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium">Cancel</button>
+          <button onClick={onConfirm} disabled={willExceed} data-testid="video-spend-confirm"
+            className="text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2 rounded-lg font-semibold">
+            Generate for ${cents(cost)}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
