@@ -1,7 +1,5 @@
 name: CI
 
-name: CI
-
 on:
   workflow_dispatch:
   push:
@@ -48,7 +46,7 @@ jobs:
           DB_NAME: ifpi_test
         run: |
           alembic upgrade head
-          python -m seed.seed_minimal || true
+          python -c "from seed_data import seed; seed()" || true
       - name: Run pytest
         working-directory: backend
         env:
