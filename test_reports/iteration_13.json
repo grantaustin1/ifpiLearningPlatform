@@ -1,0 +1,38 @@
+{
+  "summary": "Verified CI/build-config bug fixes for (1) emergentintegrations pip install via extra-index-url, (2) yarn.lock tracked in git, (3) Node 24 bump. All 7 review checks pass: pip install -r backend/requirements.txt exits 0 in a fresh venv, emergentintegrations==0.2.0 resolves from Emergent's CloudFront index, requirements.txt first non-comment line is the --extra-index-url directive, frontend/yarn.lock is git-tracked, ci.yml frontend job pins node-version: '24', secret scanner still exits 0, and pytest test_iteration21.py passes 5/5.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration21.py",
+    "/app/test_reports/pytest/iteration13_results.xml"
+  ],
+  "verification_results": {
+    "check_1_pip_install_exits_0": "PASS — fresh venv at /tmp/venv_ci_check, exit code 0, all deps incl. emergentintegrations-0.2.0 installed",
+    "check_2_pip_show_emergentintegrations": "PASS — Name: emergentintegrations, Version: 0.2.0",
+    "check_3_extra_index_url_first_directive": "PASS — line 4 (first non-comment) of /app/backend/requirements.txt is exactly '--extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/'",
+    "check_4_yarn_lock_tracked": "PASS — `git ls-files frontend/yarn.lock` returns 'frontend/yarn.lock'",
+    "check_5_node_version_24": "PASS — .github/workflows/ci.yml line 163 uses node-version: '24'",
+    "check_6_secret_scanner": "PASS — bash /app/scripts/security/scan-secrets.sh --ci exits 0 ('OK — no hardcoded secrets detected.')",
+    "check_7_test_iteration21": "PASS — 5/5 tests passed in 2.18s against REACT_APP_BACKEND_URL"
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "emergentintegrations is unpinned in requirements.txt (resolved to 0.2.0 today). Consider pinning to ==0.2.0 for reproducible CI builds.",
+    "Other deps in backend/requirements.txt are properly version-pinned — only emergentintegrations is loose. This is acceptable since it's a private Emergent package, but a pin would harden CI against upstream surprises."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "N/A (backend-only request)"},
+  "test_credentials": "admin@ifpi.org / admin123 (used by test_iteration21.py); learner@ifpi.org / learner123",
+  "seed_data_creation": "None — used existing seeded users from prior iterations",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "CI config fixes verified locally on filesystem + pip install in fresh venv. The actual GitHub Actions run cannot be triggered from here, but all locally-verifiable invariants pass. If future failures arise on GitHub Actions specifically, check (a) that the GitHub runner can reach https://d33sy5i8bnduwe.cloudfront.net (egress allowlist), and (b) that the commit pushing yarn.lock has actually been merged to the branch CI is running on.",
+  "rca of the issue": "Issue 1: emergentintegrations is hosted on Emergent's private CloudFront PyPI mirror, not public PyPI. pip default index search couldn't find it, hence 'No matching distribution found'. Fix: added --extra-index-url as first line of requirements.txt so pip appends Emergent's index to its search path. Issue 2: frontend/yarn.lock was previously untracked (likely gitignored or never staged), so a fresh CI checkout produced an empty frontend/ dir w.r.t. lockfile and setup-node's cache-dependency-path resolution failed. Fix: git add frontend/yarn.lock + bumped Node 20→24 since Node 20 is deprecated on GitHub Actions runners as of 2026."
+}
