@@ -359,7 +359,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/public_catalog.py` | 143 |
 | `routers/scorm_xapi.py` | 501 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **6654** |
+| **Total** | **6656** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
