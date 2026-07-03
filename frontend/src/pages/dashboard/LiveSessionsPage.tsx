@@ -91,16 +91,32 @@ export default function LiveSessionsPage() {
     }
   }
 
+  const [subscriptionUrl, setSubscriptionUrl] = useState<string | null>(null)
+  const [subscriptionKind, setSubscriptionKind] = useState<'admin' | 'learner'>('admin')
+
   const getSubscriptionUrl = async (kind: 'admin' | 'learner') => {
     try {
       const r = await api.post(`/live-sessions/subscribe-url?kind=${kind}`)
       const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
       const fullUrl = `${backend}${r.data.path}`
-      await navigator.clipboard.writeText(fullUrl).catch(() => { /* clipboard may be blocked */ })
-      toast.success('Subscription URL copied — paste it into your calendar app')
-      window.prompt('Your persistent calendar subscription URL:', fullUrl)
+      setSubscriptionKind(kind)
+      setSubscriptionUrl(fullUrl)
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Failed')
+    }
+  }
+
+  const rotateSubscriptionSecret = async () => {
+    if (!window.confirm(
+      'Rotate the subscription secret? All existing calendar subscription URLs for your organisation will stop working. Users will need to re-copy their fresh URL.'
+    )) return
+    try {
+      const r = await api.post('/live-sessions/subscribe-url/rotate')
+      toast.success(`Secret rotated to v${r.data.new_version} — old URLs revoked`)
+      // Refresh the current modal's URL to the new one
+      if (subscriptionUrl) await getSubscriptionUrl(subscriptionKind)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Rotation failed')
     }
   }
 
@@ -268,6 +284,95 @@ export default function LiveSessionsPage() {
 
       {showCreate && <CreateSessionModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
       {detailId !== null && <AttendanceModal sessionId={detailId} onClose={() => { setDetailId(null); load() }} />}
+      {subscriptionUrl && (
+        <SubscriptionModal
+          url={subscriptionUrl}
+          kind={subscriptionKind}
+          isAdmin={isAdmin}
+          onClose={() => setSubscriptionUrl(null)}
+          onRotate={rotateSubscriptionSecret}
+        />
+      )}
+    </div>
+  )
+}
+
+
+function SubscriptionModal({ url, kind, isAdmin, onClose, onRotate }: {
+  url: string
+  kind: 'admin' | 'learner'
+  isAdmin: boolean
+  onClose: () => void
+  onRotate: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  // Extract token from url for the QR endpoint call
+  const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
+  const qrSrc = `${backend}/api/live-sessions/subscribe-url/qr?kind=${kind}`
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true); setTimeout(() => setCopied(false), 2000)
+      toast.success('URL copied')
+    } catch { toast.error('Clipboard blocked — select and copy manually') }
+  }
+
+  const [qrSvg, setQrSvg] = useState<string | null>(null)
+  useEffect(() => {
+    // Fetch the SVG (needs Authorization header, so we can't just <img src>)
+    api.get('/live-sessions/subscribe-url/qr', {
+      params: { kind }, responseType: 'text',
+    }).then(r => setQrSvg(r.data)).catch(() => { /* silent */ })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, url])  // re-fetch after rotation refreshes `url`
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" data-testid="subscription-modal">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <h2 className="font-semibold text-slate-900">Subscribe to your live sessions</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Paste this URL into Google Calendar, Apple Calendar, or Outlook.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" data-testid="close-subscription">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          {qrSvg && (
+            <div className="flex justify-center bg-slate-50 rounded-xl p-4" data-testid="subscription-qr">
+              <div className="w-48 h-48" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Calendar subscription URL</label>
+            <div className="flex gap-2">
+              <input readOnly value={url} data-testid="subscription-url-input"
+                onClick={e => (e.target as HTMLInputElement).select()}
+                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono bg-slate-50" />
+              <button onClick={copyToClipboard} data-testid="copy-subscription-url"
+                className="inline-flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium px-3 py-2 rounded-lg">
+                {copied ? <Check className="h-3.5 w-3.5" /> : 'Copy'}
+              </button>
+            </div>
+          </div>
+          {isAdmin && (
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Danger zone</p>
+              <button onClick={onRotate} data-testid="rotate-secret-btn"
+                className="w-full inline-flex items-center justify-center gap-2 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                <RotateCcw className="h-3.5 w-3.5" /> Rotate secret & revoke all outstanding URLs
+              </button>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Use this if a URL has been leaked. Users&apos; login sessions are unaffected — only calendar subscriptions need to be re-copied.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

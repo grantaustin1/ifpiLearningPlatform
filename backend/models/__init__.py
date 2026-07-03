@@ -121,6 +121,11 @@ class Organization(Base):
     # appear in the cross-tenant public marketplace (/api/catalog, /marketplace).
     # Default true so the seeded IFPI org is discoverable out-of-the-box.
     marketplace_opt_in = Column(Boolean, default=True, nullable=False)
+    # Iter 25 — Subscription URL secret version. Bumping this (via
+    # POST /api/live-sessions/subscribe-url/rotate) invalidates every
+    # outstanding calendar-subscription URL scoped to this org, WITHOUT
+    # touching JWT_SECRET (which would log out every active user).
+    subscription_secret_version = Column(Integer, default=1, nullable=False)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

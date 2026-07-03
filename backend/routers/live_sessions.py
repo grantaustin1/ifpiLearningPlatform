@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
-from models import LiveSession, LiveSessionRsvp, User
+from models import LiveSession, LiveSessionRsvp, Organization, User
 
 router = APIRouter(prefix="/api/live-sessions", tags=["Live Sessions"])
 
@@ -508,8 +508,14 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 
-def _sign_subscription_token(user_id: int, kind: str) -> str:
-    payload = json.dumps({"sub": user_id, "kind": kind}, sort_keys=True).encode()
+def _sign_subscription_token(user_id: int, kind: str, org_id: int, version: int) -> str:
+    """Payload includes `sv` (secret version scoped to the org). Bumping
+    the org's `subscription_secret_version` column invalidates every
+    token issued at the old version — the calendar URL 404s but the
+    user's login session is untouched."""
+    payload = json.dumps({
+        "sub": user_id, "kind": kind, "org": org_id, "sv": version,
+    }, sort_keys=True).encode()
     sig = hmac.new(_sub_secret(), payload, hashlib.sha256).digest()
     return f"{_b64url(payload)}.{_b64url(sig)}"
 
@@ -530,33 +536,61 @@ def _verify_subscription_token(token: str) -> dict | None:
 def create_subscription_url(kind: str = "admin", db: Session = Depends(get_db),
                             current: CurrentUser = Depends(get_current_user)):
     """Return a URL the caller can hand to their calendar app. The URL
-    is idempotent for a given (user_id, kind) as long as JWT_SECRET is
-    stable — rotating the secret invalidates all outstanding URLs."""
+    is idempotent for a given (user_id, kind, org, secret-version) —
+    rotating the org's subscription_secret_version issues a fresh URL
+    and kills all outstanding ones."""
     if kind not in ("admin", "learner"):
         raise HTTPException(status_code=400, detail="kind must be 'admin' or 'learner'")
-    # Learner subscription is always allowed; admin subscription
-    # requires actual admin/instructor role
     if kind == "admin":
         if not current.has_any_role({"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}):
             raise HTTPException(status_code=403, detail="Not authorised for admin subscription")
-    token = _sign_subscription_token(current.id, kind)
-    return {"token": token, "path": f"/api/live-sessions/subscribe/{token}.ics"}
+    org = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    version = org.subscription_secret_version if org else 1
+    token = _sign_subscription_token(current.id, kind, current.organization_id, version)
+    return {"token": token, "path": f"/api/live-sessions/subscribe/{token}.ics",
+            "secret_version": version}
+
+
+@router.post("/subscribe-url/rotate")
+def rotate_subscription_secret(db: Session = Depends(get_db),
+                                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Iter 25 — Bump the org's subscription_secret_version. Every
+    outstanding subscription URL for this org immediately 401s; each
+    user must fetch a fresh URL from /subscribe-url. Does NOT log out
+    users (unlike rotating JWT_SECRET)."""
+    org = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    old = org.subscription_secret_version or 1
+    org.subscription_secret_version = old + 1
+    db.commit()
+    return {"old_version": old, "new_version": org.subscription_secret_version,
+            "rotated_at": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/subscribe/{token}.ics")
 def subscribe_ics(token: str, db: Session = Depends(get_db)):
     """Iter 24 — Persistent calendar subscription. Token authenticates
     the request; NO cookie/JWT required (calendar apps don't send them).
-    Returns a text/calendar bundle of the user's upcoming sessions."""
+    Returns a text/calendar bundle of the user's upcoming sessions.
+
+    Iter 25 — Also verifies the org's `subscription_secret_version`
+    matches the payload's `sv`. If admin has rotated the secret since
+    the token was issued, the URL 401s."""
     payload = _verify_subscription_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid subscription token")
 
     user_id = payload["sub"]
     kind = payload["kind"]
+    token_sv = payload.get("sv", 1)
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=404, detail="User not found or inactive")
+    org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+    current_sv = org.subscription_secret_version if org else 1
+    if current_sv != token_sv:
+        raise HTTPException(status_code=401, detail="Subscription URL revoked (secret rotated)")
 
     now = datetime.now(timezone.utc)
     q = db.query(LiveSession).filter(
@@ -614,5 +648,48 @@ def subscribe_ics(token: str, db: Session = Depends(get_db)):
         content=body,
         media_type="text/calendar",
         headers={"Cache-Control": "public, max-age=900"},  # 15 min cache — calendar apps re-poll often
+    )
+
+
+
+@router.get("/subscribe-url/qr")
+def subscribe_url_qr(
+    kind: str = "admin",
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Iter 25 — Return an SVG QR code encoding the current user's
+    subscription URL. Instructors screen-share this on a slide so
+    learners can scan directly from their phones. Cheap to generate
+    (~5ms), no caching needed — regenerated on each request so a
+    secret rotation produces a fresh code immediately."""
+    if kind not in ("admin", "learner"):
+        raise HTTPException(status_code=400, detail="kind must be 'admin' or 'learner'")
+    if kind == "admin" and not current.has_any_role({"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}):
+        raise HTTPException(status_code=403, detail="Not authorised for admin subscription")
+
+    org = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    version = org.subscription_secret_version if org else 1
+    token = _sign_subscription_token(current.id, kind, current.organization_id, version)
+
+    # Build the absolute URL from the incoming request-independent
+    # `PUBLIC_BASE_URL` env var if set (Cloudflare-friendly), else fall
+    # back to the well-known path.
+    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    url = f"{base}/api/live-sessions/subscribe/{token}.ics" if base else \
+          f"/api/live-sessions/subscribe/{token}.ics"
+
+    import qrcode
+    import qrcode.image.svg as svg
+    qr = qrcode.QRCode(box_size=8, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(url); qr.make(fit=True)
+    img = qr.make_image(image_factory=svg.SvgPathImage)
+    import io as _io
+    buf = _io.BytesIO()
+    img.save(buf)
+    svg_bytes = buf.getvalue()
+    return Response(
+        content=svg_bytes, media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
     )
 
