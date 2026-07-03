@@ -1141,6 +1141,10 @@ class LiveSession(Base):
     host_name = Column(String(200), nullable=True)
     cohort = Column(String(100), nullable=True, index=True)  # optional cohort filter
     max_attendees = Column(Integer, nullable=True)
+    # Iter 23 — Recurrence + reminder support
+    recurrence_rule = Column(String(500), nullable=True)  # iCal RRULE string, e.g. "FREQ=WEEKLY;COUNT=8"
+    parent_series_id = Column(Integer, ForeignKey("live_sessions.id"), nullable=True, index=True)
+    reminder_sent_at = Column(DateTime, nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

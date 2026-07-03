@@ -357,8 +357,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 308 |
-| `routers/misc.py` | 428 |
+| `routers/live_sessions.py` | 383 |
+| `routers/misc.py` | 451 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -369,7 +369,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **9129** |
+| **Total** | **9227** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory

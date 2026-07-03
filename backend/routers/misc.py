@@ -351,10 +351,12 @@ catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 def catalog(q: str | None = Query(None),
             category: str | None = Query(None),
             featured: bool = Query(False),
+            sort: str = Query("newest", pattern="^(newest|price_asc|price_desc|most_enrolled)$"),
             page: int = Query(1, ge=1),
             page_size: int = Query(24, ge=1, le=100),
             db: Session = Depends(get_db)):
-    from models import Organization
+    from models import Organization, Enrollment
+    from sqlalchemy import func
     query = (
         db.query(Course)
         .join(Organization, Organization.id == Course.organization_id)
@@ -367,13 +369,33 @@ def catalog(q: str | None = Query(None),
         query = query.filter(Course.category == category)
     total = query.count()
     if featured:
-        rows = query.order_by(Course.created_at.desc()).limit(6).all()
-        rows.sort(key=lambda c: len(c.enrollments), reverse=True)
-        courses = rows[:6]
+        # Featured = top 6 by enrollment count (SQL-side)
+        enroll_sq = (
+            db.query(Enrollment.course_id, func.count(Enrollment.id).label("n"))
+            .group_by(Enrollment.course_id).subquery()
+        )
+        courses = (
+            query.outerjoin(enroll_sq, enroll_sq.c.course_id == Course.id)
+                 .order_by(func.coalesce(enroll_sq.c.n, 0).desc(), Course.created_at.desc())
+                 .limit(6).all()
+        )
     else:
-        courses = (query.order_by(Course.created_at.desc())
-                        .offset((page - 1) * page_size)
-                        .limit(page_size).all())
+        # Apply sort
+        if sort == "price_asc":
+            query = query.order_by(Course.price_cents.asc(), Course.created_at.desc())
+        elif sort == "price_desc":
+            query = query.order_by(Course.price_cents.desc(), Course.created_at.desc())
+        elif sort == "most_enrolled":
+            enroll_sq = (
+                db.query(Enrollment.course_id, func.count(Enrollment.id).label("n"))
+                .group_by(Enrollment.course_id).subquery()
+            )
+            query = (query.outerjoin(enroll_sq, enroll_sq.c.course_id == Course.id)
+                          .order_by(func.coalesce(enroll_sq.c.n, 0).desc(),
+                                    Course.created_at.desc()))
+        else:  # newest
+            query = query.order_by(Course.created_at.desc())
+        courses = query.offset((page - 1) * page_size).limit(page_size).all()
     # Bulk-load orgs for the resulting courses
     org_ids = {c.organization_id for c in courses}
     orgs = {o.id: o for o in db.query(Organization).filter(Organization.id.in_(org_ids)).all()} if org_ids else {}
@@ -395,6 +417,7 @@ def catalog(q: str | None = Query(None),
         } for c in courses],
         "categories": cats,
         "total": total, "page": page, "page_size": page_size,
+        "sort": sort,
     }
 
 
