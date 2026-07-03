@@ -125,3 +125,15 @@ def register_all(app: FastAPI) -> None:
     from routers import ai_tutor
     app.include_router(ai_tutor.router)
 
+    # ── Iter 30o: Owner onboarding checklist ────────────────────────
+    from routers import onboarding
+    app.include_router(onboarding.router)
+
+    # ── Iter 30p: Scheduled reports ─────────────────────────────────
+    from routers import scheduled_reports
+    app.include_router(scheduled_reports.router)
+
+    # ── Iter 30q: AI Query Builder ──────────────────────────────────
+    from routers import query_builder
+    app.include_router(query_builder.router)
+

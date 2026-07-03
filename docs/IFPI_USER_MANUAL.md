@@ -337,7 +337,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
-| `routers/ai_tutor.py` | 308 |
+| `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
 | `routers/auth.py` | 163 |
 | `routers/authoring.py` | 131 |
@@ -357,13 +357,16 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/misc.py` | 372 |
 | `routers/narration.py` | 204 |
+| `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
 | `routers/public_catalog.py` | 143 |
+| `routers/query_builder.py` | 250 |
+| `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 499 |
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **7744** |
+| **Total** | **8357** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -402,6 +405,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `OutboxMessage` | `outbox_messages` |
 | `Person` | `persons` |
 | `RefreshToken` | `refresh_tokens` |
+| `ScheduledReport` | `scheduled_reports` |
 | `ScormPackage` | `scorm_packages` |
 | `SlideComment` | `slide_comments` |
 | `SlideVersion` | `slide_versions` |
@@ -418,7 +422,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **46** ORM models._
+_Total: **47** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -460,10 +464,17 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/invitations/{invitation_id}` | DELETE |  |
 | `/api/admin/kiosk/settings` | PUT |  |
 | `/api/admin/leaderboard.csv` | GET |  |
+| `/api/admin/onboarding/checklist` | GET |  |
 | `/api/admin/outbox` | GET |  |
 | `/api/admin/outbox/stats` | GET |  |
 | `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
+| `/api/admin/query-builder/build` | POST |  |
 | `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort, or for |
+| `/api/admin/scheduled-reports` | GET |  |
+| `/api/admin/scheduled-reports` | POST |  |
+| `/api/admin/scheduled-reports/{report_id}` | DELETE |  |
+| `/api/admin/scheduled-reports/{report_id}` | PUT |  |
+| `/api/admin/scheduled-reports/{report_id}/run-now` | POST |  |
 | `/api/admin/scorm` | GET |  |
 | `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
 | `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
@@ -615,6 +626,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/terms/accept` | POST |  |
 | `/api/terms/current` | GET |  |
 | `/api/tutor/ask` | POST |  |
+| `/api/tutor/save-as-flashcard` | POST |  |
 | `/api/tutor/sessions` | GET |  |
 | `/api/tutor/sessions/{session_id}` | GET |  |
 | `/api/tutor/sessions/{session_id}/archive` | POST |  |
@@ -625,7 +637,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **194** registered API endpoints._
+_Total: **202** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

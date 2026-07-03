@@ -306,3 +306,81 @@ def archive_session(session_id: int,
     session.archived_at = datetime.utcnow()
     db.commit()
     return {"archived": True}
+
+
+# ── Iter 30q — Save-as-flashcard ────────────────────────────────────
+
+
+class SaveAsFlashcardIn(BaseModel):
+    """Turn a helpful tutor Q+A into a durable spaced-repetition flashcard.
+
+    Caller passes the `message_id` of an assistant turn; the server pairs
+    it with the prior user turn to build the flashcard front (question)
+    and back (answer)."""
+    message_id: int
+    course_id: int
+    difficulty: int = Field(default=2, ge=1, le=5)
+
+
+@router.post("/save-as-flashcard")
+def save_as_flashcard(body: SaveAsFlashcardIn, request: Request,
+                      current: CurrentUser = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
+    from models import Course, Flashcard
+
+    # Confirm the assistant message belongs to a session owned by the
+    # current user (prevents saving someone else's tutor content)
+    assistant = db.query(AITutorMessage).join(
+        AITutorSession, AITutorSession.id == AITutorMessage.session_id
+    ).filter(
+        AITutorMessage.id == body.message_id,
+        AITutorMessage.role == "assistant",
+        AITutorSession.user_id == current.id,
+        AITutorSession.organization_id == current.organization_id,
+    ).first()
+    if not assistant:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Prior user turn = the question
+    prior_user = db.query(AITutorMessage).filter(
+        AITutorMessage.session_id == assistant.session_id,
+        AITutorMessage.role == "user",
+        AITutorMessage.id < assistant.id,
+    ).order_by(AITutorMessage.id.desc()).first()
+    if not prior_user:
+        raise HTTPException(status_code=400,
+                            detail="No user question found before this answer")
+
+    # Confirm the target course is in the user's org
+    course = db.query(Course).filter(
+        Course.id == body.course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Extract citation chunk IDs for provenance
+    citation_ids = [c["chunk_id"] for c in (assistant.citations or [])
+                    if c.get("chunk_id") is not None]
+
+    card = Flashcard(
+        organization_id=current.organization_id,
+        course_id=course.id,
+        front=(prior_user.content[:497] + "…") if len(prior_user.content) > 500 else prior_user.content,
+        back=assistant.content,
+        difficulty=body.difficulty,
+        tags=["from-tutor"],
+        generated_by_ai=True,
+        source_chunk_ids=citation_ids or None,
+        created_by_id=current.id,
+    )
+    db.add(card)
+    audit_service.record(db, current, "FLASHCARD_SAVED_FROM_TUTOR",
+                         target_type="flashcard", target_id=None,
+                         metadata={"session_id": assistant.session_id,
+                                   "message_id": assistant.id,
+                                   "course_id": course.id},
+                         request=request)
+    db.commit(); db.refresh(card)
+    return {"flashcard_id": card.id, "front": card.front,
+            "back_length": len(card.back or "")}

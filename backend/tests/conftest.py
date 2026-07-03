@@ -78,3 +78,42 @@ def pytest_collection_modifyitems(config, items):
         if any(module_name.startswith(p) for p in static_prefixes):
             continue  # static tests always run
         item.add_marker(skip)
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# Iter 30o — Auth session helper for cookie-only mode.
+# When `AUTH_COOKIE_MODE=on`, the login response body no longer carries
+# `access_token`. Tests must instead use the session cookie AND stamp
+# the `X-CSRF-Token` header on every mutating request. This helper
+# handles both transparently.
+# ─────────────────────────────────────────────────────────────────
+
+
+def authed_session(email: str, password: str, base_url: str = "") -> "requests.Session":
+    """Log in and return a `requests.Session` that works in cookie-only
+    mode. Adds an event hook that stamps the CSRF token header on all
+    mutating requests.
+
+    In dual mode this still functions — the Bearer header takes precedence
+    server-side, but the CSRF header is harmless."""
+    import requests
+
+    url = base_url or os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+    s = requests.Session()
+    r = s.post(f"{url}/api/auth/login",
+               json={"email": email, "password": password}, timeout=15)
+    r.raise_for_status()
+    body = r.json()
+    if body.get("requires_2fa"):
+        pytest.skip("Account has 2FA enabled — clear it first")
+    # Dual/off mode: Bearer takes precedence
+    if body.get("access_token"):
+        s.headers["Authorization"] = f"Bearer {body['access_token']}"
+
+    csrf = s.cookies.get("ifpi_csrf")
+    if csrf:
+        # Attach CSRF header to every request. Server ignores it on GETs
+        # and on Bearer paths; harmless to always include.
+        s.headers["X-CSRF-Token"] = csrf
+    return s

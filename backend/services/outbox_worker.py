@@ -158,6 +158,19 @@ def _webhook_retry_tick():
         logger.exception("webhook retry tick failed: %s", e)
 
 
+def _scheduled_reports_tick():
+    """Iter 30p — Custom scheduled reports. Delegates to the worker
+    service which fans out per-admin subscriptions into the outbox."""
+    try:
+        with SessionLocal() as db:
+            from services.scheduled_reports_worker import tick
+            n = tick(db)
+            if n:
+                logger.info("Enqueued %s scheduled report(s)", n)
+    except Exception as e:
+        logger.exception("scheduled reports tick failed: %s", e)
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -181,6 +194,11 @@ def start_scheduler() -> None:
         _webhook_retry_tick, "interval", seconds=30,
         id="webhook_retry", max_instances=1, coalesce=True,
         misfire_grace_time=120,
+    )
+    sched.add_job(
+        _scheduled_reports_tick, "interval", minutes=5,
+        id="scheduled_reports", max_instances=1, coalesce=True,
+        misfire_grace_time=600,
     )
     sched.start()
     _scheduler = sched

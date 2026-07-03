@@ -1035,3 +1035,35 @@ class AITutorMessage(Base):
     tokens_prompt = Column(Integer, nullable=True)
     tokens_completion = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+
+class ScheduledReport(Base):
+    """Iter 30p — Per-admin schedulable reports.
+
+    Report types (report_kind):
+      - `members_needing_action`
+      - `cohort_progress`
+      - `certificate_issuance`
+      - `enrollment_summary`
+
+    Cadence (cadence): `daily | weekly | monthly`. Delivery is via the
+    existing outbox_worker Monday-morning tick — we generate + queue the
+    email into `outbox_messages` when the next_run_at cursor is reached.
+    """
+    __tablename__ = "scheduled_reports"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"),
+                                nullable=False, index=True)
+    report_kind = Column(String(50), nullable=False)
+    cadence = Column(String(20), nullable=False)  # daily/weekly/monthly
+    recipient_emails = Column(JSON, nullable=False, default=list)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=False, default=_utcnow)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)

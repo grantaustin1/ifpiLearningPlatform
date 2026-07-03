@@ -52,15 +52,19 @@ function readCookie(name: string): string | null {
   return null
 }
 
-let refreshing: Promise<string | null> | null = null
+let refreshing: Promise<'ok' | 'fail'> | null = null
 
-async function tryRefresh(): Promise<string | null> {
+async function tryRefresh(): Promise<'ok' | 'fail'> {
   try {
     const r = await axios.post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true })
+    // In cookie-only mode (`AUTH_COOKIE_MODE=on`) the body has no
+    // access_token — the browser already stored the refreshed cookie.
+    // In dual/off mode we also cache the token in memory so Bearer
+    // header keeps working.
     const token = r.data?.access_token || null
     if (token) accessTokenMem = token
-    return token
-  } catch { return null }
+    return 'ok'
+  } catch { return 'fail' }
 }
 
 api.interceptors.response.use(
@@ -72,11 +76,15 @@ api.interceptors.response.use(
     if (status === 401 && !original._retried && !isAuthEndpoint) {
       original._retried = true
       refreshing = refreshing || tryRefresh()
-      const newTok = await refreshing
+      const outcome = await refreshing
       refreshing = null
-      if (newTok) {
-        (original.headers as any) = original.headers || {}
-        ;(original.headers as any).Authorization = `Bearer ${newTok}`
+      if (outcome === 'ok') {
+        // If we got a fresh in-memory token, stamp it. Otherwise the
+        // browser will attach the refreshed HttpOnly cookie automatically.
+        if (accessTokenMem) {
+          (original.headers as any) = original.headers || {}
+          ;(original.headers as any).Authorization = `Bearer ${accessTokenMem}`
+        }
         return api.request(original)
       }
       // Hard fail — clear token, redirect

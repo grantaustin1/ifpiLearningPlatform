@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { api } from 'lib/api'
-import { Sparkles, X, Send, BookOpen, Loader2, ShieldCheck } from 'lucide-react'
+import { Sparkles, X, Send, BookOpen, Loader2, ShieldCheck, Save, Check as CheckIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Citation = {
@@ -31,7 +31,22 @@ export function AITutorPanel({ courseId }: { courseId?: number }) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [savedCardIds, setSavedCardIds] = useState<Set<number>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const saveAsFlashcard = async (messageId: number) => {
+    if (!courseId) {
+      toast.error('Save-as-flashcard requires a course context')
+      return
+    }
+    try {
+      await api.post('/tutor/save-as-flashcard', { message_id: messageId, course_id: courseId })
+      setSavedCardIds(prev => new Set(prev).add(messageId))
+      toast.success('Saved to your flashcards')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Could not save flashcard')
+    }
+  }
 
   useEffect(() => {
     if (open && scrollRef.current) {
@@ -141,6 +156,23 @@ export function AITutorPanel({ courseId }: { courseId?: number }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {m.role === 'assistant' && courseId && m.id > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => saveAsFlashcard(m.id)}
+                    disabled={savedCardIds.has(m.id)}
+                    data-testid={`save-flashcard-${m.id}`}
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${
+                      savedCardIds.has(m.id)
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default'
+                        : 'text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                    }`}>
+                    {savedCardIds.has(m.id)
+                      ? <><CheckIcon className="h-3 w-3" /> Saved to flashcards</>
+                      : <><Save className="h-3 w-3" /> Save as flashcard</>}
+                  </button>
                 </div>
               )}
             </div>

@@ -14,22 +14,14 @@ API = f"{BASE_URL}/api"
 # ── Shared fixtures ──────────────────────────────────────────────────
 @pytest.fixture(scope="module")
 def admin_session():
-    s = requests.Session()
-    r = s.post(f"{API}/auth/login",
-               json={"email": "admin@ifpi.org", "password": "admin123"})
-    assert r.status_code == 200, r.text
-    s.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
-    return s
+    from tests.conftest import authed_session
+    return authed_session("admin@ifpi.org", "admin123", base_url=BASE_URL)
 
 
 @pytest.fixture(scope="module")
 def learner_session():
-    s = requests.Session()
-    r = s.post(f"{API}/auth/login",
-               json={"email": "learner@ifpi.org", "password": "learner123"})
-    assert r.status_code == 200, r.text
-    s.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
-    return s
+    from tests.conftest import authed_session
+    return authed_session("learner@ifpi.org", "learner123", base_url=BASE_URL)
 
 
 # ── Login + cookies ──────────────────────────────────────────────────
