@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -18,6 +18,7 @@ const ADMIN_NAV = [
   { href: '/badge-tiers',   label: 'Badge tiers',  icon: Award },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
   { href: '/scheduled-reports', label: 'Scheduled reports', icon: Send },
+  { href: '/live-sessions', label: 'Live sessions', icon: Video },
   { href: '/email-diagnostics', label: 'Email diagnostics', icon: Mail },
   { href: '/affiliate',     label: 'Affiliate',    icon: Users },
   { href: '/query-builder', label: 'Query builder', icon: Database },
@@ -38,6 +39,7 @@ const LEARNER_NAV = [
   { href: '/courses',       label: 'My Courses',     icon: BookOpen },
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
   { href: '/certificates',  label: 'My Certificates',icon: Award },
+  { href: '/live-sessions', label: 'Live sessions',  icon: Video },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: Trophy },
   { href: '/billing',       label: 'Subscriptions',  icon: CreditCard },
 ]

@@ -34,10 +34,12 @@ import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
 import TakeExamPage from 'pages/take/TakeExamPage'
 import CatalogPage from 'pages/catalog/CatalogPage'
+import CourseDetailPage from 'pages/catalog/CourseDetailPage'
 import QueryBuilderPage from 'pages/dashboard/QueryBuilderPage'
 import ScheduledReportsPage from 'pages/dashboard/ScheduledReportsPage'
 import EmailDiagnosticsPage from 'pages/dashboard/EmailDiagnosticsPage'
 import AffiliatePage from 'pages/dashboard/AffiliatePage'
+import LiveSessionsPage from 'pages/dashboard/LiveSessionsPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -68,6 +70,9 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/catalog" element={<CatalogPage />} />
+      <Route path="/catalog/:id" element={<CourseDetailPage />} />
+      <Route path="/marketplace" element={<CatalogPage />} />
+      <Route path="/marketplace/:id" element={<CourseDetailPage />} />
       <Route path="/verify/:code" element={<VerifyCertPage />} />
       <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
       <Route path="/a/:slug" element={<PortalPage />} />
@@ -93,6 +98,7 @@ export default function App() {
         <Route path="/scheduled-reports" element={<Protected adminOnly><ScheduledReportsPage /></Protected>} />
         <Route path="/email-diagnostics" element={<Protected adminOnly><EmailDiagnosticsPage /></Protected>} />
         <Route path="/affiliate" element={<Protected adminOnly><AffiliatePage /></Protected>} />
+        <Route path="/live-sessions" element={<LiveSessionsPage />} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />

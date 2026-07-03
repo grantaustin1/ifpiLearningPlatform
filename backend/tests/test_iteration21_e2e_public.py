@@ -118,9 +118,13 @@ def test_get_works_without_csrf_header(admin):
 
 
 def test_mutation_without_csrf_header_returns_403(admin):
-    # Explicitly do NOT include the CSRF header
-    r = admin.s.patch(f"{BASE_URL}/api/organization",
-                      json={"logo_url": "https://example.com/x.png"})
+    # Explicitly do NOT include the CSRF header — opt out of auto-inject
+    admin.s._skip_csrf_autoinject = True
+    try:
+        r = admin.s.patch(f"{BASE_URL}/api/organization",
+                          json={"logo_url": "https://example.com/x.png"})
+    finally:
+        admin.s._skip_csrf_autoinject = False
     assert r.status_code == 403, r.text
     assert r.json().get("error", {}).get("code") == "CSRF_TOKEN_MISMATCH"
 

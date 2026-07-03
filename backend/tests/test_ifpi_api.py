@@ -108,13 +108,15 @@ class TestAuth:
 # ── Public catalog (no auth) ────────────────────────────────────────
 class TestCatalog:
     def test_catalog_public(self):
-        r = requests.get(f"{BASE_URL}/api/catalog", timeout=10)
+        # Query with `q=IFPI` so the seeded course is not paginated out
+        # by ephemeral test-created courses.
+        r = requests.get(f"{BASE_URL}/api/catalog?q=IFPI&page_size=50", timeout=10)
         assert r.status_code == 200
         data = r.json()
         assert "courses" in data
-        # seeded "IFPI Fundamentals" should be there
         titles = [c["title"] for c in data["courses"]]
-        assert any("IFPI" in t or "Fundamentals" in t for t in titles), f"Seeded course missing. Got: {titles}"
+        assert any("IFPI" in t or "Fundamentals" in t for t in titles), \
+            f"Seeded course missing. Got: {titles}"
 
 
 # ── Courses (role-gated) ────────────────────────────────────────────

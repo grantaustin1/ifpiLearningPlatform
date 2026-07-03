@@ -117,6 +117,10 @@ class Organization(Base):
     # approaching the threshold + recap of those past it.
     cohort_digest_enabled = Column(Boolean, default=True, nullable=False)
     cohort_digest_last_sent_at = Column(DateTime)
+    # Iter 22 — Marketplace opt-in. When true, this org's PUBLISHED courses
+    # appear in the cross-tenant public marketplace (/api/catalog, /marketplace).
+    # Default true so the seeded IFPI org is discoverable out-of-the-box.
+    marketplace_opt_in = Column(Boolean, default=True, nullable=False)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -1114,3 +1118,51 @@ class AffiliateReferral(Base):
     credited_at = Column(DateTime, nullable=True)
     notes = Column(String(500), nullable=True)
 
+
+
+# ── Live Sessions (Iter 22) ──────────────────────────────────────────
+class LiveSession(Base):
+    """A scheduled cohort session hosted on an external meeting provider
+    (Zoom/Meet/Teams — admin pastes the join URL). Learners RSVP, and
+    admins mark attendance after the event."""
+    __tablename__ = "live_sessions"
+    __table_args__ = (
+        Index("ix_live_sessions_org_start", "organization_id", "start_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)  # optional link to a course
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    meeting_url = Column(String(1000), nullable=False)  # BYO — any Zoom/Meet/Teams link
+    start_at = Column(DateTime, nullable=False, index=True)
+    duration_minutes = Column(Integer, nullable=False, default=60)
+    host_name = Column(String(200), nullable=True)
+    cohort = Column(String(100), nullable=True, index=True)  # optional cohort filter
+    max_attendees = Column(Integer, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    rsvps = relationship("LiveSessionRsvp", back_populates="session",
+                         cascade="all,delete-orphan")
+
+
+class LiveSessionRsvp(Base):
+    """Per-learner RSVP + attendance state.
+    Status: RSVP → ATTENDED / NO_SHOW / CANCELLED."""
+    __tablename__ = "live_session_rsvps"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_rsvp_session_user"),
+    )
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("live_sessions.id"),
+                        nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="RSVP", index=True)
+    rsvped_at = Column(DateTime, default=_utcnow, nullable=False)
+    attendance_marked_at = Column(DateTime, nullable=True)
+
+    session = relationship("LiveSession", back_populates="rsvps")

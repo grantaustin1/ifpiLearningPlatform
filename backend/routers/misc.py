@@ -350,13 +350,33 @@ catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 @catalog_router.get("")
 def catalog(q: str | None = Query(None),
             category: str | None = Query(None),
+            featured: bool = Query(False),
+            page: int = Query(1, ge=1),
+            page_size: int = Query(24, ge=1, le=100),
             db: Session = Depends(get_db)):
-    query = db.query(Course).filter(Course.status == CourseStatus.PUBLISHED)
+    from models import Organization
+    query = (
+        db.query(Course)
+        .join(Organization, Organization.id == Course.organization_id)
+        .filter(Course.status == CourseStatus.PUBLISHED)
+        .filter(Organization.marketplace_opt_in == True)  # noqa: E712
+    )
     if q:
         query = query.filter(Course.title.ilike(f"%{q}%"))
     if category:
         query = query.filter(Course.category == category)
-    courses = query.order_by(Course.created_at.desc()).limit(100).all()
+    total = query.count()
+    if featured:
+        rows = query.order_by(Course.created_at.desc()).limit(6).all()
+        rows.sort(key=lambda c: len(c.enrollments), reverse=True)
+        courses = rows[:6]
+    else:
+        courses = (query.order_by(Course.created_at.desc())
+                        .offset((page - 1) * page_size)
+                        .limit(page_size).all())
+    # Bulk-load orgs for the resulting courses
+    org_ids = {c.organization_id for c in courses}
+    orgs = {o.id: o for o in db.query(Organization).filter(Organization.id.in_(org_ids)).all()} if org_ids else {}
     cats = [r[0] for r in db.query(Course.category).filter(
         Course.status == CourseStatus.PUBLISHED, Course.category.isnot(None),
     ).distinct().all() if r[0]]
@@ -367,6 +387,42 @@ def catalog(q: str | None = Query(None),
             "duration_minutes": c.duration_minutes, "price_cents": c.price_cents,
             "currency": c.currency, "slide_count": len(c.slides),
             "enrollment_count": len(c.enrollments),
+            "organization": ({
+                "id": orgs[c.organization_id].id,
+                "name": orgs[c.organization_id].name,
+                "logo_url": orgs[c.organization_id].logo_url,
+            } if c.organization_id in orgs else None),
         } for c in courses],
         "categories": cats,
+        "total": total, "page": page, "page_size": page_size,
+    }
+
+
+@catalog_router.get("/{course_id}")
+def catalog_detail(course_id: int, db: Session = Depends(get_db)):
+    """Public course detail — shown on marketplace product page."""
+    from models import Organization
+    course = (
+        db.query(Course)
+        .join(Organization, Organization.id == Course.organization_id)
+        .filter(Course.id == course_id)
+        .filter(Course.status == CourseStatus.PUBLISHED)
+        .filter(Organization.marketplace_opt_in == True)  # noqa: E712
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not publicly listed")
+    org = db.query(Organization).filter(Organization.id == course.organization_id).first()
+    slides = sorted(course.slides, key=lambda s: s.order_index)[:8]
+    return {
+        "id": course.id, "title": course.title, "description": course.description,
+        "category": course.category, "cover_color": course.cover_color,
+        "duration_minutes": course.duration_minutes, "price_cents": course.price_cents,
+        "currency": course.currency,
+        "slide_count": len(course.slides),
+        "enrollment_count": len(course.enrollments),
+        "syllabus_preview": [{"title": s.title, "order_index": s.order_index} for s in slides],
+        "organization": {
+            "id": org.id, "name": org.name, "logo_url": org.logo_url,
+        } if org else None,
     }

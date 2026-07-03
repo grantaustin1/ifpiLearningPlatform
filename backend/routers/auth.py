@@ -29,16 +29,20 @@ def _to_user_out(user) -> UserOut:
 
 def _login_response(response: Response, user, access: str, refresh: str,
                     request: Request | None = None) -> LoginResponse:
+    import os
     set_auth_cookie(response, access)
     set_refresh_cookie(response, refresh)
     set_csrf_cookie(response, generate_csrf_token())
-    # Iter 30r — In cookie-only mode, non-browser clients (SDKs, test
-    # harnesses, mobile) can request the token in the body by setting
-    # `X-Return-Token: true`. They're explicitly opting in to storing
-    # the token client-side, so the XSS mitigation of cookie-only mode
-    # doesn't apply to them anyway.
+    # Iter 22 — The `X-Return-Token: true` header used to be honoured
+    # unconditionally as a test/SDK affordance. That was effectively a
+    # backdoor in production: an XSS payload could set the header on a
+    # login retry and exfiltrate the JWT out of the HttpOnly cookie
+    # jar. It is now gated behind `ALLOW_TEST_TOKEN_HEADER=true`, which
+    # is set ONLY in development/test environments. Production deploys
+    # do not set the env var, so the header is inert.
+    test_bypass_allowed = os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() == "true"
     return_token = should_include_token_in_body() or (
-        request is not None and
+        test_bypass_allowed and request is not None and
         request.headers.get("x-return-token", "").lower() == "true"
     )
     return LoginResponse(
