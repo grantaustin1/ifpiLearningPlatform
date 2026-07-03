@@ -233,7 +233,7 @@ def challenge(body: TOTPChallengeIn, request: Request, response: Response,
     access, refresh = AuthService(db).issue_tokens(user)
     # Import lazily to avoid a circular import at module load.
     from routers.auth import _login_response
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
 
 
 # ── Admin force-disable ────────────────────────────────────────────────

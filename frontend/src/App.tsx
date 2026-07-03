@@ -36,6 +36,8 @@ import TakeExamPage from 'pages/take/TakeExamPage'
 import CatalogPage from 'pages/catalog/CatalogPage'
 import QueryBuilderPage from 'pages/dashboard/QueryBuilderPage'
 import ScheduledReportsPage from 'pages/dashboard/ScheduledReportsPage'
+import EmailDiagnosticsPage from 'pages/dashboard/EmailDiagnosticsPage'
+import AffiliatePage from 'pages/dashboard/AffiliatePage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -89,6 +91,8 @@ export default function App() {
         <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
         <Route path="/query-builder" element={<Protected adminOnly><QueryBuilderPage /></Protected>} />
         <Route path="/scheduled-reports" element={<Protected adminOnly><ScheduledReportsPage /></Protected>} />
+        <Route path="/email-diagnostics" element={<Protected adminOnly><EmailDiagnosticsPage /></Protected>} />
+        <Route path="/affiliate" element={<Protected adminOnly><AffiliatePage /></Protected>} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />

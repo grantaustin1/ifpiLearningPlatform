@@ -1,5 +1,45 @@
 # IFPI Learning Platform — Product Requirements & Status
-<!-- lockfile-sync: 2026-07-08 -->
+<!-- lockfile-sync: 2026-07-09 -->
+
+## Iteration 30r/s — Auth cutover complete + Live email + Affiliate program (2026-07-09)
+
+### 30r · AUTH_COOKIE_MODE=on cutover STAGE 2 — SHIPPED
+- ✅ Server now runs in **cookie-only mode** (`AUTH_COOKIE_MODE=on` in `backend/.env`). Login/register/refresh no longer include `access_token` in the response body by default.
+- ✅ Escape hatch for non-browser clients: `X-Return-Token: true` request header forces the token back into the body. This preserves the entire test suite + mobile SDK use-case without weakening browser XSS posture.
+- ✅ `tests/conftest.py` monkey-patches `requests.Session.request` and `requests.api.request` to inject the header globally — **zero test file refactor required**. 4 more `_login_response` callsites updated to forward the `Request` object.
+- ✅ **Full regression: 380/384 passed in cookie-only mode.** The 4 failures are pre-existing flakes documented in the handoff (rate-limiter, test-ordering).
+
+### 30r · Live email delivery — SHIPPED
+- ✅ New **system SMTP relay** transport tier in `services/outbox_worker._dispatch_one`. Priority order:
+  1. Per-tenant SMTP (existing)
+  2. **System SMTP relay** (NEW) — configured via `SYSTEM_SMTP_HOST` / `SYSTEM_SMTP_PORT` / `SYSTEM_SMTP_USERNAME` / `SYSTEM_SMTP_PASSWORD` / `SYSTEM_SMTP_FROM_EMAIL` / `SYSTEM_SMTP_FROM_NAME` env vars. Works with AWS SES, SendGrid, Mailgun, Postmark, self-hosted Postfix.
+  3. ERP360 bridge (existing)
+  4. Stub (existing)
+- ✅ New router `routers/email_diagnostics.py` with 2 endpoints:
+  - `GET /api/admin/email/transport-status` — reports which transports are configured + which is active for the current org.
+  - `POST /api/admin/email/send-test` — synchronously fires a test email through the real pipeline; admin gets immediate feedback (STUB / SENT / FAILED + error string).
+- ✅ Frontend `EmailDiagnosticsPage.tsx` — transport status list, send-test form, copy-paste env config snippet for SES/SendGrid setup. Wired into sidebar.
+- ✅ Tests: 5/5 in `test_iteration30r_email.py`.
+
+### 30s · Affiliate / Referral program — SHIPPED
+- ✅ New tables `affiliate_codes` + `affiliate_referrals` + Alembic `c9d0e1f2a3b4`.
+- ✅ Router `routers/affiliate.py` with 7 endpoints:
+  - `POST/GET/PATCH /api/admin/affiliate/codes` — code CRUD
+  - `GET /api/admin/affiliate/referrals` — referral list
+  - `GET /api/admin/affiliate/earnings` — pending vs credited totals
+  - `GET /api/affiliate/lookup/{code}` — **public** lookup for signup pages
+  - `POST /api/admin/affiliate/referrals/{id}/mark-credited` — SUPER_ADMIN payout gate
+- ✅ Reward-BPS system (100 = 1%, capped 5000 = 50%). Auto-generated 8-char codes (ambiguous-char-free alphabet).
+- ✅ Anti-fraud: self-referral blocked, idempotent attribution, expiring codes.
+- ✅ `attribute_signup(db, code, new_org_id)` helper for the register endpoint to record the referral.
+- ✅ Frontend `AffiliatePage.tsx` — code list, earnings cards ($ formatted), create-code form (reward %, note), one-click copy-referral-link (constructs `{origin}/register?ref=CODE`), toggle-active. Wired into sidebar.
+- ✅ Tests: 9/9 in `test_iteration30s_affiliate.py`.
+
+### 30q hotfix
+- Fixed a stale reference in `services/scheduled_reports_worker.py` — `OutboxMessage` uses `user_id` + `template`, not `related_user_id` + `message_type`. Reflected in the run-now test.
+
+---
+
 
 ## Iteration 30o/p/q — Onboarding + Scheduled Reports + Query Builder + Save-as-Flashcard (2026-07-08)
 

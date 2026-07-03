@@ -28,8 +28,11 @@ def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]
     Priority order:
     1. Per-tenant SMTP — when the message's org has smtp_host configured
        we deliver directly via that server.
-    2. ERP360 bridge — when BILLING_LIVE_MODE + ERP360_BASE_URL are set.
-    3. Stub — log only, mark STUB.
+    2. System SMTP relay — when SYSTEM_SMTP_HOST env var is set. Ideal for
+       SES/SendGrid/Mailgun/Postmark in prod when orgs haven't configured
+       their own SMTP yet.
+    3. ERP360 bridge — when BILLING_LIVE_MODE + ERP360_BASE_URL are set.
+    4. Stub — log only, mark STUB.
     """
     # 1) Per-tenant SMTP
     if msg.organization_id:
@@ -51,7 +54,34 @@ def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]
                 except Exception as e:
                     logger.warning("Per-tenant SMTP failed for msg %s: %s", msg.id, e)
                     return "FAILED", None, f"smtp: {str(e)[:900]}"
-    # 2) ERP360 bridge / 3) Stub
+
+    # 2) System SMTP relay — Iter 30r
+    import os
+    system_host = os.environ.get("SYSTEM_SMTP_HOST", "").strip()
+    if system_host:
+        try:
+            from services.smtp_service import send_via_org_smtp
+            send_via_org_smtp(
+                host=system_host,
+                port=int(os.environ.get("SYSTEM_SMTP_PORT", "587")),
+                username=os.environ.get("SYSTEM_SMTP_USERNAME") or None,
+                password_enc=("plain:" + os.environ.get("SYSTEM_SMTP_PASSWORD", "")
+                              if os.environ.get("SYSTEM_SMTP_PASSWORD") else None),
+                use_tls=os.environ.get("SYSTEM_SMTP_USE_TLS", "true").lower()
+                        in ("1", "true", "yes"),
+                from_email=os.environ.get("SYSTEM_SMTP_FROM_EMAIL",
+                                          "noreply@ifpi.local"),
+                from_name=os.environ.get("SYSTEM_SMTP_FROM_NAME", "IFPI Learning"),
+                to_email=msg.to_email, to_name=msg.to_name,
+                subject=msg.subject, body_html=msg.body_html or "",
+                body_text=msg.body_text or "",
+            )
+            return "SENT", None, None
+        except Exception as e:
+            logger.warning("System SMTP relay failed for msg %s: %s", msg.id, e)
+            return "FAILED", None, f"system_smtp: {str(e)[:900]}"
+
+    # 3) ERP360 bridge / 4) Stub
     if not (settings.billing_live_mode and settings.erp360_base_url):
         return "STUB", None, None
     try:

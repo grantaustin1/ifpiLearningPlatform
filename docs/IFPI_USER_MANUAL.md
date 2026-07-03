@@ -337,9 +337,10 @@ Core entities (see `backend/models/__init__.py` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
+| `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 163 |
+| `routers/auth.py` | 175 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -347,6 +348,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/badge_tiers.py` | 133 |
 | `routers/courses.py` | 656 |
 | `routers/docs_library.py` | 103 |
+| `routers/email_diagnostics.py` | 127 |
 | `routers/exams.py` | 212 |
 | `routers/extras.py` | 543 |
 | `routers/flashcards.py` | 497 |
@@ -366,7 +368,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **8357** |
+| **Total** | **8759** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -378,6 +380,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `AITutorMessage` | `ai_tutor_messages` |
 | `AITutorSession` | `ai_tutor_sessions` |
 | `AIUsageLedger` | `ai_usage_ledger` |
+| `AffiliateCode` | `affiliate_codes` |
+| `AffiliateReferral` | `affiliate_referrals` |
 | `ApiToken` | `api_tokens` |
 | `ApiTokenCall` | `api_token_calls` |
 | `AuditLog` | `audit_logs` |
@@ -422,7 +426,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **47** ORM models._
+_Total: **49** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -437,6 +441,12 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api` | GET |  |
 | `/api/academies` | GET | List all academies with optional search (name/slug), status filter, and sort. |
 | `/api/academies` | POST |  |
+| `/api/admin/affiliate/codes` | GET |  |
+| `/api/admin/affiliate/codes` | POST |  |
+| `/api/admin/affiliate/codes/{code_id}` | PATCH |  |
+| `/api/admin/affiliate/earnings` | GET | Aggregate earnings by status. Cents-based to avoid float drift. |
+| `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
+| `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
 | `/api/admin/analytics` | GET |  |
 | `/api/admin/api-tokens` | GET |  |
 | `/api/admin/api-tokens` | POST |  |
@@ -452,6 +462,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
 | `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
+| `/api/admin/email/send-test` | POST | Queue a test email and dispatch it synchronously so the admin |
+| `/api/admin/email/transport-status` | GET | Report which delivery transports are active for THIS org, in |
 | `/api/admin/feature-flags/{flag_key}` | PUT |  |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
@@ -489,6 +501,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/webhooks/{sub_id}` | PUT |  |
 | `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
 | `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
+| `/api/affiliate/lookup/{code}` | GET | Public — thin preview so signup forms can show |
 | `/api/ai/course-builder` | POST |  |
 | `/api/auth/2fa/challenge` | POST | Public — accepts {challenge_id, code} and returns the standard |
 | `/api/auth/2fa/disable` | POST |  |
@@ -637,7 +650,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **202** registered API endpoints._
+_Total: **211** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

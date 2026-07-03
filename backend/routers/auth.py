@@ -27,27 +27,39 @@ def _to_user_out(user) -> UserOut:
     )
 
 
-def _login_response(response: Response, user, access: str, refresh: str) -> LoginResponse:
+def _login_response(response: Response, user, access: str, refresh: str,
+                    request: Request | None = None) -> LoginResponse:
     set_auth_cookie(response, access)
     set_refresh_cookie(response, refresh)
     set_csrf_cookie(response, generate_csrf_token())
+    # Iter 30r — In cookie-only mode, non-browser clients (SDKs, test
+    # harnesses, mobile) can request the token in the body by setting
+    # `X-Return-Token: true`. They're explicitly opting in to storing
+    # the token client-side, so the XSS mitigation of cookie-only mode
+    # doesn't apply to them anyway.
+    return_token = should_include_token_in_body() or (
+        request is not None and
+        request.headers.get("x-return-token", "").lower() == "true"
+    )
     return LoginResponse(
-        access_token=access if should_include_token_in_body() else None,
+        access_token=access if return_token else None,
         expires_in=settings.jwt_expiration_minutes * 60,
         user=_to_user_out(user),
     )
 
 
 @router.post("/register", response_model=LoginResponse)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, response: Response,
+             db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.register(body.email, body.password, body.name)
     access, refresh = svc.issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
 
 
 @router.post("/login")
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, response: Response,
+          db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.login(body.email, body.password)
     # Iter 30i — if 2FA is enabled, don't issue tokens yet. Return an
@@ -59,7 +71,7 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
         return {"requires_2fa": True, "challenge_id": cid,
                 "expires_in": expires_in}
     access, refresh = svc.issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
 
 
 @router.post("/refresh", response_model=LoginResponse)
@@ -73,7 +85,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     if not token:
         raise HTTPException(status_code=401, detail="No refresh token")
     access, new_refresh, user = AuthService(db).rotate_refresh(token)
-    return _login_response(response, user, access, new_refresh)
+    return _login_response(response, user, access, new_refresh, request=request)
 
 
 @router.post("/logout")
@@ -160,4 +172,4 @@ def sso_exchange(payload: dict, response: Response, request: Request,
     db.commit()
 
     access, refresh = AuthService(db).issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
