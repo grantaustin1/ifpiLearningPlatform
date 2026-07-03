@@ -357,7 +357,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 383 |
+| `routers/live_sessions.py` | 618 |
+| `routers/marketplace_analytics.py` | 177 |
 | `routers/misc.py` | 451 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
@@ -369,7 +370,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **9227** |
+| **Total** | **9639** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -392,6 +393,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `Course` | `courses` |
 | `CoursePrerequisite` | `course_prerequisites` |
 | `CourseSlide` | `course_slides` |
+| `CourseView` | `course_views` |
 | `Enrollment` | `enrollments` |
 | `Exam` | `exams` |
 | `ExamAttempt` | `exam_attempts` |
@@ -429,7 +431,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **51** ORM models._
+_Total: **52** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -479,6 +481,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/invitations/{invitation_id}` | DELETE |  |
 | `/api/admin/kiosk/settings` | PUT |  |
 | `/api/admin/leaderboard.csv` | GET |  |
+| `/api/admin/marketplace-funnel/{course_id}` | GET |  |
 | `/api/admin/onboarding/checklist` | GET |  |
 | `/api/admin/outbox` | GET |  |
 | `/api/admin/outbox/stats` | GET |  |
@@ -559,6 +562,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
 | `/api/catalog` | GET |  |
 | `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
+| `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
@@ -620,13 +624,17 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/learning-paths/{path_id}/publish` | POST |  |
 | `/api/live-sessions` | GET |  |
 | `/api/live-sessions` | POST |  |
+| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
+| `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
 | `/api/live-sessions/upcoming` | GET | List sessions the current user can RSVP to: their cohort (or |
 | `/api/live-sessions/{session_id}` | DELETE |  |
 | `/api/live-sessions/{session_id}` | GET |  |
 | `/api/live-sessions/{session_id}` | PATCH |  |
+| `/api/live-sessions/{session_id}/cancel` | POST | Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics). |
 | `/api/live-sessions/{session_id}/ics` | GET |  |
 | `/api/live-sessions/{session_id}/mark-attendance` | POST |  |
-| `/api/live-sessions/{session_id}/rsvp` | POST |  |
+| `/api/live-sessions/{session_id}/rsvp` | POST | RSVP to a single session (default) OR the whole series when |
+| `/api/live-sessions/{session_id}/uncancel` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
 | `/api/openapi.json` | GET |  |
@@ -663,7 +671,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **221** registered API endpoints._
+_Total: **227** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

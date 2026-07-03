@@ -3,7 +3,7 @@ import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
 import { toast } from 'sonner'
 import {
-  Video, Calendar, Clock, Users, Link2, Plus, X, Check, Download,
+  Video, Calendar, Clock, Users, Link2, Plus, X, XCircle, Check, Download, RotateCcw,
   UserCheck, UserX, ExternalLink, Trash2, Loader2,
 } from 'lucide-react'
 
@@ -20,6 +20,7 @@ interface LiveSession {
   course_id?: number | null
   recurrence_rule?: string | null
   parent_series_id?: number | null
+  cancelled_at?: string | null
   rsvp_count: number
   attendance_count: number
   my_rsvp_status?: 'RSVP' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW' | null
@@ -71,11 +72,33 @@ export default function LiveSessionsPage() {
 
   useEffect(() => { load() }, [])
 
-  const toggleRsvp = async (s: LiveSession) => {
+  const toggleRsvp = async (s: LiveSession, allInSeries = false) => {
     try {
-      const r = await api.post(`/live-sessions/${s.id}/rsvp`)
-      toast.success(r.data.status === 'RSVP' ? 'You\u2019re RSVP\u2019d' : 'RSVP cancelled')
+      const path = allInSeries
+        ? `/live-sessions/${s.id}/rsvp?series=true`
+        : `/live-sessions/${s.id}/rsvp`
+      const r = await api.post(path)
+      if (allInSeries) {
+        toast.success(r.data.status === 'RSVP'
+          ? `You\u2019re RSVP\u2019d for the full series (${r.data.series_count} sessions)`
+          : `Series RSVP cancelled (${r.data.series_count} sessions)`)
+      } else {
+        toast.success(r.data.status === 'RSVP' ? 'You\u2019re RSVP\u2019d' : 'RSVP cancelled')
+      }
       load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed')
+    }
+  }
+
+  const getSubscriptionUrl = async (kind: 'admin' | 'learner') => {
+    try {
+      const r = await api.post(`/live-sessions/subscribe-url?kind=${kind}`)
+      const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
+      const fullUrl = `${backend}${r.data.path}`
+      await navigator.clipboard.writeText(fullUrl).catch(() => { /* clipboard may be blocked */ })
+      toast.success('Subscription URL copied — paste it into your calendar app')
+      window.prompt('Your persistent calendar subscription URL:', fullUrl)
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Failed')
     }
@@ -93,6 +116,19 @@ export default function LiveSessionsPage() {
       URL.revokeObjectURL(url)
     } catch (e: any) {
       toast.error('Download failed')
+    }
+  }
+
+  const cancelOccurrence = async (s: LiveSession) => {
+    try {
+      const url = s.cancelled_at
+        ? `/live-sessions/${s.id}/uncancel`
+        : `/live-sessions/${s.id}/cancel`
+      await api.post(url)
+      toast.success(s.cancelled_at ? 'Occurrence restored' : 'Occurrence cancelled')
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed')
     }
   }
 
@@ -126,6 +162,11 @@ export default function LiveSessionsPage() {
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Video className="h-6 w-6 text-indigo-600" /> Live sessions</h1>
           <p className="text-sm text-slate-500 mt-1">Scheduled cohort sessions on your preferred meeting platform.</p>
         </div>
+        <button onClick={() => getSubscriptionUrl(isAdmin ? 'admin' : 'learner')}
+          data-testid="subscribe-calendar-btn"
+          className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg">
+          <Calendar className="h-4 w-4" /> Subscribe to calendar
+        </button>
         {isAdmin && (
           <button onClick={() => setShowCreate(true)} data-testid="new-session-btn"
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
@@ -155,17 +196,28 @@ export default function LiveSessionsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-slate-900 truncate">{s.title}</h3>
+                      <h3 className={`font-semibold truncate ${s.cancelled_at ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{s.title}</h3>
                       {(s.recurrence_rule || s.parent_series_id) && (
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600" data-testid={`series-badge-${s.id}`}>Series</span>
+                      )}
+                      {s.cancelled_at && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-600" data-testid={`cancelled-badge-${s.id}`}>Cancelled</span>
                       )}
                     </div>
                     {s.host_name && <p className="text-xs text-slate-500 mt-0.5">Hosted by {s.host_name}</p>}
                   </div>
                   {isAdmin && (
-                    <button onClick={() => deleteSession(s)} className="text-slate-300 hover:text-red-500" data-testid={`del-${s.id}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => cancelOccurrence(s)}
+                        title={s.cancelled_at ? 'Restore occurrence' : 'Cancel this occurrence'}
+                        className={`p-1 rounded ${s.cancelled_at ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-300 hover:text-amber-500'}`}
+                        data-testid={`cancel-${s.id}`}>
+                        {s.cancelled_at ? <RotateCcw className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                      </button>
+                      <button onClick={() => deleteSession(s)} className="text-slate-300 hover:text-red-500 p-1" data-testid={`del-${s.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
                 {s.description && <p className="text-sm text-slate-600 mt-2 line-clamp-2">{s.description}</p>}
@@ -182,12 +234,20 @@ export default function LiveSessionsPage() {
                     <ExternalLink className="h-3.5 w-3.5" /> Join
                   </a>
                   {!isAdmin && (
-                    <button onClick={() => toggleRsvp(s)} data-testid={`rsvp-${s.id}`}
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${rsvped
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}>
-                      {rsvped ? <><Check className="h-3.5 w-3.5" /> RSVP&apos;d</> : <><UserCheck className="h-3.5 w-3.5" /> RSVP</>}
-                    </button>
+                    <>
+                      <button onClick={() => toggleRsvp(s)} data-testid={`rsvp-${s.id}`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${rsvped
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}>
+                        {rsvped ? <><Check className="h-3.5 w-3.5" /> RSVP&apos;d</> : <><UserCheck className="h-3.5 w-3.5" /> RSVP</>}
+                      </button>
+                      {(s.recurrence_rule || s.parent_series_id) && (
+                        <button onClick={() => toggleRsvp(s, true)} data-testid={`rsvp-series-${s.id}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg">
+                          <Calendar className="h-3.5 w-3.5" /> RSVP whole series
+                        </button>
+                      )}
+                    </>
                   )}
                   <button onClick={() => downloadIcs(s)} data-testid={`ics-${s.id}`}
                     className="inline-flex items-center gap-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg">

@@ -21,6 +21,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, HttpUrl
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
@@ -80,6 +81,7 @@ def _serialize(s: LiveSession, include_rsvps: bool = False) -> dict:
         "recurrence_rule": s.recurrence_rule,
         "parent_series_id": s.parent_series_id,
         "reminder_sent_at": s.reminder_sent_at.isoformat() if s.reminder_sent_at else None,
+        "cancelled_at": s.cancelled_at.isoformat() if s.cancelled_at else None,
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "rsvp_count": len([r for r in s.rsvps if r.status != "CANCELLED"]),
         "attendance_count": len([r for r in s.rsvps if r.status == "ATTENDED"]),
@@ -203,6 +205,7 @@ def list_upcoming_for_learner(
     q = db.query(LiveSession).filter(
         LiveSession.organization_id == current.organization_id,
         LiveSession.start_at >= now - timedelta(minutes=30),
+        LiveSession.cancelled_at.is_(None),  # Iter 24 — hide cancelled from learners
     )
     rows = q.order_by(LiveSession.start_at.asc()).all()
     # Filter cohort in Python (small N)
@@ -280,16 +283,96 @@ def delete_session(session_id: int, cascade_series: bool = False,
     db.commit()
 
 
-# ── RSVP ─────────────────────────────────────────────────────────────
-@router.post("/{session_id}/rsvp")
-def toggle_rsvp(session_id: int, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(get_current_user)):
+@router.post("/{session_id}/cancel")
+def cancel_occurrence(session_id: int, db: Session = Depends(get_db),
+                      current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics).
+    The row is soft-cancelled (stamped `cancelled_at`) rather than hard-
+    deleted so RSVP + attendance history is preserved for audit, and the
+    parent series' `.ics` export can emit a proper EXDATE line."""
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
         LiveSession.organization_id == current.organization_id,
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
+    s.cancelled_at = datetime.now(timezone.utc)
+    db.commit(); db.refresh(s)
+    return _serialize(s)
+
+
+@router.post("/{session_id}/uncancel")
+def uncancel_occurrence(session_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    s = db.query(LiveSession).filter(
+        LiveSession.id == session_id,
+        LiveSession.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    s.cancelled_at = None
+    db.commit(); db.refresh(s)
+    return _serialize(s)
+
+
+# ── RSVP ─────────────────────────────────────────────────────────────
+@router.post("/{session_id}/rsvp")
+def toggle_rsvp(session_id: int, series: bool = False,
+                db: Session = Depends(get_db),
+                current: CurrentUser = Depends(get_current_user)):
+    """RSVP to a single session (default) OR the whole series when
+    `?series=true` is passed against a series-head id (Iter 24 Cohort
+    Enrollment). Learners toggle once and receive all future
+    occurrences on their calendar automatically."""
+    s = db.query(LiveSession).filter(
+        LiveSession.id == session_id,
+        LiveSession.organization_id == current.organization_id,
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # ── Series-wide RSVP (Iter 24) ──────────────────────────────────
+    if series:
+        head_id = s.id if s.recurrence_rule else s.parent_series_id
+        if head_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Session is not part of a recurring series",
+            )
+        # Collect head + all children that are still upcoming and not cancelled
+        now = datetime.now(timezone.utc)
+        series_rows = (
+            db.query(LiveSession).filter(
+                or_(LiveSession.id == head_id,
+                    LiveSession.parent_series_id == head_id),
+                LiveSession.start_at >= now - timedelta(minutes=30),
+                LiveSession.cancelled_at.is_(None),
+            ).all()
+        )
+        # Check if learner is currently RSVP'd on any of them
+        existing = {
+            r.session_id: r for r in db.query(LiveSessionRsvp).filter(
+                LiveSessionRsvp.session_id.in_([x.id for x in series_rows]),
+                LiveSessionRsvp.user_id == current.id,
+            ).all()
+        }
+        any_active = any(r.status == "RSVP" for r in existing.values())
+        target_status = "CANCELLED" if any_active else "RSVP"
+        touched = 0
+        for row in series_rows:
+            r = existing.get(row.id)
+            if r:
+                r.status = target_status
+            else:
+                if target_status == "RSVP":
+                    db.add(LiveSessionRsvp(
+                        session_id=row.id, user_id=current.id, status="RSVP",
+                    ))
+            touched += 1
+        db.commit()
+        return {"status": target_status, "series_count": touched}
+
+    # ── Single-occurrence RSVP (original path) ──────────────────────
     rsvp = db.query(LiveSessionRsvp).filter(
         LiveSessionRsvp.session_id == session_id,
         LiveSessionRsvp.user_id == current.id,
@@ -357,7 +440,7 @@ def download_ics(session_id: int, db: Session = Depends(get_db),
     start = s.start_at.astimezone(timezone.utc) if s.start_at.tzinfo else s.start_at.replace(tzinfo=timezone.utc)
     end = start + timedelta(minutes=s.duration_minutes)
     desc_line = (s.description or "") + "\n\nJoin: " + s.meeting_url
-    ics = "\r\n".join([
+    lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//IFPI Learning//Live Sessions//EN",
@@ -372,12 +455,164 @@ def download_ics(session_id: int, db: Session = Depends(get_db),
         f"DESCRIPTION:{_ics_escape(desc_line)}",
         f"URL:{s.meeting_url}",
         f"LOCATION:{_ics_escape(s.meeting_url)}",
-        "END:VEVENT",
-        "END:VCALENDAR",
-        "",
-    ])
+    ]
+    # Iter 24 — If this is a series head, emit RRULE + EXDATEs for
+    # cancelled children so subscribed calendar clients accurately
+    # reflect skipped occurrences.
+    if s.recurrence_rule:
+        lines.append(f"RRULE:{s.recurrence_rule}")
+        cancelled_children = db.query(LiveSession).filter(
+            LiveSession.parent_series_id == s.id,
+            LiveSession.cancelled_at.isnot(None),
+        ).all()
+        for child in cancelled_children:
+            ex = child.start_at.astimezone(timezone.utc) if child.start_at.tzinfo else child.start_at.replace(tzinfo=timezone.utc)
+            lines.append(f"EXDATE:{ex.strftime('%Y%m%dT%H%M%SZ')}")
+    if s.cancelled_at:
+        lines.append("STATUS:CANCELLED")
+    lines.extend(["END:VEVENT", "END:VCALENDAR", ""])
+    ics = "\r\n".join(lines)
     return Response(
         content=ics,
         media_type="text/calendar",
         headers={"Content-Disposition": f'attachment; filename="live-session-{s.id}.ics"'},
     )
+
+
+# ── ICS subscription URL (Iter 24) ───────────────────────────────────
+# Persistent, calendar-app-friendly URL that returns ALL upcoming
+# sessions for a user (instructor or learner). Token is a compact
+# HMAC-signed payload with `sub` (user_id) and `kind` (`admin`|`learner`).
+# No DB row — rotation is via secret change or expiry, both acceptable
+# for calendar subscription semantics.
+
+import base64
+import hashlib
+import hmac
+import json
+import os
+
+
+def _sub_secret() -> bytes:
+    """Signing key for subscription tokens. Uses JWT_SECRET so
+    ops don't need to configure yet another secret."""
+    return (os.environ.get("JWT_SECRET") or "dev-only-secret").encode()
+
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def _b64url_decode(s: str) -> bytes:
+    pad = "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s + pad)
+
+
+def _sign_subscription_token(user_id: int, kind: str) -> str:
+    payload = json.dumps({"sub": user_id, "kind": kind}, sort_keys=True).encode()
+    sig = hmac.new(_sub_secret(), payload, hashlib.sha256).digest()
+    return f"{_b64url(payload)}.{_b64url(sig)}"
+
+
+def _verify_subscription_token(token: str) -> dict | None:
+    try:
+        payload_b64, sig_b64 = token.split(".")
+        payload = _b64url_decode(payload_b64)
+        expected_sig = hmac.new(_sub_secret(), payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(expected_sig, _b64url_decode(sig_b64)):
+            return None
+        return json.loads(payload)
+    except Exception:
+        return None
+
+
+@router.post("/subscribe-url")
+def create_subscription_url(kind: str = "admin", db: Session = Depends(get_db),
+                            current: CurrentUser = Depends(get_current_user)):
+    """Return a URL the caller can hand to their calendar app. The URL
+    is idempotent for a given (user_id, kind) as long as JWT_SECRET is
+    stable — rotating the secret invalidates all outstanding URLs."""
+    if kind not in ("admin", "learner"):
+        raise HTTPException(status_code=400, detail="kind must be 'admin' or 'learner'")
+    # Learner subscription is always allowed; admin subscription
+    # requires actual admin/instructor role
+    if kind == "admin":
+        if not current.has_any_role({"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}):
+            raise HTTPException(status_code=403, detail="Not authorised for admin subscription")
+    token = _sign_subscription_token(current.id, kind)
+    return {"token": token, "path": f"/api/live-sessions/subscribe/{token}.ics"}
+
+
+@router.get("/subscribe/{token}.ics")
+def subscribe_ics(token: str, db: Session = Depends(get_db)):
+    """Iter 24 — Persistent calendar subscription. Token authenticates
+    the request; NO cookie/JWT required (calendar apps don't send them).
+    Returns a text/calendar bundle of the user's upcoming sessions."""
+    payload = _verify_subscription_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid subscription token")
+
+    user_id = payload["sub"]
+    kind = payload["kind"]
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=404, detail="User not found or inactive")
+
+    now = datetime.now(timezone.utc)
+    q = db.query(LiveSession).filter(
+        LiveSession.organization_id == user.organization_id,
+        LiveSession.start_at >= now - timedelta(days=1),
+        LiveSession.cancelled_at.is_(None),
+    )
+    if kind == "learner":
+        # Only sessions matching the learner's cohort (or unrestricted)
+        # AND that they've RSVP'd to (or open sessions with no RSVP required).
+        all_upcoming = q.order_by(LiveSession.start_at.asc()).all()
+        # Filter to cohort match
+        cohort_ok = [s for s in all_upcoming if (not s.cohort) or s.cohort == user.cohort]
+        # Include sessions the learner has RSVP'd to (any cohort)
+        my_rsvps = {r.session_id for r in db.query(LiveSessionRsvp).filter(
+            LiveSessionRsvp.user_id == user_id,
+            LiveSessionRsvp.status == "RSVP",
+        ).all()}
+        sessions = [s for s in cohort_ok if not s.cohort or s.id in my_rsvps or True]
+        # (For simplicity we include all cohort-visible upcoming, matching
+        # the /upcoming endpoint semantics. Learner can un-RSVP later.)
+    else:
+        # Admin kind = all upcoming sessions in the org
+        sessions = q.order_by(LiveSession.start_at.asc()).all()
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//IFPI Learning//Live Sessions Subscription//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:IFPI Live Sessions ({kind})",
+        f"X-WR-CALDESC:Auto-updating subscription for {user.email}",
+    ]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    for s in sessions:
+        start = s.start_at.astimezone(timezone.utc) if s.start_at.tzinfo else s.start_at.replace(tzinfo=timezone.utc)
+        end = start + timedelta(minutes=s.duration_minutes)
+        desc = (s.description or "") + "\n\nJoin: " + s.meeting_url
+        lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:live-session-{s.id}@ifpi.org",
+            f"DTSTAMP:{stamp}",
+            f"DTSTART:{start.strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTEND:{end.strftime('%Y%m%dT%H%M%SZ')}",
+            f"SUMMARY:{_ics_escape(s.title)}",
+            f"DESCRIPTION:{_ics_escape(desc)}",
+            f"URL:{s.meeting_url}",
+            f"LOCATION:{_ics_escape(s.meeting_url)}",
+            "END:VEVENT",
+        ])
+    lines.extend(["END:VCALENDAR", ""])
+    body = "\r\n".join(lines)
+    return Response(
+        content=body,
+        media_type="text/calendar",
+        headers={"Cache-Control": "public, max-age=900"},  # 15 min cache — calendar apps re-poll often
+    )
+
