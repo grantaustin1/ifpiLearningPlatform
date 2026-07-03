@@ -241,29 +241,27 @@ def test_cert_email_outbox_no_duplicate(admin, learner):
     conn.commit()
     conn.close()
 
-    def _outbox():
-        d = admin.get(f"{BASE_URL}/api/admin/outbox?page_size=200").json()
-        return d["messages"] if isinstance(d, dict) else d
+    def _cert_outbox():
+        # Server-side filter by template so pagination window can't hide older rows
+        d = admin.get(f"{BASE_URL}/api/admin/outbox?template=cert_issued&page_size=100").json()
+        return d if isinstance(d, dict) else {"messages": d, "total": len(d)}
 
-    before = _outbox()
-    before_cert = [m for m in before if (m.get("template") or "") == "cert_issued"]
-    before_count = len(before_cert)
+    before = _cert_outbox()
+    before_count = before["total"]
 
     r = learner.post(f"{BASE_URL}/api/courses/1/complete")
     assert r.status_code == 200, r.text
 
-    after = _outbox()
-    after_cert = [m for m in after if (m.get("template") or "") == "cert_issued"]
-    assert len(after_cert) == before_count + 1, "expected 1 new cert_issued outbox message"
-    newest = after_cert[0]
+    after = _cert_outbox()
+    assert after["total"] == before_count + 1, "expected 1 new cert_issued outbox message"
+    newest = after["messages"][0]
     # attachments should reference the PDF file
     assert newest.get("attachments"), "expected attachments on cert email"
     # second completion should NOT add another email
     r2 = learner.post(f"{BASE_URL}/api/courses/1/complete")
     assert r2.status_code == 200
-    after2 = _outbox()
-    after2_cert = [m for m in after2 if (m.get("template") or "") == "cert_issued"]
-    assert len(after2_cert) == before_count + 1, "duplicate cert email created on re-complete"
+    after2 = _cert_outbox()
+    assert after2["total"] == before_count + 1, "duplicate cert email created on re-complete"
 
 
 # ── Org branding & PDF logo ───────────────────────────────────────────
