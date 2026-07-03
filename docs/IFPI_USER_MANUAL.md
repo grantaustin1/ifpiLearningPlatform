@@ -332,11 +332,268 @@ Core entities (see `backend/models/__init__.py` for the full list):
 - **OutboxMessage** (email queue)
 - **BadgeTier** + **UserBadge**
 
+## 12.1 Backend Router Inventory
+
+<!-- AUTO:BEGIN router_index -->
+| File | Lines |
+|---|---|
+| `routers/api_tokens.py` | 284 |
+| `routers/auth.py` | 154 |
+| `routers/authoring.py` | 131 |
+| `routers/authoring_extras.py` | 198 |
+| `routers/authoring_media.py` | 284 |
+| `routers/authoring_tutor.py` | 458 |
+| `routers/badge_tiers.py` | 133 |
+| `routers/courses.py` | 656 |
+| `routers/exams.py` | 212 |
+| `routers/extras.py` | 543 |
+| `routers/flashcards.py` | 497 |
+| `routers/imports.py` | 502 |
+| `routers/invitations.py` | 195 |
+| `routers/iter5.py` | 337 |
+| `routers/iter8.py` | 293 |
+| `routers/learning_paths.py` | 285 |
+| `routers/misc.py` | 372 |
+| `routers/narration.py` | 204 |
+| `routers/public_catalog.py` | 143 |
+| `routers/scorm_xapi.py` | 499 |
+| `routers/webhooks.py` | 203 |
+| **Total** | **6583** |
+<!-- AUTO:END router_index -->
+
+## 12.2 Model Inventory
+
+<!-- AUTO:BEGIN model_index -->
+| Model | Table |
+|---|---|
+| `AIJob` | `ai_jobs` |
+| `AIUsageLedger` | `ai_usage_ledger` |
+| `ApiToken` | `api_tokens` |
+| `ApiTokenCall` | `api_token_calls` |
+| `AuditLog` | `audit_logs` |
+| `BadgeTier` | `badge_tiers` |
+| `BillingEvent` | `billing_events` |
+| `Certificate` | `certificates` |
+| `Course` | `courses` |
+| `CoursePrerequisite` | `course_prerequisites` |
+| `CourseSlide` | `course_slides` |
+| `Enrollment` | `enrollments` |
+| `Exam` | `exams` |
+| `ExamAttempt` | `exam_attempts` |
+| `ExamQuestion` | `exam_questions` |
+| `Flashcard` | `flashcards` |
+| `FlashcardReview` | `flashcard_reviews` |
+| `ImportJob` | `import_jobs` |
+| `Invitation` | `invitations` |
+| `LearningPath` | `learning_paths` |
+| `LearningPathEnrollment` | `learning_path_enrollments` |
+| `LearningPathItem` | `learning_path_items` |
+| `Notification` | `notifications` |
+| `Organization` | `organizations` |
+| `OutboxMessage` | `outbox_messages` |
+| `Person` | `persons` |
+| `RefreshToken` | `refresh_tokens` |
+| `ScormPackage` | `scorm_packages` |
+| `SlideComment` | `slide_comments` |
+| `SlideVersion` | `slide_versions` |
+| `SourceChunk` | `source_chunks` |
+| `SourceDocument` | `source_documents` |
+| `SsoJtiSeen` | `sso_jti_seen` |
+| `Subscription` | `subscriptions` |
+| `User` | `users` |
+| `UserBadge` | `user_badges` |
+| `UserRole` | `user_roles` |
+| `WebhookDelivery` | `webhook_deliveries` |
+| `WebhookSubscription` | `webhook_subscriptions` |
+| `XApiStatement` | `xapi_statements` |
+
+_Total: **40** ORM models._
+<!-- AUTO:END model_index -->
+
 ---
 
 # 13. API Reference (Selective) {#13-api}
 
-Full OpenAPI at `/docs`. Highlights:
+Full OpenAPI at `/docs`. The full route table is regenerated automatically:
+
+<!-- AUTO:BEGIN api_routes -->
+| Endpoint | Verb | Purpose |
+|---|---|---|
+| `/api` | GET |  |
+| `/api/academies` | GET | List all academies with optional search (name/slug), status filter, and sort. |
+| `/api/academies` | POST |  |
+| `/api/admin/analytics` | GET |  |
+| `/api/admin/api-tokens` | GET |  |
+| `/api/admin/api-tokens` | POST |  |
+| `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
+| `/api/admin/api-tokens/analytics/usage` | GET | Return per-day request counts for the org over the last `days` days, |
+| `/api/admin/api-tokens/{token_id}` | DELETE |  |
+| `/api/admin/api-tokens/{token_id}/revoke` | POST |  |
+| `/api/admin/audit-digest` | GET | LLM-generated plain-English summary of the last N days of admin |
+| `/api/admin/audit-log` | GET |  |
+| `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
+| `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
+| `/api/admin/imports` | GET |  |
+| `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
+| `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
+| `/api/admin/imports/{job_id}` | GET |  |
+| `/api/admin/imports/{job_id}/rollback` | POST | Undo an import job — deletes every course / learning path it created. |
+| `/api/admin/invitations` | GET |  |
+| `/api/admin/invitations` | POST |  |
+| `/api/admin/invitations/bulk` | POST | Issue up to 500 invitations in one call. Each row returns its own |
+| `/api/admin/invitations/{invitation_id}` | DELETE |  |
+| `/api/admin/leaderboard.csv` | GET |  |
+| `/api/admin/outbox` | GET |  |
+| `/api/admin/outbox/stats` | GET |  |
+| `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
+| `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort, or for |
+| `/api/admin/scorm` | GET |  |
+| `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
+| `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
+| `/api/admin/users` | GET |  |
+| `/api/admin/webhooks` | GET |  |
+| `/api/admin/webhooks` | POST |  |
+| `/api/admin/webhooks/{sub_id}` | DELETE |  |
+| `/api/admin/webhooks/{sub_id}` | PUT |  |
+| `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
+| `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
+| `/api/ai/course-builder` | POST |  |
+| `/api/auth/login` | POST |  |
+| `/api/auth/logout` | POST |  |
+| `/api/auth/me` | GET |  |
+| `/api/auth/refresh` | POST |  |
+| `/api/auth/register` | POST |  |
+| `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Body: {"erp_token": "..."}. |
+| `/api/auth/sso-status` | GET | Public endpoint — the login page calls this on mount to decide whether |
+| `/api/authoring/budget` | GET |  |
+| `/api/authoring/budget` | PUT |  |
+| `/api/authoring/flashcards/bulk-save` | POST | Persist a reviewed batch. Overwrites nothing — creates fresh rows. |
+| `/api/authoring/flashcards/by-course/{course_id}` | GET |  |
+| `/api/authoring/flashcards/generate` | POST | Preview AI-generated flashcards. Does NOT persist — the client shows a |
+| `/api/authoring/flashcards/{card_id}` | DELETE |  |
+| `/api/authoring/flashcards/{card_id}` | PATCH |  |
+| `/api/authoring/mindmap/{course_id}` | POST |  |
+| `/api/authoring/mindmap/{course_id}/layout` | DELETE |  |
+| `/api/authoring/mindmap/{course_id}/layout` | GET |  |
+| `/api/authoring/mindmap/{course_id}/layout` | PUT |  |
+| `/api/authoring/narration/generate` | POST |  |
+| `/api/authoring/narration/languages` | GET | Static list of supported TTS languages — surfaced in the picker. |
+| `/api/authoring/narration/{slide_id}` | DELETE |  |
+| `/api/authoring/pptx/{course_id}` | GET |  |
+| `/api/authoring/redaction/preview` | POST | Small utility endpoint: shows staff exactly what PII gets stripped |
+| `/api/authoring/research` | GET | List recent research jobs for the org's history view. |
+| `/api/authoring/research/start` | POST | Kick off a deep research job. Returns immediately with the AIJob id. |
+| `/api/authoring/research/{job_id}` | GET |  |
+| `/api/authoring/sources` | GET |  |
+| `/api/authoring/sources` | POST | Upload a source. Two modes: |
+| `/api/authoring/sources/search` | POST |  |
+| `/api/authoring/sources/{doc_id}` | DELETE |  |
+| `/api/authoring/status` | GET | Landing endpoint that the frontend hits when a staff user opens the |
+| `/api/authoring/tutor/ask` | POST |  |
+| `/api/authoring/video/generate` | POST | Kick off a Sora 2 job. Returns 202 with the AIJob id — poll |
+| `/api/authoring/video/history` | GET |  |
+| `/api/authoring/video/preview` | POST | Show the estimated cost + remaining budget BEFORE firing a Sora |
+| `/api/authoring/video/{job_id}` | GET |  |
+| `/api/authoring/visuals/generate` | POST | Generates a PNG infographic. If `slide_id + attach_to_slide` are set, |
+| `/api/badge-tiers` | GET |  |
+| `/api/badge-tiers` | POST |  |
+| `/api/badge-tiers/reorder` | PATCH |  |
+| `/api/badge-tiers/{tier_id}` | DELETE |  |
+| `/api/badge-tiers/{tier_id}` | PATCH |  |
+| `/api/billing/subscribe` | POST |  |
+| `/api/billing/subscriptions` | GET |  |
+| `/api/billing/webhook` | POST | Receives ERP360 billing webhooks. Verified via X-Signature header. |
+| `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
+| `/api/catalog` | GET |  |
+| `/api/certificates` | GET |  |
+| `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
+| `/api/certificates/verify/{code}` | GET |  |
+| `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
+| `/api/courses` | GET |  |
+| `/api/courses` | POST |  |
+| `/api/courses/reorder` | PATCH | Body: {"course_ids": [id1, id2, ...]} — sets display_order to the |
+| `/api/courses/{course_id}` | DELETE |  |
+| `/api/courses/{course_id}` | GET |  |
+| `/api/courses/{course_id}` | PATCH |  |
+| `/api/courses/{course_id}/complete` | POST |  |
+| `/api/courses/{course_id}/duplicate` | POST | Deep-clone a course (with all slides) as a new DRAFT. Optional template path: |
+| `/api/courses/{course_id}/enroll` | POST |  |
+| `/api/courses/{course_id}/prerequisites` | GET |  |
+| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
+| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
+| `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
+| `/api/courses/{course_id}/slides` | POST |  |
+| `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
+| `/api/courses/{course_id}/slides/{slide_id}` | DELETE |  |
+| `/api/courses/{course_id}/slides/{slide_id}` | PATCH |  |
+| `/api/courses/{course_id}/slides/{slide_id}/versions` | GET |  |
+| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
+| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
+| `/api/courses/{course_id}/unpublish` | POST |  |
+| `/api/docs` | GET |  |
+| `/api/enrollments` | GET |  |
+| `/api/exams` | GET |  |
+| `/api/exams` | POST |  |
+| `/api/exams/ai-generate-questions` | POST | Generate exam questions from a course's slide content using the |
+| `/api/exams/{exam_id}` | DELETE |  |
+| `/api/exams/{exam_id}` | GET |  |
+| `/api/exams/{exam_id}` | PATCH |  |
+| `/api/exams/{exam_id}/attempts` | POST |  |
+| `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
+| `/api/gamification/leaderboard` | GET |  |
+| `/api/gamification/me` | GET |  |
+| `/api/health` | GET |  |
+| `/api/invitations/{token}` | GET |  |
+| `/api/invitations/{token}/accept` | POST |  |
+| `/api/leads` | POST | Public endpoint for partner sites / marketing pages to drop a lead in. |
+| `/api/leads/embed.js` | GET | Self-contained JS widget that partner sites drop on their page. |
+| `/api/learn/flashcards/courses/{course_id}/due` | GET | Return the learner's due-today queue for a course. Mixes: |
+| `/api/learn/flashcards/courses/{course_id}/stats` | GET |  |
+| `/api/learn/flashcards/streak` | GET | Learner's current + longest flashcard streak. Computed from |
+| `/api/learn/flashcards/{card_id}/review` | POST |  |
+| `/api/learning-paths` | GET |  |
+| `/api/learning-paths` | POST |  |
+| `/api/learning-paths/{path_id}` | DELETE |  |
+| `/api/learning-paths/{path_id}` | GET |  |
+| `/api/learning-paths/{path_id}` | PATCH |  |
+| `/api/learning-paths/{path_id}/enroll` | POST |  |
+| `/api/learning-paths/{path_id}/items` | POST |  |
+| `/api/learning-paths/{path_id}/items/reorder` | PATCH | Accepts {"item_ids": [id1, id2, ...]}. |
+| `/api/learning-paths/{path_id}/items/{course_id}` | DELETE |  |
+| `/api/learning-paths/{path_id}/publish` | POST |  |
+| `/api/notifications` | GET |  |
+| `/api/notifications/read-all` | PATCH |  |
+| `/api/openapi.json` | GET |  |
+| `/api/organization` | GET |  |
+| `/api/organization` | PATCH |  |
+| `/api/organization/apply-theme/{slug}` | POST | Copy a preset's branding values onto the caller's organization. |
+| `/api/organization/cohort-digest/send-now` | POST | Manual trigger — queues the weekly cohort digest immediately for this |
+| `/api/organization/cohort-settings` | PUT |  |
+| `/api/organization/cohort-settings/test-webhook` | POST | Send a sample celebration message to verify the configured webhook. |
+| `/api/organization/smtp` | GET | Returns the SMTP config minus the password. Password is write-only. |
+| `/api/organization/smtp` | PUT |  |
+| `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
+| `/api/organization/themes` | GET | Read-only list of curated theme presets an ADMIN can apply in one click. |
+| `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
+| `/api/public/catalog` | GET | List PUBLISHED courses in the caller's org. Read-only, no PII. |
+| `/api/public/certificates/verify/{code}` | GET | Anonymous verification. Rate-limited to 30/min per IP (Redis |
+| `/api/rich-text/sanitize` | POST | Server-side HTML sanitizer for the rich-text editor preview. |
+| `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
+| `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
+| `/api/slides/{slide_id}/comments` | GET |  |
+| `/api/slides/{slide_id}/comments` | POST |  |
+| `/api/slides/{slide_id}/comments/{comment_id}` | DELETE |  |
+| `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
+| `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
+| `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
+| `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
+| `/api/xapi/statements` | GET |  |
+| `/api/xapi/statements` | POST |  |
+
+_Total: **170** registered API endpoints._
+<!-- AUTO:END api_routes -->
+
+Highlights (curated):
 
 | Endpoint | Verb | Purpose |
 |---|---|---|

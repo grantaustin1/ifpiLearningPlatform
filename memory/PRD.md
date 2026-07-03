@@ -1,6 +1,23 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## What's been implemented (2026-07-03 — iteration 30c · Docs Automation)
+
+### Auto-generated manuals + CI drift gate
+- ✅ `/app/backend/scripts/build_docs.py` — scans `role_registry`, live FastAPI routes, router/model file inventory. Regenerates `<!-- AUTO:BEGIN X -->…<!-- AUTO:END X -->` blocks in all four IFPI manuals in-place. Human-authored prose untouched. `--check` mode for CI, `--html` render.
+- ✅ Auto-blocks live: `role_matrix`, `role_aliases`, `api_routes` (187 routes), `router_index`, `model_index`.
+- ✅ `/app/backend/tests/test_docs_completeness.py` — 3 tests: (a) drift-check via `build_docs.py --check`, (b) every `/api/*` route is mentioned in some manual, (c) every router file is indexed.
+- ✅ `tests/conftest.py` — exempts `test_docs_*` from the "no backend → skip" rule so docs gate runs on any CI runner.
+- ✅ `.github/workflows/ci.yml` — new `docs-drift` job runs on every PR + push; uploads the generated `IFPI_Master_Manual.html` (104 KB) as a build artifact.
+
+### Verified end-to-end
+- Drift-check on corrupt AUTO block → exit 1 with "run build_docs.py" message.
+- Drift-check on clean tree → exit 0.
+- Manuals now auto-regenerate on every push; contributors adding a router without updating docs will fail CI immediately.
+
+---
+
+
 ## Original problem statement (verbatim)
 > "Build IFPI as a sibling app that is pre-made to 'drop into' ERP360 at a later stage and borrow all patterns, reuse APIs if this can be done and won't affect ERP360 now with an easy method to bolt it onto ERP360 when we are ready to do so."
 

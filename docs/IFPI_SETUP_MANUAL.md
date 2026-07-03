@@ -95,14 +95,28 @@ Pick one of the built-in templates or upload a custom Nano-Banana-generated bann
 
 ## Step B.1 — Understanding IFPI's Role Matrix
 
-| Role | Can Author | Can Enroll Learners | Can Publish | Certifies | AI Spend Budget |
-|---|---|---|---|---|---|
-| `OWNER` | ✔ | ✔ | ✔ | ✔ | Unlimited |
-| `SUPER_ADMIN` | ✔ | ✔ | ✔ | ✔ | Unlimited |
-| `ADMIN` | ✔ | ✔ | ✔ | ✔ | Org budget |
-| `INSTRUCTOR` | ✔ (own courses) | ✔ (own cohorts) | ✘ | ✘ | Per-course cap |
-| `LEARNER` | ✘ | ✘ (self-enrol on public) | ✘ | ✘ | N/A |
-| `API_TOKEN` | Scoped (see Phase E) | — | — | — | N/A |
+<!-- AUTO:BEGIN role_matrix -->
+| Role | Description |
+|---|---|
+| `SUPER_ADMIN` | Platform super-admin — can manage all academies |
+| `ADMIN` | Academy administrator — full control of one academy |
+| `INSTRUCTOR` | Can create courses/exams and grade learners |
+| `BILLING_VIEWER` | Read-only access to billing/invoicing |
+| `LEARNER` | End-user enrolled in courses (default) |
+<!-- AUTO:END role_matrix -->
+
+**Alias tolerated from external systems / SSO (auto-mapped):**
+
+<!-- AUTO:BEGIN role_aliases -->
+| Alias | Canonical |
+|---|---|
+| `OWNER` | `ADMIN` |
+| `MANAGER` | `ADMIN` |
+| `PLATFORM_ADMIN` | `SUPER_ADMIN` |
+| `TRAINER` | `INSTRUCTOR` |
+| `STUDENT` | `LEARNER` |
+| `USER` | `LEARNER` |
+<!-- AUTO:END role_aliases -->
 
 Roles are **additive** — a user with `INSTRUCTOR` + `LEARNER` sees both dashboards.
 
