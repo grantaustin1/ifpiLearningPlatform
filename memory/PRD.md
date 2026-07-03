@@ -1,6 +1,23 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## Hotfix (2026-07-03 · iteration 30f · CI dep resolver + envelope compat)
+
+### Pip resolver conflict
+- ✅ Bumped `python-jose==3.3.0` → `python-jose==3.5.0`. The older 3.4.0 (the version CI happened to be pulling) required `pyasn1<0.5.0`, which conflicts with our `pyasn1==0.6.3` pin. jose 3.5.0 requires `pyasn1>=0.5.0` — clean resolve. JWT + SSO handlers verified functional.
+
+### Exception envelope backwards-compat (Iter 30d follow-up)
+- ✅ Updated `core/middleware.py::_http_exc` — when a handler raises `HTTPException(status_code=X, detail={"key": ...})` with a **dict detail**, the response now preserves every field of the dict AT THE TOP LEVEL alongside the wrapper `error` block. This keeps old client code (that reads `body["missing"]`, `body["message"]`, etc.) working while ALSO exposing the new envelope for new code.
+- ✅ Migrated **10 legacy tests** that asserted on `r.json()["detail"]` to the tolerant `body.get("error", {}).get("message") or body.get("detail", "")` pattern (test_iteration14/17/18_20/26/7).
+- ✅ Case-insensitive check in `test_iteration15_gaps.py::test_requirements_txt_pins_all_five` (PyPI is case-insensitive; `Markdown` vs `markdown`).
+
+### Regression
+- **360/364 tests pass.** The 4 remaining failures are unrelated pre-existing flakes: test-ordering data pollution in `test_ifpi_api::test_enrol_free_course_learner`, external AI 502 in `TestAIBuilder`, order-dependent xAPI test, and Redis-state rate-limit race — all pass in isolation.
+- Zero lint errors. `pip install -r requirements.txt --dry-run` shows a clean resolve.
+
+---
+
+
 ## What's been implemented (2026-07-03 · iteration 30e · Documents Tab + Screenshots)
 
 ### Full 24-screen capture completed

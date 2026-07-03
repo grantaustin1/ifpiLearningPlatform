@@ -103,9 +103,11 @@ def test_prereq_enforcement_412(admin, learner, second_course):
     # 3) Enroll attempt should now be 412
     r = learner.post(f"{BASE_URL}/api/courses/1/enroll")
     assert r.status_code == 412, r.text
-    detail = r.json().get("detail", {})
-    assert "missing" in detail, detail
-    ids = [m["id"] for m in detail["missing"]]
+    body = r.json()
+    # 412 handler returns a dict detail; the envelope preserves its
+    # fields alongside a wrapper `error` block (Iter 30d).
+    assert "missing" in body, body
+    ids = [m["id"] for m in body["missing"]]
     assert second_course in ids
 
 

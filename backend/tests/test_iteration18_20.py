@@ -101,7 +101,7 @@ def test_scorm_upload_rejects_non_scorm_zip(admin):
     files = {"file": ("nope.zip", buf.getvalue(), "application/zip")}
     r = admin.post(f"{BASE_URL}/api/admin/scorm/upload", files=files, timeout=10)
     assert r.status_code == 400
-    assert "imsmanifest" in r.json()["detail"].lower()
+    assert "imsmanifest" in (r.json().get("error", {}).get("message") or r.json().get("detail", "")).lower()
 
 
 def test_scorm_upload_rejects_traversal(admin):
