@@ -345,7 +345,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
 | `routers/courses.py` | 656 |
-| `routers/docs_library.py` | 71 |
+| `routers/docs_library.py` | 103 |
 | `routers/exams.py` | 212 |
 | `routers/extras.py` | 543 |
 | `routers/flashcards.py` | 497 |
@@ -359,7 +359,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/public_catalog.py` | 143 |
 | `routers/scorm_xapi.py` | 499 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **6654** |
+| **Total** | **6686** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory

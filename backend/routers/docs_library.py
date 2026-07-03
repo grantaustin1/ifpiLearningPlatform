@@ -56,6 +56,7 @@ def download_pdf(
         metadata={"format": "pdf", "bytes": len(pdf_bytes)},
         request=request,
     )
+    db.commit()
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -93,6 +94,7 @@ def download_raw(
         metadata={"format": "markdown", "bytes": len(body)},
         request=request,
     )
+    db.commit()
     return PlainTextResponse(
         content=body,
         headers={

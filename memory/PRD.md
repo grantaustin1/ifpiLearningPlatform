@@ -1,6 +1,22 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## Hotfix (2026-07-04 · iteration 30g · Audit-log commit fix)
+
+- ✅ Fixed the two regressions from iter 30e — `test_download_records_audit_log_entry`
+  and `test_preview_records_distinct_audit_action`. Root cause: `audit_service.record()`
+  only calls `db.add()`, relying on the caller's transaction to commit. The docs library
+  PDF/raw endpoints are pure GETs — nothing else triggered a commit — so `get_db()`
+  closed the session and the audit rows were silently dropped.
+- ✅ Added explicit `db.commit()` in `routers/docs_library.py::download_pdf` and
+  `download_raw` right after each `audit_service.record()` call. All other write-flow
+  callers already commit as part of their business-object flush, so no other endpoints
+  need touching.
+- ✅ Regenerated the docs-library `AUTO:*` blocks via `python backend/scripts/build_docs.py`
+  (stale `router_index / model_index / api_routes` in `IFPI_USER_MANUAL.md`).
+- **Regression:** 10/10 `test_iteration30e.py` + 3/3 `test_iteration30d.py` +
+  3/3 `test_docs_completeness.py` all green (20/20).
+
 ## Hotfix (2026-07-03 · iteration 30f · CI dep resolver + envelope compat)
 
 ### Pip resolver conflict
