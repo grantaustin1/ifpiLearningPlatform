@@ -3,6 +3,7 @@ import { api } from 'lib/api'
 import { Link } from 'react-router-dom'
 import { BookOpen, ClipboardList, Users, Award, ArrowRight, Plus, Sparkles, TrendingUp } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
+import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
 
 export default function DashboardPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -58,6 +59,23 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-2">
+          <MembersNeedingActionWidget />
+        </div>
+        <div className="bg-white rounded-2xl card-glow p-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {actions.map(a => (
+              <Link key={a.href} to={a.href}
+                className={`flex flex-col items-center gap-2 ${a.color} text-white text-xs font-semibold py-4 rounded-xl shadow transition-all hover:-translate-y-0.5`}>
+                <a.icon className="h-5 w-5" /> {a.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 bg-white rounded-2xl card-glow overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100"><h2 className="text-sm font-semibold text-slate-800">Recent Activity</h2></div>
           <div className="divide-y divide-slate-50">
@@ -72,17 +90,6 @@ export default function DashboardPage() {
                 </p>
                 <span className="text-[11px] text-slate-400">{timeAgo(a.enrolled_at)}</span>
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl card-glow p-5">
-          <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {actions.map(a => (
-              <Link key={a.href} to={a.href}
-                className={`flex flex-col items-center gap-2 ${a.color} text-white text-xs font-semibold py-4 rounded-xl shadow transition-all hover:-translate-y-0.5`}>
-                <a.icon className="h-5 w-5" /> {a.label}
-              </Link>
             ))}
           </div>
         </div>

@@ -108,3 +108,12 @@ def register_all(app: FastAPI) -> None:
     from routers import docs_library
     app.include_router(docs_library.router)
 
+    # ── Iter 30i: TOTP-based 2FA ─────────────────────────────────────
+    from routers import totp
+    app.include_router(totp.user_router)
+    app.include_router(totp.admin_router)
+
+    # ── Iter 30k: Owner dashboard widgets ────────────────────────────
+    from routers import owner_dashboard
+    app.include_router(owner_dashboard.router)
+

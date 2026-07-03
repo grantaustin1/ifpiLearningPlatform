@@ -273,20 +273,109 @@ class LoginBruteForceMiddleware(BaseHTTPMiddleware):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 4. CSRF double-submit cookie (Iter 30h)
+# ─────────────────────────────────────────────────────────────────────
+
+
+class CSRFProtectMiddleware(BaseHTTPMiddleware):
+    """Double-submit cookie CSRF guard.
+
+    Enforcement rules:
+    - Only when `CSRF_ENABLED=true` in config (opt-in for safe rollout).
+    - Only on mutating methods: POST/PUT/PATCH/DELETE.
+    - Only when the request presents the auth cookie (`ifpi_auth_token`).
+      Bearer-header requests (API tokens, mobile clients, tests) bypass
+      the check — they aren't vulnerable to CSRF since a browser can't
+      attach an arbitrary Authorization header cross-origin.
+    - Certain public/entry-point paths bypass (login, register, refresh,
+      SSO exchange, public catalog, portal, lead capture, xAPI receiver,
+      SCORM runtime, invitation accept). Login/refresh have their own
+      Origin-check via SameSite=lax; enforcing CSRF on them would create
+      a chicken-and-egg problem where the client has no CSRF token yet.
+
+    On success: pass through. On failure: return 403 CSRF_TOKEN_MISMATCH
+    in the standard envelope.
+    """
+
+    UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+    # Paths that are always exempt. Prefix match — everything under these
+    # trees also bypasses.
+    EXEMPT_PREFIXES = (
+        "/api/auth/login",
+        "/api/member/auth/login",
+        "/api/auth/register",
+        "/api/auth/refresh",
+        "/api/auth/sso-exchange",
+        "/api/auth/sso-status",
+        "/api/auth/2fa/challenge",   # 2FA login exchange (no session yet)
+        "/api/leads",           # public lead capture + embed.js
+        "/api/public/",
+        "/api/portal/",
+        "/api/scorm/",
+        "/api/xapi/",
+        "/api/invitations/",    # accept-invite is a public POST
+        "/api/branding/public",
+        "/api/uploads/files/",
+    )
+    COOKIE_NAME = "ifpi_auth_token"
+    CSRF_COOKIE = "ifpi_csrf"
+    HEADER_NAME = "x-csrf-token"
+
+    async def dispatch(self, request: Request, call_next):
+        from core.config import settings as _s
+        if not _s.csrf_enabled:
+            return await call_next(request)
+        if request.method.upper() not in self.UNSAFE_METHODS:
+            return await call_next(request)
+        path = request.url.path
+        if any(path.startswith(p) for p in self.EXEMPT_PREFIXES):
+            return await call_next(request)
+        # Bearer-header auth is exempt (API tokens, tests) — a browser
+        # can't set an arbitrary Authorization header cross-origin, so
+        # CSRF isn't the applicable threat model.
+        authz = request.headers.get("authorization", "")
+        if authz.lower().startswith("bearer "):
+            return await call_next(request)
+        # From here on: caller is (or claims to be) a cookie-authed
+        # browser session — enforce double-submit.
+        auth_cookie = request.cookies.get(self.COOKIE_NAME)
+        if not auth_cookie:
+            # No cookie session at all → let the auth dependency handle
+            # the 401. Not a CSRF failure.
+            return await call_next(request)
+        cookie_token = request.cookies.get(self.CSRF_COOKIE)
+        header_token = request.headers.get(self.HEADER_NAME)
+        if (not cookie_token or not header_token
+                or not _consteq(cookie_token, header_token)):
+            return _err(403, "CSRF_TOKEN_MISMATCH",
+                        "CSRF token missing or invalid — refresh the page "
+                        "and retry.")
+        return await call_next(request)
+
+
+def _consteq(a: str, b: str) -> bool:
+    """Constant-time string compare — resists timing oracle attacks."""
+    import hmac
+    return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Public installer — one line in server.py
 # ─────────────────────────────────────────────────────────────────────
 
 
 def install_middleware(app: FastAPI) -> None:
-    """Wire up correlation-ID, exception envelope, brute-force lockout.
+    """Wire up correlation-ID, exception envelope, brute-force lockout, CSRF.
 
-    Order matters:
-      1. Correlation-ID first — so it's available to all downstream
-         (including exception handlers and the token-call logger).
-      2. Brute-force checker second — runs BEFORE routers so failed
-         logins can't slip past.
-      3. Exception handlers last (they're registered, not stacked).
+    Order matters (middleware runs in REVERSE order of registration):
+      1. CorrelationId FIRST registered → LAST executed on outbound path
+         (so response headers include the ID).
+      2. BruteForce → runs early on inbound; blocks bad-actor logins.
+      3. CSRF → runs after brute-force so brute-force gate isn't itself
+         CSRF-gated (login is exempt anyway).
+      4. Exception handlers are registered separately, not stacked.
     """
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(LoginBruteForceMiddleware)
+    app.add_middleware(CSRFProtectMiddleware)
     install_exception_handlers(app)

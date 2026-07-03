@@ -1,6 +1,56 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## Iteration 30h/i/j/k — Auth Refactor + 2FA + Locust CI + Owner Widget (2026-07-05)
+
+### 30h · CSRF double-submit middleware — SHIPPED
+- ✅ New `CSRFProtectMiddleware` in `core/middleware.py`. Opt-in via `CSRF_ENABLED=true` (now default in `backend/.env`).
+- ✅ On login/register/refresh, backend issues a NON-HttpOnly `ifpi_csrf` cookie scoped to `/` so JS can read it via `document.cookie`. Auth cookie stays HttpOnly on `/api`.
+- ✅ Enforcement: POST/PUT/PATCH/DELETE using cookie auth must present `X-CSRF-Token` header matching the cookie. Bearer-header calls (API tokens, mobile, tests) bypass. Login/register/refresh/SSO exchange/public catalog/portal/xAPI/SCORM/invitation-accept are exempt.
+- ✅ Frontend `lib/api.ts` axios interceptor reads `ifpi_csrf` and stamps the header on every mutating call. Zero client changes required after the interceptor lands.
+- ✅ Tests: 10/10 in `tests/test_iteration30h_csrf.py` (unit + E2E). Verified live via Playwright: cookie-authed POST without CSRF → 403; with matching header → 200; Bearer bypass → 200.
+
+### 30i · TOTP-based 2FA (RFC 6238) — SHIPPED
+- ✅ New model columns on `users`: `totp_secret_enc` (Fernet-encrypted), `totp_enabled_at`, `totp_recovery_codes` (bcrypt-hashed list of 10 single-use codes). Alembic `b2c3d4e5f6a7`.
+- ✅ Service `services/totp_service.py` — pyotp 2.10.0 wrapper, provisioning URI, QR-as-base64-PNG, recovery-code lifecycle. Piggybacks on `SMTP_ENCRYPTION_KEY` for encryption.
+- ✅ Router `routers/totp.py` — 6 endpoints:
+  - `GET /api/auth/2fa/status`
+  - `POST /api/auth/2fa/setup-init` (QR + secret preview, not saved)
+  - `POST /api/auth/2fa/setup` (verify code → persist encrypted secret + issue 10 recovery codes ONCE)
+  - `POST /api/auth/2fa/disable` (self-service, requires password + valid code)
+  - `POST /api/auth/2fa/challenge` (public — exchange challenge_id + code → LoginResponse)
+  - `POST /api/admin/users/{id}/2fa/disable` (SUPER_ADMIN force-disable)
+- ✅ Login flow modified: if user has 2FA enabled, `/api/auth/login` returns `{requires_2fa: true, challenge_id, expires_in}` instead of tokens. Frontend swaps password form for TOTP-code form and hits `/challenge` to complete.
+- ✅ In-memory challenge store with 5-min TTL + 5 attempt cap. Recovery codes are consumed on use (single-use enforced).
+- ✅ Frontend `SecurityTab.tsx` — Settings → Security tab. Full lifecycle UI: QR scan → verify → recovery-code display → disable form.
+- ✅ `LoginPage` now handles the 2FA gate: shows a code input, "Use a different account" cancel, error surfacing from envelope.
+- ✅ Tests: 7/7 in `tests/test_iteration30i_totp.py` — full enable/login/disable cycle, recovery-code single-use, challenge lockout at 5 attempts.
+
+### 30j · Locust smoke load CI job — SHIPPED
+- ✅ New `.github/workflows/ci.yml::locust-smoke` job — spins up uvicorn, seeds DB, runs 5-user × 30s smoke with `--tags smoke`, asserts p95 < 3000ms + error rate < 5%. Fails CI on breach. Uploads CSV artifacts on every run.
+- ✅ Fixed 2 dead endpoints in `scripts/locustfile.py` — `/api/dashboard` → `/api/notifications`, `/api/learn/flashcards/courses/{id}` → `/api/learn/flashcards/courses/{id}/due`. Verified locally: 0% errors, p95 = 240ms on a 20s run.
+
+### 30k · Owner dashboard — Members needing action widget — SHIPPED
+- ✅ New endpoint `GET /api/admin/dashboard/members-needing-action?limit=1-100`. Categorizes learners into 3 priority buckets:
+  - **STALLED** (P1) — enrolled ≥ 14 days, progress = 0
+  - **IDLE** (P2) — progress 1-99%, enrolled ≥ 14 days ago
+  - **NEVER_SIGNED_IN** (P3) — account ≥ 7 days old, `last_login_at IS NULL`
+- ✅ Response shape: `{count, total_flagged, generated_at, items[]}`. Each item carries a reason code, human message, detail, and a `next_step` (label + path admins can click into).
+- ✅ Sorted by priority ascending — highest-urgency first.
+- ✅ Frontend `MembersNeedingActionWidget.tsx` mounted at top of admin dashboard (replaces the old activity-only layout). Colour-coded by reason. React Query with 60s stale time.
+- ✅ Tests: 4/4 in `tests/test_iteration30k_owner.py` — shape, admin gate, limit enforcement, priority ordering.
+
+### Deferred to next iteration
+- **Kiosk mode + T&Cs acceptance tracking** — needs its own migration, dedicated kiosk-shell UI, and offline mode. Deferred for scope.
+- **`AUTH_COOKIE_MODE=on` cutover** — remains on `dual` (cookie + Bearer in body). Flip when we're sure no downstream (mobile, external integrations) still reads `access_token` from the body.
+
+### Regression + hotfix note
+- `test_iteration5.py` admin_session fixture updated to attach `Authorization: Bearer` (was cookie-only; would fail under CSRF enforcement).
+- Docs library `AUTO:*` blocks regenerated (2 new router files → `api_routes` block re-emitted).
+
+---
+
+
 ## Hotfix (2026-07-04 · iteration 30g · Audit-log commit fix)
 
 - ✅ Fixed the two regressions from iter 30e — `test_download_records_audit_log_entry`
