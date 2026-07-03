@@ -32,6 +32,37 @@ def admin(): return _login("admin@ifpi.org", "admin123")
 def learner(): return _login("learner@ifpi.org", "learner123")
 
 
+# Iter 23 — Autouse teardown that demotes+deletes any iter30l-* terms
+# rows this module publishes. Without this, each iter30l test run leaves
+# the newest published terms version as `is_current=True`, which then
+# gates the /live-sessions UI (TermsGate) for every subsequent user
+# visit. The cleanup service correctly preserves is_current=True rows
+# by design, so cleanup has to happen here — where the test knows the
+# row is disposable — not later.
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup_iter30l_terms():
+    yield
+    import sys
+    sys.path.insert(0, "/app/backend")
+    from core.database import SessionLocal
+    from models import TermsVersion, TermsAcceptance
+    with SessionLocal() as db:
+        ids = [
+            r.id for r in db.query(TermsVersion.id, TermsVersion.version)
+            .filter(TermsVersion.version.like("iter30l-%")).all()
+        ]
+        if ids:
+            db.query(TermsAcceptance).filter(
+                TermsAcceptance.terms_version_id.in_(ids)
+            ).delete(synchronize_session=False)
+            db.query(TermsVersion).filter(
+                TermsVersion.id.in_(ids)
+            ).delete(synchronize_session=False)
+            db.commit()
+
+
+
+
 # ── T&Cs ──────────────────────────────────────────────────────────────
 
 
