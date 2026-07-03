@@ -99,3 +99,50 @@ def test_pdf_cached_between_requests(admin):
     # Warm should be at least 2x faster (cache hit reads a small file
     # instead of running xhtml2pdf). Guard is loose to avoid flakiness.
     assert warm < cold, f"warm ({warm:.3f}s) not faster than cold ({cold:.3f}s)"
+
+
+# ── Iter 30g — inline preview + audit trail ─────────────────────────
+
+
+def test_preview_returns_inline_content_disposition(admin):
+    """?preview=true swaps `attachment` for `inline` so browsers render
+    the PDF in an iframe/embed instead of dumping it into Downloads."""
+    r = admin.get(f"{BASE_URL}/api/admin/docs/setup-manual/pdf?preview=true",
+                  timeout=30)
+    assert r.status_code == 200
+    cd = r.headers.get("content-disposition", "")
+    assert cd.startswith("inline;"), f"expected inline disposition, got {cd!r}"
+    assert r.content[:4] == b"%PDF"
+
+
+def test_download_records_audit_log_entry(admin):
+    """DOC_DOWNLOADED audit rows are written on every PDF/raw fetch."""
+    # Trigger a download
+    slug = "user-manual"
+    r = admin.get(f"{BASE_URL}/api/admin/docs/{slug}/pdf", timeout=30)
+    assert r.status_code == 200
+    # Check the audit log surfaced it. `/api/admin/audit-log` returns
+    # {total, items} scoped to the caller's org.
+    r = admin.get(f"{BASE_URL}/api/admin/audit-log?action=DOC_DOWNLOADED",
+                  timeout=10)
+    assert r.status_code == 200, r.text
+    entries = r.json().get("items", [])
+    hits = [e for e in entries if e.get("target_id") == slug
+            and e.get("action") == "DOC_DOWNLOADED"]
+    assert hits, f"no DOC_DOWNLOADED entry for {slug} — got {entries[:3]}"
+
+
+def test_preview_records_distinct_audit_action(admin):
+    """Preview writes DOC_PREVIEWED (not DOC_DOWNLOADED) so analytics
+    can distinguish 'user browsed' from 'user committed to a copy'."""
+    slug = "assessment"
+    r = admin.get(f"{BASE_URL}/api/admin/docs/{slug}/pdf?preview=true",
+                  timeout=30)
+    assert r.status_code == 200
+    r = admin.get(f"{BASE_URL}/api/admin/audit-log?action=DOC_PREVIEWED",
+                  timeout=10)
+    assert r.status_code == 200, r.text
+    entries = r.json().get("items", [])
+    hits = [e for e in entries if e.get("target_id") == slug
+            and e.get("action") == "DOC_PREVIEWED"]
+    assert hits, f"no DOC_PREVIEWED entry for {slug} — got {entries[:3]}"
