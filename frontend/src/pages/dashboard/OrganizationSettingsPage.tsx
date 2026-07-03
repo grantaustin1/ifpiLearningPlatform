@@ -258,6 +258,7 @@ export default function OrganizationSettingsPage() {
 
         <SmtpSection inputCls={inputCls} />
         <CohortSettingsSection inputCls={inputCls} />
+        <MarketplaceSection />
       </div>
 
       <aside className="xl:col-span-2 sticky top-6 self-start">
@@ -575,3 +576,47 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
   )
 }
 
+
+
+function MarketplaceSection() {
+  const [optIn, setOptIn] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.get('/organization').then(r => setOptIn(r.data.marketplace_opt_in !== false))
+  }, [])
+
+  const save = async (next: boolean) => {
+    setSaving(true)
+    try {
+      await api.patch('/organization', { marketplace_opt_in: next })
+      setOptIn(next)
+      toast.success(next
+        ? 'Your published courses are now visible in the marketplace'
+        : 'Your courses have been removed from the marketplace')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Save failed')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Section icon={Building2} title="Marketplace listing" help="When enabled, your PUBLISHED courses appear on the cross-tenant public marketplace at /marketplace. Anonymous visitors can browse them and enrol after signing up.">
+      <div className="flex items-start justify-between gap-4 py-2" data-testid="marketplace-opt-in-row">
+        <div>
+          <p className="text-sm font-medium text-slate-900">List published courses on the public marketplace</p>
+          <p className="text-xs text-slate-500 mt-0.5">Off = only enrolled learners can see them. Toggling this is instant.</p>
+        </div>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => save(!optIn)}
+          data-testid="marketplace-opt-in-toggle"
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${optIn ? 'bg-indigo-600' : 'bg-slate-300'} disabled:opacity-50`}
+          aria-checked={optIn}
+          role="switch">
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${optIn ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </div>
+    </Section>
+  )
+}

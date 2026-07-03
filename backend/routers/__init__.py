@@ -145,3 +145,7 @@ def register_all(app: FastAPI) -> None:
     from routers import affiliate
     app.include_router(affiliate.router)
 
+    # ── Iter 22: Live Sessions (cohort meetings + attendance) ────────
+    from routers import live_sessions
+    app.include_router(live_sessions.router)
+

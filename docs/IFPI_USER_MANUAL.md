@@ -340,7 +340,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 175 |
+| `routers/auth.py` | 179 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -350,14 +350,15 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/exams.py` | 212 |
-| `routers/extras.py` | 543 |
+| `routers/extras.py` | 545 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 195 |
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/misc.py` | 372 |
+| `routers/live_sessions.py` | 308 |
+| `routers/misc.py` | 428 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -368,7 +369,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **8759** |
+| **Total** | **9129** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -404,6 +405,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `LearningPath` | `learning_paths` |
 | `LearningPathEnrollment` | `learning_path_enrollments` |
 | `LearningPathItem` | `learning_path_items` |
+| `LiveSession` | `live_sessions` |
+| `LiveSessionRsvp` | `live_session_rsvps` |
 | `Notification` | `notifications` |
 | `Organization` | `organizations` |
 | `OutboxMessage` | `outbox_messages` |
@@ -426,7 +429,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **49** ORM models._
+_Total: **51** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -555,6 +558,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/billing/webhook` | POST | Receives ERP360 billing webhooks. Verified via X-Signature header. |
 | `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
 | `/api/catalog` | GET |  |
+| `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
 | `/api/certificates` | GET |  |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
@@ -614,6 +618,15 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/learning-paths/{path_id}/items/reorder` | PATCH | Accepts {"item_ids": [id1, id2, ...]}. |
 | `/api/learning-paths/{path_id}/items/{course_id}` | DELETE |  |
 | `/api/learning-paths/{path_id}/publish` | POST |  |
+| `/api/live-sessions` | GET |  |
+| `/api/live-sessions` | POST |  |
+| `/api/live-sessions/upcoming` | GET | List sessions the current user can RSVP to: their cohort (or |
+| `/api/live-sessions/{session_id}` | DELETE |  |
+| `/api/live-sessions/{session_id}` | GET |  |
+| `/api/live-sessions/{session_id}` | PATCH |  |
+| `/api/live-sessions/{session_id}/ics` | GET |  |
+| `/api/live-sessions/{session_id}/mark-attendance` | POST |  |
+| `/api/live-sessions/{session_id}/rsvp` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
 | `/api/openapi.json` | GET |  |
@@ -650,7 +663,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **211** registered API endpoints._
+_Total: **221** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
