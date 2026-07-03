@@ -103,6 +103,135 @@ def track_view(
 
 
 # ── Admin: per-course funnel ─────────────────────────────────────────
+@admin_router.get("/marketplace-funnel")
+def marketplace_funnel_rollup(
+    days: int = Query(30, ge=1, le=365),
+    top_n: int = Query(5, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN", "INSTRUCTOR")),
+):
+    """Iter 25 — Cross-course marketplace funnel roll-up for the current
+    organisation. Aggregates views/enrolments/completions across all
+    published courses + returns the top-N by view-to-enrol conversion
+    rate."""
+    since = date.today() - timedelta(days=days)
+    since_iso = since.isoformat()
+    since_dt = datetime.combine(since, datetime.min.time())
+
+    # Course ids belonging to this org (any status — completions are
+    # still valid on unpublished courses if legacy learners exist)
+    org_course_ids = [
+        c.id for c in db.query(Course.id).filter(
+            Course.organization_id == current.organization_id
+        ).all()
+    ]
+    if not org_course_ids:
+        return {"days_window": days, "totals": {"views": 0, "enrollments": 0, "completions": 0},
+                "view_to_enroll_rate": 0.0, "enroll_to_complete_rate": 0.0,
+                "top_by_conversion": [], "daily": []}
+
+    total_views = db.query(CourseView).filter(
+        CourseView.course_id.in_(org_course_ids),
+        CourseView.viewed_on_date >= since_iso,
+    ).count()
+    total_enrolls = db.query(Enrollment).filter(
+        Enrollment.course_id.in_(org_course_ids),
+        Enrollment.enrolled_at >= since_dt,
+    ).count()
+    total_completes = db.query(Enrollment).filter(
+        Enrollment.course_id.in_(org_course_ids),
+        Enrollment.completed_at.isnot(None),
+        Enrollment.completed_at >= since_dt,
+    ).count()
+
+    view_to_enroll = min(1.0, round(total_enrolls / total_views, 4)) if total_views > 0 else 0.0
+    enroll_to_complete = min(1.0, round(total_completes / total_enrolls, 4)) if total_enrolls > 0 else 0.0
+
+    # Per-course numbers → sorted by V→E rate desc
+    views_by_course = dict(
+        db.query(CourseView.course_id, func.count(CourseView.id))
+        .filter(CourseView.course_id.in_(org_course_ids),
+                CourseView.viewed_on_date >= since_iso)
+        .group_by(CourseView.course_id).all()
+    )
+    enrolls_by_course = dict(
+        db.query(Enrollment.course_id, func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(org_course_ids),
+                Enrollment.enrolled_at >= since_dt)
+        .group_by(Enrollment.course_id).all()
+    )
+    completes_by_course = dict(
+        db.query(Enrollment.course_id, func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(org_course_ids),
+                Enrollment.completed_at.isnot(None),
+                Enrollment.completed_at >= since_dt)
+        .group_by(Enrollment.course_id).all()
+    )
+    course_titles = {
+        c.id: c.title for c in db.query(Course.id, Course.title).filter(
+            Course.id.in_(org_course_ids)
+        ).all()
+    }
+
+    per_course = []
+    for cid in org_course_ids:
+        v, e, c = views_by_course.get(cid, 0), enrolls_by_course.get(cid, 0), completes_by_course.get(cid, 0)
+        if v == 0 and e == 0 and c == 0:
+            continue
+        per_course.append({
+            "course_id": cid,
+            "course_title": course_titles.get(cid, "?"),
+            "views": v, "enrollments": e, "completions": c,
+            "view_to_enroll_rate": min(1.0, round(e / v, 4)) if v > 0 else 0.0,
+            "enroll_to_complete_rate": min(1.0, round(c / e, 4)) if e > 0 else 0.0,
+        })
+    top_by_conversion = sorted(
+        [p for p in per_course if p["views"] > 0],
+        key=lambda p: p["view_to_enroll_rate"], reverse=True,
+    )[:top_n]
+
+    # Daily totals across all org courses
+    daily_views = dict(
+        db.query(CourseView.viewed_on_date, func.count(CourseView.id))
+        .filter(CourseView.course_id.in_(org_course_ids),
+                CourseView.viewed_on_date >= since_iso)
+        .group_by(CourseView.viewed_on_date).all()
+    )
+    daily_enrolls = dict(
+        db.query(func.date(Enrollment.enrolled_at), func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(org_course_ids),
+                Enrollment.enrolled_at >= since_dt)
+        .group_by(func.date(Enrollment.enrolled_at)).all()
+    )
+    daily_completes = dict(
+        db.query(func.date(Enrollment.completed_at), func.count(Enrollment.id))
+        .filter(Enrollment.course_id.in_(org_course_ids),
+                Enrollment.completed_at.isnot(None),
+                Enrollment.completed_at >= since_dt)
+        .group_by(func.date(Enrollment.completed_at)).all()
+    )
+    daily = [{
+        "date": (since + timedelta(days=i)).isoformat(),
+        "views": daily_views.get((since + timedelta(days=i)).isoformat(), 0),
+        "enrollments": daily_enrolls.get((since + timedelta(days=i)).isoformat(), 0),
+        "completions": daily_completes.get((since + timedelta(days=i)).isoformat(), 0),
+    } for i in range(days + 1)]
+
+    return {
+        "days_window": days,
+        "totals": {
+            "views": total_views,
+            "enrollments": total_enrolls,
+            "completions": total_completes,
+            "courses_with_activity": len(per_course),
+        },
+        "view_to_enroll_rate": view_to_enroll,
+        "enroll_to_complete_rate": enroll_to_complete,
+        "top_by_conversion": top_by_conversion,
+        "daily": daily,
+    }
+
+
 @admin_router.get("/marketplace-funnel/{course_id}")
 def marketplace_funnel(
     course_id: int,

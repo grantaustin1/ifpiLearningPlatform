@@ -357,8 +357,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 618 |
-| `routers/marketplace_analytics.py` | 189 |
+| `routers/live_sessions.py` | 695 |
+| `routers/marketplace_analytics.py` | 318 |
 | `routers/misc.py` | 451 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
@@ -370,7 +370,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **9651** |
+| **Total** | **9857** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -481,6 +481,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/invitations/{invitation_id}` | DELETE |  |
 | `/api/admin/kiosk/settings` | PUT |  |
 | `/api/admin/leaderboard.csv` | GET |  |
+| `/api/admin/marketplace-funnel` | GET | Iter 25 — Cross-course marketplace funnel roll-up for the current |
 | `/api/admin/marketplace-funnel/{course_id}` | GET |  |
 | `/api/admin/onboarding/checklist` | GET |  |
 | `/api/admin/outbox` | GET |  |
@@ -625,6 +626,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/live-sessions` | GET |  |
 | `/api/live-sessions` | POST |  |
 | `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
+| `/api/live-sessions/subscribe-url/qr` | GET | Iter 25 — Return an SVG QR code encoding the current user's |
+| `/api/live-sessions/subscribe-url/rotate` | POST | Iter 25 — Bump the org's subscription_secret_version. Every |
 | `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
 | `/api/live-sessions/upcoming` | GET | List sessions the current user can RSVP to: their cohort (or |
 | `/api/live-sessions/{session_id}` | DELETE |  |
@@ -671,7 +674,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **227** registered API endpoints._
+_Total: **230** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
