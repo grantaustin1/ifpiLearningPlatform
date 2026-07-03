@@ -45,6 +45,12 @@ app.add_middleware(
 # ── Iter 28 · Rate limiting is per-router (in-memory sliding window). ─
 # See routers/public_catalog.py::_ratelimit — no middleware needed.
 
+# ── Iter 30d · Observability + brute-force lockout ─────────────────
+# Adds correlation-ID header, global exception envelope, and rate-limits
+# `/api/auth/login` at 5 failures / 15 min per email+IP combo.
+from core.middleware import install_middleware
+install_middleware(app)
+
 
 # ── Iter P2 · API token call logger ────────────────────────────────
 # Records one row in `api_token_calls` for every request authenticated
