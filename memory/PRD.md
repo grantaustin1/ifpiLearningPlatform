@@ -1,6 +1,33 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## What's been implemented (2026-07-03 · iteration 30d · Security + Scale + Screenshots)
+
+### Screenshot capture pipeline
+- ✅ `backend/scripts/build_screenshots.py` — Playwright + Chromium capture of 24 canonical screens (admin/learner/anon contexts). Optional `--overlay` mode outlines every element with a `data-testid` in red. Emits `docs/screenshots/index.md` with all captures linked + failure notes. Login page verified (127 KB PNG rendered).
+
+### Security uplift (Option B, partial)
+- ✅ `backend/core/middleware.py`:
+  - **Correlation-ID middleware** — reads or generates `x-correlation-id`, propagates via `contextvars`, echoes on the response. Truncates pathological inputs to 64 chars.
+  - **Global exception envelope** — every `4xx/5xx` returns `{error: {code, message, status, correlation_id}}`. Wired for both FastAPI + Starlette HTTPException so 404s from unmatched routes surface too. 500s log the stack + return a sanitized message.
+  - **Brute-force lockout** on `/api/auth/login` and `/api/member/auth/login` — 5 failures / 15 min per `email+IP` combo via Redis sliding window. Successful login resets the bucket. Returns `429 LOGIN_LOCKED_OUT` with `Retry-After`.
+- ✅ `backend/tests/test_iteration30d.py` — 7 tests covering all three features. All pass.
+- ⏳ **Deferred to a dedicated PR:** cookie sessions + CSRF middleware (touches every auth path; needs the testing agent).
+
+### Scalability quick-wins
+- ✅ `backend/core/slow_query_logger.py` — SQLAlchemy `before/after_cursor_execute` listeners. Configurable via `SLOW_QUERY_MS` (default 500 ms). Logs elapsed / rowcount / statement / params / correlation_id for Grafana-Loki parsing.
+- ✅ `backend/core/database.py` — Postgres pool tuned via `DB_POOL_SIZE` (20), `DB_MAX_OVERFLOW` (10), `DB_POOL_RECYCLE_SECS` (1800). SQLite path unchanged.
+- ✅ `backend/scripts/locustfile.py` — Load-test suite with weighted spawn (5 % admin, 90 % learner, 5 % anonymous). Covers dashboard, courses, flashcards, catalog, verify, spend chart. `--tags smoke` for a 30 s CI smoke run.
+- ⏳ **Deferred:** Redis pub/sub cache invalidation bus for cross-worker JWT cache (needs the multi-worker uvicorn config first). PgBouncer sidecar for prod.
+
+### Test posture
+- **44/44 pytests pass** across iteration_28/29/30/30b/30d + docs completeness.
+- Middleware install order: CorrelationId → LoginBruteForce → exception handlers.
+- No lint errors on new files.
+
+---
+
+
 ## What's been implemented (2026-07-03 — iteration 30c · Docs Automation)
 
 ### Auto-generated manuals + CI drift gate
