@@ -34,6 +34,8 @@ import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
 import TakeExamPage from 'pages/take/TakeExamPage'
 import CatalogPage from 'pages/catalog/CatalogPage'
+import { TermsGate } from 'components/TermsGate'
+import { KioskShell } from 'components/KioskShell'
 
 function Protected({ children, adminOnly = false }:
 { children: React.ReactNode; adminOnly?: boolean }) {
@@ -55,7 +57,9 @@ function FullPageSpinner() {
 
 export default function App() {
   return (
-    <Routes>
+    <KioskShell>
+      <TermsGate />
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -96,6 +100,7 @@ export default function App() {
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </KioskShell>
   )
 }

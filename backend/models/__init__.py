@@ -907,3 +907,83 @@ class FlashcardReview(Base):
     last_reviewed_at = Column(DateTime)
     review_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Iter 30l — T&Cs versions + acceptances, per-org kiosk settings,
+# per-org feature-module flags.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class TermsVersion(Base):
+    """A single published version of an organisation's Terms & Conditions.
+
+    Versions are additive: publishing a new version supersedes the
+    previous `current=True` row (a trigger below flips it). Body is
+    markdown; frontend renders + shows a required "I accept" gate the
+    first time a user encounters a fresh version.
+    """
+    __tablename__ = "terms_versions"
+    __table_args__ = (
+        Index("ix_terms_org_version", "organization_id", "version"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    version = Column(String(32), nullable=False)  # e.g. "1.0", "2024-Q3"
+    title = Column(String(255), nullable=False, default="Terms of Service")
+    body_markdown = Column(Text, nullable=False, default="")
+    is_current = Column(Boolean, nullable=False, default=False, index=True)
+    published_by_user_id = Column(Integer, ForeignKey("users.id"))
+    published_at = Column(DateTime, nullable=False, default=_utcnow)
+
+
+class TermsAcceptance(Base):
+    """One row per (user, version). Immutable ledger."""
+    __tablename__ = "terms_acceptances"
+    __table_args__ = (
+        UniqueConstraint("user_id", "terms_version_id", name="uq_terms_ack"),
+    )
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    terms_version_id = Column(Integer, ForeignKey("terms_versions.id"),
+                              nullable=False, index=True)
+    accepted_at = Column(DateTime, nullable=False, default=_utcnow)
+    ip_address = Column(String(45))     # IPv4/IPv6 for audit
+    user_agent = Column(String(500))
+
+
+class KioskSettings(Base):
+    """Per-org kiosk config. One row per org (nullable — orgs without a
+    row default to sensible values)."""
+    __tablename__ = "kiosk_settings"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, unique=True, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    # Idle lock timeout in seconds (0 = never lock)
+    idle_timeout_seconds = Column(Integer, default=300, nullable=False)
+    # Optional PIN (bcrypt-hashed) required to unlock the kiosk. When
+    # NULL the user must re-enter password.
+    unlock_pin_hash = Column(String(200), nullable=True)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)
+
+
+class FeatureFlag(Base):
+    """Per-org feature module toggle. Missing row = default (usually ON).
+    This is a stopgap for granular billing / progressive rollout —
+    NOT a full LaunchDarkly-style targeting engine."""
+    __tablename__ = "feature_flags"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "flag_key", name="uq_flag_org_key"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    flag_key = Column(String(80), nullable=False, index=True)
+    enabled = Column(Boolean, default=True, nullable=False)
+    note = Column(String(500), nullable=True)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)

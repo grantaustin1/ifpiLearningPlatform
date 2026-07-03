@@ -117,3 +117,7 @@ def register_all(app: FastAPI) -> None:
     from routers import owner_dashboard
     app.include_router(owner_dashboard.router)
 
+    # ── Iter 30l: T&Cs, kiosk, feature flags ────────────────────────
+    from routers import terms_kiosk
+    app.include_router(terms_kiosk.router)
+
