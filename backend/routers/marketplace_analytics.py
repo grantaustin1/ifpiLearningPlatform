@@ -50,7 +50,15 @@ class TrackViewIn(BaseModel):
 def _viewer_key(request: Request, user_id: Optional[int]) -> str:
     if user_id is not None:
         return f"u:{user_id}"
-    ip = request.client.host if request.client else "unknown"
+    # We're typically behind a CDN/proxy (Cloudflare + K8s ingress), so
+    # `request.client.host` is the proxy's ephemeral IP, which changes
+    # between requests. Trust `X-Forwarded-For` (first entry = real
+    # client) when present; fall back to direct socket IP otherwise.
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        ip = xff.split(",")[0].strip()
+    else:
+        ip = request.client.host if request.client else "unknown"
     ua = request.headers.get("user-agent", "")
     h = hashlib.sha256(f"{ip}|{ua}".encode()).hexdigest()[:16]
     return f"a:{h}"
@@ -128,8 +136,12 @@ def marketplace_funnel(
         Enrollment.completed_at >= datetime.combine(since, datetime.min.time()),
     ).count()
 
-    view_to_enroll = round(enrollments / views, 4) if views > 0 else 0.0
-    enroll_to_complete = round(completions / enrollments, 4) if enrollments > 0 else 0.0
+    # Iter 24 — Clamp to [0.0, 1.0]. In real production data, enrollments
+    # will often exceed views because view-tracking was only added in
+    # this iteration while enrollments have historic backlog. Without
+    # the clamp the UI shows nonsense like "350% conversion".
+    view_to_enroll = min(1.0, round(enrollments / views, 4)) if views > 0 else 0.0
+    enroll_to_complete = min(1.0, round(completions / enrollments, 4)) if enrollments > 0 else 0.0
 
     # Daily breakdown — GROUP BY viewed_on_date. Enrollments and completions
     # are grouped by DATE(enrolled_at/completed_at). SQLite `date()` function
