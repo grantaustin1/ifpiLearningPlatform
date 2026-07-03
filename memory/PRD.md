@@ -780,3 +780,20 @@ That's it. No ERP360 schema changes, no model merges, no shared codebase. Two ne
 
 ## Tech debt note
 None significant. The codebase intentionally mirrors ERP360 conventions so future engineers context-switch cleanly. Lint passes clean. 0 known bugs.
+
+## Iteration 21 — Feb 2026 (fork certification)
+- ✅ Full E2E certification sweep via `testing_agent_v3_fork`. Report: `/app/test_reports/iteration_21.json`.
+- ✅ Backend regression: **450/454 tests pass** (99.1%). New iter-21 E2E suite (`tests/test_iteration21_e2e_public.py`): **18/18 pass** on the public preview URL with real HttpOnly cookies + CSRF headers.
+- ✅ Frontend smoke (Playwright) certified: login, dashboard, /affiliate, /query-builder, /scheduled-reports, /email-diagnostics, /settings (Security/Compliance/Terms&Kiosk), /learn/:id + AI Tutor panel. Zero unexpected console errors, all `data-testid`s present.
+- ✅ P0 features certified: CSRF middleware, 2FA (TOTP) enroll/verify/challenge lifecycle, AI Tutor v1, Query Builder (`question` field, not `prompt`), Scheduled Reports, Email Diagnostics + System SMTP fallback, Affiliate/Referral, Terms Gate, Kiosk Mode, Onboarding Board, Owner Dashboard widget.
+- ✅ Stabilized previously flaky `test_cert_email_outbox_no_duplicate` — switched to server-side `template=cert_issued` filter instead of client-side pagination filtering.
+- Route note: admin pages are at flat routes (`/affiliate`, `/query-builder`, `/scheduled-reports`, `/email-diagnostics`, `/settings`), NOT `/dashboard/*` prefixed — `DashboardLayout` wraps them but URLs are flat.
+- 2FA teardown safety: any test enabling 2FA on admin@ifpi.org MUST clear `totp_secret_enc / totp_enabled_at / totp_recovery_codes` in a `finally:` block. Snippet is in `/app/memory/test_credentials.md`.
+
+## Next Action Items (post iter-21)
+- P1: **Marketplace Integration** — public course catalog + monetization hooks (spec in `/app/docs/P2_BACKLOG_SPECS.md`).
+- P1: **Live Sessions Module** — scheduled cohort sessions, video-link + attendance tracking.
+- P2: **pgvector Migration** — Postgres + vector search for advanced RAG tutor. Deferred; heavy storage-engine swap.
+- Tech debt: retire `X-Return-Token: true` test bypass (~35 files) → migrate to pure cookie-jar flow.
+- Docs: run `python backend/scripts/build_docs.py` whenever new endpoints are added, to satisfy the CI doc-drift guard.
+
