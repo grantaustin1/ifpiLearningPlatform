@@ -4,6 +4,7 @@ import { api } from 'lib/api'
 import { ChevronLeft, ChevronRight, CheckCircle, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
+import { AITutorPanel } from 'components/AITutorPanel'
 
 export default function LearnPage() {
   const { courseId } = useParams()
@@ -117,6 +118,7 @@ export default function LearnPage() {
           </div>
         )}
       </div>
+      <AITutorPanel courseId={course.id} />
     </div>
   )
 }

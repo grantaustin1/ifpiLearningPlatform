@@ -1,5 +1,47 @@
 # IFPI Learning Platform — Product Requirements & Status
-<!-- lockfile-sync: 2026-07-02 -->
+<!-- lockfile-sync: 2026-07-07 -->
+
+## Iteration 30l/m/n — Kiosk + T&Cs + AI Tutor v1 + Digest + Factories (2026-07-07)
+
+### 30l · Kiosk mode + T&Cs versioning + per-org feature flags — SHIPPED
+- ✅ Three new tables: `terms_versions`, `terms_acceptances`, `kiosk_settings`, `feature_flags`. Alembic `c3d4e5f6a7b8` (idempotent — `create_all` in dev doesn't collide).
+- ✅ Router `routers/terms_kiosk.py` with 10 endpoints:
+  - **T&Cs:** `GET/POST /api/admin/terms`, `GET /api/admin/terms/acceptances`, `GET /api/terms/current`, `POST /api/terms/accept`
+  - **Kiosk:** `GET /api/kiosk/settings`, `PUT /api/admin/kiosk/settings`, `POST /api/kiosk/unlock`
+  - **Feature flags:** `GET /api/feature-flags`, `PUT /api/admin/feature-flags/{key}`
+- ✅ Frontend `TermsGate.tsx` — full-screen blocking modal on every route change if user hasn't accepted the current version. Records IP + user agent on accept.
+- ✅ Frontend `KioskShell.tsx` — idle-lock overlay driven by `mousedown/keydown/touchstart/scroll` events. Unlock via PIN (bcrypt-hashed) or password fallback. Zero-footprint when kiosk is disabled for the org.
+- ✅ New Settings tab `ComplianceTab.tsx` — publish T&C versions, configure kiosk, toggle 12 known feature flags.
+- ✅ 12 known flags registered: `ai_authoring`, `deep_research`, `sora_video`, `nano_banana`, `scorm_export`, `xapi_receiver`, `webhooks_outgoing`, `api_tokens`, `kiosk_mode`, `affiliate_program`, `marketplace`, `live_sessions`.
+- ✅ Tests: 11/11 in `tests/test_iteration30l_terms_kiosk.py` — publish flow, acceptance ledger, admin gate, kiosk PIN + password unlock, flag registry, learner permission checks.
+
+### 30m · AI Tutor v1 — SHIPPED (Kimi-plan-adapted, SQLite-friendly)
+- ✅ Instead of Kimi's 5 new tables + pgvector requirement, delivered a **2-table** solution that reuses the EXISTING `SourceDocument` + `SourceChunk` corpus (Deep Research already ingests to it):
+  - `ai_tutor_sessions` (user, course, title, archived_at)
+  - `ai_tutor_messages` (role, content, citations JSON, tokens)
+- ✅ Retrieval reuses `services.embedding_service.semantic_search()` when embeddings exist; falls back to LIKE-based snippet extraction when they don't (no more "empty tutor" for orgs that haven't run deep research yet).
+- ✅ LLM call via `emergentintegrations.llm.chat.LlmChat` — same provider/model as AI builder (`gpt-4o-mini`).
+- ✅ **PII redaction is ALWAYS ON.** Fixed Kimi's flaw where staff could opt out. Learner questions go through `pii_redactor.redact()` before the LLM; original text is stored in message history so the learner sees their own words.
+- ✅ 4 endpoints: `POST /api/tutor/ask`, `GET /api/tutor/sessions`, `GET /api/tutor/sessions/{id}`, `POST /api/tutor/sessions/{id}/archive`.
+- ✅ Frontend `AITutorPanel.tsx` — floating "Ask AI Tutor" button on the course learn page, slide-out chat with citations, auto-scroll, redaction toast, keyboard-friendly (Enter to send, Shift+Enter for newline).
+- ✅ Full org-scope isolation: user A in org X cannot list/view/continue sessions belonging to user B or org Y (verified in tests).
+- ✅ Tests: 9/9 in `tests/test_iteration30m_tutor.py` — including 3 that hit real GPT-4o (~45s), PII always-redacted verification, cross-org isolation.
+
+### 30n · Weekly digest email enhancement + factory-boy fixtures — SHIPPED
+- ✅ Extended existing Monday-09:00-UTC `cohort_digest` with a **"Members needing action"** section. Reuses the exact same query from `routers/owner_dashboard.py` (single source of truth). Colour-coded rows by reason code, capped at 10 items to keep emails scannable. Admins now wake up on Monday to a proactive nudge list.
+- ✅ New `tests/factories.py` — factory-boy factories for `Organization`, `User`, `AdminUser`, `Course`, `Enrollment`. UUID-suffixed slugs/emails to survive re-runs. Zero-arg construction wires FKs via `_create()` overrides. Docs + example in module header.
+- ✅ Tests: 5/5 in `tests/test_iteration30n_factories.py` — smoke + composition.
+
+### Kimi AI review — Actioned vs Deferred
+- **Actioned (adapted):** Learner-facing AI tutor with session persistence, citations, LLM re-ranking option. Adjusted for SQLite (no pgvector), reuse of existing corpus tables, always-on PII redaction, standard envelope errors.
+- **Deferred:** pgvector migration (blocked on PostgreSQL move), staff-side "AI Studio panel" (duplicates existing authoring), Kimi's `deep_research_sources` table (existing `SourceDocument` covers it).
+- **Rejected:** Staff opt-out of PII redaction. Redaction is now always-on per GDPR posture.
+
+### Deferred (previously flagged; still pending)
+- **AUTH_COOKIE_MODE cutover** to `on` — remains at `dual`. Flip requires mobile/external consumers to stop reading `access_token` from body; that audit is a dedicated task.
+
+---
+
 
 ## Iteration 30h/i/j/k — Auth Refactor + 2FA + Locust CI + Owner Widget (2026-07-05)
 

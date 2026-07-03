@@ -337,6 +337,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
+| `routers/ai_tutor.py` | 308 |
 | `routers/api_tokens.py` | 284 |
 | `routers/auth.py` | 163 |
 | `routers/authoring.py` | 131 |
@@ -359,9 +360,10 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/owner_dashboard.py` | 148 |
 | `routers/public_catalog.py` | 143 |
 | `routers/scorm_xapi.py` | 499 |
+| `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **7111** |
+| **Total** | **7744** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -370,6 +372,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | Model | Table |
 |---|---|
 | `AIJob` | `ai_jobs` |
+| `AITutorMessage` | `ai_tutor_messages` |
+| `AITutorSession` | `ai_tutor_sessions` |
 | `AIUsageLedger` | `ai_usage_ledger` |
 | `ApiToken` | `api_tokens` |
 | `ApiTokenCall` | `api_token_calls` |
@@ -384,10 +388,12 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `Exam` | `exams` |
 | `ExamAttempt` | `exam_attempts` |
 | `ExamQuestion` | `exam_questions` |
+| `FeatureFlag` | `feature_flags` |
 | `Flashcard` | `flashcards` |
 | `FlashcardReview` | `flashcard_reviews` |
 | `ImportJob` | `import_jobs` |
 | `Invitation` | `invitations` |
+| `KioskSettings` | `kiosk_settings` |
 | `LearningPath` | `learning_paths` |
 | `LearningPathEnrollment` | `learning_path_enrollments` |
 | `LearningPathItem` | `learning_path_items` |
@@ -403,6 +409,8 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `SourceDocument` | `source_documents` |
 | `SsoJtiSeen` | `sso_jti_seen` |
 | `Subscription` | `subscriptions` |
+| `TermsAcceptance` | `terms_acceptances` |
+| `TermsVersion` | `terms_versions` |
 | `User` | `users` |
 | `UserBadge` | `user_badges` |
 | `UserRole` | `user_roles` |
@@ -410,7 +418,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **40** ORM models._
+_Total: **46** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -440,6 +448,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
 | `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
+| `/api/admin/feature-flags/{flag_key}` | PUT |  |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
@@ -449,6 +458,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/invitations` | POST |  |
 | `/api/admin/invitations/bulk` | POST | Issue up to 500 invitations in one call. Each row returns its own |
 | `/api/admin/invitations/{invitation_id}` | DELETE |  |
+| `/api/admin/kiosk/settings` | PUT |  |
 | `/api/admin/leaderboard.csv` | GET |  |
 | `/api/admin/outbox` | GET |  |
 | `/api/admin/outbox/stats` | GET |  |
@@ -457,6 +467,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/scorm` | GET |  |
 | `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
 | `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
+| `/api/admin/terms` | GET |  |
+| `/api/admin/terms` | POST |  |
+| `/api/admin/terms/acceptances` | GET |  |
 | `/api/admin/users` | GET |  |
 | `/api/admin/users/{user_id}/2fa/disable` | POST |  |
 | `/api/admin/webhooks` | GET |  |
@@ -553,11 +566,14 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}` | PATCH |  |
 | `/api/exams/{exam_id}/attempts` | POST |  |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
+| `/api/feature-flags` | GET |  |
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/me` | GET |  |
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
 | `/api/invitations/{token}/accept` | POST |  |
+| `/api/kiosk/settings` | GET |  |
+| `/api/kiosk/unlock` | POST |  |
 | `/api/leads` | POST | Public endpoint for partner sites / marketing pages to drop a lead in. |
 | `/api/leads/embed.js` | GET | Self-contained JS widget that partner sites drop on their page. |
 | `/api/learn/flashcards/courses/{course_id}/due` | GET | Return the learner's due-today queue for a course. Mixes: |
@@ -596,6 +612,12 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/slides/{slide_id}/comments` | GET |  |
 | `/api/slides/{slide_id}/comments` | POST |  |
 | `/api/slides/{slide_id}/comments/{comment_id}` | DELETE |  |
+| `/api/terms/accept` | POST |  |
+| `/api/terms/current` | GET |  |
+| `/api/tutor/ask` | POST |  |
+| `/api/tutor/sessions` | GET |  |
+| `/api/tutor/sessions/{session_id}` | GET |  |
+| `/api/tutor/sessions/{session_id}/archive` | POST |  |
 | `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
 | `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
@@ -603,7 +625,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **180** registered API endpoints._
+_Total: **194** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

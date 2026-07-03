@@ -101,7 +101,31 @@ def compute_org_digest(db: Session, org: Organization) -> dict:
         "nudge": nudge,
         "other": other,
         "total_cohorts": len(all_stats),
+        "members_needing_action": _compute_members_needing_action(db, org),
     }
+
+
+def _compute_members_needing_action(db: Session, org: Organization,
+                                    limit: int = 10) -> list[dict]:
+    """Iter 30n — inline the members-needing-action widget into the
+    weekly digest so admins get a proactive nudge without having to
+    remember to check the dashboard.
+
+    Reuses the same three priority tiers as
+    `routers/owner_dashboard.py::members_needing_action`. Kept in a
+    separate helper to preserve the router as the single source of
+    truth for the shape (we only need to render, not query differently).
+    """
+    from routers.owner_dashboard import members_needing_action
+
+    class _Stub:
+        organization_id = org.id
+    try:
+        return members_needing_action(limit=limit, current=_Stub(), db=db)["items"]
+    except Exception as e:
+        logger.warning("digest: skip members-needing-action for %s: %s",
+                       org.slug, e)
+        return []
 
 
 def _bar(pct: float) -> str:
@@ -150,6 +174,25 @@ def _render_html(org: Organization, payload: dict) -> str:
     if not sections:
         sections.append(
             '<p style="color:#64748b;font:14px system-ui">No cohorts with enrolments yet — invite learners with a cohort tag to start tracking progress here.</p>'
+        )
+
+    # Iter 30n — members needing action
+    mna = payload.get("members_needing_action") or []
+    if mna:
+        _REASON_COLOR = {"STALLED": "#e11d48", "IDLE": "#d97706",
+                         "NEVER_SIGNED_IN": "#64748b"}
+        rows = "".join(
+            f'<tr><td style="padding:6px 10px;font-size:12px;color:#0f172a"><strong>{i["name"]}</strong> · '
+            f'<span style="color:#64748b">{i["email"]}</span></td>'
+            f'<td style="padding:6px 10px;font-size:11px;font-weight:600;color:{_REASON_COLOR.get(i["reason_code"], "#475569")}">{i["reason_code"]}</td>'
+            f'<td style="padding:6px 10px;font-size:12px;color:#475569">{i["reason"]}</td></tr>'
+            for i in mna
+        )
+        sections.append(
+            f'<h3 style="margin:24px 0 6px;font:600 14px system-ui;color:#0f172a">'
+            f'👋 Members needing action ({len(mna)})</h3>'
+            f'<table style="border-collapse:collapse;width:100%;background:#fef2f2;'
+            f'border:1px solid #fecaca;border-radius:6px">{rows}</table>'
         )
 
     return (
