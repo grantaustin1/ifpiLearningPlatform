@@ -1,6 +1,50 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## What's been implemented (2026-07-03 · iteration 30d · Security + Scale + Screenshots)
+
+### Screenshot capture pipeline
+- ✅ `backend/scripts/build_screenshots.py` — Playwright + Chromium capture of 24 canonical screens (admin/learner/anon contexts). Optional `--overlay` mode outlines every element with a `data-testid` in red. Emits `docs/screenshots/index.md` with all captures linked + failure notes. Login page verified (127 KB PNG rendered).
+
+### Security uplift (Option B, partial)
+- ✅ `backend/core/middleware.py`:
+  - **Correlation-ID middleware** — reads or generates `x-correlation-id`, propagates via `contextvars`, echoes on the response. Truncates pathological inputs to 64 chars.
+  - **Global exception envelope** — every `4xx/5xx` returns `{error: {code, message, status, correlation_id}}`. Wired for both FastAPI + Starlette HTTPException so 404s from unmatched routes surface too. 500s log the stack + return a sanitized message.
+  - **Brute-force lockout** on `/api/auth/login` and `/api/member/auth/login` — 5 failures / 15 min per `email+IP` combo via Redis sliding window. Successful login resets the bucket. Returns `429 LOGIN_LOCKED_OUT` with `Retry-After`.
+- ✅ `backend/tests/test_iteration30d.py` — 7 tests covering all three features. All pass.
+- ⏳ **Deferred to a dedicated PR:** cookie sessions + CSRF middleware (touches every auth path; needs the testing agent).
+
+### Scalability quick-wins
+- ✅ `backend/core/slow_query_logger.py` — SQLAlchemy `before/after_cursor_execute` listeners. Configurable via `SLOW_QUERY_MS` (default 500 ms). Logs elapsed / rowcount / statement / params / correlation_id for Grafana-Loki parsing.
+- ✅ `backend/core/database.py` — Postgres pool tuned via `DB_POOL_SIZE` (20), `DB_MAX_OVERFLOW` (10), `DB_POOL_RECYCLE_SECS` (1800). SQLite path unchanged.
+- ✅ `backend/scripts/locustfile.py` — Load-test suite with weighted spawn (5 % admin, 90 % learner, 5 % anonymous). Covers dashboard, courses, flashcards, catalog, verify, spend chart. `--tags smoke` for a 30 s CI smoke run.
+- ⏳ **Deferred:** Redis pub/sub cache invalidation bus for cross-worker JWT cache (needs the multi-worker uvicorn config first). PgBouncer sidecar for prod.
+
+### Test posture
+- **44/44 pytests pass** across iteration_28/29/30/30b/30d + docs completeness.
+- Middleware install order: CorrelationId → LoginBruteForce → exception handlers.
+- No lint errors on new files.
+
+---
+
+
+## What's been implemented (2026-07-03 — iteration 30c · Docs Automation)
+
+### Auto-generated manuals + CI drift gate
+- ✅ `/app/backend/scripts/build_docs.py` — scans `role_registry`, live FastAPI routes, router/model file inventory. Regenerates `<!-- AUTO:BEGIN X -->…<!-- AUTO:END X -->` blocks in all four IFPI manuals in-place. Human-authored prose untouched. `--check` mode for CI, `--html` render.
+- ✅ Auto-blocks live: `role_matrix`, `role_aliases`, `api_routes` (187 routes), `router_index`, `model_index`.
+- ✅ `/app/backend/tests/test_docs_completeness.py` — 3 tests: (a) drift-check via `build_docs.py --check`, (b) every `/api/*` route is mentioned in some manual, (c) every router file is indexed.
+- ✅ `tests/conftest.py` — exempts `test_docs_*` from the "no backend → skip" rule so docs gate runs on any CI runner.
+- ✅ `.github/workflows/ci.yml` — new `docs-drift` job runs on every PR + push; uploads the generated `IFPI_Master_Manual.html` (104 KB) as a build artifact.
+
+### Verified end-to-end
+- Drift-check on corrupt AUTO block → exit 1 with "run build_docs.py" message.
+- Drift-check on clean tree → exit 0.
+- Manuals now auto-regenerate on every push; contributors adding a router without updating docs will fail CI immediately.
+
+---
+
+
 ## Original problem statement (verbatim)
 > "Build IFPI as a sibling app that is pre-made to 'drop into' ERP360 at a later stage and borrow all patterns, reuse APIs if this can be done and won't affect ERP360 now with an easy method to bolt it onto ERP360 when we are ready to do so."
 
