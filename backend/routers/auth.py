@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from auth.cookies import (
-    REFRESH_COOKIE, clear_auth_cookies, set_auth_cookie, set_refresh_cookie,
-    should_include_token_in_body,
+    REFRESH_COOKIE, clear_auth_cookies, generate_csrf_token, set_auth_cookie,
+    set_csrf_cookie, set_refresh_cookie, should_include_token_in_body,
 )
 from auth.dependencies import CurrentUser, get_current_user
 from core.config import settings
@@ -30,6 +30,7 @@ def _to_user_out(user) -> UserOut:
 def _login_response(response: Response, user, access: str, refresh: str) -> LoginResponse:
     set_auth_cookie(response, access)
     set_refresh_cookie(response, refresh)
+    set_csrf_cookie(response, generate_csrf_token())
     return LoginResponse(
         access_token=access if should_include_token_in_body() else None,
         expires_in=settings.jwt_expiration_minutes * 60,
@@ -45,10 +46,18 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
     return _login_response(response, user, access, refresh)
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login")
 def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.login(body.email, body.password)
+    # Iter 30i — if 2FA is enabled, don't issue tokens yet. Return an
+    # opaque challenge_id that the frontend exchanges for tokens after
+    # collecting the 6-digit code.
+    if user.totp_secret_enc and user.totp_enabled_at:
+        from routers.totp import create_challenge
+        cid, expires_in = create_challenge(user.id)
+        return {"requires_2fa": True, "challenge_id": cid,
+                "expires_in": expires_in}
     access, refresh = svc.issue_tokens(user)
     return _login_response(response, user, access, refresh)
 

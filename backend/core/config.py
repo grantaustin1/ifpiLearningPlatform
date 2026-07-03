@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     auth_cookie_mode: str = "dual"     # off | dual | on
     auth_cookie_samesite: str = "lax"  # lax | none | strict
     auth_cookie_secure: bool = False
+    # Iter 30h — CSRF double-submit cookie enforcement. When True, the
+    # server issues a non-HttpOnly `ifpi_csrf` cookie on login/refresh
+    # and requires it (mirrored in the `X-CSRF-Token` header) on every
+    # mutating request that authenticates via cookie. Bearer-header
+    # requests (API tokens, mobile) are exempt.
+    csrf_enabled: bool = False
     allowed_origins: str = "*"
 
     emergent_llm_key: str = ""

@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from 'lib/api'
-import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy, FileText } from 'lucide-react'
+import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy, FileText, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { DocumentsTab } from './OrganizationDocumentsTab'
+import { SecurityTab } from './SecurityTab'
 
-type SettingsTab = 'branding' | 'documents'
+type SettingsTab = 'branding' | 'documents' | 'security'
 
 export default function OrganizationSettingsPage() {
   const [org, setOrg] = useState<any>(null)
@@ -126,6 +127,7 @@ export default function OrganizationSettingsPage() {
         {([
           { key: 'branding', label: 'Branding & Certificates', icon: Palette },
           { key: 'documents', label: 'Documents', icon: FileText },
+          { key: 'security', label: 'Security', icon: ShieldCheck },
         ] as const).map(t => {
           const Icon = t.icon
           const active = tab === t.key
@@ -149,6 +151,8 @@ export default function OrganizationSettingsPage() {
 
       {tab === 'documents' ? (
         <DocumentsTab />
+      ) : tab === 'security' ? (
+        <SecurityTab />
       ) : (
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
       <div className="xl:col-span-3">

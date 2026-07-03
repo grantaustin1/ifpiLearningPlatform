@@ -25,8 +25,32 @@ api.interceptors.request.use((config) => {
     (config.headers as any) = config.headers || {}
     ;(config.headers as any).Authorization = `Bearer ${accessTokenMem}`
   }
+  // CSRF double-submit (Iter 30h). Cookie-authed browser sessions must
+  // mirror the `ifpi_csrf` cookie into an `X-CSRF-Token` header on every
+  // mutating request. Safe when CSRF is disabled server-side (header is
+  // simply ignored) or when the caller uses Bearer auth (server exempts
+  // the Bearer path).
+  const method = (config.method || 'get').toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS'
+      && typeof document !== 'undefined') {
+    const csrf = readCookie('ifpi_csrf')
+    if (csrf) {
+      ;(config.headers as any) = config.headers || {}
+      ;(config.headers as any)['X-CSRF-Token'] = csrf
+    }
+  }
   return config
 })
+
+function readCookie(name: string): string | null {
+  const target = `${name}=`
+  const parts = (document.cookie || '').split(';')
+  for (const raw of parts) {
+    const c = raw.trim()
+    if (c.startsWith(target)) return decodeURIComponent(c.slice(target.length))
+  }
+  return null
+}
 
 let refreshing: Promise<string | null> | null = null
 

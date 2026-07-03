@@ -36,6 +36,34 @@ class LoginResponse(BaseModel):
     user: UserOut
 
 
+# ── 2FA (TOTP) ───────────────────────────────────────────────────────
+class TwoFactorChallenge(BaseModel):
+    """Returned instead of a LoginResponse when the user has 2FA enabled.
+    Client shows a 6-digit code prompt and POSTs to /api/auth/2fa/challenge
+    with the challenge_id + code (or a recovery code)."""
+    requires_2fa: bool = True
+    challenge_id: str
+    expires_in: int      # seconds
+
+
+class TOTPSetupIn(BaseModel):
+    """Body for /api/auth/2fa/setup — client must resend the secret it
+    received in /setup along with a code from their authenticator to
+    confirm they scanned the QR correctly before we persist."""
+    secret: str
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TOTPDisableIn(BaseModel):
+    password: str
+    code: str  # 6-digit TOTP OR 9-char recovery code
+
+
+class TOTPChallengeIn(BaseModel):
+    challenge_id: str
+    code: str  # TOTP OR recovery code
+
+
 # ── Course ───────────────────────────────────────────────────────────
 class SlideIn(BaseModel):
     title: str

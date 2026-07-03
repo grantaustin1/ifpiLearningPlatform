@@ -139,6 +139,13 @@ class User(Base):
     points = Column(Integer, default=0)             # gamification XP
     cohort = Column(String(100), index=True)         # nullable — populated when invited via a cohort batch
     erp360_user_id = Column(Integer, nullable=True, index=True)  # link for SSO
+    # Iter 30i — TOTP-based 2FA (RFC 6238). Secret stored Fernet-
+    # encrypted alongside SMTP passwords. Enabled_at both marks the
+    # user as 2FA-required AND records when they turned it on. Recovery
+    # codes are single-use bcrypt-hashed backups (10 issued at setup).
+    totp_secret_enc = Column(String(500), nullable=True)
+    totp_enabled_at = Column(DateTime, nullable=True)
+    totp_recovery_codes = Column(JSON, nullable=True, default=list)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

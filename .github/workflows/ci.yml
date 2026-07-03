@@ -215,3 +215,91 @@ jobs:
         with:
           name: ifpi-master-manual-html
           path: frontend/public/docs/IFPI_Master_Manual.html
+
+  # ─── Locust smoke load-suite (Iter 30j) ─────────────────────────
+  # Spins up the backend, seeds it, and hits every canonical endpoint
+  # under a 5-user × 30s load. Fails CI if p95 > 2000ms or if any
+  # request errors > 1%. Uses the pre-existing scripts/locustfile.py.
+  locust-smoke:
+    name: Locust Smoke Load
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install deps
+        run: |
+          pip install -r backend/requirements.txt
+          pip install locust
+      - name: Bootstrap DB + seed
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_locust.db
+          SMTP_ALLOW_PLAINTEXT: '1'
+        run: |
+          alembic upgrade head
+          python -c "from seed_data import seed; seed()" || true
+      - name: Start backend in background
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_locust.db
+          SMTP_ALLOW_PLAINTEXT: '1'
+        run: |
+          nohup uvicorn server:app --host 0.0.0.0 --port 8001 > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8001/api/branding/public > /dev/null && break
+            sleep 1
+          done
+      - name: Run Locust smoke (5 users × 30s)
+        working-directory: backend
+        run: |
+          locust -f scripts/locustfile.py --headless \
+            -u 5 -r 2 -t 30s \
+            --host http://localhost:8001 \
+            --tags smoke \
+            --csv=/tmp/locust \
+            --exit-code-on-error 0
+      - name: Assert perf gates (p95 + error rate)
+        run: |
+          python3 - <<'PY'
+          import csv, sys, os
+          # locust_stats.csv columns: Type,Name,Request Count,Failure Count,...,
+          # '50%','66%','75%','80%','90%','95%','98%','99%','99.9%','99.99%','100%',
+          # 'Average Response Time','Min Response Time','Max Response Time',
+          # 'Average Content Size','Requests/s','Failures/s'
+          path = "/tmp/locust_stats.csv"
+          if not os.path.exists(path):
+              print("locust_stats.csv missing — smoke run failed to emit stats", file=sys.stderr)
+              sys.exit(1)
+          with open(path) as f:
+              rows = list(csv.DictReader(f))
+          agg = [r for r in rows if r.get("Name") == "Aggregated"]
+          if not agg:
+              print("no Aggregated row in stats", file=sys.stderr); sys.exit(1)
+          a = agg[0]
+          reqs = int(a["Request Count"])
+          fails = int(a["Failure Count"])
+          # locust writes p95 as an integer millisecond value
+          p95 = int(a["95%"])
+          err_rate = (fails / reqs) if reqs else 0.0
+          print(f"reqs={reqs} fails={fails} err_rate={err_rate*100:.2f}% p95={p95}ms")
+          if reqs < 10:
+              print("Too few requests — backend probably didn't respond", file=sys.stderr); sys.exit(1)
+          if err_rate > 0.05:
+              print(f"error rate {err_rate*100:.2f}% > 5% budget", file=sys.stderr); sys.exit(1)
+          if p95 > 3000:
+              print(f"p95 {p95}ms > 3000ms budget", file=sys.stderr); sys.exit(1)
+          print("Locust smoke gates PASS")
+          PY
+      - name: Upload locust artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-smoke-report
+          path: /tmp/locust_*.csv

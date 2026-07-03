@@ -6,6 +6,16 @@ Both accounts live in the default "IFPI Main Academy" tenant (`organization_id=1
 - Email: `admin@ifpi.org`
 - Password: `admin123`
 - Role: `ADMIN`
+- 2FA (TOTP): **DISABLED** by default. Test files (`test_iteration30i_totp.py`) enable it,
+  run the flow, and re-disable at teardown. If a test aborts mid-flow, run the following
+  to recover:
+  ```
+  cd /app/backend && python -c "
+  from core.database import SessionLocal; from models import User
+  db=SessionLocal(); u=db.query(User).filter_by(email='admin@ifpi.org').first()
+  u.totp_secret_enc=None; u.totp_enabled_at=None; u.totp_recovery_codes=[]
+  db.commit(); print('2FA cleared')"
+  ```
 - Capabilities: full course/exam CRUD, AI builder, analytics, user list, billing console.
 
 ## Learner

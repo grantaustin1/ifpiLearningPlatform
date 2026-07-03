@@ -338,7 +338,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | File | Lines |
 |---|---|
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 154 |
+| `routers/auth.py` | 163 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -356,10 +356,12 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/misc.py` | 372 |
 | `routers/narration.py` | 204 |
+| `routers/owner_dashboard.py` | 148 |
 | `routers/public_catalog.py` | 143 |
 | `routers/scorm_xapi.py` | 499 |
+| `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **6686** |
+| **Total** | **7111** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -434,6 +436,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/audit-log` | GET |  |
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
+| `/api/admin/dashboard/members-needing-action` | GET |  |
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
 | `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
@@ -455,6 +458,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
 | `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
 | `/api/admin/users` | GET |  |
+| `/api/admin/users/{user_id}/2fa/disable` | POST |  |
 | `/api/admin/webhooks` | GET |  |
 | `/api/admin/webhooks` | POST |  |
 | `/api/admin/webhooks/{sub_id}` | DELETE |  |
@@ -462,6 +466,11 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
 | `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
 | `/api/ai/course-builder` | POST |  |
+| `/api/auth/2fa/challenge` | POST | Public — accepts {challenge_id, code} and returns the standard |
+| `/api/auth/2fa/disable` | POST |  |
+| `/api/auth/2fa/setup` | POST |  |
+| `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
+| `/api/auth/2fa/status` | GET |  |
 | `/api/auth/login` | POST |  |
 | `/api/auth/logout` | POST |  |
 | `/api/auth/me` | GET |  |
@@ -594,7 +603,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **173** registered API endpoints._
+_Total: **180** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

@@ -18,6 +18,7 @@ def admin_session():
     r = s.post(f"{API}/auth/login",
                json={"email": "admin@ifpi.org", "password": "admin123"})
     assert r.status_code == 200, r.text
+    s.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
     return s
 
 
@@ -27,6 +28,7 @@ def learner_session():
     r = s.post(f"{API}/auth/login",
                json={"email": "learner@ifpi.org", "password": "learner123"})
     assert r.status_code == 200, r.text
+    s.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
     return s
 
 

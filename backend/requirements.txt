@@ -165,3 +165,6 @@ xhtml2pdf==0.2.17
 xlsxwriter==3.2.9
 yarl==1.24.2
 zipp==4.1.0
+
+PyOTP==2.10.0
+qrcode==8.0
