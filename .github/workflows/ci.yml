@@ -165,3 +165,53 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           CI=true yarn build
+
+
+  # ─── Docs drift gate ───────────────────────────────────────────
+  # Fails the build if the AUTO-BLOCKs in /docs/IFPI_*_MANUAL.md are
+  # stale relative to the live router/model/role registries. Contributors
+  # who add a router without regenerating docs get a clear error with
+  # the fix command. Also runs the coverage tests that ensure every
+  # /api route + router file is mentioned somewhere in a manual.
+  docs-drift:
+    name: Docs Drift Gate
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest
+      - name: Regenerate check
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+        run: |
+          python -c "import server" || true  # warm import; failures OK — build_docs handles it
+          python scripts/build_docs.py --check
+      - name: Route + router coverage
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+          RUN_INTEGRATION_TESTS: '0'
+        run: |
+          python -m pytest tests/test_docs_completeness.py -q --maxfail=3
+      - name: Emit HTML render (artifact for preview)
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+        run: python scripts/build_docs.py --html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ifpi-master-manual-html
+          path: frontend/public/docs/IFPI_Master_Manual.html

@@ -140,8 +140,7 @@ def c8():
 
 
 def main() -> int:
-    _repo_root = Path(__file__).resolve().parents[3]
-    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_010.json"
+    out = _report_path("agent_010.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     failed = [r for r in RESULTS if not r["ok"]]
     out.write_text(json.dumps({

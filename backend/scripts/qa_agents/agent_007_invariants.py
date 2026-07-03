@@ -30,6 +30,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+
+def _report_path(filename: str) -> Path:
+    """Report dir defaults to /app/test_reports (container runtime); on
+    CI or any machine where /app isn't writable, use $QA_REPORT_DIR or a
+    repo-relative ./test_reports folder next to the script's git root."""
+    env_dir = os.environ.get("QA_REPORT_DIR")
+    if env_dir:
+        return Path(env_dir) / filename
+    default = Path("/app/test_reports")
+    try:
+        default.mkdir(parents=True, exist_ok=True)
+        return default / filename
+    except (PermissionError, OSError):
+        # Fall back to <repo>/test_reports
+        repo_root = Path(__file__).resolve().parents[3]
+        return repo_root / "test_reports" / filename
+
+
 from sqlalchemy import and_, func, text  # noqa: E402
 
 from core.database import SessionLocal  # noqa: E402
@@ -138,8 +156,7 @@ def main() -> int:
         "generated_at": now.isoformat(), "invariants_checked": 9,
         "violations": len(failures), "failures": failures,
     }
-    _repo_root = Path(__file__).resolve().parents[3]
-    out = Path(os.environ.get("AGENT_REPORT_DIR", str(_repo_root / "test_reports"))) / "agent_007.json"
+    out = _report_path("agent_007.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str))
 
