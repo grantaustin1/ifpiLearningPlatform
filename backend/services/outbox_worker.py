@@ -201,6 +201,33 @@ def _scheduled_reports_tick():
         logger.exception("scheduled reports tick failed: %s", e)
 
 
+def _live_session_reminder_tick():
+    """Iter 23 — 15-minute reminder emails for live sessions. Runs every
+    minute; sends only to sessions in the 14–16 min pre-start window."""
+    try:
+        with SessionLocal() as db:
+            from services.live_session_reminder_worker import tick
+            n = tick(db)
+            if n:
+                logger.info("Sent live-session reminders for %s session(s)", n)
+    except Exception as e:
+        logger.exception("live-session reminder tick failed: %s", e)
+
+
+def _test_debris_cleanup_tick():
+    """Iter 23 — Nightly cleanup of TEST_*/UITEST_*/iter test data that
+    accumulates across CI runs. Runs at 03:00 UTC daily."""
+    try:
+        with SessionLocal() as db:
+            from services.test_debris_cleanup import tick
+            stats = tick(db)
+            total = sum(stats.values())
+            if total:
+                logger.info("Nightly cleanup: removed %s test rows: %s", total, stats)
+    except Exception as e:
+        logger.exception("nightly test-debris cleanup failed: %s", e)
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -229,6 +256,16 @@ def start_scheduler() -> None:
         _scheduled_reports_tick, "interval", minutes=5,
         id="scheduled_reports", max_instances=1, coalesce=True,
         misfire_grace_time=600,
+    )
+    sched.add_job(
+        _live_session_reminder_tick, "interval", seconds=60,
+        id="live_session_reminders", max_instances=1, coalesce=True,
+        misfire_grace_time=120,
+    )
+    sched.add_job(
+        _test_debris_cleanup_tick, "cron", hour=3, minute=0,
+        id="test_debris_nightly_cleanup", max_instances=1, coalesce=True,
+        misfire_grace_time=7200,
     )
     sched.start()
     _scheduler = sched

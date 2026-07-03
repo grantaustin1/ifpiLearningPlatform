@@ -105,3 +105,30 @@ def test_marketplace_opt_in_toggle_hides_org_courses():
     # Verify restored
     cat2 = requests.get(f"{BASE_URL}/api/catalog?q=IFPI", timeout=10).json()
     assert any("IFPI" in c["title"] for c in cat2["courses"])
+
+
+# ── Sort (Iter 23) ───────────────────────────────────────────────────
+def test_catalog_sort_price_asc_returns_cheapest_first():
+    r = requests.get(f"{BASE_URL}/api/catalog?sort=price_asc&page_size=10", timeout=10)
+    assert r.status_code == 200
+    prices = [c["price_cents"] for c in r.json()["courses"]]
+    assert prices == sorted(prices), f"price_asc should return ascending, got {prices}"
+
+
+def test_catalog_sort_price_desc_returns_most_expensive_first():
+    r = requests.get(f"{BASE_URL}/api/catalog?sort=price_desc&page_size=10", timeout=10)
+    assert r.status_code == 200
+    prices = [c["price_cents"] for c in r.json()["courses"]]
+    assert prices == sorted(prices, reverse=True), f"price_desc should return descending, got {prices}"
+
+
+def test_catalog_sort_most_enrolled_returns_high_first():
+    r = requests.get(f"{BASE_URL}/api/catalog?sort=most_enrolled&page_size=10", timeout=10)
+    assert r.status_code == 200
+    counts = [c["enrollment_count"] for c in r.json()["courses"]]
+    assert counts == sorted(counts, reverse=True), f"most_enrolled should return descending, got {counts}"
+
+
+def test_catalog_sort_invalid_rejected():
+    r = requests.get(f"{BASE_URL}/api/catalog?sort=random", timeout=10)
+    assert r.status_code == 422

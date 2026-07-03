@@ -18,6 +18,8 @@ interface LiveSession {
   cohort?: string | null
   max_attendees?: number | null
   course_id?: number | null
+  recurrence_rule?: string | null
+  parent_series_id?: number | null
   rsvp_count: number
   attendance_count: number
   my_rsvp_status?: 'RSVP' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW' | null
@@ -94,11 +96,23 @@ export default function LiveSessionsPage() {
     }
   }
 
-  const deleteSession = async (id: number) => {
-    if (!window.confirm('Delete this session?')) return
+  const deleteSession = async (s: LiveSession) => {
+    const inSeries = s.recurrence_rule || s.parent_series_id
+    let cascade = false
+    if (inSeries) {
+      const choice = window.confirm(
+        'This session is part of a recurring series. OK = delete the whole series, Cancel = delete only this occurrence.'
+      )
+      cascade = choice
+    } else if (!window.confirm('Delete this session?')) {
+      return
+    }
     try {
-      await api.delete(`/live-sessions/${id}`)
-      toast.success('Session removed')
+      const url = cascade
+        ? `/live-sessions/${s.id}?cascade_series=true`
+        : `/live-sessions/${s.id}`
+      await api.delete(url)
+      toast.success(cascade ? 'Series deleted' : 'Session removed')
       load()
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Delete failed')
@@ -140,11 +154,16 @@ export default function LiveSessionsPage() {
               <div key={s.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm" data-testid={`session-card-${s.id}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 truncate">{s.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-900 truncate">{s.title}</h3>
+                      {(s.recurrence_rule || s.parent_series_id) && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600" data-testid={`series-badge-${s.id}`}>Series</span>
+                      )}
+                    </div>
                     {s.host_name && <p className="text-xs text-slate-500 mt-0.5">Hosted by {s.host_name}</p>}
                   </div>
                   {isAdmin && (
-                    <button onClick={() => deleteSession(s.id)} className="text-slate-300 hover:text-red-500" data-testid={`del-${s.id}`}>
+                    <button onClick={() => deleteSession(s)} className="text-slate-300 hover:text-red-500" data-testid={`del-${s.id}`}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   )}
@@ -203,13 +222,27 @@ function CreateSessionModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [cohort, setCohort] = useState('')
   const [hostName, setHostName] = useState('')
   const [maxAttendees, setMaxAttendees] = useState<number | ''>('')
+  // Iter 23 — Recurrence support
+  const [recurrenceType, setRecurrenceType] = useState<'none' | 'weekly' | 'daily' | 'biweekly' | 'custom'>('none')
+  const [recurrenceCount, setRecurrenceCount] = useState(4)
+  const [customRrule, setCustomRrule] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const buildRrule = (): string | null => {
+    if (recurrenceType === 'none') return null
+    if (recurrenceType === 'custom') return customRrule.trim() || null
+    if (recurrenceType === 'weekly') return `FREQ=WEEKLY;COUNT=${recurrenceCount}`
+    if (recurrenceType === 'biweekly') return `FREQ=WEEKLY;INTERVAL=2;COUNT=${recurrenceCount}`
+    if (recurrenceType === 'daily') return `FREQ=DAILY;COUNT=${recurrenceCount}`
+    return null
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
-      await api.post('/live-sessions', {
+      const rrule = buildRrule()
+      const r = await api.post('/live-sessions', {
         title,
         description: description || null,
         meeting_url: meetingUrl,
@@ -218,8 +251,12 @@ function CreateSessionModal({ onClose, onCreated }: { onClose: () => void; onCre
         cohort: cohort || null,
         host_name: hostName || null,
         max_attendees: maxAttendees === '' ? null : maxAttendees,
+        recurrence_rule: rrule,
       })
-      toast.success('Session scheduled')
+      const created = r.data.series_instances_created || 0
+      toast.success(created > 0
+        ? `Session scheduled with ${created + 1} occurrences`
+        : 'Session scheduled')
       onCreated()
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Create failed')
@@ -279,6 +316,42 @@ function CreateSessionModal({ onClose, onCreated }: { onClose: () => void; onCre
             <label className="text-xs font-medium text-slate-700">Max attendees (optional)</label>
             <input type="number" min={1} value={maxAttendees} onChange={e => setMaxAttendees(e.target.value === '' ? '' : parseInt(e.target.value))}
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          {/* Iter 23 — Recurrence */}
+          <div className="pt-3 border-t border-slate-100">
+            <label className="text-xs font-medium text-slate-700 block mb-2">Repeat</label>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={recurrenceType} onChange={e => setRecurrenceType(e.target.value as typeof recurrenceType)}
+                data-testid="recurrence-type"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="none">Does not repeat</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="daily">Daily</option>
+                <option value="custom">Custom RRULE</option>
+              </select>
+              {recurrenceType !== 'none' && recurrenceType !== 'custom' && (
+                <div>
+                  <label className="text-xs text-slate-500">Occurrences (max 26)</label>
+                  <input type="number" min={2} max={26} value={recurrenceCount}
+                    onChange={e => setRecurrenceCount(Math.max(2, Math.min(26, parseInt(e.target.value) || 2)))}
+                    data-testid="recurrence-count"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
+                </div>
+              )}
+            </div>
+            {recurrenceType === 'custom' && (
+              <input value={customRrule} onChange={e => setCustomRrule(e.target.value)}
+                placeholder="FREQ=WEEKLY;COUNT=8"
+                data-testid="recurrence-custom-rrule"
+                className="mt-2 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono" />
+            )}
+            {recurrenceType !== 'none' && (
+              <p className="text-[11px] text-slate-400 mt-2">
+                All occurrences will be created as separate sessions. Delete the first session with &ldquo;Delete series&rdquo; to remove them all at once.
+              </p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="text-sm text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-50">Cancel</button>

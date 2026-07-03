@@ -41,6 +41,11 @@ class LiveSessionIn(BaseModel):
     cohort: Optional[str] = Field(default=None, max_length=100)
     course_id: Optional[int] = None
     max_attendees: Optional[int] = Field(default=None, ge=1)
+    # Iter 23 — optional recurrence. Accepts an iCal RRULE without the
+    # leading "RRULE:" prefix, e.g. "FREQ=WEEKLY;COUNT=8" or
+    # "FREQ=DAILY;INTERVAL=2;UNTIL=20260901T000000Z". Materialised into
+    # up to 26 child instances at creation time.
+    recurrence_rule: Optional[str] = Field(default=None, max_length=500)
 
 
 class LiveSessionPatch(BaseModel):
@@ -72,6 +77,9 @@ def _serialize(s: LiveSession, include_rsvps: bool = False) -> dict:
         "cohort": s.cohort,
         "course_id": s.course_id,
         "max_attendees": s.max_attendees,
+        "recurrence_rule": s.recurrence_rule,
+        "parent_series_id": s.parent_series_id,
+        "reminder_sent_at": s.reminder_sent_at.isoformat() if s.reminder_sent_at else None,
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "rsvp_count": len([r for r in s.rsvps if r.status != "CANCELLED"]),
         "attendance_count": len([r for r in s.rsvps if r.status == "ATTENDED"]),
@@ -86,6 +94,39 @@ def _serialize(s: LiveSession, include_rsvps: bool = False) -> dict:
     return out
 
 
+# ── Recurrence helper ────────────────────────────────────────────────
+# Cap at 26 instances (~6 months weekly) to keep the DB row count in
+# check while still covering realistic term-length cohorts.
+_MAX_RECURRENCE_INSTANCES = 26
+
+
+def _expand_recurrence(rrule_str: str, dtstart: datetime) -> list[datetime]:
+    """Return a list of concrete `datetime`s for the recurrence,
+    excluding the seed dtstart (which is the head). Empty on parse error
+    to keep failures graceful — the head instance is still created.
+
+    Note: python-dateutil's `rrulestr` truncates microseconds on emitted
+    occurrences, so we compare on second-resolution to detect the
+    dtstart's "twin" and skip it — otherwise the head would be
+    duplicated as a child."""
+    from dateutil.rrule import rrulestr
+
+    try:
+        rule = rrulestr(rrule_str, dtstart=dtstart)
+    except Exception:
+        return []
+    seed_seconds = dtstart.replace(microsecond=0)
+    out: list[datetime] = []
+    for occurrence in rule:
+        # Skip the head's twin (first occurrence when the RRULE includes dtstart)
+        if occurrence.replace(microsecond=0) == seed_seconds and not out:
+            continue
+        out.append(occurrence)
+        if len(out) >= _MAX_RECURRENCE_INSTANCES:
+            break
+    return out
+
+
 # ── Admin routes ─────────────────────────────────────────────────────
 @router.post("", status_code=201)
 def create_session(body: LiveSessionIn, db: Session = Depends(get_db),
@@ -94,7 +135,7 @@ def create_session(body: LiveSessionIn, db: Session = Depends(get_db),
     start = body.start_at
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
-    s = LiveSession(
+    head = LiveSession(
         organization_id=current.organization_id,
         title=body.title,
         description=body.description,
@@ -105,10 +146,33 @@ def create_session(body: LiveSessionIn, db: Session = Depends(get_db),
         cohort=body.cohort,
         course_id=body.course_id,
         max_attendees=body.max_attendees,
+        recurrence_rule=body.recurrence_rule,
         created_by_id=current.id,
     )
-    db.add(s); db.commit(); db.refresh(s)
-    return _serialize(s)
+    db.add(head); db.flush()  # need head.id for children's parent_series_id
+    instances_created = 0
+    if body.recurrence_rule:
+        for occurrence_dt in _expand_recurrence(body.recurrence_rule, start):
+            child = LiveSession(
+                organization_id=current.organization_id,
+                title=body.title,
+                description=body.description,
+                meeting_url=str(body.meeting_url),
+                start_at=occurrence_dt,
+                duration_minutes=body.duration_minutes,
+                host_name=body.host_name,
+                cohort=body.cohort,
+                course_id=body.course_id,
+                max_attendees=body.max_attendees,
+                parent_series_id=head.id,  # child instance — no RRULE of its own
+                created_by_id=current.id,
+            )
+            db.add(child)
+            instances_created += 1
+    db.commit(); db.refresh(head)
+    result = _serialize(head)
+    result["series_instances_created"] = instances_created
+    return result
 
 
 @router.get("")
@@ -194,7 +258,8 @@ def update_session(session_id: int, body: LiveSessionPatch,
 
 
 @router.delete("/{session_id}", status_code=204)
-def delete_session(session_id: int, db: Session = Depends(get_db),
+def delete_session(session_id: int, cascade_series: bool = False,
+                   db: Session = Depends(get_db),
                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
@@ -202,7 +267,17 @@ def delete_session(session_id: int, db: Session = Depends(get_db),
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
-    db.delete(s); db.commit()
+    if cascade_series and (s.recurrence_rule or s.parent_series_id):
+        # Head to cascade from: either this row (if it's the head) or its parent.
+        head_id = s.id if s.recurrence_rule else s.parent_series_id
+        # Delete all children first (they FK to the head), then the head
+        db.query(LiveSession).filter(LiveSession.parent_series_id == head_id).delete(
+            synchronize_session=False)
+        db.query(LiveSession).filter(LiveSession.id == head_id).delete(
+            synchronize_session=False)
+    else:
+        db.delete(s)
+    db.commit()
 
 
 # ── RSVP ─────────────────────────────────────────────────────────────

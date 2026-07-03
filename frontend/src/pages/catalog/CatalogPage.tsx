@@ -66,11 +66,12 @@ export default function CatalogPage() {
   const nav = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [sort, setSort] = useState<'newest' | 'price_asc' | 'price_desc' | 'most_enrolled'>('newest')
 
   const { data, isLoading } = useQuery<CatalogResponse>({
-    queryKey: ['catalog', search, category],
+    queryKey: ['catalog', search, category, sort],
     queryFn: async () => (await api.get('/catalog', {
-      params: { q: search || undefined, category: category || undefined, page_size: 24 },
+      params: { q: search || undefined, category: category || undefined, sort, page_size: 24 },
     })).data,
   })
 
@@ -177,6 +178,13 @@ export default function CatalogPage() {
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">All categories</option>
             {(data?.categories || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="catalog-sort"
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="newest">Newest</option>
+            <option value="most_enrolled">Most enrolled</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
           </select>
         </div>
 
