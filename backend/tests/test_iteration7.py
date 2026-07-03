@@ -165,7 +165,7 @@ class TestSmtp:
         # 400 'SMTP not configured'
         rt = admin_client.post(f"{BASE_URL}/api/organization/smtp/test", json={"to": "x@example.com"})
         assert rt.status_code == 400
-        assert "SMTP not configured" in rt.json().get("detail", "")
+        assert "SMTP not configured" in (rt.json().get("error", {}).get("message") or rt.json().get("detail", ""))
 
         # Now configure
         r2 = admin_client.put(f"{BASE_URL}/api/organization/smtp", json={
@@ -191,7 +191,7 @@ class TestSmtp:
                                 json={"to": "ops@example.test"})
         # Either 400 (SMTP test failed) — not the "not configured" branch
         assert rt2.status_code == 400
-        assert "not configured" not in rt2.json().get("detail", "")
+        assert "not configured" not in (rt2.json().get("error", {}).get("message") or rt2.json().get("detail", ""))
 
         # Cleanup — restore baseline (clear)
         admin_client.put(f"{BASE_URL}/api/organization/smtp", json={
@@ -243,7 +243,7 @@ class TestBulkInvite:
         r = admin_client.post(f"{BASE_URL}/api/admin/invitations/bulk",
                               json={"invitations": rows})
         assert r.status_code == 400
-        assert "500" in r.json().get("detail", "")
+        assert "500" in (r.json().get("error", {}).get("message") or r.json().get("detail", ""))
 
 
 # ── New academy seeds default badge tiers ─────────────────────────────

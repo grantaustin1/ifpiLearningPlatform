@@ -105,7 +105,7 @@ def test_upload_zip_rejects_non_zip(admin):
     files = {"file": ("readme.txt", b"not a zip", "text/plain")}
     r = admin.post(f"{BASE_URL}/api/admin/imports/upload-zip", files=files, timeout=10)
     assert r.status_code == 400
-    assert "zip" in r.json()["detail"].lower()
+    assert "zip" in (r.json().get("error", {}).get("message") or r.json().get("detail", "")).lower()
 
 
 def test_upload_zip_rejects_traversal(admin):
@@ -115,7 +115,7 @@ def test_upload_zip_rejects_traversal(admin):
     files = {"file": ("evil.zip", buf.getvalue(), "application/zip")}
     r = admin.post(f"{BASE_URL}/api/admin/imports/upload-zip", files=files, timeout=10)
     assert r.status_code == 400
-    assert "unsafe" in r.json()["detail"].lower()
+    assert "unsafe" in (r.json().get("error", {}).get("message") or r.json().get("detail", "")).lower()
 
 
 # ── SSO replay protection now persisted in SQL ────────────────────────

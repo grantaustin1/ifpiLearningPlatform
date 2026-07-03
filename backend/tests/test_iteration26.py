@@ -45,7 +45,7 @@ def test_courses_uq_org_title_returns_409(admin):
                    json={"title": title, "description": "dup test"},
                    timeout=10)
     assert r.status_code == 409, r.text
-    assert "already exists" in r.json()["detail"]
+    assert "already exists" in (r.json().get("error", {}).get("message") or r.json().get("detail", ""))
 
 
 # ─── Iter 25c: flashcard streak + XP ─────────────────────────────────
