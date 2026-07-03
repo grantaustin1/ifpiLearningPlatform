@@ -1,6 +1,32 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-02 -->
 
+## What's been implemented (2026-07-03 · iteration 30e · Documents Tab + Screenshots)
+
+### Full 24-screen capture completed
+- ✅ `docs/screenshots/` — 24 PNGs + 24 `_overlay.png` variants (48 files, 12 MB total) with data-testid outlines. `index.md` auto-generated with success/fail annotations. Every canonical IFPI page captured across admin/learner/anon contexts.
+
+### Documents Library (backend + frontend)
+- ✅ `backend/services/docs_library_service.py` — Markdown → HTML → PDF via `xhtml2pdf` (pure Python, no cairo/pango deps). Cover page + running footer + on-demand rendering with mtime-keyed cache (1 h TTL). Strips AUTO-BLOCK markers from PDF output while keeping them in raw markdown downloads.
+- ✅ `backend/routers/docs_library.py` — 3 endpoints (`GET /api/admin/docs`, `GET /api/admin/docs/{slug}/pdf`, `GET /api/admin/docs/{slug}/raw`). Admin+ role gate.
+- ✅ `frontend/src/pages/dashboard/OrganizationDocumentsTab.tsx` — New tab. Lists 4 docs with title, subtitle, audience, line count, size, last-modified. "AUTO-REGENERATED" badge for docs kept in sync by `build_docs.py`. Authenticated blob download → browser save-as.
+- ✅ `frontend/src/pages/dashboard/OrganizationSettingsPage.tsx` — Converted single-page to tabbed layout: **Branding & Certificates** | **Documents**.
+- ✅ Verified end-to-end via Playwright: 4/4 download buttons render, tab switching works, PDF downloads valid (%PDF header, 42 KB for setup manual).
+
+### Tests
+- ✅ `backend/tests/test_iteration30e.py` — 7 tests covering: manifest listing, learner 403, PDF download for all 4 docs, %PDF header, raw markdown variant, 404 envelope for unknown slug, cache hit is faster than cold render. **All pass.**
+
+### Regression
+- **17/17 tests** across `test_iteration30d.py` (middleware) + `test_iteration30e.py` (docs library) + `test_docs_completeness.py` (drift gate) all pass.
+- Docs drift gate updated: new `/api/admin/docs/*` routes now appear in the auto-generated `api_routes` block (188 total routes).
+- Zero lint errors on new files.
+
+### Deferred (from prior plan)
+- Locust smoke run — deferred to a dedicated performance-testing session (script ready to run).
+
+---
+
+
 ## What's been implemented (2026-07-03 · iteration 30d · Security + Scale + Screenshots)
 
 ### Screenshot capture pipeline

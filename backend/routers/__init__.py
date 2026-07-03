@@ -103,3 +103,8 @@ def register_all(app: FastAPI) -> None:
     # ── P3: Public catalog + cert verify ────────────────────────────
     from routers import public_catalog
     app.include_router(public_catalog.router)
+
+    # ── Iter 30e: Docs Library (downloadable manuals) ────────────────
+    from routers import docs_library
+    app.include_router(docs_library.router)
+

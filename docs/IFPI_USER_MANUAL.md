@@ -345,6 +345,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
 | `routers/courses.py` | 656 |
+| `routers/docs_library.py` | 71 |
 | `routers/exams.py` | 212 |
 | `routers/extras.py` | 543 |
 | `routers/flashcards.py` | 497 |
@@ -358,7 +359,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/public_catalog.py` | 143 |
 | `routers/scorm_xapi.py` | 499 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **6583** |
+| **Total** | **6654** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -433,6 +434,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/audit-log` | GET |  |
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
+| `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
+| `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
+| `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
@@ -590,7 +594,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **170** registered API endpoints._
+_Total: **173** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
