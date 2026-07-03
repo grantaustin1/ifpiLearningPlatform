@@ -914,3 +914,36 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Rotate JWT_SECRET periodically & wire secret-rotation into subscription-url invalidation (currently: rotating JWT_SECRET invalidates ALL outstanding URLs — good, but manual)
 - P2 deferred: pgvector migration for advanced RAG (still on the roadmap)
 
+
+## Iteration 25 — Feb 2026 (sprint: rollup + QR + secret rotation)
+
+### Sprint deliverables (all shipped + certified)
+- ✅ **Marketplace analytics roll-up** — new admin endpoint `GET /api/admin/marketplace-funnel` (no course_id) aggregates views/enrolments/completions across the whole org + returns top-N courses by V→E conversion + org-wide daily trend. New page at `/marketplace-analytics` with 4 KPI cards, 2 rate rows, top-by-conversion list linking to each course's Edit page, and CSS sparkline. Sidebar nav link with `TrendingUp` icon.
+- ✅ **QR code + Subscription URL modal** — `GET /api/live-sessions/subscribe-url/qr?kind=admin|learner` returns SVG generated via `qrcode` lib. Frontend replaces the ugly `window.prompt` with a proper `SubscriptionModal` component: inline SVG QR (via `dangerouslySetInnerHTML`), URL input, Copy button, admin-only "Rotate secret" danger zone. QR endpoint route ordering nested under `/subscribe-url/qr` so the int-param `/{session_id}` doesn't intercept it.
+- ✅ **JWT_SECRET-independent secret rotation** — new `Organization.subscription_secret_version` int column (default 1). `POST /api/live-sessions/subscribe-url/rotate` bumps it and includes the version in every issued token's HMAC payload. Old URLs immediately 401 with `"revoked"` in the detail. Admin's JWT is untouched (no re-login required). Per-org scope — one org's rotation doesn't affect another's.
+
+### Post-cert fix (testing agent found + fixed)
+- **CRITICAL syntax bug**: LiveSessionsPage.tsx SubscriptionModal function was left unclosed (missing `}` at line 378). Whole frontend failed to compile, red overlay covered every route including /login. Testing agent added the missing brace. Root cause: main-agent saved the file before running lint/tsc; ESLint's `no-empty-function` can't catch unclosed function bodies but TypeScript compile can — CI hook worth adding.
+
+### Tests
+- 11 new iter-25 tests (`test_iteration25_rollup_rotation_qr.py`) — all pass
+- Full regression: **534/535 pass, 3 skips, 1 pre-existing flaky rate-limit test** (env-conditional, K8s ingress IP behaviour — unrelated to iter-25)
+- Fork testing agent report: `/app/test_reports/iteration_25.json`
+
+### Migration
+- `20260714_0900_b4c5d6e7f8a9_subscription_secret_version.py` — adds `organizations.subscription_secret_version`
+
+### Route inventory (new)
+- `GET /api/admin/marketplace-funnel` (roll-up, no course_id)
+- `POST /api/live-sessions/subscribe-url/rotate` (admin — invalidate all outstanding URLs)
+- `GET /api/live-sessions/subscribe-url/qr?kind=…` (SVG QR code)
+- Frontend: `/marketplace-analytics` new admin page
+
+## Next Action Items (post iter-25)
+- **Slide-level drop-off analytics**: requires new `SlideView` model + per-slide tracking events from the course player. Would show admin heat-map of "which slide learners quit at". Big-value insight for authoring quality.
+- Certificate of Attendance PDF for live sessions (leverages existing cert pipeline)
+- Learner-side ICS subscription (currently only cohort-visible sessions — a personal "My RSVPs" ICS feed would be more useful)
+- Cross-tenant marketplace search (currently tenant-siloed by default)
+- Rate-limit env-fix: use `X-Forwarded-For` in the rate-limit key so K8s-ingress-fronted tests pass (currently flaky)
+- P2 deferred: pgvector migration for advanced RAG (still on the roadmap)
+
