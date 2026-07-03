@@ -18,6 +18,8 @@ const ADMIN_NAV = [
   { href: '/badge-tiers',   label: 'Badge tiers',  icon: Award },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
   { href: '/scheduled-reports', label: 'Scheduled reports', icon: Send },
+  { href: '/email-diagnostics', label: 'Email diagnostics', icon: Mail },
+  { href: '/affiliate',     label: 'Affiliate',    icon: Users },
   { href: '/query-builder', label: 'Query builder', icon: Database },
   { href: '/users',         label: 'Users',        icon: Users },
   { href: '/outbox',        label: 'Email Outbox', icon: Mail },

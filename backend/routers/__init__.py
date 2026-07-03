@@ -137,3 +137,11 @@ def register_all(app: FastAPI) -> None:
     from routers import query_builder
     app.include_router(query_builder.router)
 
+    # ── Iter 30r: Email diagnostics ─────────────────────────────────
+    from routers import email_diagnostics
+    app.include_router(email_diagnostics.router)
+
+    # ── Iter 30s: Affiliate / referral program ──────────────────────
+    from routers import affiliate
+    app.include_router(affiliate.router)
+

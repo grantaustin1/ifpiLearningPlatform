@@ -91,29 +91,59 @@ def pytest_collection_modifyitems(config, items):
 
 
 def authed_session(email: str, password: str, base_url: str = "") -> "requests.Session":
-    """Log in and return a `requests.Session` that works in cookie-only
-    mode. Adds an event hook that stamps the CSRF token header on all
-    mutating requests.
+    """Log in and return a `requests.Session` that works in ANY
+    `AUTH_COOKIE_MODE`. Sets `X-Return-Token: true` so the login
+    response body contains the access_token even in cookie-only mode.
 
-    In dual mode this still functions — the Bearer header takes precedence
-    server-side, but the CSRF header is harmless."""
+    Also attaches the CSRF token header for cookie-authed calls (harmless
+    when Bearer is also present)."""
     import requests
 
     url = base_url or os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
     s = requests.Session()
+    s.headers["X-Return-Token"] = "true"
     r = s.post(f"{url}/api/auth/login",
                json={"email": email, "password": password}, timeout=15)
     r.raise_for_status()
     body = r.json()
     if body.get("requires_2fa"):
         pytest.skip("Account has 2FA enabled — clear it first")
-    # Dual/off mode: Bearer takes precedence
     if body.get("access_token"):
         s.headers["Authorization"] = f"Bearer {body['access_token']}"
-
     csrf = s.cookies.get("ifpi_csrf")
     if csrf:
-        # Attach CSRF header to every request. Server ignores it on GETs
-        # and on Bearer paths; harmless to always include.
         s.headers["X-CSRF-Token"] = csrf
     return s
+
+
+# ─────────────────────────────────────────────────────────────────
+# Iter 30r — Global `X-Return-Token` header for the top-level
+# `requests` module. Some tests use `requests.post(...)` directly
+# rather than `requests.Session()`; monkey-patch the module-level
+# helpers so cookie-only mode doesn't break them either.
+# ─────────────────────────────────────────────────────────────────
+
+import requests as _rq_module  # noqa: E402
+
+_orig_request = _rq_module.api.request
+_orig_session_request = _rq_module.Session.request
+
+
+def _patched_request(method: str, url: str, **kwargs):  # pragma: no cover
+    if "headers" not in kwargs or kwargs["headers"] is None:
+        kwargs["headers"] = {}
+    kwargs["headers"].setdefault("X-Return-Token", "true")
+    return _orig_request(method, url, **kwargs)
+
+
+def _patched_session_request(self, method, url, **kwargs):  # pragma: no cover
+    # Session-level calls go through here; inject the header if the
+    # session hasn't explicitly overridden it.
+    if "X-Return-Token" not in self.headers:
+        self.headers["X-Return-Token"] = "true"
+    return _orig_session_request(self, method, url, **kwargs)
+
+
+_rq_module.api.request = _patched_request
+_rq_module.request = _patched_request
+_rq_module.Session.request = _patched_session_request
