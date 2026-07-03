@@ -59,8 +59,11 @@ _BACKEND_LIVE = bool(BACKEND_URL) and _reachable(BACKEND_URL)
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip every test in this folder when the backend is unreachable and
-    the operator hasn't explicitly opted in with RUN_INTEGRATION_TESTS=1."""
+    """Skip integration tests when the backend is unreachable and the
+    operator hasn't explicitly opted in with RUN_INTEGRATION_TESTS=1.
+
+    Static tests (docs completeness, import checks) never touch the
+    backend, so they always run — even without a live server."""
     if FORCE_RUN or _BACKEND_LIVE:
         return
     reason = (
@@ -69,5 +72,9 @@ def pytest_collection_modifyitems(config, items):
         "Set RUN_INTEGRATION_TESTS=1 to force."
     )
     skip = pytest.mark.skip(reason=reason)
+    static_prefixes = ("test_docs_", "test_static_", "test_lint_")
     for item in items:
+        module_name = item.nodeid.split("::", 1)[0].split("/")[-1]
+        if any(module_name.startswith(p) for p in static_prefixes):
+            continue  # static tests always run
         item.add_marker(skip)
