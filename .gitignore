@@ -19,3 +19,5 @@ test_reports/
 
 # Uploaded files
 backend/uploads/
+frontend/build/
+frontend/node_modules/.cache/
