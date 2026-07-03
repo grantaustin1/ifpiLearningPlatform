@@ -874,3 +874,43 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Test hygiene: expand the cleanup patterns as more iterations land (currently 9 course patterns, 4 live-session patterns)
 - P2 deferred: pgvector migration for advanced RAG (still on the roadmap)
 
+
+## Iteration 24 — Feb 2026 (sprint: funnel analytics + EXDATE + subscription URL + cohort enrollment)
+
+### Sprint deliverables (all shipped + certified)
+- ✅ **Marketplace funnel analytics** — `CourseView` model (dedup by course + viewer_key + day), public `POST /api/catalog/{id}/track-view` fired from `CourseDetailPage` useEffect (anon-friendly via new `get_optional_user` dep), admin `GET /api/admin/marketplace-funnel/{course_id}?days=…` returns full funnel + daily breakdown. Embedded `CourseFunnelPanel` on the Course Edit right sidebar with 3 stat cards, 2 rate rows, days-window selector, CSS sparkline. Rates clamped `[0.0, 1.0]` (post-cert fix).
+- ✅ **EXDATE / cancel single occurrence** — `LiveSession.cancelled_at` column. `POST /:id/cancel` + `/:id/uncancel` toggle. Cancelled rows are: (a) hidden from learner `/upcoming`, (b) skipped by reminder worker, (c) exported as `EXDATE:` lines on the head's `.ics`. Frontend shows strikethrough title + "Cancelled" badge + amber X icon toggle.
+- ✅ **Instructor-side persistent ICS subscription URL** — `POST /api/live-sessions/subscribe-url?kind=admin|learner` returns a HMAC-signed opaque token; `GET /api/live-sessions/subscribe/{token}.ics` returns text/calendar with all upcoming sessions **without requiring auth** (calendar apps don't send cookies/JWT). Signed using `JWT_SECRET`. Idempotent per (user, kind). Rotation via secret change.
+- ✅ **Test hygiene expansion** — New patterns: `iter22-%`, `iter23-%`, `iter24-%`, more course patterns (`Iter% SCORM %`, `AI Test %`, `Bulk Import Test%`, `Learning Path Test%`), `iter30l-%` explicit terms pattern. New `course_views` cleanup key (>90-day rows). CLI now `cd`s to backend/ so relative DB path resolves. Cleanup service is now 5-key idempotent.
+- ✅ **Cohort Enrollment (improvement)** — `POST /live-sessions/{head_id}/rsvp?series=true` auto-RSVPs to head + all upcoming non-cancelled children in one call. Toggles all together. Returns `{status, series_count}`. Frontend adds a "RSVP whole series" button on series cards for learners.
+
+### Post-cert fixes
+- **Backend**: Rates clamped `min(1.0, ...)` — production data will regularly have `enrollments > views` because tracking started in iter-24 while enrollments are historic. Added `test_admin_funnel_rates_clamped_when_enrollments_exceed_views`.
+- **Backend**: `_viewer_key` now trusts `X-Forwarded-For` for the client IP (we're behind Cloudflare + K8s ingress). Without this, two POSTs from the same client got different viewer_keys → dedup broke.
+- **Frontend**: Testing agent fixed a CRA-incompatible `import.meta.env` reference in `LiveSessionsPage.tsx:97` (used `(import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin`).
+
+### Tests
+- 10 new funnel tests (`test_iteration24_funnel.py`) — all pass
+- 14 new EXDATE + subscription + cohort tests (`test_iteration24_exdate_and_subscription.py`) — all pass
+- Full regression: **523 passed / 3 skipped / 0 failures** — up from 500 in iter-23
+- Fork testing agent report: `/app/test_reports/iteration_24.json`
+
+### Migration
+- `20260713_0900_a3b4c5d6e7f8_course_views_and_cancelled_at.py` — adds `course_views` table + `live_sessions.cancelled_at` column
+
+### Route inventory (new)
+- `POST /api/catalog/{id}/track-view` (public, anon-friendly)
+- `GET /api/admin/marketplace-funnel/{course_id}` (admin, per-course funnel)
+- `POST /api/live-sessions/{id}/cancel` (admin)
+- `POST /api/live-sessions/{id}/uncancel` (admin)
+- `POST /api/live-sessions/subscribe-url?kind=admin|learner` (authed → returns signed token)
+- `GET /api/live-sessions/subscribe/{token}.ics` (public, HMAC-verified)
+- `POST /api/live-sessions/{id}/rsvp?series=true` (learner Cohort Enrollment)
+
+## Next Action Items (post iter-24)
+- Certificate of Attendance PDF for live sessions (auto-generated when learner is marked ATTENDED — leverages existing cert PDF pipeline)
+- Marketplace analytics roll-up view (aggregate cross-course funnel across the org)
+- Live Sessions: instructor-side subscription UI toast should also render a QR code so learners can scan directly from a screen-shared session slide
+- Rotate JWT_SECRET periodically & wire secret-rotation into subscription-url invalidation (currently: rotating JWT_SECRET invalidates ALL outstanding URLs — good, but manual)
+- P2 deferred: pgvector migration for advanced RAG (still on the roadmap)
+

@@ -79,7 +79,19 @@ def test_track_view_anonymous_creates_row():
 
 
 def test_track_view_dedups_same_day_same_viewer():
-    # Two POSTs from the same anon (same IP+UA in test client) → 2nd is a dedup
+    # Explicitly clear any prior views for this viewer + course + day
+    # so we can assert on the fresh-then-dedup sequence deterministically.
+    from core.database import SessionLocal
+    from models import CourseView
+    from datetime import date as _date
+    with SessionLocal() as db:
+        db.query(CourseView).filter(
+            CourseView.course_id == 1,
+            CourseView.viewed_on_date == _date.today().isoformat(),
+        ).delete(synchronize_session=False)
+        db.commit()
+    # Two POSTs from the same anon session (same UA + same source IP) →
+    # 2nd is a dedup
     s = requests.Session()
     r1 = s.post(f"{BASE_URL}/api/catalog/1/track-view", json={}, timeout=10).json()
     r2 = s.post(f"{BASE_URL}/api/catalog/1/track-view", json={}, timeout=10).json()
@@ -146,3 +158,20 @@ def test_admin_funnel_learner_role_forbidden(learner):
 def test_admin_funnel_unknown_course_404(admin):
     r = admin.get(f"{BASE_URL}/api/admin/marketplace-funnel/9999999", timeout=10)
     assert r.status_code == 404
+
+
+def test_admin_funnel_rates_clamped_when_enrollments_exceed_views(admin):
+    """Iter 24 follow-up: enrollments > views can happen when
+    view-tracking was added after historic enrollments existed.
+    Rates must clamp at 1.0 instead of showing 350%."""
+    # Course 1 has ~7 historic enrollments; today's autouse fixture
+    # wiped views for it. Add exactly 1 view — the ratio (7/1) would
+    # be 7.0 without the clamp.
+    import requests as _rq
+    _rq.post(f"{BASE_URL}/api/catalog/1/track-view", json={}, timeout=10)
+    r = admin.get(f"{BASE_URL}/api/admin/marketplace-funnel/1?days=365", timeout=10)
+    assert r.status_code == 200
+    d = r.json()
+    if d["enrollments"] > d["views"] and d["views"] > 0:
+        assert d["view_to_enroll_rate"] == 1.0, \
+            f"rate must clamp at 1.0 when enrollments={d['enrollments']} > views={d['views']}, got {d['view_to_enroll_rate']}"
