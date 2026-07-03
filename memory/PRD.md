@@ -1,5 +1,40 @@
 # IFPI Learning Platform — Product Requirements & Status
-<!-- lockfile-sync: 2026-07-07 -->
+<!-- lockfile-sync: 2026-07-08 -->
+
+## Iteration 30o/p/q — Onboarding + Scheduled Reports + Query Builder + Save-as-Flashcard (2026-07-08)
+
+### 30o · Owner Onboarding Board — SHIPPED
+- ✅ New `GET /api/admin/onboarding/checklist` endpoint. Returns a 7-step checklist with per-step `done` flag, human label, CTA path, and overall progress %.
+- ✅ Steps: branding (colour/logo), first course, first invitee, cert signature, SMTP (optional), T&Cs published, first activity.
+- ✅ Frontend `OnboardingBoard.tsx` mounted on admin dashboard — gradient hero, progress bar, per-step CTA, auto-hides at 100%.
+- ✅ Tests: 3/3 in `tests/test_iteration30op_onboarding_reports.py` (shape, learner-blocked, keys-stable contract).
+
+### 30p · Custom Scheduled Reports — SHIPPED
+- ✅ New table `scheduled_reports` + Alembic `b8c9d0e1f2a3`. Per-admin subscriptions with cadence (daily/weekly/monthly), report_kind (4 options), recipient list.
+- ✅ Full CRUD: `GET/POST/PUT/DELETE /api/admin/scheduled-reports` + `POST /:id/run-now`.
+- ✅ Report kinds: `members_needing_action`, `cohort_progress`, `certificate_issuance`, `enrollment_summary`. Each has a dedicated builder in `services/scheduled_reports_worker.py`.
+- ✅ Scheduler tick added to `outbox_worker` — every 5 min, generates + enqueues due reports into the existing outbox pipeline (reuses SMTP delivery, retry, dead-letter).
+- ✅ Frontend `ScheduledReportsPage.tsx` — CRUD list with cadence + kind selectors, per-row Run Now / Pause / Delete. Wired into sidebar.
+- ✅ Tests: 5/5 (CRUD cycle, unknown kind rejection, bad email rejection, run-now enqueue, learner-blocked).
+
+### 30q · AI Query Builder v1 + Save-as-Flashcard — SHIPPED
+- ✅ New `POST /api/admin/query-builder/build` — natural-language → SQL against a curated 7-table schema catalog. LLM via `emergentintegrations` (same GPT-4o path as AI Tutor).
+- ✅ Guardrails: SELECT-only, whitelist of 7 tables (users/courses/enrollments/certificates/quizzes/quiz_attempts/organizations), auto `LIMIT 500`, no semicolons, keyword blacklist (INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/ATTACH/PRAGMA), regex-extracted table check.
+- ✅ Frontend `QueryBuilderPage.tsx` — sample-questions bar, generated-SQL display with copy button, tabular results, reason line, truncated indicator. Wired into sidebar.
+- ✅ **Save-as-flashcard** enhancement: new `POST /api/tutor/save-as-flashcard`. Given an assistant `message_id`, pairs it with the prior user turn and creates a Flashcard row with `source_chunk_ids` provenance. Enters SM-2 pack automatically.
+- ✅ Frontend `AITutorPanel.tsx` — every assistant reply now sports a "Save as flashcard" button that turns green + "Saved" on click. Closes the loop between explore-and-learn.
+- ✅ Tests: 5/5 including cross-user isolation (`test_save_as_flashcard_rejects_someone_elses_message`), real LLM query builder JOIN handling.
+
+### AUTH_COOKIE_MODE cutover — STAGE 1 SHIPPED, STAGE 2 DOCUMENTED
+- ✅ **Stage 1**: Frontend `lib/api.ts::tryRefresh` fixed. Previously assumed `access_token` in body — would bail on cookie-only mode. Now distinguishes "refresh succeeded" from "got a token back", cleanly supports both `dual` and `on` modes.
+- ✅ Audit: 4 code sites reading `access_token` from response body — 3 are conditional (`if r.data?.access_token`) and safe, 1 was dead code (`void tok` in CourseEditPage).
+- ⏸️ **Stage 2**: Full server flip to `AUTH_COOKIE_MODE=on` deferred. Test suite has ~15 files using `s.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})` — this breaks when the token isn't in the body. New `tests/conftest.py::authed_session()` helper added for future migration; test refactor is a dedicated session.
+
+### P2 Backlog Specs — SHIPPED
+- ✅ New file `/app/docs/P2_BACKLOG_SPECS.md`. Detailed pickup docs for the 4 remaining P2 heavies (affiliate program, marketplace, live sessions, pgvector migration). Each includes value proposition, table plan, endpoint plan, watch-outs, estimate.
+
+---
+
 
 ## Iteration 30l/m/n — Kiosk + T&Cs + AI Tutor v1 + Digest + Factories (2026-07-07)
 

@@ -34,6 +34,8 @@ import LearningPathEditPage from 'pages/dashboard/LearningPathEditPage'
 import LearnPage from 'pages/learn/LearnPage'
 import TakeExamPage from 'pages/take/TakeExamPage'
 import CatalogPage from 'pages/catalog/CatalogPage'
+import QueryBuilderPage from 'pages/dashboard/QueryBuilderPage'
+import ScheduledReportsPage from 'pages/dashboard/ScheduledReportsPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -85,6 +87,8 @@ export default function App() {
         <Route path="/academies" element={<Protected adminOnly><AcademiesPage /></Protected>} />
         <Route path="/badge-tiers" element={<Protected adminOnly><BadgeTiersPage /></Protected>} />
         <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
+        <Route path="/query-builder" element={<Protected adminOnly><QueryBuilderPage /></Protected>} />
+        <Route path="/scheduled-reports" element={<Protected adminOnly><ScheduledReportsPage /></Protected>} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
