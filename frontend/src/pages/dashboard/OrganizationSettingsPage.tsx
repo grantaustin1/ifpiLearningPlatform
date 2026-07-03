@@ -527,4 +527,3 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
     </Section>
   )
 }
-

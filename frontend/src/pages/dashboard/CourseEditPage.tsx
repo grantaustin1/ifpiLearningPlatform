@@ -20,7 +20,7 @@ export default function CourseEditPage() {
   const [showAddPrereq, setShowAddPrereq] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [r, p, all] = await Promise.all([
       api.get(`/courses/${id}`),
       api.get(`/courses/${id}/prerequisites`),
