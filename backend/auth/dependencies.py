@@ -104,6 +104,30 @@ def requires_roles(*allowed: str):
     return _check
 
 
+def get_optional_user(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> CurrentUser | None:
+    """Auth dependency that returns the current user if a valid token is
+    present, or None for anonymous requests. Never raises. Used by
+    public endpoints that want to record who's viewing (e.g. marketplace
+    funnel analytics) without gating access."""
+    # Extract token via the same logic as `extract_token`, but silent
+    # on missing/invalid instead of raising 401.
+    token: str | None = None
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip() or None
+    if not token:
+        token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return None
+    try:
+        return get_current_user(token=token, db=db)
+    except HTTPException:
+        return None
+
+
 
 # ── Iter 22 — semantic gate for the AI authoring suite ─────────────────
 # Every /api/authoring/* endpoint MUST use `requires_staff()` (not

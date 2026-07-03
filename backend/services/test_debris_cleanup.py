@@ -41,7 +41,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from models import (
-    Course, LiveSession, LiveSessionRsvp, OutboxMessage,
+    Course, CourseView, LiveSession, LiveSessionRsvp, OutboxMessage,
     TermsAcceptance, TermsVersion,
 )
 
@@ -59,19 +59,36 @@ COURSE_TITLE_PATTERNS = [
     "iter21%",             # any iter21-prefixed test title
     "iter30%",             # any iter30-prefixed test title
     "Iter30%",             # capitalised iter30 tests
+    # ── Iter 24 additions ────────────────────────────────────────────
+    "iter22-%",            # marketplace tests
+    "iter23-%",            # recurrence + reminder tests
+    "iter24-%",            # funnel + EXDATE + subscription tests
+    "Iter22 test%",        # live_sessions iter22 fixture titles
+    "SmokeTest%",          # generic smoke-test prefix
+    "%SCORM smoke%",       # SCORM smoke residue
+    "%_debris_%",          # cleanup-tests' own debris fixtures
+    "AI Test %",           # ai_authoring test residue
+    "Bulk Import Test%",   # bulk-import test residue
+    "Learning Path Test%",  # learning-path test residue
 ]
 
 LIVE_SESSION_TITLE_PATTERNS = [
     "UITEST-%",
     "iter22-%",
     "iter23-%",
+    "iter24-%",              # Iter 24 additions
     "Iter22 test%",
+    "iter24-exdate-%",
+    "iter24-cancelled-%",
+    "iter24-cleanup-%",
+    "SmokeTest%",
 ]
 
 TERMS_VERSION_PATTERNS = [
     "iter%",
     "TEST-%",
     "%audit%",
+    "iter30l-%",           # Iter 24 — explicit iter30l cleanup pattern
 ]
 
 
@@ -193,6 +210,19 @@ def _delete_stale_outbox(db: Session) -> int:
     return n
 
 
+def _delete_stale_course_views(db: Session) -> int:
+    """Iter 24 — CourseView rows referencing already-deleted courses
+    become orphans (FK is nullable? no — it's NOT NULL). But CASCADE
+    already handles them via the courses cleanup. This function only
+    purges *old* views (>90 days) to keep the funnel table lean; funnel
+    analytics never look back that far anyway."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).date().isoformat()
+    n = db.query(CourseView).filter(
+        CourseView.viewed_on_date < cutoff
+    ).delete(synchronize_session=False)
+    return n
+
+
 def tick(db: Session, dry_run: bool = False) -> dict:
     """Run the full cleanup pass. Returns a dict of {resource: rows_deleted}.
 
@@ -203,6 +233,7 @@ def tick(db: Session, dry_run: bool = False) -> dict:
         "live_sessions": _delete_stale_live_sessions(db),
         "terms_versions": _delete_stale_terms_versions(db),
         "outbox_messages": _delete_stale_outbox(db),
+        "course_views": _delete_stale_course_views(db),
     }
     if dry_run:
         db.rollback()

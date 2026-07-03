@@ -1145,6 +1145,7 @@ class LiveSession(Base):
     recurrence_rule = Column(String(500), nullable=True)  # iCal RRULE string, e.g. "FREQ=WEEKLY;COUNT=8"
     parent_series_id = Column(Integer, ForeignKey("live_sessions.id"), nullable=True, index=True)
     reminder_sent_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)  # Iter 24 — single-occurrence cancel (EXDATE)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -1170,3 +1171,32 @@ class LiveSessionRsvp(Base):
     attendance_marked_at = Column(DateTime, nullable=True)
 
     session = relationship("LiveSession", back_populates="rsvps")
+
+
+
+# ── Marketplace funnel analytics (Iter 24) ──────────────────────────
+class CourseView(Base):
+    """A recorded impression on the public marketplace course-detail page.
+    Deduped upstream by (course_id, viewer_key, day) so refresh-mashers
+    don't inflate the funnel."""
+    __tablename__ = "course_views"
+    __table_args__ = (
+        Index("ix_course_views_course_day", "course_id", "viewed_on_date"),
+        UniqueConstraint(
+            "course_id", "viewer_key", "viewed_on_date",
+            name="uq_course_view_unique_per_day",
+        ),
+    )
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    # Viewer key: `u:<user_id>` for authed viewers, `a:<anon_hash>` for
+    # anon (SHA-256 of IP+UA truncated to 16 hex chars). Never PII on
+    # its own — the anon hash cannot be reversed to an identity.
+    viewer_key = Column(String(80), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    referrer = Column(String(500), nullable=True)
+    viewed_at = Column(DateTime, default=_utcnow, nullable=False)
+    # Day-only column for the dedup unique constraint; ISO date string
+    # (SQLite-friendly). Stored redundantly so dedup lookups are indexed.
+    viewed_on_date = Column(String(10), nullable=False, index=True)
+

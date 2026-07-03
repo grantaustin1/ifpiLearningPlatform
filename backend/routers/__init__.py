@@ -149,3 +149,8 @@ def register_all(app: FastAPI) -> None:
     from routers import live_sessions
     app.include_router(live_sessions.router)
 
+    # ── Iter 24: Marketplace funnel analytics ────────────────────────
+    from routers import marketplace_analytics
+    app.include_router(marketplace_analytics.public_router)
+    app.include_router(marketplace_analytics.admin_router)
+

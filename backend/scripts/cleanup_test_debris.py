@@ -10,9 +10,13 @@ before a big demo, or when reviewing CI leakage.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
-sys.path.insert(0, "/app/backend")
+# Iter 24 — CD to backend/ so the relative DATABASE_URL
+# `sqlite:///./ifpi_lms.db` resolves to the same DB the app uses.
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.getcwd())
 
 from core.database import SessionLocal
 from services.test_debris_cleanup import tick

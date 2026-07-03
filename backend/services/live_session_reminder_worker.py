@@ -73,6 +73,7 @@ def tick(db: Session) -> int:
         .filter(LiveSession.reminder_sent_at.is_(None))
         .filter(LiveSession.start_at >= window_start)
         .filter(LiveSession.start_at <= window_end)
+        .filter(LiveSession.cancelled_at.is_(None))  # Iter 24 — never remind about cancelled sessions
         .all()
     )
     if not sessions:

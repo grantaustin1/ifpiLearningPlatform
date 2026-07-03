@@ -36,6 +36,16 @@ export default function CourseDetailPage() {
     enabled: !!id,
   })
 
+  // Iter 24 — Marketplace funnel: fire a view impression once per
+  // detail-page mount. Backend dedups by (user_or_anon, course, day),
+  // so refresh spamming doesn't inflate the funnel.
+  useEffect(() => {
+    if (!id) return
+    api.post(`/catalog/${id}/track-view`, {
+      referrer: document.referrer || null,
+    }).catch(() => { /* fire-and-forget — never break UX */ })
+  }, [id])
+
   const handleEnroll = async () => {
     if (!data) return
     if (!user) {
