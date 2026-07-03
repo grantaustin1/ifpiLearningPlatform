@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
@@ -31,8 +31,8 @@ export default function CourseEditPage() {
     setActive(r.data.slides?.[0]?.id ?? null)
     setPrereqs(p.data)
     setAllCourses(all.data)
-  }
-  useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id])
+  useEffect(() => { load() }, [load])
 
   const save = async () => {
     if (!course) return
