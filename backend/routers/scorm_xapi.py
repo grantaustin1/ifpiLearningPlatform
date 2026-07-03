@@ -25,7 +25,9 @@ logger = logging.getLogger("ifpi.scorm.router")
 
 # Where extracted packages live. Disk root — served as static files via
 # /api/scorm/files/<package_id>/<rel_path>.
-SCORM_ROOT = Path(os.environ.get("SCORM_PACKAGE_ROOT", "/app/backend/uploads/scorm"))
+# Default: <backend_dir>/uploads/scorm (works both locally and in Docker at /app/backend).
+_backend_dir = Path(__file__).resolve().parents[1]
+SCORM_ROOT = Path(os.environ.get("SCORM_PACKAGE_ROOT", str(_backend_dir / "uploads" / "scorm")))
 SCORM_ROOT.mkdir(parents=True, exist_ok=True)
 
 MAX_SCORM_ZIP = 100 * 1024 * 1024  # 100 MB
