@@ -797,3 +797,43 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Tech debt: retire `X-Return-Token: true` test bypass (~35 files) → migrate to pure cookie-jar flow.
 - Docs: run `python backend/scripts/build_docs.py` whenever new endpoints are added, to satisfy the CI doc-drift guard.
 
+
+
+## Iteration 22 — Feb 2026 (sprint: refactor + marketplace + live sessions)
+
+### Sprint deliverables (all shipped + certified)
+- ✅ **Test-suite refactor** — retired the `X-Return-Token` production backdoor. Server-side bypass is now gated behind `ALLOW_TEST_TOKEN_HEADER=true` env var, which is set only in dev/test. Production deploys will NOT set it, so the header is inert. New pure-cookie `authed_session()` helper added to `conftest.py` for future tests. Legacy tests keep working via the dual-path `Session.request` monkey-patch. Verified: with env var =false, `access_token` is absent from login response body.
+- ✅ **Marketplace Integration (P1)** — public multi-tenant catalog with pagination + total count, org-level opt-in flag (`Organization.marketplace_opt_in`, default true), featured-courses endpoint, full public course detail page with syllabus preview + billing-stub-powered "Get access" CTA, register-then-auto-enroll handoff flow (`/register?next=/catalog/:id&auto_enroll=1`), and admin toggle in Settings → Marketplace listing section.
+- ✅ **Live Sessions Module (P1)** — new `live_sessions` + `live_session_rsvps` tables + `/api/live-sessions` router. Admin CRUD (create/list/detail/patch/delete with 201/204 semantics), learner RSVP toggle with `max_attendees` enforcement, cohort filtering on `/upcoming` endpoint, admin bulk `POST /:id/mark-attendance` (auto-creates walk-in RSVPs), .ics calendar export. Frontend page at `/live-sessions` renders role-specific UI (admin = Schedule/Attendance/Delete, learner = RSVP/.ics).
+- ✅ **"Get Started" CTA** — embedded on marketplace hero as the anonymous conversion path (recommended improvement).
+- ⏸️ **pgvector migration** — explicitly deferred per user decision (heavy Postgres storage-engine swap).
+
+### Tests
+- 6 new marketplace tests (`test_iteration22_marketplace.py`) — all pass
+- 11 new live-sessions tests (`test_iteration22_live_sessions.py`) — all pass
+- Full regression: 486/489 pass (3 env-conditional skips, 0 failures)
+- Fork testing agent report: `/app/test_reports/iteration_22.json`
+
+### Migrations added
+- `20260710_0900_d0e1f2a3b4c5_marketplace_opt_in.py`
+- `20260711_0900_e1f2a3b4c5d6_live_sessions.py`
+
+### New env var
+- `ALLOW_TEST_TOKEN_HEADER=true` (backend/.env) — gates the `X-Return-Token` test bypass. MUST be absent/false in production.
+
+### Route inventory (new)
+- `GET /api/catalog?featured=…&page=…` (public) — paginated marketplace
+- `GET /api/catalog/{id}` (public) — course detail
+- `POST/GET/PATCH/DELETE /api/live-sessions[/{id}]` (admin+learner)
+- `POST /api/live-sessions/{id}/rsvp` (learner)
+- `POST /api/live-sessions/{id}/mark-attendance` (admin)
+- `GET /api/live-sessions/upcoming` (learner)
+- `GET /api/live-sessions/{id}/ics` (both)
+- Frontend: `/marketplace`, `/marketplace/:id`, `/catalog/:id`, `/live-sessions`
+
+## Next Action Items (post iter-22)
+- Marketplace: add sort options (price asc/desc, most enrolled) — mostly UI, backend already supports it via a small query tweak
+- Live Sessions: recurring sessions (weekly / bi-weekly repeat) — additional `recurrence_rule` column + iCal RRULE support
+- Live Sessions: reminder email 15min before start (leverage existing outbox worker)
+- Test hygiene: nightly cleanup task for TEST_*/UITEST_* seeded courses & sessions accumulated across CI runs (see iter-22 report action items)
+- P2 deferred: pgvector migration (still on the roadmap; use PostgreSQL sidecar approach when picked up)
