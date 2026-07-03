@@ -2,6 +2,7 @@
 import os
 import uuid
 import time
+import importlib.util
 
 import pytest
 import requests
@@ -22,6 +23,7 @@ if not BASE_URL:
 
 ADMIN_CREDS = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER_CREDS = {"email": "learner@ifpi.org", "password": "learner123"}
+HAS_EMERGENT_LLM_KEY = bool(os.environ.get("EMERGENT_LLM_KEY", "").strip())
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
@@ -175,6 +177,13 @@ class TestCourses:
 
     def test_enrol_free_course_learner(self, learner_session):
         """Seeded course id=1 is free; enrol should NOT return 402."""
+        prereqs = learner_session.get(f"{BASE_URL}/api/courses/1/prerequisites", timeout=10)
+        assert prereqs.status_code == 200, prereqs.text
+        for prereq in prereqs.json() or []:
+            enroll = learner_session.post(f"{BASE_URL}/api/courses/{prereq['course_id']}/enroll", timeout=10)
+            assert enroll.status_code == 200, f"Prereq enroll failed: {enroll.status_code} {enroll.text}"
+            complete = learner_session.post(f"{BASE_URL}/api/courses/{prereq['course_id']}/complete", timeout=10)
+            assert complete.status_code == 200, f"Prereq completion failed: {complete.status_code} {complete.text}"
         r = learner_session.post(f"{BASE_URL}/api/courses/1/enroll", timeout=10)
         assert r.status_code == 200, f"Free course enrol failed: {r.status_code} {r.text}"
         assert r.json().get("ok") is True
@@ -207,12 +216,8 @@ class TestExams:
         answers = {str(q["id"]): q.get("correct_answer", "") for q in qs}
         rs = learner_session.post(f"{BASE_URL}/api/exams/1/attempts",
                                   json={"answers": answers}, timeout=15)
-        # Learner may have used all attempts on this seeded exam in prior
-        # test runs. If so, that's a valid product state — skip rather than
-        # fail. We already assert grading via other tests / test_iteration25.
-        if rs.status_code == 400 and "attempt" in rs.text.lower():
-            import pytest
-            pytest.skip("Learner has consumed all attempts for seeded exam")
+        if rs.status_code == 400 and "Maximum attempts reached" in rs.text:
+            pytest.skip("Seeded learner has exhausted exam attempts in this environment")
         assert rs.status_code == 200, rs.text
         result = rs.json()
         assert "score" in result
@@ -303,8 +308,12 @@ class TestBilling:
 
 
 # ── AI builder ──────────────────────────────────────────────────────
+@pytest.mark.skipif(not os.environ.get("EMERGENT_LLM_KEY"), reason="EMERGENT_LLM_KEY not set")
 class TestAIBuilder:
+    @pytest.mark.skipif(not HAS_EMERGENT_LLM_KEY, reason="EMERGENT_LLM_KEY is required for AI builder tests")
     def test_ai_course_builder(self, admin_session):
+        if not AI_INTEGRATION_AVAILABLE:
+            pytest.skip("AI integration unavailable (EMERGENT_LLM_KEY and package required)")
         payload = {"topic": "Python basics", "num_slides": 3,
                    "include_quiz": True, "num_questions": 2}
         t0 = time.time()
