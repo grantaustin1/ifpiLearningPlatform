@@ -159,7 +159,7 @@ class TestSSOSecurityHardening:
         r = requests.post(f"{BASE_URL}/api/auth/sso-exchange",
                           json={"erp_token": token}, timeout=10)
         assert r.status_code == 401
-        assert "issuer" in r.json().get("detail", "").lower()
+        assert "issuer" in r.json().get("error", {}).get("message", r.json().get("detail", "")).lower()
 
     def test_wrong_audience(self):
         token = _mint_token(sub="9103", email="x@erp360.test",
@@ -185,7 +185,7 @@ class TestSSOSecurityHardening:
         r = requests.post(f"{BASE_URL}/api/auth/sso-exchange",
                           json={"erp_token": token}, timeout=10)
         assert r.status_code == 401
-        assert "too old" in r.json().get("detail", "").lower()
+        assert "too old" in r.json().get("error", {}).get("message", r.json().get("detail", "")).lower()
 
     def test_missing_jti(self):
         # Manually mint a token without jti
@@ -197,7 +197,7 @@ class TestSSOSecurityHardening:
         r = requests.post(f"{BASE_URL}/api/auth/sso-exchange",
                           json={"erp_token": token}, timeout=10)
         assert r.status_code == 401
-        assert "jti" in r.json().get("detail", "").lower()
+        assert "jti" in r.json().get("error", {}).get("message", r.json().get("detail", "")).lower()
 
     def test_replay_same_jti_twice(self):
         jti = f"replay-{uuid.uuid4().hex}"
@@ -209,7 +209,7 @@ class TestSSOSecurityHardening:
         r2 = requests.post(f"{BASE_URL}/api/auth/sso-exchange",
                            json={"erp_token": token}, timeout=10)
         assert r2.status_code == 401
-        assert "replay" in r2.json().get("detail", "").lower()
+        assert "replay" in r2.json().get("error", {}).get("message", r2.json().get("detail", "")).lower()
 
 
 class TestSSOAudit:

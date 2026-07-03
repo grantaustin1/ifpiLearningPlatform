@@ -1,7 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from 'lib/api'
-import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy } from 'lucide-react'
+import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import { DocumentsTab } from './OrganizationDocumentsTab'
+
+type SettingsTab = 'branding' | 'documents'
 
 export default function OrganizationSettingsPage() {
   const [org, setOrg] = useState<any>(null)
@@ -10,6 +13,7 @@ export default function OrganizationSettingsPage() {
   const [previewing, setPreviewing] = useState(false)
   const [themes, setThemes] = useState<any[]>([])
   const [applyingTheme, setApplyingTheme] = useState<string | null>(null)
+  const [tab, setTab] = useState<SettingsTab>('branding')
   const logoInputRef = useRef<HTMLInputElement>(null)
   const sigInputRef = useRef<HTMLInputElement>(null)
 
@@ -42,8 +46,7 @@ export default function OrganizationSettingsPage() {
     if (!previewUrl) return // wait until user clicks "Live preview" once
     const t = setTimeout(() => { livePreview() }, 500)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewKey])
+  }, [previewKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     setSaving(true)
@@ -112,12 +115,46 @@ export default function OrganizationSettingsPage() {
   if (!org) return <div className="p-8"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="p-8 grid grid-cols-1 xl:grid-cols-5 gap-6" data-testid="org-settings-page">
+    <div className="p-8" data-testid="org-settings-page">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900 font-display">Academy Settings</h1>
+        <p className="text-slate-500 mt-1">Branding, certificate template, and downloadable documentation.</p>
+      </div>
+
+      {/* Tab bar — Iter 30e adds the Documents tab */}
+      <div className="border-b border-slate-200 mb-6 flex gap-1" data-testid="settings-tabs">
+        {([
+          { key: 'branding', label: 'Branding & Certificates', icon: Palette },
+          { key: 'documents', label: 'Documents', icon: FileText },
+        ] as const).map(t => {
+          const Icon = t.icon
+          const active = tab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              data-testid={`settings-tab-${t.key}`}
+              className={
+                'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ' +
+                (active
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200')
+              }
+            >
+              <Icon className="h-4 w-4" /> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'documents' ? (
+        <DocumentsTab />
+      ) : (
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
       <div className="xl:col-span-3">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 font-display">Academy Settings</h1>
-            <p className="text-slate-500 mt-1">Branding & certificate template</p>
+            <p className="text-slate-500">Update visual identity and certificate look-and-feel.</p>
           </div>
           <div className="flex gap-2">
             <button onClick={livePreview} disabled={previewing} data-testid="cert-preview-btn"
@@ -228,6 +265,8 @@ export default function OrganizationSettingsPage() {
           )}
         </div>
       </aside>
+      </div>
+      )}
     </div>
   )
 }

@@ -109,10 +109,9 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def _http_exc(_req: Request, exc):
         # Preserve any custom headers (e.g. Retry-After on 429).
         headers = getattr(exc, "headers", None)
-        # If the handler already returned a dict with an "error" key,
-        # respect its shape.
         detail = getattr(exc, "detail", None)
         status_code = getattr(exc, "status_code", 500)
+        # 1) Handler pre-shaped the envelope? Respect it.
         if isinstance(detail, dict) and "error" in detail:
             body = detail
             body["error"].setdefault("status", status_code)
@@ -120,12 +119,26 @@ def install_exception_handlers(app: FastAPI) -> None:
             return JSONResponse(status_code=status_code, content=body,
                                 headers=headers)
         code = _code_for_status(status_code)
+        cid = get_correlation_id()
+        # 2) Dict detail (common pattern for 412 with structured data) —
+        #    preserve every field ALONGSIDE the envelope so callers can
+        #    keep reading `body["missing"]` etc. This is a superset of
+        #    the pure envelope.
+        if isinstance(detail, dict):
+            msg = detail.get("message") or detail.get("detail") or ""
+            merged = {**detail,
+                      "error": {"code": code, "message": msg,
+                                "status": status_code,
+                                "correlation_id": cid}}
+            return JSONResponse(status_code=status_code, content=merged,
+                                headers=headers)
+        # 3) Fall-through: plain string / None
         msg = detail if isinstance(detail, str) else str(detail or "")
         return JSONResponse(
             status_code=status_code,
             content={"error": {"code": code, "message": msg,
                                "status": status_code,
-                               "correlation_id": get_correlation_id()}},
+                               "correlation_id": cid}},
             headers=headers,
         )
 

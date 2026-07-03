@@ -50,7 +50,7 @@ class TestPinnedDeps:
 
     def test_requirements_txt_pins_all_five(self):
         with open(f"{BACKEND_DIR}/requirements.txt", "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read().lower()  # PyPI package names are case-insensitive; Markdown pins as `Markdown==`
         for token in ["bleach==6.4.0", "python-docx==1.2.0", "pandas==3.0.3",
                       "openpyxl==3.1.5", "markdown==3.10.2"]:
             assert token in content, f"{token} missing from requirements.txt"
