@@ -121,3 +121,7 @@ def register_all(app: FastAPI) -> None:
     from routers import terms_kiosk
     app.include_router(terms_kiosk.router)
 
+    # ── Iter 30m: AI Tutor v1 ────────────────────────────────────────
+    from routers import ai_tutor
+    app.include_router(ai_tutor.router)
+

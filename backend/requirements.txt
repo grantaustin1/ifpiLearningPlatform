@@ -168,3 +168,4 @@ zipp==4.1.0
 
 PyOTP==2.10.0
 qrcode==8.0
+factory-boy==3.3.3

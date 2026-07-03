@@ -987,3 +987,51 @@ class FeatureFlag(Base):
     note = Column(String(500), nullable=True)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
                         nullable=False)
+
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Iter 30m — AI Tutor v1 (learner-facing course chat).
+# Reuses SourceDocument + SourceChunk + embedding_service for retrieval.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class AITutorSession(Base):
+    """One conversation with the AI tutor. Keyed to (user, course) —
+    persisted so learners can resume mid-chat."""
+    __tablename__ = "ai_tutor_sessions"
+    __table_args__ = (
+        Index("ix_tutor_session_user_course",
+              "user_id", "course_id"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False,
+                     index=True)
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"),
+                       nullable=True, index=True)
+    title = Column(String(200), nullable=False, default="New chat")
+    archived_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    last_message_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class AITutorMessage(Base):
+    """One turn (either user or assistant). Assistant turns carry a JSON
+    `citations` list: `[{chunk_id, document_id, document_title, snippet, score}]`.
+    """
+    __tablename__ = "ai_tutor_messages"
+    __table_args__ = (
+        Index("ix_tutor_msg_session", "session_id", "created_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer,
+                        ForeignKey("ai_tutor_sessions.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    role = Column(String(12), nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    citations = Column(JSON, nullable=True)    # list[dict] on assistant turns
+    tokens_prompt = Column(Integer, nullable=True)
+    tokens_completion = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
