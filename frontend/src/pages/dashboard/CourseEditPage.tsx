@@ -234,7 +234,7 @@ export default function CourseEditPage() {
         ) : <div className="flex-1 flex items-center justify-center text-slate-400">Select or add a slide to start</div>}
       </div>
 
-      <aside className="w-80 bg-white border-l p-4 overflow-y-auto">
+      <aside className="w-80 xl:w-[36rem] bg-white border-l p-4 overflow-y-auto">
         <h3 className="font-semibold text-slate-900 text-sm mb-4">Course Settings</h3>
         <Field label="Title"><input value={course.title || ''} onChange={e => setCourse({ ...course, title: e.target.value })} data-testid="sidebar-course-title" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
         <Field label="Description"><textarea value={course.description || ''} onChange={e => setCourse({ ...course, description: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>

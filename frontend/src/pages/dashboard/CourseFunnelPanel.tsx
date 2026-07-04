@@ -131,6 +131,11 @@ export function CourseFunnelPanel({ courseId }: Props) {
         </div>
       </div>
 
+      {/* Iter 28 — On XL screens, place daily trend + slide drop-off
+          side-by-side to use the widened right rail (36rem instead of
+          20rem). On narrower widths, keep the original stacked layout. */}
+      <div className="xl:grid xl:grid-cols-2 xl:gap-6 xl:items-start" data-testid="funnel-charts-grid">
+
       {/* Sparkline — collapsible */}
       <div>
         <button onClick={toggleTrend} data-testid="toggle-funnel-trend"
@@ -158,7 +163,7 @@ export function CourseFunnelPanel({ courseId }: Props) {
 
       {/* Iter 26 — Slide-level drop-off heatmap (Iter 27 — collapsible) */}
       {dropoff && dropoff.slides.length > 0 && (
-        <div className="mt-6 pt-5 border-t border-slate-100" data-testid="slide-dropoff-block">
+        <div className="mt-6 pt-5 border-t border-slate-100 xl:mt-0 xl:pt-0 xl:border-t-0" data-testid="slide-dropoff-block">
           <div className="flex items-center justify-between mb-3">
             <button onClick={toggleDropoff} data-testid="toggle-slide-dropoff"
               className="flex items-center gap-1 text-[11px] uppercase font-medium tracking-wide text-slate-500 hover:text-slate-700 transition-colors">
@@ -209,6 +214,7 @@ export function CourseFunnelPanel({ courseId }: Props) {
           ))}
         </div>
       )}
+      </div> {/* end xl:grid — funnel-charts-grid */}
     </div>
   )
 }

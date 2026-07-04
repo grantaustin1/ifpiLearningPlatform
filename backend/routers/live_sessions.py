@@ -16,6 +16,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -27,6 +28,8 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from models import LiveSession, LiveSessionRsvp, Organization, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/live-sessions", tags=["Live Sessions"])
 
@@ -396,10 +399,10 @@ def toggle_rsvp(session_id: int, series: bool = False,
 
 
 # ── Attendance ───────────────────────────────────────────────────────
-def _issue_attendance_cert(db: Session, user_id: int, session: LiveSession) -> Optional["Certificate"]:
+def _issue_attendance_cert(db: Session, user_id: int, session: LiveSession):
     """Iter 27 — Idempotent attendance-certificate issuance. Skips if
     the user already has a cert for this session. Returns the new
-    Certificate or None."""
+    Certificate row or None."""
     from models import Certificate  # local import to avoid cycles
     existing = db.query(Certificate).filter(
         Certificate.user_id == user_id,
@@ -443,12 +446,66 @@ def mark_attendance(session_id: int, body: MarkAttendanceIn,
         rsvp.attendance_marked_at = datetime.now(timezone.utc)
         marked += 1
         # Iter 27 — Auto-issue attendance cert on ATTENDED (idempotent)
+        # Iter 28 — Email the certificate link to the learner via outbox
         if body.status == "ATTENDED":
-            if _issue_attendance_cert(db, uid, s) is not None:
+            cert = _issue_attendance_cert(db, uid, s)
+            if cert is not None:
                 certs_issued += 1
+                try:
+                    _email_attendance_cert(db, cert, s, current.organization_id)
+                except Exception:  # never fail attendance flow on mail issue
+                    logger.exception("attendance cert email enqueue failed")
     db.commit()
     return {"marked": marked, "status": body.status,
             "attendance_certs_issued": certs_issued}
+
+
+def _email_attendance_cert(db: Session, cert, session: LiveSession,
+                           organization_id: int) -> None:
+    """Iter 28 — Queue an outbox email containing the branded cert PDF.
+
+    Uses the standard MailService (which queues to `outbox_messages`
+    and lets the outbox worker deliver via per-tenant SMTP or system
+    relay). PDF is regenerated on demand by the worker via the
+    attachment URL — we only enqueue a link, not the bytes, keeping
+    the outbox row small."""
+    from models import User, Organization
+    from services.mail_service import MailService
+
+    user = db.query(User).filter(User.id == cert.user_id).first()
+    if not user or not user.email:
+        return
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    org_name = org.name if org else "IFPI Learning"
+    cert_link = f"/verify/{cert.code}"
+    pdf_link = f"/api/certificates/{cert.id}/pdf"
+
+    subject = f"Your attendance certificate for {session.title}"
+    body_html = f"""
+    <p>Hi {user.name or 'there'},</p>
+    <p>Thanks for attending <strong>{session.title}</strong>. Your
+    certificate of attendance is ready.</p>
+    <p><a href="{pdf_link}" style="background:#4f46e5;color:white;
+        padding:10px 16px;text-decoration:none;border-radius:6px;
+        display:inline-block;">Download certificate (PDF)</a></p>
+    <p>Prefer to verify it later? Share this link:
+    <br/><code>{cert_link}</code></p>
+    <p>— {org_name}</p>
+    """
+    body_text = (
+        f"Hi {user.name or 'there'},\n\n"
+        f"Thanks for attending {session.title}. Your certificate of "
+        f"attendance is ready.\n\n"
+        f"Download PDF: {pdf_link}\n"
+        f"Verify: {cert_link}\n\n"
+        f"— {org_name}"
+    )
+    MailService(db).send_email(
+        to_email=user.email, to_name=user.name,
+        subject=subject, body_html=body_html, body_text=body_text,
+        template="live_session_attendance",
+        organization_id=organization_id, user_id=user.id,
+    )
 
 
 # ── ICS export ───────────────────────────────────────────────────────

@@ -120,6 +120,70 @@ def verify_certificate(code: str, db: Session = Depends(get_db)):
     }
 
 
+@cert_router.get("/verify/{code}/og-image.svg", response_class=Response)
+def certificate_og_image(code: str, db: Session = Depends(get_db)):
+    """Iter 28 — SVG OG image for social share previews. 1200×630 to
+    match Twitter/LinkedIn card ratios. Lightweight, static, safe to
+    inline in HTML meta tags."""
+    from models import LiveSession, Organization
+    from xml.sax.saxutils import escape
+    c = db.query(Certificate).filter(Certificate.code == code).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
+        sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
+        title = f"Attended · {sess.title}" if sess else "Live Session Attendance"
+    else:
+        title = c.course.title if c.course else "IFPI Certificate"
+
+    recipient = (c.user.name if c.user and c.user.name else "A learner")
+    org_name = "IFPI Learning"
+    if c.user and c.user.organization_id:
+        org = db.query(Organization).filter(Organization.id == c.user.organization_id).first()
+        if org:
+            org_name = org.name
+
+    # Truncate to avoid overflow
+    def _fit(s: str, n: int) -> str:
+        return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+    t = escape(_fit(title, 60))
+    r = escape(_fit(recipient, 40))
+    o = escape(_fit(org_name, 40))
+
+    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eef2ff" />
+      <stop offset="100%" stop-color="#ede9fe" />
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect x="60" y="80" width="1080" height="470" rx="24" fill="white" opacity="0.95" />
+  <rect x="60" y="80" width="1080" height="8" fill="url(#ribbon)" />
+  <text x="600" y="200" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="28" fill="#6366f1" font-weight="600">CERTIFICATE OF ACHIEVEMENT</text>
+  <text x="600" y="290" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="52" fill="#1e293b" font-weight="700">{r}</text>
+  <text x="600" y="360" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="22" fill="#64748b">has successfully completed</text>
+  <text x="600" y="420" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="34" fill="#4338ca" font-weight="600">{t}</text>
+  <text x="600" y="490" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="18" fill="#94a3b8">Awarded by {o}</text>
+  <text x="600" y="530" text-anchor="middle" font-family="ui-monospace, monospace"
+        font-size="14" fill="#cbd5e1">verify: {escape(code)}</text>
+</svg>"""
+    return Response(svg, media_type="image/svg+xml", headers={
+        "Cache-Control": "public, max-age=86400",  # 24h — code + cert are immutable
+    })
+
+
 @cert_router.get("/{cert_id}/pdf")
 def download_certificate_pdf(
     cert_id: int, request: Request, db: Session = Depends(get_db),
@@ -261,6 +325,66 @@ def learning_streak(
     `{current_streak, longest_streak, active_today, last_active_date}`."""
     from services.gamification_service import GamificationService
     return GamificationService(db).compute_learning_streak(current.id)
+
+
+@gam_router.get("/streak-leaderboard")
+def streak_leaderboard(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Iter 28 — Org-wide "top streaks this week" leaderboard.
+
+    Ranks the top `limit` learners in the caller's organisation by
+    current streak (descending). Ties break on longest_streak, then
+    user id. Includes the caller's own rank at the bottom even if
+    they're outside the top N.
+
+    Cheap enough to compute on the fly for orgs up to a few hundred
+    active users (SlideView + FlashcardReview joins are already
+    indexed). For much larger orgs, pre-computing in a nightly job
+    would be advisable — but iter-28 scope is small orgs.
+    """
+    from services.gamification_service import GamificationService
+    limit = max(1, min(limit, 50))
+    gam = GamificationService(db)
+    users = db.query(User).filter(
+        User.organization_id == current.organization_id,
+        User.is_active == True,  # noqa: E712
+    ).all()
+
+    entries = []
+    for u in users:
+        try:
+            s = gam.compute_learning_streak(u.id)
+        except Exception:
+            continue
+        if s["current_streak"] <= 0 and s["longest_streak"] <= 0:
+            continue  # skip users with no activity — cleaner UX
+        entries.append({
+            "user_id": u.id,
+            "name": u.name or u.email.split("@")[0],
+            "avatar_url": None,  # Iter 29 backlog — org-scoped avatars
+            "current_streak": s["current_streak"],
+            "longest_streak": s["longest_streak"],
+            "active_today": s["active_today"],
+            "is_you": u.id == current.id,
+        })
+    entries.sort(key=lambda e: (
+        -e["current_streak"], -e["longest_streak"], e["user_id"],
+    ))
+
+    top = entries[:limit]
+    caller_rank = next(
+        (i + 1 for i, e in enumerate(entries) if e["user_id"] == current.id),
+        None,
+    )
+    return {
+        "top": top,
+        "your_rank": caller_rank,
+        "your_entry": next((e for e in entries if e["is_you"]), None),
+        "total_participants": len(entries),
+    }
 
 
 # ── Analytics (admin) ────────────────────────────────────────────────

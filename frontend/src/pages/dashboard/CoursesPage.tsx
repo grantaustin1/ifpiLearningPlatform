@@ -7,6 +7,7 @@ import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Lo
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { LearningStreakBadge } from 'components/LearningStreakBadge'
+import { StreakLeaderboardTrigger } from 'components/StreakLeaderboardModal'
 
 export default function CoursesPage() {
   const qc = useQueryClient()
@@ -59,6 +60,7 @@ export default function CoursesPage() {
           <div className="flex items-center gap-3 mt-1">
             <p className="text-slate-500">{isLoading ? 'Loading…' : `${courses.length} courses available`}</p>
             {!isAdmin && <LearningStreakBadge />}
+            {!isAdmin && <StreakLeaderboardTrigger />}
           </div>
         </div>
         {isAdmin && (
