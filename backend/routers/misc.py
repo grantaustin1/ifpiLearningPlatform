@@ -274,6 +274,187 @@ def bulk_revoke_certificates(
     }
 
 
+class BulkUnrevokeIn(BaseModel):
+    certificate_ids: list[int]
+
+
+@cert_router.post("/bulk-unrevoke")
+def bulk_unrevoke_certificates(
+    body: BulkUnrevokeIn,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 31 — Bulk lift-revocation. Skips currently-active certs
+    (idempotent) and cross-tenant certs. Emits `certificate.unrevoked`
+    webhook per newly-restored cert."""
+    from models import CertificateRevocationEvent
+    from services.webhook_service import emit_safely
+    to_emit = []
+    results = []
+    for cid in body.certificate_ids:
+        c = db.query(Certificate).filter(Certificate.id == cid).first()
+        if not c:
+            results.append({"id": cid, "status": "not_found"}); continue
+        if c.user and c.user.organization_id != current.organization_id:
+            results.append({"id": cid, "status": "forbidden"}); continue
+        if not c.revoked_at:
+            results.append({"id": cid, "status": "already_active"}); continue
+        c.revoked_at = None
+        c.revoked_reason = None
+        db.add(CertificateRevocationEvent(
+            certificate_id=c.id, actor_user_id=current.id,
+            action="UNREVOKE", reason=None,
+        ))
+        to_emit.append(c)
+        results.append({"id": cid, "status": "unrevoked"})
+    db.commit()
+    for c in to_emit:
+        emit_safely(db, current.organization_id, "certificate.unrevoked", {
+            "certificate_id": c.id, "code": c.code, "user_id": c.user_id,
+            "type": c.type, "actor_user_id": current.id, "bulk": True,
+        })
+    return {
+        "unrevoked_count": sum(1 for r in results if r["status"] == "unrevoked"),
+        "skipped_count": sum(1 for r in results if r["status"] != "unrevoked"),
+        "results": results,
+    }
+
+
+class BulkEmailIn(BaseModel):
+    certificate_ids: list[int]
+
+
+@cert_router.post("/bulk-email")
+def bulk_email_certificates(
+    body: BulkEmailIn,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 31 — Bulk re-email certificate download links to owners.
+    Useful for resending after infra issues or re-notifying learners
+    of a re-issued cert. Uses standard outbox pipeline."""
+    from models import User as UserModel, LiveSession, Organization
+    from services.mail_service import MailService
+    mail = MailService(db)
+    org = db.query(Organization).filter(
+        Organization.id == current.organization_id
+    ).first()
+    org_name = org.name if org else "IFPI Learning"
+    queued = 0
+    results = []
+    for cid in body.certificate_ids:
+        c = db.query(Certificate).filter(Certificate.id == cid).first()
+        if not c:
+            results.append({"id": cid, "status": "not_found"}); continue
+        if c.user and c.user.organization_id != current.organization_id:
+            results.append({"id": cid, "status": "forbidden"}); continue
+        if c.revoked_at:
+            results.append({"id": cid, "status": "revoked_skipped"}); continue
+        user = c.user
+        if not user or not user.email:
+            results.append({"id": cid, "status": "no_email"}); continue
+        title = (c.course.title if c.course
+                 else (db.query(LiveSession).filter(
+                     LiveSession.id == c.live_session_id).first().title
+                     if c.live_session_id else "IFPI Certificate"))
+        try:
+            mail.send_email(
+                to_email=user.email, to_name=user.name,
+                subject=f"Your certificate for {title}",
+                body_html=f'<p>Hi {user.name or "there"},</p>'
+                          f'<p>Here is your certificate for <strong>{title}</strong>.'
+                          f'</p><p><a href="/api/certificates/{c.id}/pdf">'
+                          f'Download PDF</a> · <a href="/verify/{c.code}">'
+                          f'Verify link</a></p><p>— {org_name}</p>',
+                body_text=f"Hi {user.name or 'there'},\n\n"
+                          f"Here is your certificate for {title}.\n"
+                          f"Download PDF: /api/certificates/{c.id}/pdf\n"
+                          f"Verify: /verify/{c.code}\n\n— {org_name}",
+                template="cert_resend",
+                organization_id=current.organization_id, user_id=user.id,
+            )
+            queued += 1
+            results.append({"id": cid, "status": "queued"})
+        except Exception:  # pragma: no cover
+            results.append({"id": cid, "status": "send_failed"})
+    db.commit()
+    return {"queued_count": queued, "results": results}
+
+
+class BulkZipIn(BaseModel):
+    certificate_ids: list[int]
+
+
+@cert_router.post("/bulk-zip")
+def bulk_zip_certificates(
+    body: BulkZipIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for
+    admin download. Skips revoked + cross-tenant certs silently. Caps
+    at 100 to prevent runaway memory usage."""
+    import io, zipfile
+    from models import Organization, LiveSession
+    from services.pdf_certificate_service import render_certificate
+    if len(body.certificate_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 certs per bulk zip")
+    base = str(request.base_url).rstrip("/")
+    buf = io.BytesIO()
+    added = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for cid in body.certificate_ids:
+            c = db.query(Certificate).filter(Certificate.id == cid).first()
+            if not c or c.revoked_at:
+                continue
+            if c.user and c.user.organization_id != current.organization_id:
+                continue
+            org = db.query(Organization).filter(
+                Organization.id == c.user.organization_id).first() if c.user else None
+            if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
+                sess = db.query(LiveSession).filter(
+                    LiveSession.id == c.live_session_id).first()
+                title = sess.title if sess else "Live Session"
+                cert_type = "Live Session Attendance"
+            else:
+                title = c.course.title if c.course else "IFPI Course"
+                cert_type = "Course Completion" if c.type == "COURSE_COMPLETION" \
+                    else c.type.replace("_", " ").title()
+            try:
+                pdf = render_certificate(
+                    recipient_name=c.user.name or c.user.email,
+                    course_title=title,
+                    certificate_code=c.code,
+                    issued_at=c.issued_at,
+                    verify_url=f"{base}/verify/{c.code}",
+                    score=c.score,
+                    cert_type=cert_type,
+                    organisation_name=org.name if org else "IFPI Learning",
+                    organisation_logo_url=org.logo_url if org else None,
+                    accent_color=(org.cert_accent_color or org.primary_color or "#6366f1")
+                                 if org else "#6366f1",
+                    signature_text=org.cert_signature_text if org else None,
+                    signature_image_url=org.cert_signature_image_url if org else None,
+                    footer_text=org.cert_footer_text if org else None,
+                )
+                safe_name = (c.user.name or c.user.email or f"cert-{c.id}").replace("/", "_")
+                zf.writestr(f"{safe_name}-{c.code[:8]}.pdf", pdf)
+                added += 1
+            except Exception:
+                continue
+    if added == 0:
+        raise HTTPException(status_code=400, detail="No certs to bundle")
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="certificates-{added}.zip"',
+            "X-Certs-Bundled": str(added),
+        },
+    )
+
+
 @cert_router.get("/admin-list")
 def admin_list_certificates(
     q: str | None = None,
@@ -608,6 +789,35 @@ def my_gamification(db: Session = Depends(get_db),
         User.organization_id == current.organization_id, User.is_active.is_(True),
     ).count()
     return {"points": user.points or 0, "badges": badges, "rank": rank, "total": total}
+
+
+@gam_router.get("/preferences")
+def get_gamification_preferences(
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Iter 31 — per-user gamification preferences."""
+    user = db.query(User).filter(User.id == current.id).first()
+    return {
+        "streak_digest_enabled": bool(user.streak_digest_enabled)
+        if user else True,
+    }
+
+
+@gam_router.patch("/preferences")
+def update_gamification_preferences(
+    body: dict,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Iter 31 — toggle weekly streak digest opt-in/out."""
+    user = db.query(User).filter(User.id == current.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if "streak_digest_enabled" in body:
+        user.streak_digest_enabled = bool(body["streak_digest_enabled"])
+    db.commit()
+    return {"streak_digest_enabled": bool(user.streak_digest_enabled)}
 
 
 @gam_router.get("/learning-streak")

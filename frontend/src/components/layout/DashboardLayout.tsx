@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -44,6 +44,7 @@ const LEARNER_NAV = [
   { href: '/live-sessions', label: 'Live sessions',  icon: Video },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: Trophy },
   { href: '/billing',       label: 'Subscriptions',  icon: CreditCard },
+  { href: '/preferences',   label: 'Preferences',    icon: SlidersHorizontal },
 ]
 
 export default function DashboardLayout() {

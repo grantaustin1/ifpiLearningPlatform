@@ -286,6 +286,27 @@ def start_scheduler() -> None:
         id="streak_leaderboard_weekly_digest", max_instances=1, coalesce=True,
         misfire_grace_time=86400,
     )
+    # Iter 31 — Certificate revocation compliance auto-report.
+    # Configurable cadence via COMPLIANCE_REPORT_CADENCE env var
+    # (daily | weekly | monthly). Recipient is COMPLIANCE_OFFICER_EMAIL.
+    # No-op if the recipient env var is empty.
+    import os as _os
+    _cadence = (_os.environ.get("COMPLIANCE_REPORT_CADENCE")
+                or "weekly").strip().lower()
+    from services.compliance_report_worker import _tick as _compliance_tick
+    if _cadence == "daily":
+        sched.add_job(_compliance_tick, "cron", hour=7, minute=0,
+                      id="compliance_report", max_instances=1,
+                      coalesce=True, misfire_grace_time=86400)
+    elif _cadence == "monthly":
+        sched.add_job(_compliance_tick, "cron", day=1, hour=7, minute=0,
+                      id="compliance_report", max_instances=1,
+                      coalesce=True, misfire_grace_time=86400 * 3)
+    else:  # weekly default
+        sched.add_job(_compliance_tick, "cron", day_of_week="mon",
+                      hour=7, minute=0, id="compliance_report",
+                      max_instances=1, coalesce=True,
+                      misfire_grace_time=86400)
     sched.start()
     _scheduler = sched
     logger.info("Outbox worker scheduled every %ss (max %s attempts), "
