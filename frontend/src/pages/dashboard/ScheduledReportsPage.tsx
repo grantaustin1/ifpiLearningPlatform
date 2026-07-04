@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { Mail, Plus, Trash2, Play, Loader2, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from 'components/ConfirmDialog'
 
 type Report = {
   id: number
@@ -28,6 +29,7 @@ const KINDS = [
 const CADENCES = ['daily', 'weekly', 'monthly']
 
 export default function ScheduledReportsPage() {
+  const confirm = useConfirm()
   const [items, setItems] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [kind, setKind] = useState('members_needing_action')
@@ -79,7 +81,11 @@ export default function ScheduledReportsPage() {
   }
 
   const remove = async (id: number) => {
-    if (!window.confirm('Delete this schedule?')) return
+    if (!(await confirm({
+      title: 'Delete scheduled report?',
+      description: 'Recipients will stop receiving future emails immediately.',
+      confirmLabel: 'Delete', variant: 'danger',
+    }))) return
     try {
       await api.delete(`/admin/scheduled-reports/${id}`)
       await load()

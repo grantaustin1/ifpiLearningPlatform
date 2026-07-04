@@ -4,8 +4,10 @@ import { api } from 'lib/api'
 import { ArrowLeft, Save, Send, EyeOff, Trash2, Plus, X, Layers, BookOpen, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { useConfirm } from 'components/ConfirmDialog'
 
 export default function LearningPathEditPage() {
+  const confirm = useConfirm()
   const { id } = useParams()
   const nav = useNavigate()
   const [path, setPath] = useState<any>(null)
@@ -67,7 +69,11 @@ export default function LearningPathEditPage() {
   }
 
   const deletePath = async () => {
-    if (!window.confirm('Delete this learning path? This cannot be undone.')) return
+    if (!(await confirm({
+      title: 'Delete learning path?',
+      description: 'This cannot be undone. Enrolments and progress will be lost.',
+      confirmLabel: 'Delete', variant: 'danger',
+    }))) return
     await api.delete(`/learning-paths/${id}`)
     toast.success('Deleted')
     nav('/learning-paths')

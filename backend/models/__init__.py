@@ -334,6 +334,9 @@ class Certificate(Base):
     code = Column(String(40), unique=True, nullable=False, default=_cuid)
     score = Column(Float, nullable=True)
     issued_at = Column(DateTime, default=_utcnow)
+    # Iter 29 — Revocation
+    revoked_at = Column(DateTime, nullable=True, index=True)
+    revoked_reason = Column(String(255), nullable=True)
 
     user = relationship("User", back_populates="certificates")
     course = relationship("Course", back_populates="certificates")

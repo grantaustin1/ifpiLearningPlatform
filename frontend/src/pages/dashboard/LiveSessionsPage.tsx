@@ -6,6 +6,7 @@ import {
   Video, Calendar, Clock, Users, Plus, XCircle, Check, Download,
   ExternalLink, Trash2, Loader2, RotateCcw, UserCheck,
 } from 'lucide-react'
+import { useConfirm } from 'components/ConfirmDialog'
 import { SubscriptionModal, SubscriptionKindPicker } from './live-sessions/SubscriptionModal'
 import { CreateSessionModal } from './live-sessions/CreateSessionModal'
 import { AttendanceModal } from './live-sessions/AttendanceModal'
@@ -57,6 +58,7 @@ function relTime(iso: string): string {
 export default function LiveSessionsPage() {
   const { hasRole } = useAuth()
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
+  const confirm = useConfirm()
   const [sessions, setSessions] = useState<LiveSession[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -87,6 +89,18 @@ export default function LiveSessionsPage() {
           : `Series RSVP cancelled (${r.data.series_count} sessions)`)
       } else {
         toast.success(r.data.status === 'RSVP' ? 'You\u2019re RSVP\u2019d' : 'RSVP cancelled')
+      }
+      // Iter 29 — Cohort auto-enrol from RSVP: surface the enrolment
+      // as a distinct celebratory toast so the learner knows the
+      // course is now on their dashboard.
+      if (r.data.auto_enrolled && r.data.course_id) {
+        toast.success('\u2728 You\u2019ve also been enrolled in the course', {
+          action: {
+            label: 'Open',
+            onClick: () => { window.location.href = `/learn/${r.data.course_id}` },
+          },
+          duration: 6000,
+        })
       }
       load()
     } catch (e: any) {
@@ -119,9 +133,12 @@ export default function LiveSessionsPage() {
   }
 
   const rotateSubscriptionSecret = async () => {
-    if (!window.confirm(
-      'Rotate the subscription secret? All existing calendar subscription URLs for your organisation will stop working. Users will need to re-copy their fresh URL.'
-    )) return
+    if (!(await confirm({
+      title: 'Rotate subscription secret?',
+      description: 'All existing calendar subscription URLs for your organisation will stop working. Users will need to re-copy their fresh URL.',
+      confirmLabel: 'Rotate',
+      variant: 'danger',
+    }))) return
     try {
       const r = await api.post('/live-sessions/subscribe-url/rotate')
       toast.success(`Secret rotated to v${r.data.new_version} — old URLs revoked`)
@@ -164,11 +181,20 @@ export default function LiveSessionsPage() {
     const inSeries = s.recurrence_rule || s.parent_series_id
     let cascade = false
     if (inSeries) {
-      const choice = window.confirm(
-        'This session is part of a recurring series. OK = delete the whole series, Cancel = delete only this occurrence.'
-      )
+      const choice = await confirm({
+        title: 'Delete recurring session?',
+        description: 'This session is part of a recurring series. Delete the WHOLE series (all future occurrences) or ONLY this occurrence?',
+        confirmLabel: 'Delete whole series',
+        cancelLabel: 'Delete this occurrence',
+        variant: 'danger',
+      })
       cascade = choice
-    } else if (!window.confirm('Delete this session?')) {
+    } else if (!(await confirm({
+      title: 'Delete this session?',
+      description: 'The session and any RSVPs will be removed. This cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    }))) {
       return
     }
     try {

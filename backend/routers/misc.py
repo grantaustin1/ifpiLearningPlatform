@@ -97,7 +97,57 @@ def my_certificates(db: Session = Depends(get_db),
         id=c.id, code=c.code, type=c.type,
         course_title=_title(c),
         issued_at=c.issued_at, score=c.score,
+        revoked_at=c.revoked_at, revoked_reason=c.revoked_reason,
     ) for c in rows]
+
+
+@cert_router.post("/{cert_id}/revoke")
+def revoke_certificate(
+    cert_id: int,
+    body: dict | None = None,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 29 — Revoke a certificate. Requires ADMIN role. Idempotent
+    (re-revoke updates reason but doesn't error). Setting `revoked_at`
+    flips the public verify/share pages to a "REVOKED" state so
+    LinkedIn/Twitter/etc. refresh their link previews to show
+    invalidation.
+
+    Body: {"reason": "..."} — optional. Kept concise (<=255 chars)."""
+    c = db.query(Certificate).filter(Certificate.id == cert_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    if c.user and c.user.organization_id != current.organization_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    reason = None
+    if body and isinstance(body.get("reason"), str):
+        reason = body["reason"][:255]
+    from datetime import datetime as _dt, timezone as _tz
+    c.revoked_at = _dt.now(_tz.utc)
+    c.revoked_reason = reason
+    db.commit()
+    return {"revoked": True, "code": c.code, "revoked_at": c.revoked_at,
+            "reason": reason}
+
+
+@cert_router.post("/{cert_id}/unrevoke")
+def unrevoke_certificate(
+    cert_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 29 — Clear a revocation flag. In case of a mistaken
+    revoke — same tenant check applies."""
+    c = db.query(Certificate).filter(Certificate.id == cert_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    if c.user and c.user.organization_id != current.organization_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    c.revoked_at = None
+    c.revoked_reason = None
+    db.commit()
+    return {"revoked": False, "code": c.code}
 
 
 @cert_router.get("/verify/{code}")
@@ -113,10 +163,14 @@ def verify_certificate(code: str, db: Session = Depends(get_db)):
         if sess:
             title = sess.title
     return {
-        "valid": True, "code": c.code, "type": c.type,
+        "valid": not bool(c.revoked_at),
+        "code": c.code, "type": c.type,
         "recipient_name": c.user.name if c.user else None,
         "course_title": title,
         "issued_at": c.issued_at,
+        # Iter 29 — revocation state (nulls when not revoked)
+        "revoked_at": c.revoked_at,
+        "revoked_reason": c.revoked_reason,
     }
 
 
@@ -151,6 +205,18 @@ def certificate_og_image(code: str, db: Session = Depends(get_db)):
     r = escape(_fit(recipient, 40))
     o = escape(_fit(org_name, 40))
 
+    # Iter 29 — Revoked overlay
+    revoked_overlay = ""
+    if c.revoked_at:
+        revoked_overlay = """
+  <g opacity="0.92">
+    <rect x="0" y="200" width="1200" height="120" fill="#dc2626" />
+    <text x="600" y="278" text-anchor="middle"
+          font-family="system-ui, -apple-system, Segoe UI, sans-serif"
+          font-size="72" font-weight="800" fill="white"
+          letter-spacing="8">REVOKED</text>
+  </g>"""
+
     svg = f"""<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
@@ -178,9 +244,13 @@ def certificate_og_image(code: str, db: Session = Depends(get_db)):
         font-size="18" fill="#94a3b8">Awarded by {o}</text>
   <text x="600" y="530" text-anchor="middle" font-family="ui-monospace, monospace"
         font-size="14" fill="#cbd5e1">verify: {escape(code)}</text>
+{revoked_overlay}
 </svg>"""
     return Response(svg, media_type="image/svg+xml", headers={
-        "Cache-Control": "public, max-age=86400",  # 24h — code + cert are immutable
+        # Iter 29 — revoked certs: shorter cache so LinkedIn re-fetches
+        # sooner and reflects the revocation state in previews.
+        "Cache-Control": "public, max-age=300" if c.revoked_at
+                         else "public, max-age=86400",
     })
 
 
@@ -201,6 +271,11 @@ def download_certificate_pdf(
         raise HTTPException(status_code=404, detail="Certificate not found")
     if c.user_id != current.id and not current.has_any_role({"ADMIN", "SUPER_ADMIN"}):
         raise HTTPException(status_code=403, detail="Forbidden")
+    # Iter 29 — Revoked certs cannot be re-downloaded (410 Gone)
+    # unless the caller is admin (admins may need to inspect the
+    # original for audit).
+    if c.revoked_at and not current.has_any_role({"ADMIN", "SUPER_ADMIN"}):
+        raise HTTPException(status_code=410, detail="Certificate has been revoked")
     base = str(request.base_url).rstrip("/")
     verify_url = f"{base}/verify/{c.code}"
     org = db.query(Organization).filter(Organization.id == c.user.organization_id).first() if c.user else None

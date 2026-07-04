@@ -18,6 +18,7 @@ engines and social crawlers won't respect an `/api/sitemap.xml`.
 from __future__ import annotations
 
 import html
+import os
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
@@ -37,6 +38,15 @@ router = APIRouter(prefix="/api/seo", tags=["SEO"])
 
 # ─────────────────────────── Sitemap helpers ─────────────────────────
 def _base(req: Request) -> str:
+    """Iter 29 — Prefer the `PUBLIC_BASE_URL` env var so preview
+    environments emit the public preview hostname (e.g.
+    `https://foo.preview.emergentagent.com`) rather than the K8s
+    cluster-internal hostname derived from the ingress `Host` header.
+    Falls back to `request.base_url` in dev/prod when the env var is
+    unset."""
+    override = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if override:
+        return override
     return str(req.base_url).rstrip("/")
 
 
@@ -214,10 +224,34 @@ def cert_share(code: str, request: Request, db: Session = Depends(get_db)):
     # Pre-baked SVG OG image (light-weight, always renders)
     og_image = f"{base}/api/certificates/verify/{code}/og-image.svg"
 
+    # Iter 29 — Revoked certs get a different title/desc so LinkedIn's
+    # link preview reflects the invalidation on next crawl.
+    revoked = c.revoked_at is not None
+    if revoked:
+        header_title = f"[REVOKED] {recipient} · {title}"
+        header_desc = f"This certificate has been revoked by {org_name}"
+    else:
+        header_title = f"{recipient} · {title}"
+        header_desc = f"Awarded by {org_name}"
+
     html_body = _og_meta(
-        title=f"{recipient} · {title}",
-        description=f"Awarded by {org_name}",
+        title=header_title,
+        description=header_desc,
         image_url=og_image,
         url=share_url,
     ).replace("{code}", html.escape(code))
-    return Response(html_body, media_type="text/html")
+    # Inject a red REVOKED ribbon at the top of the human-visible card
+    if revoked:
+        html_body = html_body.replace(
+            '<div class="card">',
+            '<div class="card" style="border:2px solid #dc2626;position:relative;">'
+            '<div style="position:absolute;top:-1px;left:-1px;right:-1px;'
+            'background:#dc2626;color:white;font-weight:700;padding:8px;'
+            'font-size:13px;letter-spacing:2px;'
+            'border-radius:22px 22px 0 0;">CERTIFICATE REVOKED</div>'
+            '<div style="height:36px"></div>',
+            1,
+        )
+    return Response(html_body, media_type="text/html", headers={
+        "Cache-Control": "public, max-age=300" if revoked else "public, max-age=3600",
+    })
