@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { X, UserCheck, UserX } from 'lucide-react'
 import { api } from 'lib/api'
@@ -36,7 +36,7 @@ export function AttendanceModal({ sessionId, onClose }: {
   const [users, setUsers] = useState<Record<number, { name: string; email: string }>>({})
   const [saving, setSaving] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const r = await api.get(`/live-sessions/${sessionId}`)
     setSession(r.data)
     const ids: number[] = (r.data.rsvps || []).map((x: Rsvp) => x.user_id)
@@ -48,8 +48,8 @@ export function AttendanceModal({ sessionId, onClose }: {
         setUsers(map)
       } catch { /* fallback: show IDs */ }
     }
-  }
-  useEffect(() => { load() }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId])
+  useEffect(() => { load() }, [load])
 
   const mark = async (userId: number, status: 'ATTENDED' | 'NO_SHOW') => {
     setSaving(true)
@@ -70,6 +70,32 @@ export function AttendanceModal({ sessionId, onClose }: {
     } finally { setSaving(false) }
   }
 
+  // Iter 28 — Bulk "Mark all as ATTENDED" quick action. Skips learners
+  // already marked ATTENDED so idempotent re-clicks don't re-fire.
+  const markAllAttended = async () => {
+    const targets = rsvps.filter(r => r.status !== 'ATTENDED').map(r => r.user_id)
+    if (targets.length === 0) {
+      toast.info('Everyone is already marked ATTENDED')
+      return
+    }
+    if (!window.confirm(`Mark ${targets.length} learner${targets.length === 1 ? '' : 's'} as ATTENDED?`)) return
+    setSaving(true)
+    try {
+      const r = await api.post(`/live-sessions/${sessionId}/mark-attendance`, {
+        user_ids: targets, status: 'ATTENDED',
+      })
+      const issued = r.data?.attendance_certs_issued ?? 0
+      toast.success(
+        issued > 0
+          ? `${r.data.marked} marked · ${issued} certificate${issued === 1 ? '' : 's'} issued`
+          : `${r.data.marked} marked as ATTENDED`
+      )
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Bulk mark failed')
+    } finally { setSaving(false) }
+  }
+
   const rsvps = useMemo(() => {
     return (session?.rsvps || []).filter(r => r.status !== 'CANCELLED')
   }, [session])
@@ -84,6 +110,19 @@ export function AttendanceModal({ sessionId, onClose }: {
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" data-testid="close-attendance"><X className="h-4 w-4" /></button>
         </div>
+        {rsvps.length > 0 && (
+          <div className="px-5 pt-3 pb-2 border-b border-slate-100 flex justify-end">
+            <button
+              onClick={markAllAttended}
+              disabled={saving}
+              data-testid="mark-all-attended-btn"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg disabled:opacity-50"
+              title="Mark every RSVP'd learner as ATTENDED (auto-issues certificates)"
+            >
+              <UserCheck className="h-3.5 w-3.5" /> Mark all as ATTENDED
+            </button>
+          </div>
+        )}
         <div className="p-5 max-h-[60vh] overflow-y-auto">
           {rsvps.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-8">No RSVPs yet.</p>

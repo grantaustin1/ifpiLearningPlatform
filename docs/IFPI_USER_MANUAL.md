@@ -357,9 +357,9 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 740 |
+| `routers/live_sessions.py` | 797 |
 | `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 533 |
+| `routers/misc.py` | 657 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -367,10 +367,11 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 499 |
+| `routers/seo.py` | 223 |
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **10100** |
+| **Total** | **10504** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -571,6 +572,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/certificates` | GET |  |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
+| `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
 | `/api/courses` | GET |  |
 | `/api/courses` | POST |  |
@@ -607,6 +609,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
+| `/api/gamification/streak-leaderboard` | GET | Iter 28 — Org-wide "top streaks this week" leaderboard. |
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
 | `/api/invitations/{token}/accept` | POST |  |
@@ -662,6 +665,10 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/rich-text/sanitize` | POST | Server-side HTML sanitizer for the rich-text editor preview. |
 | `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
 | `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
+| `/api/seo/certificates/share/{code}` | GET | Iter 28 — Public shareable brag-card for a certificate. |
+| `/api/seo/robots.txt` | GET |  |
+| `/api/seo/sitemap-{org_id}.xml` | GET |  |
+| `/api/seo/sitemap.xml` | GET |  |
 | `/api/slides/{slide_id}/comments` | GET |  |
 | `/api/slides/{slide_id}/comments` | POST |  |
 | `/api/slides/{slide_id}/comments/{comment_id}` | DELETE |  |
@@ -679,7 +686,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **234** registered API endpoints._
+_Total: **240** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

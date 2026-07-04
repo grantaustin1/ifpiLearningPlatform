@@ -34,6 +34,10 @@ def register_all(app: FastAPI) -> None:
     app.include_router(misc.billing_router)
     app.include_router(misc.catalog_router)
 
+    # Iter 28 — Public SEO endpoints (no /api prefix)
+    from routers import seo
+    app.include_router(seo.router)
+
     # ── Onboarding: invitations + lead capture + org/outbox ──────────
     from routers import invitations, extras
     app.include_router(invitations.admin_router)
