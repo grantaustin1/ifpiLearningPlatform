@@ -1046,3 +1046,30 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - **Cloudflare edge prepends its 'Managed Content' block to /robots.txt** — our IFPI block correctly appended at bottom; crawlers still discover the Sitemap directive. Non-blocking.
 - **Sitemap URLs use the cluster-internal hostname** (derived from incoming Host header). In production the public host resolves correctly. Consider forcing `PUBLIC_BASE_URL` env override for preview environments.
 - **`window.confirm()` in bulk-mark UI** — functional but not on-brand. Consider a shadcn `AlertDialog` swap in a future polish pass.
+
+
+## Iteration 29 — Feb 2026 (Auto-enrol from RSVP + PUBLIC_BASE_URL + Confirm dialog + Cert revocation)
+
+### Sprint deliverables (all shipped + certified — 100% pass, 60 tests green)
+- ✅ **Cohort auto-enrol from live-session RSVP** — When a learner RSVPs to a session tied to a course they're not yet enrolled in, `toggle_rsvp` inserts an `Enrollment` row inline and returns `{auto_enrolled: true, course_id: N}`. Idempotent (2nd RSVP → `auto_enrolled: false`). Series-wide RSVP applies the same logic to the series-head course. Frontend fires a distinct celebratory toast with an 'Open' action button linking to `/learn/{courseId}`.
+- ✅ **PUBLIC_BASE_URL env override** — `routers/seo.py::_base()` now prefers `os.environ.get('PUBLIC_BASE_URL')` before falling back to `request.base_url`. Preview env sets it to the public URL so sitemap `<loc>` entries + robots.txt `Sitemap:` directive show crawler-friendly URLs (not cluster-internal hostnames).
+- ✅ **Radix-based ConfirmDialog replacing all window.confirm()** — new `components/ConfirmDialog.tsx` with a Promise-returning `useConfirm()` hook. Mounted at app root via `<ConfirmDialogProvider>` in `index.tsx`. 12 pages migrated: `AttendanceModal`, `LiveSessionsPage` (rotate secret, delete session, delete series), `ImportsPage` (rollback), `ApiTokensPage` (revoke, delete), `MindMapPage` (clear layout), `CourseEditPage` (restore version, clear narration), `FlashcardsAuthoringPage` (delete flashcard), `LearningPathEditPage` (delete), `WebhooksPage` (delete), `BadgeTiersPage` (delete tier), `ScheduledReportsPage` (delete). All use consistent testids: `confirm-dialog`, `confirm-dialog-title`, `confirm-dialog-description`, `confirm-dialog-confirm`, `confirm-dialog-cancel`.
+- ✅ **UX Improvement: Certificate revocation with instant social invalidation** — `POST /api/certificates/{id}/revoke` (admin only, body `{reason}`) sets `revoked_at + revoked_reason`. Verify endpoint returns `valid=false + revoked_at + revoked_reason`. Learner PDF download returns `410 Gone`; admin still gets 200 for audit. `POST /unrevoke` restores. Share HTML shows `[REVOKED]` in `<title>` + og:title + red ribbon banner in body → LinkedIn/Twitter refresh previews on next crawl. OG SVG renders a red `REVOKED` overlay band. Frontend admin sees `cert-revoke-{id}` + `cert-unrevoke-{id}` buttons; revoked certs render `cert-revoked-banner-{id}` with red border + reduced opacity.
+
+### Tests
+- 8 new iter-29 tests (`test_iteration29_sprint.py`) — all pass
+- Combined regression: 60/60 pass across iter20/25/26/27/28/29
+
+### Migration
+- `20260717_0900_e7f8a9b0c1d2_certificate_revocation.py` — adds `certificates.revoked_at (indexed)` + `certificates.revoked_reason`
+
+### Route inventory (new)
+- `POST /api/certificates/{id}/revoke` — admin revoke
+- `POST /api/certificates/{id}/unrevoke` — admin unrevoke
+
+### Critical fix during E2E validation
+- **ImportsPage.tsx missing import** — testing agent auto-fixed a dropped `import { api } from 'lib/api'` that would have black-screened the entire React app. Recommend adding `tsc --noEmit` to pre-commit / CI to catch this class of bug earlier.
+
+### Non-blocking notes
+- Unrevoke has NO confirmation dialog (by design — undo is non-destructive).
+- K8s ingress strips custom `Cache-Control` headers on all API responses — the revoked-cert 5-min cache TTL is best-effort. Doesn't affect functionality (LinkedIn/Twitter re-scrape on URL change).

@@ -3,21 +3,22 @@
 Prioritized backlog. Completed items live in `CHANGELOG.md`.
 
 ## P0 — Next up
-_Nothing currently blocking; iter-28 shipped 5 planned items + 1 UX
-improvement (shareable certificate brag card). Waiting on user for next
-sprint._
+_Nothing currently blocking; iter-29 shipped 3 planned items + 1 UX
+improvement (certificate revocation). Waiting on user for next sprint._
 
 ## P1 — High value
-- **Cohort auto-enrol from live-session RSVP** — reverse of Iter 24's
-  auto-RSVP; RSVP'ing to a live session in a course you're not enrolled
-  in should offer inline enrolment.
-- **`PUBLIC_BASE_URL` env override** — SEO sitemap URLs currently derive
-  from the incoming Host header. Force the public preview URL in the
-  preview env so crawlers see the same hostname the user sees.
-- **Bulk mark-attendance shadcn AlertDialog** — replace `window.confirm()`
-  with an on-brand confirmation modal.
-- **AlertDialog + toast polish** — audit all `window.confirm()` calls in
-  the frontend and swap to shadcn `AlertDialog`.
+- **`tsc --noEmit` pre-commit / CI check** — catch missing-import bugs
+  before they black-screen the app (see iter-29 ImportsPage.tsx
+  incident). Small config change; big safety net.
+- **Confirm dialog audit sweep** — verify no `window.confirm` remains
+  anywhere in the frontend (grep + fix).
+- **Revocation audit log** — track WHO revoked WHICH cert + WHEN in a
+  dedicated audit table so compliance teams can trace decisions.
+- **Cert revocation webhook event** — fire an outgoing webhook on
+  revoke/unrevoke so external HR systems + LinkedIn integrations can
+  sync in real-time.
+- **Streak-leaderboard weekly digest email** — currently only in-app;
+  a weekly "leaderboard" email would drive retention.
 
 ## P2 — Nice to have
 - **pgvector migration** for advanced RAG on AI Tutor. Spec in
