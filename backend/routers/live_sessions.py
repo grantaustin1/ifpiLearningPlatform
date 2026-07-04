@@ -396,6 +396,28 @@ def toggle_rsvp(session_id: int, series: bool = False,
 
 
 # ── Attendance ───────────────────────────────────────────────────────
+def _issue_attendance_cert(db: Session, user_id: int, session: LiveSession) -> Optional["Certificate"]:
+    """Iter 27 — Idempotent attendance-certificate issuance. Skips if
+    the user already has a cert for this session. Returns the new
+    Certificate or None."""
+    from models import Certificate  # local import to avoid cycles
+    existing = db.query(Certificate).filter(
+        Certificate.user_id == user_id,
+        Certificate.live_session_id == session.id,
+        Certificate.type == "LIVE_SESSION_ATTENDANCE",
+    ).first()
+    if existing:
+        return None
+    cert = Certificate(
+        user_id=user_id,
+        live_session_id=session.id,
+        course_id=session.course_id,  # optional back-link
+        type="LIVE_SESSION_ATTENDANCE",
+    )
+    db.add(cert); db.flush()
+    return cert
+
+
 @router.post("/{session_id}/mark-attendance")
 def mark_attendance(session_id: int, body: MarkAttendanceIn,
                     db: Session = Depends(get_db),
@@ -407,6 +429,7 @@ def mark_attendance(session_id: int, body: MarkAttendanceIn,
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
     marked = 0
+    certs_issued = 0
     for uid in body.user_ids:
         rsvp = db.query(LiveSessionRsvp).filter(
             LiveSessionRsvp.session_id == session_id,
@@ -419,8 +442,13 @@ def mark_attendance(session_id: int, body: MarkAttendanceIn,
         rsvp.status = body.status
         rsvp.attendance_marked_at = datetime.now(timezone.utc)
         marked += 1
+        # Iter 27 — Auto-issue attendance cert on ATTENDED (idempotent)
+        if body.status == "ATTENDED":
+            if _issue_attendance_cert(db, uid, s) is not None:
+                certs_issued += 1
     db.commit()
-    return {"marked": marked, "status": body.status}
+    return {"marked": marked, "status": body.status,
+            "attendance_certs_issued": certs_issued}
 
 
 # ── ICS export ───────────────────────────────────────────────────────

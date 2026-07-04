@@ -155,6 +155,8 @@ class User(Base):
     totp_secret_enc = Column(String(500), nullable=True)
     totp_enabled_at = Column(DateTime, nullable=True)
     totp_recovery_codes = Column(JSON, nullable=True, default=list)
+    # Iter 27 — streak-break nudge dedup (dont email twice for same lapse)
+    streak_nudge_last_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -325,6 +327,9 @@ class Certificate(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     exam_id = Column(Integer, ForeignKey("exams.id"), nullable=True)
+    # Iter 27 — attach cert to a live session for attendance certs
+    live_session_id = Column(Integer, ForeignKey("live_sessions.id"),
+                             nullable=True, index=True)
     type = Column(String(50), default="COURSE_COMPLETION")
     code = Column(String(40), unique=True, nullable=False, default=_cuid)
     score = Column(Float, nullable=True)

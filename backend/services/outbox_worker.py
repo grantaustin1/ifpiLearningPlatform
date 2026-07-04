@@ -267,6 +267,16 @@ def start_scheduler() -> None:
         id="test_debris_nightly_cleanup", max_instances=1, coalesce=True,
         misfire_grace_time=7200,
     )
+    # Iter 27 — Streak-break nudge every 6h. Idempotent via the
+    # streak_nudge_last_sent_at timestamp; runs are cheap (scans
+    # active users, computes streak, emits Notification rows only for
+    # ones that just broke a 3+ day streak).
+    from services.streak_nudge_worker import _tick as _streak_nudge_tick
+    sched.add_job(
+        _streak_nudge_tick, "interval", hours=6,
+        id="streak_break_nudge", max_instances=1, coalesce=True,
+        misfire_grace_time=3600,
+    )
     sched.start()
     _scheduler = sched
     logger.info("Outbox worker scheduled every %ss (max %s attempts), "

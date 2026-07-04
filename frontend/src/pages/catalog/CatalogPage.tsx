@@ -66,13 +66,28 @@ export default function CatalogPage() {
   const nav = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [org, setOrg] = useState<number | ''>('')
   const [sort, setSort] = useState<'newest' | 'price_asc' | 'price_desc' | 'most_enrolled'>('newest')
 
   const { data, isLoading } = useQuery<CatalogResponse>({
-    queryKey: ['catalog', search, category, sort],
+    queryKey: ['catalog', search, category, org, sort],
     queryFn: async () => (await api.get('/catalog', {
-      params: { q: search || undefined, category: category || undefined, sort, page_size: 24 },
+      params: {
+        q: search || undefined,
+        category: category || undefined,
+        org: org || undefined,
+        sort, page_size: 24,
+      },
     })).data,
+  })
+
+  // Iter 27 — Cross-tenant marketplace: list opted-in orgs for filter
+  const { data: orgs } = useQuery<Array<{
+    id: number; name: string; logo_url: string | null; course_count: number
+  }>>({
+    queryKey: ['catalog-organizations'],
+    queryFn: async () => (await api.get('/catalog/organizations')).data,
+    staleTime: 5 * 60_000,
   })
 
   const { data: featured } = useQuery<CatalogResponse>({
@@ -179,6 +194,16 @@ export default function CatalogPage() {
             <option value="">All categories</option>
             {(data?.categories || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
           </select>
+          {orgs && orgs.length > 1 && (
+            <select value={org} onChange={e => setOrg(e.target.value === '' ? '' : parseInt(e.target.value))}
+              data-testid="catalog-org-filter"
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">All publishers</option>
+              {orgs.map(o => (
+                <option key={o.id} value={o.id}>{o.name} ({o.course_count})</option>
+              ))}
+            </select>
+          )}
           <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="catalog-sort"
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="newest">Newest</option>

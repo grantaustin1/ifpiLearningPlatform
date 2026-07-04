@@ -80,22 +80,42 @@ def my_certificates(db: Session = Depends(get_db),
         rows = db.query(Certificate).filter(
             Certificate.user_id == current.id,
         ).order_by(Certificate.issued_at.desc()).all()
+    # Iter 27 — For attendance certs (LIVE_SESSION_ATTENDANCE), fold
+    # the session title into course_title so learner UIs show a
+    # meaningful label without a schema change.
+    from models import LiveSession
+    session_ids = [c.live_session_id for c in rows if c.live_session_id]
+    sessions = ({s.id: s for s in db.query(LiveSession).filter(
+        LiveSession.id.in_(session_ids)).all()} if session_ids else {})
+
+    def _title(c):
+        if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id in sessions:
+            return sessions[c.live_session_id].title
+        return c.course.title if c.course else None
+
     return [CertificateOut(
         id=c.id, code=c.code, type=c.type,
-        course_title=c.course.title if c.course else None,
+        course_title=_title(c),
         issued_at=c.issued_at, score=c.score,
     ) for c in rows]
 
 
 @cert_router.get("/verify/{code}")
 def verify_certificate(code: str, db: Session = Depends(get_db)):
+    from models import LiveSession
     c = db.query(Certificate).filter(Certificate.code == code).first()
     if not c:
         raise HTTPException(status_code=404, detail="Certificate not found")
+    # Iter 27 — attendance certs surface the session title
+    title = c.course.title if c.course else None
+    if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
+        sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
+        if sess:
+            title = sess.title
     return {
         "valid": True, "code": c.code, "type": c.type,
         "recipient_name": c.user.name if c.user else None,
-        "course_title": c.course.title if c.course else None,
+        "course_title": title,
         "issued_at": c.issued_at,
     }
 
@@ -105,8 +125,12 @@ def download_certificate_pdf(
     cert_id: int, request: Request, db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
 ):
-    """Generate a branded PDF for a certificate. Owner or admin only."""
-    from models import Organization
+    """Generate a branded PDF for a certificate. Owner or admin only.
+
+    Iter 27 — Attendance certs (type=LIVE_SESSION_ATTENDANCE) render
+    the session title as the "course" line and use "Live Session
+    Attendance" as the cert type label."""
+    from models import Organization, LiveSession
     from services.pdf_certificate_service import render_certificate
     c = db.query(Certificate).filter(Certificate.id == cert_id).first()
     if not c:
@@ -116,14 +140,24 @@ def download_certificate_pdf(
     base = str(request.base_url).rstrip("/")
     verify_url = f"{base}/verify/{c.code}"
     org = db.query(Organization).filter(Organization.id == c.user.organization_id).first() if c.user else None
+
+    # Resolve title + cert type label
+    if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
+        sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
+        title = sess.title if sess else "Live Session"
+        cert_type = "Live Session Attendance"
+    else:
+        title = c.course.title if c.course else "IFPI Course"
+        cert_type = "Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title()
+
     pdf = render_certificate(
         recipient_name=c.user.name or c.user.email,
-        course_title=c.course.title if c.course else "IFPI Course",
+        course_title=title,
         certificate_code=c.code,
         issued_at=c.issued_at,
         verify_url=verify_url,
         score=c.score,
-        cert_type="Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title(),
+        cert_type=cert_type,
         organisation_name=org.name if org else "IFPI Learning",
         organisation_logo_url=org.logo_url if org else None,
         accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
@@ -359,16 +393,43 @@ async def billing_webhook(request: Request, db: Session = Depends(get_db)):
 catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 
 
+@catalog_router.get("/organizations")
+def catalog_organizations(db: Session = Depends(get_db)):
+    """Iter 27 — Cross-tenant marketplace search: list opted-in
+    organizations with a public course. Powers the org-filter dropdown
+    on the marketplace catalog page."""
+    from models import Organization
+    from sqlalchemy import func
+    rows = (
+        db.query(
+            Organization.id, Organization.name, Organization.logo_url,
+            func.count(Course.id).label("course_count"),
+        )
+        .join(Course, Course.organization_id == Organization.id)
+        .filter(Organization.marketplace_opt_in == True)  # noqa: E712
+        .filter(Course.status == CourseStatus.PUBLISHED)
+        .group_by(Organization.id, Organization.name, Organization.logo_url)
+        .order_by(func.count(Course.id).desc(), Organization.name.asc())
+        .all()
+    )
+    return [
+        {"id": r.id, "name": r.name, "logo_url": r.logo_url,
+         "course_count": r.course_count}
+        for r in rows
+    ]
+
+
 @catalog_router.get("")
 def catalog(q: str | None = Query(None),
             category: str | None = Query(None),
+            org: int | None = Query(None, description="Filter by organization id (Iter 27)"),
             featured: bool = Query(False),
             sort: str = Query("newest", pattern="^(newest|price_asc|price_desc|most_enrolled)$"),
             page: int = Query(1, ge=1),
             page_size: int = Query(24, ge=1, le=100),
             db: Session = Depends(get_db)):
     from models import Organization, Enrollment
-    from sqlalchemy import func
+    from sqlalchemy import func, or_
     query = (
         db.query(Course)
         .join(Organization, Organization.id == Course.organization_id)
@@ -376,9 +437,18 @@ def catalog(q: str | None = Query(None),
         .filter(Organization.marketplace_opt_in == True)  # noqa: E712
     )
     if q:
-        query = query.filter(Course.title.ilike(f"%{q}%"))
+        # Iter 27 — Cross-tenant search: match on course title
+        # OR organization name so a search for "IFPI" surfaces
+        # courses published by "IFPI Academy" etc.
+        like = f"%{q}%"
+        query = query.filter(or_(
+            Course.title.ilike(like),
+            Organization.name.ilike(like),
+        ))
     if category:
         query = query.filter(Course.category == category)
+    if org is not None:
+        query = query.filter(Course.organization_id == org)
     total = query.count()
     if featured:
         # Featured = top 6 by enrollment count (SQL-side)
