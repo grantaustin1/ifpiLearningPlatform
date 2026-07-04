@@ -45,19 +45,22 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 7. **Documentation drift protection** — every new endpoint must appear in
    `IFPI_USER_MANUAL.md` after running `python backend/scripts/build_docs.py`.
 
-## Health snapshot (2026-02, post iter-27)
-- Backend routes: 250+ endpoints (auto-indexed in the manual).
-- Frontend: React 19, 60+ pages/components.
+## Health snapshot (2026-02, post iter-31)
+- Backend routes: 260+ endpoints (auto-indexed in the manual).
+- Frontend: React 19, 65+ pages/components.
 - Background workers: outbox drain, webhook retry, cohort celebrations,
   weekly digest, live-session reminders, nightly test-debris cleanup,
-  streak-break nudge (Iter 27), scheduled reports.
-- Storage: SQLite (dev + preview). Postgres migration deferred to P2.
-- Tests: 550+ pytest tests + 40+ Playwright E2E flows via
+  streak-break nudge (Iter 27), scheduled reports, streak leaderboard
+  digest (Iter 30), **compliance auto-report (Iter 31, env-gated)**.
+- Storage: SQLite (dev + preview) at absolute path
+  `sqlite:////app/backend/ifpi_lms.db`. Postgres migration deferred to P2.
+- Tests: 566+ pytest tests + 50+ Playwright E2E flows via
   `testing_agent_v3_fork`.
 
 ## Related docs
 - `IFPI_USER_MANUAL.md` — auto-generated API + model index
 - `IFPI_SETUP_MANUAL.md` — role matrix + deployment setup
 - `IFPI_INTEGRATION_MATRIX.md` — third-party integration status
+- `IFPI_WEBHOOK_EVENTS.md` — outgoing webhook payload reference (Iter 31)
 - `IFPI_VS_ERP360_ASSESSMENT.md` — original assessment
 - `docs/P2_BACKLOG_SPECS.md` — deep-dive specs for deferred items

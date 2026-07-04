@@ -1,6 +1,55 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 31 — Bulk cert ops UX + Compliance Auto-Report + Preferences (2026-02-11)
+
+### Backend
+- ✅ New `services/compliance_report_worker.py` — env-driven periodic
+  compliance email (`COMPLIANCE_OFFICER_EMAIL` recipient,
+  `COMPLIANCE_REPORT_CADENCE` = daily|weekly|monthly). Renders a full
+  audit table of every REVOKE/UNREVOKE event in the look-back window.
+  Registered in `outbox_worker.start_scheduler` with cadence-appropriate
+  cron trigger. No-op when recipient env var is unset.
+- ✅ Alembic migration `a9b0c1d2e3f4_streak_digest_opt_out` (from
+  previous session) — `users.streak_digest_enabled` column active.
+- ✅ Bulk cert endpoints already shipped in the previous session:
+  `POST /api/certificates/bulk-unrevoke`, `bulk-email`, `bulk-zip` (all
+  admin-only, cross-tenant safe, idempotent).
+- ✅ Preferences endpoints: `GET`+`PATCH /api/gamification/preferences`
+  (per-user streak-digest opt-out).
+
+### Frontend
+- ✅ `components/PromptDialog.tsx` — new shadcn/Radix-based on-brand
+  prompt dialog with a text/textarea input, replaces every
+  `window.prompt` in the app. `usePrompt()` returns a promise.
+- ✅ `pages/dashboard/AdminCertificatesPage.tsx` — new bulk toolbar
+  buttons: **Email**, **Download ZIP**, **Restore** (unrevoke), plus
+  the existing Revoke. Selection is partitioned into active vs revoked
+  ids so each action only targets compatible certs. Revoke reason UX
+  now uses the PromptDialog (no more native window.prompt).
+- ✅ `pages/dashboard/PreferencesPage.tsx` — new `/preferences` route
+  (accessible to every authenticated user). Currently exposes the
+  weekly streak-digest toggle; more prefs can slot in cleanly.
+  Registered in sidebar for both admin & learner navs.
+
+### Docs
+- ✅ `/app/docs/IFPI_WEBHOOK_EVENTS.md` — full public documentation of
+  every outgoing webhook payload (certificate.issued / revoked /
+  unrevoked, enrollment.created / completed, exam.attempt.completed,
+  live_session.rsvped / attended). Includes HMAC signature verifier
+  snippets in Node.js + Python and the retry/backoff schedule.
+
+### Tests
+- ✅ New `tests/test_iteration31_sprint.py` — 16/16 passing.
+- ✅ Regression: 11/11 in `test_iteration30_sprint.py` still passing.
+- ✅ testing_agent_v3_fork iteration_31.json: 100% backend, 100% frontend
+  E2E. Zero product bugs.
+
+### Env additions (backend/.env)
+- `COMPLIANCE_OFFICER_EMAIL=` (empty by default → worker no-op)
+- `COMPLIANCE_REPORT_CADENCE=weekly`
+
+
 ## Iteration 30r/s — Auth cutover complete + Live email + Affiliate program (2026-07-09)
 
 ### 30r · AUTH_COOKIE_MODE=on cutover STAGE 2 — SHIPPED
