@@ -359,7 +359,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 843 |
 | `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 952 |
+| `routers/misc.py` | 1162 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -371,7 +371,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **10879** |
+| **Total** | **11089** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -573,7 +573,10 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/certificates` | GET |  |
 | `/api/certificates/admin-export.csv` | GET | Iter 30 — CSV export for compliance / auditors. All org certs |
 | `/api/certificates/admin-list` | GET | Iter 30 — Admin view: paginated list of ALL certs in the org. |
+| `/api/certificates/bulk-email` | POST | Iter 31 — Bulk re-email certificate download links to owners. |
 | `/api/certificates/bulk-revoke` | POST | Iter 30 — Bulk revoke. Skips already-revoked certs (idempotent) |
+| `/api/certificates/bulk-unrevoke` | POST | Iter 31 — Bulk lift-revocation. Skips currently-active certs |
+| `/api/certificates/bulk-zip` | POST | Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
 | `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
@@ -616,6 +619,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
+| `/api/gamification/preferences` | GET | Iter 31 — per-user gamification preferences. |
+| `/api/gamification/preferences` | PATCH | Iter 31 — toggle weekly streak digest opt-in/out. |
 | `/api/gamification/streak-leaderboard` | GET | Iter 28 — Org-wide "top streaks this week" leaderboard. |
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
@@ -693,7 +698,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **246** registered API endpoints._
+_Total: **251** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

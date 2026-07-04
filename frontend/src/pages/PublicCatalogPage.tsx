@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'react-router-dom'
 import axios from 'axios'
 import { BookOpen, CheckCircle2, XCircle, Search, ShieldCheck } from 'lucide-react'
+import { toast } from 'sonner'
+import { usePrompt } from 'components/PromptDialog'
 
 const API = (import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''
 
@@ -131,6 +133,7 @@ function VerifyTab() {
   const [cert, setCert] = useState<Cert | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState(false)
+  const prompt = usePrompt()
 
   const verify = async () => {
     if (!code.trim()) return
@@ -140,7 +143,7 @@ function VerifyTab() {
       setCert(r.data)
     } catch (e: any) {
       if (e?.response?.status === 404) setNotFound(true)
-      else if (e?.response?.status === 429) alert('Too many verification attempts — please try again in a minute.')
+      else if (e?.response?.status === 429) toast.error('Too many verification attempts — please try again in a minute.')
     } finally { setBusy(false) }
   }
 
@@ -196,10 +199,21 @@ function VerifyTab() {
             <button
               onClick={() => {
                 const url = `${window.location.origin}/verify/${encodeURIComponent(cert.code)}`
-                navigator.clipboard?.writeText(url).then(
-                  () => alert(`Verify link copied:\n${url}`),
-                  () => window.prompt('Copy this link:', url),
-                )
+                const showManualCopy = () => prompt({
+                  title: 'Copy this verify link',
+                  description: 'Your browser blocked automatic copy. Select the text and copy it manually.',
+                  defaultValue: url,
+                  confirmLabel: 'Done',
+                  cancelLabel: 'Close',
+                })
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(url).then(
+                    () => toast.success('Verify link copied · share it with recruiters'),
+                    () => showManualCopy(),
+                  )
+                } else {
+                  showManualCopy()
+                }
               }}
               data-testid="pub-cert-copy-link"
               className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg inline-flex items-center gap-2"

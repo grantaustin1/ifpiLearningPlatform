@@ -4,11 +4,13 @@ import { Award, Download, FileText, Linkedin, Link2, ShieldCheck, Share2, XCircl
 import { toast } from 'sonner'
 import { useAuth } from 'contexts/AuthContext'
 import { useConfirm } from 'components/ConfirmDialog'
+import { usePrompt } from 'components/PromptDialog'
 
 export default function CertificatesPage() {
   const { hasRole } = useAuth()
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN')
   const confirm = useConfirm()
+  const prompt = usePrompt()
   const qc = useQueryClient()
   const { data: certs = [], isLoading } = useQuery<any[]>({
     queryKey: ['certificates'], queryFn: async () => (await api.get('/certificates')).data,
@@ -53,7 +55,13 @@ export default function CertificatesPage() {
         toast.success('Share link copied · paste on LinkedIn or Twitter for a rich preview')
       )
     } else {
-      window.prompt('Copy this link:', url)
+      prompt({
+        title: 'Copy this share link',
+        description: 'Your browser blocked automatic copy. Select the text and copy it manually.',
+        defaultValue: url,
+        confirmLabel: 'Done',
+        cancelLabel: 'Close',
+      })
     }
   }
 
@@ -90,7 +98,13 @@ export default function CertificatesPage() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => toast.success('Verify link copied'))
     } else {
-      window.prompt('Copy this link:', url)
+      prompt({
+        title: 'Copy this link',
+        description: 'Your browser blocked automatic copy. Select the text and copy it manually.',
+        defaultValue: url,
+        confirmLabel: 'Done',
+        cancelLabel: 'Close',
+      })
     }
   }
 
