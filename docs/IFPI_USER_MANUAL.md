@@ -357,9 +357,9 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 797 |
+| `routers/live_sessions.py` | 843 |
 | `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 657 |
+| `routers/misc.py` | 732 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -367,11 +367,11 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 499 |
-| `routers/seo.py` | 223 |
+| `routers/seo.py` | 257 |
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **10504** |
+| **Total** | **10659** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -574,6 +574,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/certificates/verify/{code}` | GET |  |
 | `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
+| `/api/certificates/{cert_id}/revoke` | POST | Iter 29 — Revoke a certificate. Requires ADMIN role. Idempotent |
+| `/api/certificates/{cert_id}/unrevoke` | POST | Iter 29 — Clear a revocation flag. In case of a mistaken |
 | `/api/courses` | GET |  |
 | `/api/courses` | POST |  |
 | `/api/courses/reorder` | PATCH | Body: {"course_ids": [id1, id2, ...]} — sets display_order to the |
@@ -686,7 +688,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **240** registered API endpoints._
+_Total: **242** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

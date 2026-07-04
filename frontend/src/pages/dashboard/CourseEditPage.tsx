@@ -4,6 +4,7 @@ import { api } from 'lib/api'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
 
 const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
@@ -325,6 +326,7 @@ export default function CourseEditPage() {
 
 function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
   { courseId: number; slideId: number; onClose: () => void; onRestored: () => void }) {
+  const confirm = useConfirm()
   const [versions, setVersions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [restoring, setRestoring] = useState<number | null>(null)
@@ -336,7 +338,11 @@ function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
   }, [courseId, slideId])
 
   const restore = async (n: number) => {
-    if (!window.confirm(`Restore this slide to version ${n}? Your current content will be saved as a new version first, so nothing is lost.`)) return
+    if (!(await confirm({
+      title: `Restore to version ${n}?`,
+      description: 'Your current content will be saved as a new version first, so nothing is lost.',
+      confirmLabel: 'Restore',
+    }))) return
     setRestoring(n)
     try {
       await api.post(`/courses/${courseId}/slides/${slideId}/versions/${n}/restore`)
@@ -401,6 +407,7 @@ const NARRATION_LANGS = [
 ] as const
 
 function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+  const confirm = useConfirm()
   const [voice, setVoice] = useState(slide.narration_voice || 'nova')
   const [model, setModel] = useState<'tts-1' | 'tts-1-hd'>('tts-1')
   const [language, setLanguage] = useState<string>('en')
@@ -422,7 +429,12 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
   }
 
   const clear = async () => {
-    if (!window.confirm('Remove this narration? You can regenerate anytime.')) return
+    if (!(await confirm({
+      title: 'Remove narration?',
+      description: 'You can regenerate anytime — no data is lost permanently.',
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    }))) return
     await api.delete(`/authoring/narration/${slide.id}`)
     toast.success('Narration cleared')
     onUpdated()

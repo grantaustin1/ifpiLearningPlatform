@@ -1,9 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Award, Download, FileText, Linkedin, Link2, ShieldCheck, Share2 } from 'lucide-react'
+import { Award, Download, FileText, Linkedin, Link2, ShieldCheck, Share2, XCircle, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from 'contexts/AuthContext'
+import { useConfirm } from 'components/ConfirmDialog'
 
 export default function CertificatesPage() {
+  const { hasRole } = useAuth()
+  const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN')
+  const confirm = useConfirm()
+  const qc = useQueryClient()
   const { data: certs = [], isLoading } = useQuery<any[]>({
     queryKey: ['certificates'], queryFn: async () => (await api.get('/certificates')).data,
   })
@@ -48,6 +54,34 @@ export default function CertificatesPage() {
       )
     } else {
       window.prompt('Copy this link:', url)
+    }
+  }
+
+  // Iter 29 — Admin revoke / unrevoke actions. Revoked certs get a
+  // red REVOKED ribbon on the public share/verify pages + a 410 Gone
+  // on the PDF download for non-admins.
+  const revokeCert = async (cert: any) => {
+    if (!(await confirm({
+      title: 'Revoke this certificate?',
+      description: `The public share page and OG preview will show "REVOKED". The learner can no longer download the PDF. This action is reversible.`,
+      confirmLabel: 'Revoke',
+      variant: 'danger',
+    }))) return
+    try {
+      await api.post(`/certificates/${cert.id}/revoke`, { reason: 'Revoked by admin' })
+      toast.success('Certificate revoked · social previews will refresh within minutes')
+      qc.invalidateQueries({ queryKey: ['certificates'] })
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Revoke failed')
+    }
+  }
+  const unrevokeCert = async (cert: any) => {
+    try {
+      await api.post(`/certificates/${cert.id}/unrevoke`)
+      toast.success('Revocation lifted')
+      qc.invalidateQueries({ queryKey: ['certificates'] })
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed')
     }
   }
 
@@ -100,7 +134,13 @@ export default function CertificatesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="cert-grid">
           {certs.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 hover:border-amber-300 hover:shadow-lg transition" data-testid={`cert-${c.id}`}>
+            <div key={c.id} className={`bg-white rounded-2xl shadow-sm p-5 border transition ${c.revoked_at ? 'border-red-300 opacity-80' : 'border-slate-200 hover:border-amber-300 hover:shadow-lg'}`} data-testid={`cert-${c.id}`}>
+              {c.revoked_at && (
+                <div className="mb-3 -mt-2 -mx-2 px-3 py-1.5 bg-red-50 border-b border-red-200 rounded-t-lg text-[11px] font-semibold text-red-700 uppercase tracking-wide flex items-center gap-1.5"
+                  data-testid={`cert-revoked-banner-${c.id}`}>
+                  <XCircle className="h-3.5 w-3.5" /> Revoked
+                </div>
+              )}
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center flex-shrink-0"><Award className="h-6 w-6 text-amber-600" /></div>
                 <div className="flex-1 min-w-0">
@@ -132,6 +172,18 @@ export default function CertificatesPage() {
                   className="col-span-2 inline-flex items-center justify-center gap-1.5 text-xs border border-emerald-300 text-emerald-700 hover:bg-emerald-50 px-3 py-2 rounded-lg font-semibold">
                   <ShieldCheck className="h-3.5 w-3.5" /> Verify
                 </a>
+                {isAdmin && !c.revoked_at && (
+                  <button onClick={() => revokeCert(c)} data-testid={`cert-revoke-${c.id}`}
+                    className="col-span-2 inline-flex items-center justify-center gap-1.5 text-xs border border-red-300 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg font-semibold">
+                    <XCircle className="h-3.5 w-3.5" /> Revoke certificate
+                  </button>
+                )}
+                {isAdmin && c.revoked_at && (
+                  <button onClick={() => unrevokeCert(c)} data-testid={`cert-unrevoke-${c.id}`}
+                    className="col-span-2 inline-flex items-center justify-center gap-1.5 text-xs border border-slate-300 text-slate-700 hover:bg-slate-50 px-3 py-2 rounded-lg font-semibold">
+                    <RotateCcw className="h-3.5 w-3.5" /> Lift revocation
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -373,7 +373,29 @@ def toggle_rsvp(session_id: int, series: bool = False,
                     ))
             touched += 1
         db.commit()
-        return {"status": target_status, "series_count": touched}
+        # Iter 29 — Cohort auto-enrol from series RSVP too. Use the
+        # series head's course_id (usually all occurrences share it).
+        head_row = next((x for x in series_rows if x.id == head_id), s)
+        auto_enrolled = False
+        if target_status == "RSVP" and head_row.course_id:
+            from models import Enrollment
+            existing_enrol = db.query(Enrollment).filter(
+                Enrollment.user_id == current.id,
+                Enrollment.course_id == head_row.course_id,
+            ).first()
+            if not existing_enrol:
+                db.add(Enrollment(
+                    user_id=current.id,
+                    course_id=head_row.course_id,
+                    progress=0.0,
+                ))
+                db.commit()
+                auto_enrolled = True
+        return {
+            "status": target_status, "series_count": touched,
+            "auto_enrolled": auto_enrolled,
+            "course_id": head_row.course_id if auto_enrolled else None,
+        }
 
     # ── Single-occurrence RSVP (original path) ──────────────────────
     rsvp = db.query(LiveSessionRsvp).filter(
@@ -384,7 +406,8 @@ def toggle_rsvp(session_id: int, series: bool = False,
         # Toggle: RSVP → CANCELLED → RSVP
         rsvp.status = "CANCELLED" if rsvp.status == "RSVP" else "RSVP"
         db.commit(); db.refresh(rsvp)
-        return {"status": rsvp.status}
+        return {"status": rsvp.status, "auto_enrolled": False,
+                "course_id": None}
     # Enforce max_attendees
     if s.max_attendees:
         current_rsvps = db.query(LiveSessionRsvp).filter(
@@ -394,8 +417,31 @@ def toggle_rsvp(session_id: int, series: bool = False,
         if current_rsvps >= s.max_attendees:
             raise HTTPException(status_code=400, detail="Session is full")
     rsvp = LiveSessionRsvp(session_id=session_id, user_id=current.id, status="RSVP")
-    db.add(rsvp); db.commit(); db.refresh(rsvp)
-    return {"status": rsvp.status}
+    db.add(rsvp)
+    # Iter 29 — Cohort auto-enrol from RSVP. If the session is tied to
+    # a course the learner is NOT yet enrolled in, create the
+    # Enrollment inline so they can start the course from their
+    # dashboard immediately without a second click.
+    auto_enrolled = False
+    if s.course_id:
+        from models import Enrollment
+        existing_enrol = db.query(Enrollment).filter(
+            Enrollment.user_id == current.id,
+            Enrollment.course_id == s.course_id,
+        ).first()
+        if not existing_enrol:
+            db.add(Enrollment(
+                user_id=current.id,
+                course_id=s.course_id,
+                progress=0.0,
+            ))
+            auto_enrolled = True
+    db.commit(); db.refresh(rsvp)
+    return {
+        "status": rsvp.status,
+        "auto_enrolled": auto_enrolled,
+        "course_id": s.course_id if auto_enrolled else None,
+    }
 
 
 # ── Attendance ───────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { X, UserCheck, UserX } from 'lucide-react'
 import { api } from 'lib/api'
+import { useConfirm } from 'components/ConfirmDialog'
 
 /**
  * AttendanceModal — Instructor marks each RSVP'd learner ATTENDED or
@@ -32,6 +33,7 @@ export function AttendanceModal({ sessionId, onClose }: {
   sessionId: number
   onClose: () => void
 }) {
+  const confirm = useConfirm()
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [users, setUsers] = useState<Record<number, { name: string; email: string }>>({})
   const [saving, setSaving] = useState(false)
@@ -78,7 +80,11 @@ export function AttendanceModal({ sessionId, onClose }: {
       toast.info('Everyone is already marked ATTENDED')
       return
     }
-    if (!window.confirm(`Mark ${targets.length} learner${targets.length === 1 ? '' : 's'} as ATTENDED?`)) return
+    if (!(await confirm({
+      title: 'Mark everyone as ATTENDED?',
+      description: `${targets.length} learner${targets.length === 1 ? '' : 's'} will be marked ATTENDED and receive their attendance certificate by email.`,
+      confirmLabel: 'Mark all',
+    }))) return
     setSaving(true)
     try {
       const r = await api.post(`/live-sessions/${sessionId}/mark-attendance`, {

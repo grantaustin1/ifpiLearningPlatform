@@ -216,6 +216,9 @@ class CertificateOut(BaseModel):
     course_title: Optional[str] = None
     issued_at: datetime
     score: Optional[float] = None
+    # Iter 29 — revocation state
+    revoked_at: Optional[datetime] = None
+    revoked_reason: Optional[str] = None
 
 
 # ── AI Builder ───────────────────────────────────────────────────────
