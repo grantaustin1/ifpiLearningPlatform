@@ -342,6 +342,20 @@ class Certificate(Base):
     course = relationship("Course", back_populates="certificates")
 
 
+class CertificateRevocationEvent(Base):
+    """Iter 30 — Audit trail for cert revocation actions."""
+    __tablename__ = "certificate_revocation_events"
+    id = Column(Integer, primary_key=True)
+    certificate_id = Column(Integer, ForeignKey("certificates.id"),
+                            nullable=False, index=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"),
+                           nullable=False, index=True)
+    action = Column(String(20), nullable=False)  # REVOKE | UNREVOKE
+    reason = Column(String(255), nullable=True)
+    occurred_at = Column(DateTime, nullable=False, index=True,
+                         default=_utcnow)
+
+
 # ── Gamification ─────────────────────────────────────────────────────
 class BadgeTier(Base):
     """Per-organization configurable badge ladder.

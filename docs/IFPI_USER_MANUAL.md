@@ -359,7 +359,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 843 |
 | `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 732 |
+| `routers/misc.py` | 952 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -371,7 +371,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **10659** |
+| **Total** | **10879** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -391,6 +391,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `BadgeTier` | `badge_tiers` |
 | `BillingEvent` | `billing_events` |
 | `Certificate` | `certificates` |
+| `CertificateRevocationEvent` | `certificate_revocation_events` |
 | `Course` | `courses` |
 | `CoursePrerequisite` | `course_prerequisites` |
 | `CourseSlide` | `course_slides` |
@@ -433,7 +434,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **53** ORM models._
+_Total: **54** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -570,10 +571,14 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
+| `/api/certificates/admin-export.csv` | GET | Iter 30 — CSV export for compliance / auditors. All org certs |
+| `/api/certificates/admin-list` | GET | Iter 30 — Admin view: paginated list of ALL certs in the org. |
+| `/api/certificates/bulk-revoke` | POST | Iter 30 — Bulk revoke. Skips already-revoked certs (idempotent) |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
 | `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
+| `/api/certificates/{cert_id}/revocation-history` | GET | Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events |
 | `/api/certificates/{cert_id}/revoke` | POST | Iter 29 — Revoke a certificate. Requires ADMIN role. Idempotent |
 | `/api/certificates/{cert_id}/unrevoke` | POST | Iter 29 — Clear a revocation flag. In case of a mistaken |
 | `/api/courses` | GET |  |
@@ -688,7 +693,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **242** registered API endpoints._
+_Total: **246** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

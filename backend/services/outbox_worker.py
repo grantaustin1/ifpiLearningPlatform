@@ -277,6 +277,15 @@ def start_scheduler() -> None:
         id="streak_break_nudge", max_instances=1, coalesce=True,
         misfire_grace_time=3600,
     )
+    # Iter 30 — Streak-leaderboard weekly digest every Monday at 08:00
+    # UTC. Emails each org's ADMIN role holders the top 5 streaks +
+    # participation count. Reuses MailService/outbox pipeline.
+    from services.streak_digest_worker import _tick as _streak_digest_tick
+    sched.add_job(
+        _streak_digest_tick, "cron", day_of_week="mon", hour=8, minute=0,
+        id="streak_leaderboard_weekly_digest", max_instances=1, coalesce=True,
+        misfire_grace_time=86400,
+    )
     sched.start()
     _scheduler = sched
     logger.info("Outbox worker scheduled every %ss (max %s attempts), "

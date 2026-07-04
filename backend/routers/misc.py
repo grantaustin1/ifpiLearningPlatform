@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -124,9 +125,31 @@ def revoke_certificate(
     if body and isinstance(body.get("reason"), str):
         reason = body["reason"][:255]
     from datetime import datetime as _dt, timezone as _tz
+    from models import CertificateRevocationEvent
+    from services.webhook_service import emit_safely
+    was_already_revoked = c.revoked_at is not None
     c.revoked_at = _dt.now(_tz.utc)
     c.revoked_reason = reason
+    db.add(CertificateRevocationEvent(
+        certificate_id=c.id,
+        actor_user_id=current.id,
+        action="REVOKE",
+        reason=reason,
+    ))
     db.commit()
+    # Iter 30 — Fire outgoing webhook so HR / LinkedIn integrations can
+    # sync. Only emit if this is a NEW revocation (not a reason-update
+    # re-revoke) to keep the event stream idempotent.
+    if not was_already_revoked:
+        emit_safely(db, current.organization_id, "certificate.revoked", {
+            "certificate_id": c.id,
+            "code": c.code,
+            "user_id": c.user_id,
+            "type": c.type,
+            "reason": reason,
+            "revoked_at": c.revoked_at.isoformat(),
+            "actor_user_id": current.id,
+        })
     return {"revoked": True, "code": c.code, "revoked_at": c.revoked_at,
             "reason": reason}
 
@@ -144,10 +167,207 @@ def unrevoke_certificate(
         raise HTTPException(status_code=404, detail="Certificate not found")
     if c.user and c.user.organization_id != current.organization_id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    from models import CertificateRevocationEvent
+    from services.webhook_service import emit_safely
+    was_revoked = c.revoked_at is not None
     c.revoked_at = None
     c.revoked_reason = None
+    if was_revoked:
+        db.add(CertificateRevocationEvent(
+            certificate_id=c.id,
+            actor_user_id=current.id,
+            action="UNREVOKE",
+            reason=None,
+        ))
     db.commit()
+    if was_revoked:
+        emit_safely(db, current.organization_id, "certificate.unrevoked", {
+            "certificate_id": c.id,
+            "code": c.code,
+            "user_id": c.user_id,
+            "type": c.type,
+            "actor_user_id": current.id,
+        })
     return {"revoked": False, "code": c.code}
+
+
+@cert_router.get("/{cert_id}/revocation-history")
+def cert_revocation_history(
+    cert_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events
+    for a cert in reverse-chronological order."""
+    from models import CertificateRevocationEvent, User as UserModel
+    c = db.query(Certificate).filter(Certificate.id == cert_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    if c.user and c.user.organization_id != current.organization_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    rows = db.query(CertificateRevocationEvent).filter(
+        CertificateRevocationEvent.certificate_id == cert_id,
+    ).order_by(CertificateRevocationEvent.occurred_at.desc()).all()
+    # Hydrate actor names
+    actor_ids = list({r.actor_user_id for r in rows})
+    actors = {u.id: u for u in db.query(UserModel).filter(
+        UserModel.id.in_(actor_ids)
+    ).all()} if actor_ids else {}
+    return [{
+        "id": r.id,
+        "action": r.action,
+        "reason": r.reason,
+        "occurred_at": r.occurred_at,
+        "actor_user_id": r.actor_user_id,
+        "actor_name": actors[r.actor_user_id].name if r.actor_user_id in actors else None,
+        "actor_email": actors[r.actor_user_id].email if r.actor_user_id in actors else None,
+    } for r in rows]
+
+
+class BulkRevokeIn(BaseModel):
+    certificate_ids: list[int]
+    reason: str | None = None
+
+
+@cert_router.post("/bulk-revoke")
+def bulk_revoke_certificates(
+    body: BulkRevokeIn,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 30 — Bulk revoke. Skips already-revoked certs (idempotent)
+    and cross-tenant certs (safety). Returns per-id status list."""
+    from datetime import datetime as _dt, timezone as _tz
+    from models import CertificateRevocationEvent
+    from services.webhook_service import emit_safely
+    now = _dt.now(_tz.utc)
+    reason = body.reason[:255] if body.reason else None
+    results = []
+    to_emit = []
+    for cid in body.certificate_ids:
+        c = db.query(Certificate).filter(Certificate.id == cid).first()
+        if not c:
+            results.append({"id": cid, "status": "not_found"}); continue
+        if c.user and c.user.organization_id != current.organization_id:
+            results.append({"id": cid, "status": "forbidden"}); continue
+        if c.revoked_at:
+            results.append({"id": cid, "status": "already_revoked"}); continue
+        c.revoked_at = now
+        c.revoked_reason = reason
+        db.add(CertificateRevocationEvent(
+            certificate_id=c.id, actor_user_id=current.id,
+            action="REVOKE", reason=reason,
+        ))
+        to_emit.append(c)
+        results.append({"id": cid, "status": "revoked"})
+    db.commit()
+    for c in to_emit:
+        emit_safely(db, current.organization_id, "certificate.revoked", {
+            "certificate_id": c.id, "code": c.code, "user_id": c.user_id,
+            "type": c.type, "reason": reason, "revoked_at": c.revoked_at.isoformat(),
+            "actor_user_id": current.id, "bulk": True,
+        })
+    return {
+        "revoked_count": sum(1 for r in results if r["status"] == "revoked"),
+        "skipped_count": sum(1 for r in results if r["status"] != "revoked"),
+        "results": results,
+    }
+
+
+@cert_router.get("/admin-list")
+def admin_list_certificates(
+    q: str | None = None,
+    type: str | None = None,
+    status: str | None = None,  # "all" | "active" | "revoked"
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 30 — Admin view: paginated list of ALL certs in the org.
+    Supports search by learner name/email/code, filter by type, and
+    revocation status. Backs the bulk-ops table."""
+    from models import User as UserModel, LiveSession
+    query = db.query(Certificate).join(
+        UserModel, UserModel.id == Certificate.user_id
+    ).filter(UserModel.organization_id == current.organization_id)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (UserModel.name.ilike(like)) | (UserModel.email.ilike(like)) |
+            (Certificate.code.ilike(like))
+        )
+    if type:
+        query = query.filter(Certificate.type == type)
+    if status == "revoked":
+        query = query.filter(Certificate.revoked_at.isnot(None))
+    elif status == "active":
+        query = query.filter(Certificate.revoked_at.is_(None))
+    total = query.count()
+    rows = (query.order_by(Certificate.issued_at.desc())
+            .offset((page - 1) * page_size).limit(page_size).all())
+    session_ids = [c.live_session_id for c in rows if c.live_session_id]
+    sessions = {s.id: s for s in db.query(LiveSession).filter(
+        LiveSession.id.in_(session_ids))} if session_ids else {}
+    def _title(c):
+        if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id in sessions:
+            return sessions[c.live_session_id].title
+        return c.course.title if c.course else None
+    return {
+        "total": total, "page": page, "page_size": page_size,
+        "items": [{
+            "id": c.id, "code": c.code, "type": c.type,
+            "title": _title(c),
+            "recipient_name": c.user.name if c.user else None,
+            "recipient_email": c.user.email if c.user else None,
+            "issued_at": c.issued_at,
+            "revoked_at": c.revoked_at,
+            "revoked_reason": c.revoked_reason,
+            "score": c.score,
+        } for c in rows],
+    }
+
+
+@cert_router.get("/admin-export.csv")
+def admin_export_certificates_csv(
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Iter 30 — CSV export for compliance / auditors. All org certs
+    with status + revocation metadata."""
+    import csv, io
+    from models import User as UserModel, LiveSession
+    rows = db.query(Certificate).join(
+        UserModel, UserModel.id == Certificate.user_id
+    ).filter(UserModel.organization_id == current.organization_id
+    ).order_by(Certificate.issued_at.desc()).all()
+    session_ids = [c.live_session_id for c in rows if c.live_session_id]
+    sessions = {s.id: s for s in db.query(LiveSession).filter(
+        LiveSession.id.in_(session_ids))} if session_ids else {}
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "id", "code", "type", "title", "recipient_name", "recipient_email",
+        "issued_at", "score", "status", "revoked_at", "revoked_reason",
+    ])
+    for c in rows:
+        title = (sessions[c.live_session_id].title
+                 if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id in sessions
+                 else (c.course.title if c.course else ""))
+        w.writerow([
+            c.id, c.code, c.type, title,
+            c.user.name if c.user else "",
+            c.user.email if c.user else "",
+            c.issued_at.isoformat() if c.issued_at else "",
+            c.score if c.score is not None else "",
+            "REVOKED" if c.revoked_at else "ACTIVE",
+            c.revoked_at.isoformat() if c.revoked_at else "",
+            c.revoked_reason or "",
+        ])
+    return Response(
+        buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="certificates.csv"'},
+    )
 
 
 @cert_router.get("/verify/{code}")

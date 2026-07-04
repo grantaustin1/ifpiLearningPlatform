@@ -14,6 +14,7 @@ const ADMIN_NAV = [
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
   { href: '/exams',         label: 'Exams',        icon: ClipboardList },
   { href: '/certificates',  label: 'Certificates', icon: Award },
+  { href: '/admin/certificates', label: 'Cert. audit', icon: Shield },
   { href: '/leaderboard',   label: 'Leaderboard',  icon: Trophy },
   { href: '/badge-tiers',   label: 'Badge tiers',  icon: Award },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
