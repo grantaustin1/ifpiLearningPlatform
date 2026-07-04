@@ -11,6 +11,7 @@ import CoursesPage from 'pages/dashboard/CoursesPage'
 import CourseEditPage from 'pages/dashboard/CourseEditPage'
 import ExamsPage from 'pages/dashboard/ExamsPage'
 import CertificatesPage from 'pages/dashboard/CertificatesPage'
+import AdminCertificatesPage from 'pages/dashboard/AdminCertificatesPage'
 import UsersPage from 'pages/dashboard/UsersPage'
 import ReportsPage from 'pages/dashboard/ReportsPage'
 import LeaderboardPage from 'pages/dashboard/LeaderboardPage'
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/learning-paths" element={<LearningPathsPage />} />
         <Route path="/learning-paths/:id/edit" element={<Protected adminOnly><LearningPathEditPage /></Protected>} />
         <Route path="/certificates" element={<CertificatesPage />} />
+        <Route path="/admin/certificates" element={<Protected adminOnly><AdminCertificatesPage /></Protected>} />
         <Route path="/users" element={<Protected adminOnly><UsersPage /></Protected>} />
         <Route path="/reports" element={<Protected adminOnly><ReportsPage /></Protected>} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
