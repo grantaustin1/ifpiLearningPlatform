@@ -947,3 +947,36 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Rate-limit env-fix: use `X-Forwarded-For` in the rate-limit key so K8s-ingress-fronted tests pass (currently flaky)
 - P2 deferred: pgvector migration for advanced RAG (still on the roadmap)
 
+
+
+## Iteration 26 — Feb 2026 (sprint: slide drop-off + my_rsvps ICS + rate-limit env-fix + streaks)
+
+### Sprint deliverables (all shipped + certified — 100% pass)
+- ✅ **Slide-level drop-off analytics** — frontend course player (`LearnPage.tsx`) POSTs to `/api/catalog/{cid}/slides/{sid}/track-view` once per (slide, user, day). `CourseFunnelPanel.tsx` now renders a "Slide drop-off" section (data-testid=`slide-dropoff-block`) below the existing funnel: per-slide horizontal bars with retention %, unique-viewer count, and an amber `AlertTriangle` warning icon for slides with `step_dropoff > 0.5` (excluding slide 1). Empty state via `slide-dropoff-empty` when no view data yet.
+- ✅ **Learner "My RSVPs" ICS feed** — `POST /api/live-sessions/subscribe-url?kind=my_rsvps` + matching QR endpoint. Frontend: `SubscriptionKindPicker` component gives learners two options ("All my cohort sessions" / "Only sessions I've RSVP'd to"); admins bypass the picker straight to their admin feed. Feed contains ONLY RSVP'd sessions (verified via ICS body inspection).
+- ✅ **Rate-limit env-fix** — new `X-Test-Client-Ip` header (gated by `ALLOW_TEST_TOKEN_HEADER=true`) pins the rate-limit bucket in `_client_ip()` across `public_catalog.py`, `middleware.py`, and `marketplace_analytics._viewer_key`. Test workers now get isolated buckets and the previously flaky `test_public_verify_rate_limiter_triggers_429` passes deterministically. Production is unaffected — env var is off there.
+- ✅ **UX Improvement: Learner Progress Streaks** — new `compute_learning_streak(user_id)` in `gamification_service.py` fuses `SlideView` + `FlashcardReview` activity dates into a consecutive-day streak. `GET /api/gamification/learning-streak` returns `{current_streak, longest_streak, active_today, last_active_date}`. New `LearningStreakBadge.tsx` component renders a flame-icon chip next to the course count on `/courses` for learners only, hides on zero streak, uses muted amber if idle today, orange otherwise.
+
+### Tests
+- 10 new iter-26 tests (`test_iteration26_sprint.py`) — all pass
+- Previously flaky `test_iteration20_retest.py::test_public_verify_rate_limiter_triggers_429` — now passes deterministically via `X-Test-Client-Ip` header
+- Fork testing agent report: `/app/test_reports/iteration_26.json` — 100% success on both backend + frontend E2E
+
+### Route inventory (new)
+- `POST /api/catalog/{course_id}/slides/{slide_id}/track-view` — learner slide-view impression
+- `GET /api/admin/course-dropoff/{course_id}` — per-slide retention + step_dropoff (staff only)
+- `POST /api/live-sessions/subscribe-url?kind=my_rsvps` + matching QR endpoint
+- `GET /api/gamification/learning-streak` — learner streak (current + longest + active_today)
+
+### Non-blocking notes (deferred to iter-27)
+- **PRD.md now 1000+ lines** — should be split into `PRD.md` (static) + `CHANGELOG.md` (per-iter entries) + `ROADMAP.md` (pending backlog). Not blocking.
+- **LiveSessionsPage.tsx approaching 700 lines** — extract `SubscriptionKindPicker` + `SubscriptionModal` + `CreateSessionModal` into their own files.
+- **Course edit right rail is tall** — Marketplace funnel + slide-dropoff card push below the fold on 1080p. Could collapse or two-column layout.
+
+## Next Action Items (post iter-26)
+- **Certificate of Attendance PDF** for live sessions (leverages existing cert PDF pipeline; auto-generate when learner is marked ATTENDED)
+- **Cross-tenant marketplace search** (currently tenant-siloed by default)
+- **Refactor: split PRD.md** into PRD/CHANGELOG/ROADMAP (mechanical, ~5 min)
+- **Refactor: split LiveSessionsPage.tsx** into modals-in-own-files
+- **Course edit right-rail density** (collapse or two-column funnel + drop-off + …)
+- **P2 deferred**: pgvector migration for advanced RAG
