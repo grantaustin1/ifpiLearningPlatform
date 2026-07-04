@@ -3,22 +3,23 @@
 Prioritized backlog. Completed items live in `CHANGELOG.md`.
 
 ## P0 — Next up
-_Nothing currently blocking; iter-29 shipped 3 planned items + 1 UX
-improvement (certificate revocation). Waiting on user for next sprint._
+_Nothing currently blocking; iter-30 shipped 5 planned items + 1 UX
+improvement (bulk certificate operations). Waiting on user for next
+sprint._
 
 ## P1 — High value
-- **`tsc --noEmit` pre-commit / CI check** — catch missing-import bugs
-  before they black-screen the app (see iter-29 ImportsPage.tsx
-  incident). Small config change; big safety net.
-- **Confirm dialog audit sweep** — verify no `window.confirm` remains
-  anywhere in the frontend (grep + fix).
-- **Revocation audit log** — track WHO revoked WHICH cert + WHEN in a
-  dedicated audit table so compliance teams can trace decisions.
-- **Cert revocation webhook event** — fire an outgoing webhook on
-  revoke/unrevoke so external HR systems + LinkedIn integrations can
-  sync in real-time.
-- **Streak-leaderboard weekly digest email** — currently only in-app;
-  a weekly "leaderboard" email would drive retention.
+- **Absolute SQLite path** — flip `DATABASE_URL` from `sqlite:///./ifpi_lms.db`
+  to `sqlite:////app/backend/ifpi_lms.db` so pytest from any cwd hits
+  the right DB. Prevents the iter-30 stale-fixture flake.
+- **Bulk-revoke reason modal** — replace `window.prompt()` in
+  `AdminCertificatesPage` with an in-brand text-input modal.
+- **HR-system webhook payload docs** — publish an `IFPI_WEBHOOK_EVENTS.md`
+  documenting `certificate.revoked` + `certificate.unrevoked` payload
+  shape for external integrators.
+- **Bulk unrevoke + bulk email + bulk download-zip** — extend the
+  admin-certs table with reverse bulk ops (currently only revoke).
+- **Streak-digest opt-out** — some admins may not want the weekly
+  email; per-user preference or org toggle.
 
 ## P2 — Nice to have
 - **pgvector migration** for advanced RAG on AI Tutor. Spec in

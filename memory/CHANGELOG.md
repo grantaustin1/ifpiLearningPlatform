@@ -1073,3 +1073,38 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 ### Non-blocking notes
 - Unrevoke has NO confirmation dialog (by design — undo is non-destructive).
 - K8s ingress strips custom `Cache-Control` headers on all API responses — the revoked-cert 5-min cache TTL is best-effort. Doesn't affect functionality (LinkedIn/Twitter re-scrape on URL change).
+
+
+## Iteration 30 — Feb 2026 (tsc guard + Confirm audit + Revocation audit log + Cert webhook + Streak digest + Bulk cert ops)
+
+### Sprint deliverables (all shipped + certified — 100% pass, 70 tests green)
+- ✅ **`tsc --noEmit` CI safety net** — new `frontend/package.json` scripts (`typecheck`, `typecheck:strict`, `precommit`) + `/app/scripts/ci_typecheck.sh` for CI. Prevents missing-import black-screen regressions (iter-29 ImportsPage.tsx incident).
+- ✅ **Confirm dialog audit sweep** — grep verified zero `window.confirm(` calls remain across all `.tsx/.ts` files. All 13 confirmation flows use the `useConfirm()` hook. Regression test asserts this.
+- ✅ **Revocation audit log** — new `certificate_revocation_events` table + Certificate model relationship. `POST /revoke` + `POST /unrevoke` both insert audit rows with actor_user_id + reason + occurred_at. New `GET /api/certificates/{id}/revocation-history` returns reverse-chronological events with hydrated actor name/email (admin only, 403 for learner).
+- ✅ **Cert revocation webhook events** — `emit_safely()` fires `certificate.revoked` + `certificate.unrevoked` events on the outgoing webhook bus, payload includes `{certificate_id, code, user_id, type, reason, revoked_at, actor_user_id, bulk?}`. HR/LinkedIn integrations can now sync in real-time.
+- ✅ **Streak-leaderboard weekly digest** — new `services/streak_digest_worker.py`, APScheduler cron Monday 08:00 UTC. Each org's ADMIN/INSTRUCTOR receives an email with top-5 streak leaders + participation count. Reuses MailService/outbox pipeline with `template='streak_digest'`.
+- ✅ **UX: Bulk certificate operations** — new `/admin/certificates` route + `AdminCertificatesPage`. Features: (a) searchable/filterable table (name/email/code, status, type) with pagination, (b) multi-select via checkboxes with 'select all' shortcut, (c) `POST /bulk-revoke` with idempotent per-item results (already_revoked/forbidden/not_found/revoked), (d) `GET /admin-export.csv` for auditor CSV download, (e) slide-out revocation history drawer per cert with hydrated audit trail.
+
+### Tests
+- 11 new iter-30 tests (`test_iteration30_sprint.py`) — all pass
+- Combined regression: 70/70 pass across iter20/25/26/27/28/29/30
+
+### Migration
+- `20260718_0900_f8a9b0c1d2e3_revocation_audit_log.py` — new `certificate_revocation_events` table with FK + occurred_at index
+
+### Route inventory (new)
+- `POST /api/certificates/bulk-revoke` — admin bulk revoke
+- `GET /api/certificates/{id}/revocation-history` — audit trail per cert
+- `GET /api/certificates/admin-list` — paginated org-scoped admin view
+- `GET /api/certificates/admin-export.csv` — CSV export
+
+### New files
+- `backend/services/streak_digest_worker.py`
+- `backend/tests/test_iteration30_sprint.py`
+- `frontend/src/pages/dashboard/AdminCertificatesPage.tsx`
+- `scripts/ci_typecheck.sh`
+
+### Notable non-blocking notes
+- **Route naming**: `/bulk-revoke`, `/admin-list`, `/admin-export.csv` use single-segment paths to avoid FastAPI parsing `admin`/`bulk` as `{cert_id}` (int). Documented in code.
+- **Bulk-revoke reason input** intentionally uses `window.prompt()` (single text input; a full modal would be nice but out of scope). Not a `window.confirm` regression.
+- **Cwd-sensitive SQLite path** — `DATABASE_URL=sqlite:///./ifpi_lms.db` is relative. Always run pytest from `/app/backend`. Optional future hardening: absolute path.
