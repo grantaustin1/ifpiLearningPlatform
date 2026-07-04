@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
-import { BarChart3, Eye, GraduationCap, Trophy, TrendingUp, TrendingDown, Loader2, AlertTriangle } from 'lucide-react'
+import { BarChart3, Eye, GraduationCap, Trophy, TrendingUp, TrendingDown, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface FunnelData {
   course_id: number
@@ -43,6 +43,21 @@ export function CourseFunnelPanel({ courseId }: Props) {
   const [dropoff, setDropoff] = useState<DropoffData | null>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
+  // Iter 27 — Collapsible sections. Trend defaults collapsed (density);
+  // drop-off defaults expanded (higher signal). Persist per-user in
+  // localStorage so a habitual instructor's layout survives reloads.
+  const [showTrend, setShowTrend] = useState<boolean>(
+    () => localStorage.getItem('funnel-show-trend') !== '0'
+  )
+  const [showDropoff, setShowDropoff] = useState<boolean>(
+    () => localStorage.getItem('funnel-show-dropoff') !== '0'
+  )
+  const toggleTrend = () => setShowTrend(v => {
+    localStorage.setItem('funnel-show-trend', v ? '0' : '1'); return !v
+  })
+  const toggleDropoff = () => setShowDropoff(v => {
+    localStorage.setItem('funnel-show-dropoff', v ? '0' : '1'); return !v
+  })
 
   useEffect(() => {
     setLoading(true)
@@ -116,33 +131,45 @@ export function CourseFunnelPanel({ courseId }: Props) {
         </div>
       </div>
 
-      {/* Sparkline — small CSS bar chart, no external lib */}
+      {/* Sparkline — collapsible */}
       <div>
-        <p className="text-[11px] uppercase font-medium tracking-wide text-slate-400 mb-2">Daily trend</p>
-        <div className="flex items-end gap-[2px] h-16" data-testid="funnel-sparkline">
-          {data.daily.slice(-30).map(d => (
-            <div key={d.date} className="flex-1 flex flex-col gap-[1px] justify-end" title={`${d.date}: ${d.views} views · ${d.enrollments} enrolls · ${d.completions} completes`}>
-              <div className="bg-emerald-500 rounded-sm" style={{ height: `${(d.completions / maxDaily) * 100}%` }} />
-              <div className="bg-indigo-500 rounded-sm" style={{ height: `${(d.enrollments / maxDaily) * 100}%` }} />
-              <div className="bg-slate-300 rounded-sm" style={{ height: `${(d.views / maxDaily) * 100}%` }} />
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-4 mt-2 text-[10px] text-slate-500">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> Views</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> Enrols</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Completes</span>
-        </div>
+        <button onClick={toggleTrend} data-testid="toggle-funnel-trend"
+          className="flex items-center gap-1 text-[11px] uppercase font-medium tracking-wide text-slate-400 mb-2 hover:text-slate-600 transition-colors">
+          {showTrend ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Daily trend
+        </button>
+        {showTrend && (<>
+          <div className="flex items-end gap-[2px] h-16" data-testid="funnel-sparkline">
+            {data.daily.slice(-30).map(d => (
+              <div key={d.date} className="flex-1 flex flex-col gap-[1px] justify-end" title={`${d.date}: ${d.views} views · ${d.enrollments} enrolls · ${d.completions} completes`}>
+                <div className="bg-emerald-500 rounded-sm" style={{ height: `${(d.completions / maxDaily) * 100}%` }} />
+                <div className="bg-indigo-500 rounded-sm" style={{ height: `${(d.enrollments / maxDaily) * 100}%` }} />
+                <div className="bg-slate-300 rounded-sm" style={{ height: `${(d.views / maxDaily) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-slate-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> Views</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> Enrols</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Completes</span>
+          </div>
+        </>)}
       </div>
 
-      {/* Iter 26 — Slide-level drop-off heatmap */}
+      {/* Iter 26 — Slide-level drop-off heatmap (Iter 27 — collapsible) */}
       {dropoff && dropoff.slides.length > 0 && (
         <div className="mt-6 pt-5 border-t border-slate-100" data-testid="slide-dropoff-block">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] uppercase font-medium tracking-wide text-slate-500">Slide drop-off</p>
-            <span className="text-[10px] text-slate-400">baseline: {dropoff.baseline_viewers} viewers</span>
+            <button onClick={toggleDropoff} data-testid="toggle-slide-dropoff"
+              className="flex items-center gap-1 text-[11px] uppercase font-medium tracking-wide text-slate-500 hover:text-slate-700 transition-colors">
+              {showDropoff ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              Slide drop-off
+            </button>
+            {showDropoff && (
+              <span className="text-[10px] text-slate-400">baseline: {dropoff.baseline_viewers} viewers</span>
+            )}
           </div>
-          {dropoff.baseline_viewers === 0 ? (
+          {showDropoff && (dropoff.baseline_viewers === 0 ? (
             <p className="text-xs text-slate-400 py-2" data-testid="slide-dropoff-empty">
               No slide-view data yet. Learners must play the course for tracking to appear.
             </p>
@@ -179,7 +206,7 @@ export function CourseFunnelPanel({ courseId }: Props) {
                 )
               })}
             </ul>
-          )}
+          ))}
         </div>
       )}
     </div>

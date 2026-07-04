@@ -357,9 +357,9 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 712 |
+| `routers/live_sessions.py` | 740 |
 | `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 463 |
+| `routers/misc.py` | 533 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
@@ -370,7 +370,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **10002** |
+| **Total** | **10100** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -564,6 +564,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/billing/webhook` | POST | Receives ERP360 billing webhooks. Verified via X-Signature header. |
 | `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
 | `/api/catalog` | GET |  |
+| `/api/catalog/organizations` | GET | Iter 27 — Cross-tenant marketplace search: list opted-in |
 | `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
 | `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
@@ -678,7 +679,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **233** registered API endpoints._
+_Total: **234** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
