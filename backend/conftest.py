@@ -2,7 +2,13 @@ from pathlib import Path
 import os
 
 
-if os.environ.get("GITHUB_ACTIONS") == "true":
+# Integration suites require a live backend URL. In CI this is usually unset.
+if not os.environ.get("REACT_APP_BACKEND_URL"):
     root = Path(__file__).parent
-    collect_ignore = [str(path.resolve()) for path in (root / "tests").glob("test_iteration*.py")]
-    collect_ignore.append(str((root / "tests" / "test_ifpi_api.py").resolve()))
+    tests_dir = root / "tests"
+    rel_paths = ["tests/test_ifpi_api.py"]
+    abs_paths = [str((tests_dir / "test_ifpi_api.py").resolve())]
+    for path in sorted(tests_dir.glob("test_iteration*.py")):
+        rel_paths.append(f"tests/{path.name}")
+        abs_paths.append(str(path.resolve()))
+    collect_ignore = rel_paths + abs_paths
