@@ -3,24 +3,21 @@
 Prioritized backlog. Completed items live in `CHANGELOG.md`.
 
 ## P0 — Next up
-_Nothing currently blocking; iter-27 shipped 6 planned items + 1 UX
-improvement (streak-nudge worker). Waiting on user for next sprint._
+_Nothing currently blocking; iter-28 shipped 5 planned items + 1 UX
+improvement (shareable certificate brag card). Waiting on user for next
+sprint._
 
 ## P1 — High value
-- **Live-session Certificate email delivery** — currently the attendance
-  cert is created + surfaced in the `/certificates` list; the outbox
-  worker could email a link to it automatically.
-- **Learner streak leaderboard** — org-wide "top streaks this week"
-  gamification widget. Trivial with existing SlideView + FlashcardReview
-  data.
-- **Course edit right-rail two-column layout** — currently 1-col-tall.
-  Consider a `xl:grid-cols-2` split of funnel + drop-off cards on
-  wide screens (>1280px). Collapse already exists for density (Iter 27).
-- **Cross-tenant public catalog SEO** — meta tags + sitemap.xml per
-  opted-in org so search engines can index cross-tenant courses.
-- **Bulk mark-attendance UI** — the backend already accepts
-  `user_ids: [ ]`; the UI currently only marks one learner at a time.
-  Add "Mark all as ATTENDED" quick action.
+- **Cohort auto-enrol from live-session RSVP** — reverse of Iter 24's
+  auto-RSVP; RSVP'ing to a live session in a course you're not enrolled
+  in should offer inline enrolment.
+- **`PUBLIC_BASE_URL` env override** — SEO sitemap URLs currently derive
+  from the incoming Host header. Force the public preview URL in the
+  preview env so crawlers see the same hostname the user sees.
+- **Bulk mark-attendance shadcn AlertDialog** — replace `window.confirm()`
+  with an on-brand confirmation modal.
+- **AlertDialog + toast polish** — audit all `window.confirm()` calls in
+  the frontend and swap to shadcn `AlertDialog`.
 
 ## P2 — Nice to have
 - **pgvector migration** for advanced RAG on AI Tutor. Spec in
