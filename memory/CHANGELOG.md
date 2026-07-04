@@ -1012,3 +1012,37 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - `memory/PRD.md` (983 → 65 lines)
 - `memory/CHANGELOG.md` (new — historical iterations)
 - `memory/ROADMAP.md` (new — P0-P3 backlog)
+
+
+## Iteration 28 — Feb 2026 (Attendance email + Streak leaderboard + XL right-rail + SEO + Bulk mark + Share brag card)
+
+### Sprint deliverables (all shipped + certified — 100% pass, 52 tests green)
+- ✅ **Live-session attendance certificate email delivery** — `routers/live_sessions.py::_email_attendance_cert` queues an outbox message with `template='live_session_attendance'` when a learner is marked ATTENDED. Idempotent (guarded by same session_id/user_id check that gates cert issuance). Contains PDF download link + verify link + org branding.
+- ✅ **Org-wide streak leaderboard** — new `GET /api/gamification/streak-leaderboard?limit=10` returns `{top, your_rank, your_entry, total_participants}`. Frontend `StreakLeaderboardModal` + `StreakLeaderboardTrigger` next to the streak badge on `/courses`. Highlights caller with `is_you=true` + `(you)` badge; shows a separate "Your rank" block if caller is outside top N.
+- ✅ **Course edit right-rail two-column XL layout** — Aside widened from `w-80` to `w-80 xl:w-[36rem]` (~576px). `CourseFunnelPanel` wraps Daily trend + Slide drop-off in `funnel-charts-grid` (`xl:grid xl:grid-cols-2 xl:gap-6`). Stacks on <XL.
+- ✅ **Cross-tenant public catalog SEO** — new `routers/seo.py` under `/api/seo/*` prefix (K8s ingress requirement): `robots.txt`, `sitemap.xml` (global — orgs + published courses), `sitemap-{org_id}.xml` (per-org). Static `frontend/public/robots.txt` at site root points crawlers to the API-prefixed sitemap.
+- ✅ **Bulk mark-attendance UI** — new `mark-all-attended-btn` in AttendanceModal header. `markAllAttended` filters unmarked learners, `window.confirm()`s the count, and fires a single POST. Toast shows `"N marked · X certificates issued"`. Short-circuits with info toast if everyone already ATTENDED.
+- ✅ **UX Improvement: Shareable certificate brag card** — new `GET /api/seo/certificates/share/{code}` returns HTML with OpenGraph + Twitter meta tags for rich LinkedIn/Twitter/WhatsApp link previews. Backed by `GET /api/certificates/verify/{code}/og-image.svg` (1200x630 SVG). Learner-side "Share card" button (`cert-share-{id}`) on `/certificates` copies the share URL to clipboard.
+
+### Tests
+- 11 new iter-28 tests (`test_iteration28_sprint.py`) — all pass
+- Combined regression: 52/52 pass across iter20/25/26/27/28
+
+### Route inventory (new)
+- `GET /api/gamification/streak-leaderboard` — org leaderboard
+- `GET /api/seo/robots.txt` — dynamic robots policy
+- `GET /api/seo/sitemap.xml` — global sitemap
+- `GET /api/seo/sitemap-{org_id}.xml` — per-org sitemap
+- `GET /api/seo/certificates/share/{code}` — shareable HTML brag card
+- `GET /api/certificates/verify/{code}/og-image.svg` — 1200×630 OG image
+
+### New files
+- `backend/routers/seo.py` — SEO router (robots, sitemap, share card)
+- `backend/services/streak_nudge_worker.py` (iter-27, unchanged)
+- `frontend/src/components/StreakLeaderboardModal.tsx`
+- `frontend/public/robots.txt` — static crawler-facing robots
+
+### Non-blocking notes
+- **Cloudflare edge prepends its 'Managed Content' block to /robots.txt** — our IFPI block correctly appended at bottom; crawlers still discover the Sitemap directive. Non-blocking.
+- **Sitemap URLs use the cluster-internal hostname** (derived from incoming Host header). In production the public host resolves correctly. Consider forcing `PUBLIC_BASE_URL` env override for preview environments.
+- **`window.confirm()` in bulk-mark UI** — functional but not on-brand. Consider a shadcn `AlertDialog` swap in a future polish pass.
