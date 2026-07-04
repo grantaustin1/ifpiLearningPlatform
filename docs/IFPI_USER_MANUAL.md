@@ -357,20 +357,20 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 695 |
-| `routers/marketplace_analytics.py` | 318 |
-| `routers/misc.py` | 451 |
+| `routers/live_sessions.py` | 712 |
+| `routers/marketplace_analytics.py` | 424 |
+| `routers/misc.py` | 463 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 148 |
-| `routers/public_catalog.py` | 143 |
+| `routers/public_catalog.py` | 153 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 499 |
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **9857** |
+| **Total** | **10002** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -418,6 +418,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `ScormPackage` | `scorm_packages` |
 | `SlideComment` | `slide_comments` |
 | `SlideVersion` | `slide_versions` |
+| `SlideView` | `slide_views` |
 | `SourceChunk` | `source_chunks` |
 | `SourceDocument` | `source_documents` |
 | `SsoJtiSeen` | `sso_jti_seen` |
@@ -431,7 +432,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **52** ORM models._
+_Total: **53** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -463,6 +464,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/audit-log` | GET |  |
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
+| `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
 | `/api/admin/dashboard/members-needing-action` | GET |  |
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
@@ -563,6 +565,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
 | `/api/catalog` | GET |  |
 | `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
+| `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
@@ -601,6 +604,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
 | `/api/feature-flags` | GET |  |
 | `/api/gamification/leaderboard` | GET |  |
+| `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
@@ -674,7 +678,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **230** registered API endpoints._
+_Total: **233** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
