@@ -3,11 +3,13 @@ import { useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { CheckCircle2, XCircle, Award, Link as LinkIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { usePrompt } from 'components/PromptDialog'
 
 export default function VerifyCertPage() {
   const { code } = useParams()
   const [cert, setCert] = useState<any>(null)
   const [error, setError] = useState('')
+  const prompt = usePrompt()
 
   useEffect(() => {
     // Prefer the rate-limited public endpoint (Iter 28) to protect against
@@ -33,7 +35,15 @@ export default function VerifyCertPage() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => toast.success('Verify link copied — share with recruiters'))
     } else {
-      window.prompt('Copy this link:', url)
+      // Fallback for older browsers — show the URL in an on-brand dialog
+      // with pre-selected text so the user can Cmd/Ctrl+C manually.
+      prompt({
+        title: 'Copy this link',
+        description: 'Your browser blocked automatic copy. Select the text below and copy it manually.',
+        defaultValue: url,
+        confirmLabel: 'Done',
+        cancelLabel: 'Close',
+      })
     }
   }
 
