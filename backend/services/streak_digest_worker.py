@@ -98,6 +98,7 @@ def run_streak_digest_pass() -> dict:
             admins = db.query(User).filter(
                 User.organization_id == org.id,
                 User.is_active == True,  # noqa: E712
+                User.streak_digest_enabled == True,  # noqa: E712 — Iter 31 opt-out
             ).all()
             admins = [u for u in admins if any(
                 ur.role in {"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}

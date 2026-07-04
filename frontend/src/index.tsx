@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { ConfirmDialogProvider } from './components/ConfirmDialog'
+import { PromptDialogProvider } from './components/PromptDialog'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -18,8 +19,10 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AuthProvider>
           <ConfirmDialogProvider>
-            <App />
-            <Toaster position="bottom-right" richColors closeButton />
+            <PromptDialogProvider>
+              <App />
+              <Toaster position="bottom-right" richColors closeButton />
+            </PromptDialogProvider>
           </ConfirmDialogProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { toast } from 'sonner'
-import { Search, XCircle, Download, ChevronLeft, ChevronRight, ShieldCheck, Clock, History } from 'lucide-react'
+import { Search, XCircle, Download, ChevronLeft, ChevronRight, ShieldCheck, Clock, History, Mail, FileArchive, Undo2 } from 'lucide-react'
 import { useConfirm } from 'components/ConfirmDialog'
+import { usePrompt } from 'components/PromptDialog'
 
 interface Row {
   id: number
@@ -37,6 +38,7 @@ interface RevocationEvent {
  */
 export default function AdminCertificatesPage() {
   const confirm = useConfirm()
+  const prompt = usePrompt()
   const qc = useQueryClient()
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all')
@@ -60,8 +62,13 @@ export default function AdminCertificatesPage() {
   const items = data?.items || []
   const total = data?.total || 0
   const totalPages = Math.max(1, Math.ceil(total / 25))
-  const allSelectableIds = items.filter(r => !r.revoked_at).map(r => r.id)
-  const isAllSelected = allSelectableIds.length > 0 && allSelectableIds.every(id => selected.has(id))
+  const allIds = items.map(r => r.id)
+  const isAllSelected = allIds.length > 0 && allIds.every(id => selected.has(id))
+
+  // Iter 31 — Split selection by revocation state so each bulk action
+  // targets only the compatible subset (avoids server-side skipping).
+  const selectedActiveIds = items.filter(r => selected.has(r.id) && !r.revoked_at).map(r => r.id)
+  const selectedRevokedIds = items.filter(r => selected.has(r.id) && r.revoked_at).map(r => r.id)
 
   const toggle = (id: number) => setSelected(prev => {
     const next = new Set(prev)
@@ -70,22 +77,29 @@ export default function AdminCertificatesPage() {
   })
   const toggleAll = () => setSelected(prev => {
     if (isAllSelected) return new Set()
-    return new Set(allSelectableIds)
+    return new Set(allIds)
   })
 
   const bulkRevoke = async () => {
-    if (selected.size === 0) return
-    const reason = window.prompt('Optional reason for revocation (visible in audit log):', '')
-    if (reason === null) return  // Cancel button on prompt
+    if (selectedActiveIds.length === 0) return
+    const reason = await prompt({
+      title: 'Reason for revocation',
+      description: `Optional — this note is written to the audit log for compliance review. ${selectedActiveIds.length} certificate${selectedActiveIds.length === 1 ? '' : 's'} will be revoked.`,
+      placeholder: 'e.g. Issued in error / Learner request / Superseded by re-issue',
+      multiline: true,
+      maxLength: 255,
+      confirmLabel: 'Continue',
+    })
+    if (reason === null) return  // user cancelled
     if (!(await confirm({
-      title: `Revoke ${selected.size} certificate${selected.size === 1 ? '' : 's'}?`,
+      title: `Revoke ${selectedActiveIds.length} certificate${selectedActiveIds.length === 1 ? '' : 's'}?`,
       description: 'Their public verify + share pages will show REVOKED. Learners can no longer download their PDF. This is reversible per-cert.',
-      confirmLabel: `Revoke ${selected.size}`,
+      confirmLabel: `Revoke ${selectedActiveIds.length}`,
       variant: 'danger',
     }))) return
     try {
       const r = await api.post('/certificates/bulk-revoke', {
-        certificate_ids: Array.from(selected),
+        certificate_ids: selectedActiveIds,
         reason: reason || null,
       })
       toast.success(`Revoked ${r.data.revoked_count} certificate${r.data.revoked_count === 1 ? '' : 's'} · ${r.data.skipped_count} skipped`)
@@ -93,6 +107,66 @@ export default function AdminCertificatesPage() {
       qc.invalidateQueries({ queryKey: ['admin-certs'] })
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Bulk revoke failed')
+    }
+  }
+
+  const bulkUnrevoke = async () => {
+    if (selectedRevokedIds.length === 0) return
+    if (!(await confirm({
+      title: `Restore ${selectedRevokedIds.length} certificate${selectedRevokedIds.length === 1 ? '' : 's'}?`,
+      description: 'The revoked flag will be cleared. Learners will regain PDF download access. An UNREVOKE event is written to the audit log for each cert.',
+      confirmLabel: `Restore ${selectedRevokedIds.length}`,
+    }))) return
+    try {
+      const r = await api.post('/certificates/bulk-unrevoke', {
+        certificate_ids: selectedRevokedIds,
+      })
+      toast.success(`Restored ${r.data.unrevoked_count} · ${r.data.skipped_count} skipped`)
+      setSelected(new Set())
+      qc.invalidateQueries({ queryKey: ['admin-certs'] })
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Bulk unrevoke failed')
+    }
+  }
+
+  const bulkEmail = async () => {
+    if (selectedActiveIds.length === 0) return
+    if (!(await confirm({
+      title: `Email ${selectedActiveIds.length} learner${selectedActiveIds.length === 1 ? '' : 's'}?`,
+      description: 'A certificate download + verification link will be queued to each learner via the standard email outbox.',
+      confirmLabel: `Queue ${selectedActiveIds.length} email${selectedActiveIds.length === 1 ? '' : 's'}`,
+    }))) return
+    try {
+      const r = await api.post('/certificates/bulk-email', {
+        certificate_ids: selectedActiveIds,
+      })
+      toast.success(`Queued ${r.data.queued_count} email${r.data.queued_count === 1 ? '' : 's'}`)
+      setSelected(new Set())
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Bulk email failed')
+    }
+  }
+
+  const bulkDownloadZip = async () => {
+    if (selectedActiveIds.length === 0) return
+    if (selectedActiveIds.length > 100) {
+      toast.error('Max 100 certificates per ZIP. Please narrow your selection.')
+      return
+    }
+    try {
+      const r = await api.post('/certificates/bulk-zip',
+        { certificate_ids: selectedActiveIds },
+        { responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      const count = r.headers['x-certs-bundled'] || selectedActiveIds.length
+      a.download = `certificates-${count}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Downloaded ${count} certificate${count === '1' ? '' : 's'} as ZIP`)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Bulk ZIP failed')
     }
   }
 
@@ -117,18 +191,42 @@ export default function AdminCertificatesPage() {
           <h1 className="text-2xl font-bold text-slate-900 font-display">Certificates</h1>
           <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${total} total in your organisation`}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={exportCsv} data-testid="export-csv-btn"
             className="inline-flex items-center gap-1.5 text-sm border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium">
             <Download className="h-4 w-4" /> Export CSV
           </button>
           <button
+            onClick={bulkEmail}
+            disabled={selectedActiveIds.length === 0}
+            data-testid="bulk-email-btn"
+            className="inline-flex items-center gap-1.5 text-sm border border-slate-300 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-700 px-4 py-2 rounded-lg font-medium"
+          >
+            <Mail className="h-4 w-4" /> Email {selectedActiveIds.length > 0 ? `(${selectedActiveIds.length})` : ''}
+          </button>
+          <button
+            onClick={bulkDownloadZip}
+            disabled={selectedActiveIds.length === 0}
+            data-testid="bulk-zip-btn"
+            className="inline-flex items-center gap-1.5 text-sm border border-slate-300 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-700 px-4 py-2 rounded-lg font-medium"
+          >
+            <FileArchive className="h-4 w-4" /> Download ZIP {selectedActiveIds.length > 0 ? `(${selectedActiveIds.length})` : ''}
+          </button>
+          <button
+            onClick={bulkUnrevoke}
+            disabled={selectedRevokedIds.length === 0}
+            data-testid="bulk-unrevoke-btn"
+            className="inline-flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold"
+          >
+            <Undo2 className="h-4 w-4" /> Restore {selectedRevokedIds.length > 0 ? `(${selectedRevokedIds.length})` : ''}
+          </button>
+          <button
             onClick={bulkRevoke}
-            disabled={selected.size === 0}
+            disabled={selectedActiveIds.length === 0}
             data-testid="bulk-revoke-btn"
             className="inline-flex items-center gap-1.5 text-sm bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold"
           >
-            <XCircle className="h-4 w-4" /> Revoke {selected.size > 0 ? `(${selected.size})` : ''}
+            <XCircle className="h-4 w-4" /> Revoke {selectedActiveIds.length > 0 ? `(${selectedActiveIds.length})` : ''}
           </button>
         </div>
       </div>
@@ -182,7 +280,6 @@ export default function AdminCertificatesPage() {
                 <td className="px-4 py-3">
                   <input type="checkbox"
                     checked={selected.has(r.id)}
-                    disabled={!!r.revoked_at}
                     onChange={() => toggle(r.id)}
                     data-testid={`select-cert-${r.id}`}
                     className="h-4 w-4 rounded" />

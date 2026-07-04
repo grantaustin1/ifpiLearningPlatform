@@ -157,6 +157,9 @@ class User(Base):
     totp_recovery_codes = Column(JSON, nullable=True, default=list)
     # Iter 27 — streak-break nudge dedup (dont email twice for same lapse)
     streak_nudge_last_sent_at = Column(DateTime, nullable=True)
+    # Iter 31 — user-level weekly streak digest opt-out (default True)
+    streak_digest_enabled = Column(Boolean, nullable=False, default=True,
+                                   server_default="1")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

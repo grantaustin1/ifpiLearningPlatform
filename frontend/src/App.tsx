@@ -42,6 +42,7 @@ import EmailDiagnosticsPage from 'pages/dashboard/EmailDiagnosticsPage'
 import AffiliatePage from 'pages/dashboard/AffiliatePage'
 import LiveSessionsPage from 'pages/dashboard/LiveSessionsPage'
 import MarketplaceAnalyticsPage from 'pages/dashboard/MarketplaceAnalyticsPage'
+import PreferencesPage from 'pages/dashboard/PreferencesPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -103,6 +104,7 @@ export default function App() {
         <Route path="/affiliate" element={<Protected adminOnly><AffiliatePage /></Protected>} />
         <Route path="/live-sessions" element={<LiveSessionsPage />} />
         <Route path="/marketplace-analytics" element={<Protected adminOnly><MarketplaceAnalyticsPage /></Protected>} />
+        <Route path="/preferences" element={<PreferencesPage />} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
