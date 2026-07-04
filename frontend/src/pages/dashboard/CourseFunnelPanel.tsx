@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
-import { BarChart3, Eye, GraduationCap, Trophy, TrendingUp, TrendingDown, Loader2 } from 'lucide-react'
+import { BarChart3, Eye, GraduationCap, Trophy, TrendingUp, TrendingDown, Loader2, AlertTriangle } from 'lucide-react'
 
 interface FunnelData {
   course_id: number
@@ -14,6 +14,21 @@ interface FunnelData {
   daily: { date: string; views: number; enrollments: number; completions: number }[]
 }
 
+interface DropoffData {
+  course_id: number
+  course_title: string
+  days_window: number
+  baseline_viewers: number
+  slides: {
+    slide_id: number
+    order_index: number
+    title: string
+    unique_viewers: number
+    retention: number
+    step_dropoff: number
+  }[]
+}
+
 interface Props {
   courseId: number
 }
@@ -25,14 +40,18 @@ interface Props {
  */
 export function CourseFunnelPanel({ courseId }: Props) {
   const [data, setData] = useState<FunnelData | null>(null)
+  const [dropoff, setDropoff] = useState<DropoffData | null>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/admin/marketplace-funnel/${courseId}`, { params: { days } })
-      .then(r => setData(r.data))
-      .catch(() => setData(null))
+    Promise.all([
+      api.get(`/admin/marketplace-funnel/${courseId}`, { params: { days } }),
+      api.get(`/admin/course-dropoff/${courseId}`, { params: { days } }),
+    ])
+      .then(([f, d]) => { setData(f.data); setDropoff(d.data) })
+      .catch(() => { setData(null); setDropoff(null) })
       .finally(() => setLoading(false))
   }, [courseId, days])
 
@@ -115,6 +134,54 @@ export function CourseFunnelPanel({ courseId }: Props) {
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Completes</span>
         </div>
       </div>
+
+      {/* Iter 26 — Slide-level drop-off heatmap */}
+      {dropoff && dropoff.slides.length > 0 && (
+        <div className="mt-6 pt-5 border-t border-slate-100" data-testid="slide-dropoff-block">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] uppercase font-medium tracking-wide text-slate-500">Slide drop-off</p>
+            <span className="text-[10px] text-slate-400">baseline: {dropoff.baseline_viewers} viewers</span>
+          </div>
+          {dropoff.baseline_viewers === 0 ? (
+            <p className="text-xs text-slate-400 py-2" data-testid="slide-dropoff-empty">
+              No slide-view data yet. Learners must play the course for tracking to appear.
+            </p>
+          ) : (
+            <ul className="space-y-1.5" data-testid="slide-dropoff-list">
+              {dropoff.slides.map(s => {
+                const pct = Math.max(0, Math.min(100, s.retention * 100))
+                const isSevereDrop = s.step_dropoff > 0.5 && s.order_index > 0
+                return (
+                  <li key={s.slide_id} className="flex items-center gap-2 text-xs"
+                    data-testid={`slide-dropoff-row-${s.slide_id}`}>
+                    <span className="w-5 text-right text-slate-400 tabular-nums">{s.order_index + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        {isSevereDrop && (
+                          <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0"
+                            data-testid={`slide-dropoff-warning-${s.slide_id}`} />
+                        )}
+                        <span className={`truncate ${isSevereDrop ? 'text-amber-700 font-medium' : 'text-slate-600'}`}>
+                          {s.title || `Slide ${s.order_index + 1}`}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full ${isSevereDrop ? 'bg-amber-400' : pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-slate-400'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-14 text-right tabular-nums text-slate-500">
+                      {s.unique_viewers} · {(s.retention * 100).toFixed(0)}%
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   )
 }

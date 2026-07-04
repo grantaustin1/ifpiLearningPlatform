@@ -24,9 +24,18 @@ export default function LearnPage() {
     })()
   }, [courseId])
 
+  const slide = course?.slides?.[current]
+
+  // Iter 26 — Slide-view drop-off tracking. Fire once per (slide,
+  // user, day) via the public track-view endpoint. Silent — an error
+  // must never derail the player.
+  useEffect(() => {
+    if (!slide?.id || !courseId) return
+    api.post(`/catalog/${courseId}/slides/${slide.id}/track-view`).catch(() => { /* silent */ })
+  }, [slide?.id, courseId])
+
   if (!course) return <div className="flex items-center justify-center h-screen"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
 
-  const slide = course.slides[current]
   const progress = course.slides.length ? (completed.size / course.slides.length) * 100 : 0
   const isLast = current === course.slides.length - 1
 

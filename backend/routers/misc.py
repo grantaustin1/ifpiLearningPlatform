@@ -217,6 +217,18 @@ def my_gamification(db: Session = Depends(get_db),
     return {"points": user.points or 0, "badges": badges, "rank": rank, "total": total}
 
 
+@gam_router.get("/learning-streak")
+def learning_streak(
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(get_current_user),
+):
+    """Iter 26 — Consecutive-day learning streak. A day counts when the
+    learner viewed a course slide OR reviewed a flashcard. Returns
+    `{current_streak, longest_streak, active_today, last_active_date}`."""
+    from services.gamification_service import GamificationService
+    return GamificationService(db).compute_learning_streak(current.id)
+
+
 # ── Analytics (admin) ────────────────────────────────────────────────
 admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 

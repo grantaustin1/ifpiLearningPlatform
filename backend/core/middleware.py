@@ -238,6 +238,15 @@ class LoginBruteForceMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _client_ip(request: Request) -> str:
+        # Iter 26 — Test-only IP pinning header. Prevents CI flakiness
+        # from parallel workers sharing the K8s ingress upstream IP.
+        # Gated behind `ALLOW_TEST_TOKEN_HEADER=true`; never active in
+        # production because the env var is off there.
+        import os as _os
+        if _os.environ.get("ALLOW_TEST_TOKEN_HEADER") == "true":
+            test_ip = request.headers.get("x-test-client-ip") or ""
+            if test_ip.strip():
+                return test_ip.strip()
         fwd = request.headers.get("x-forwarded-for") or ""
         if fwd:
             first = fwd.split(",")[0].strip()

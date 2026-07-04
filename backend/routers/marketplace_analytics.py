@@ -54,6 +54,14 @@ def _viewer_key(request: Request, user_id: Optional[int]) -> str:
     # `request.client.host` is the proxy's ephemeral IP, which changes
     # between requests. Trust `X-Forwarded-For` (first entry = real
     # client) when present; fall back to direct socket IP otherwise.
+    # Iter 26 — Same test-only IP pin as the login/verify limiters.
+    import os as _os
+    if _os.environ.get("ALLOW_TEST_TOKEN_HEADER") == "true":
+        test_ip = request.headers.get("x-test-client-ip") or ""
+        if test_ip.strip():
+            ua = request.headers.get("user-agent", "")
+            h = hashlib.sha256(f"{test_ip.strip()}|{ua}".encode()).hexdigest()[:16]
+            return f"a:{h}"
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
         ip = xff.split(",")[0].strip()
@@ -316,3 +324,101 @@ def marketplace_funnel(
         "enroll_to_complete_rate": enroll_to_complete,
         "daily": daily,
     }
+
+
+
+# ── Slide-level drop-off (Iter 26) ───────────────────────────────────
+from models import CourseSlide, SlideView  # noqa: E402
+
+
+@public_router.post("/{course_id}/slides/{slide_id}/track-view", status_code=200)
+def track_slide_view(
+    course_id: int,
+    slide_id: int,
+    db: Session = Depends(get_db),
+    current: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Iter 26 — Fire once per (slide, learner, day) from the course
+    player's slide-change effect. Anonymous viewers are ignored (we
+    need a user_id to compute drop-off — anon sessions can't be
+    correlated across slides reliably)."""
+    if current is None:
+        return {"tracked": False, "reason": "anon"}
+    # Verify the slide actually belongs to that course
+    slide = db.query(CourseSlide).filter(
+        CourseSlide.id == slide_id, CourseSlide.course_id == course_id
+    ).first()
+    if not slide:
+        return {"tracked": False, "reason": "unknown_slide"}
+    today = date.today().isoformat()
+    view = SlideView(
+        course_id=course_id, slide_id=slide_id,
+        user_id=current.id, viewed_on_date=today,
+    )
+    try:
+        db.add(view); db.commit()
+        return {"tracked": True}
+    except IntegrityError:
+        db.rollback()
+        return {"tracked": False, "reason": "already_counted_today"}
+
+
+@admin_router.get("/course-dropoff/{course_id}")
+def course_dropoff(
+    course_id: int,
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN", "INSTRUCTOR")),
+):
+    """Iter 26 — Per-slide unique-viewers + drop-off %. For each slide
+    in the course, compute how many unique learners viewed it in the
+    window, and the drop-off relative to the first slide (which acts
+    as the 100% baseline for course-entry)."""
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    since_iso = (date.today() - timedelta(days=days)).isoformat()
+    # Distinct-user counts per slide
+    rows = (
+        db.query(SlideView.slide_id, func.count(func.distinct(SlideView.user_id)))
+        .filter(SlideView.course_id == course_id,
+                SlideView.viewed_on_date >= since_iso)
+        .group_by(SlideView.slide_id).all()
+    )
+    counts = {sid: n for sid, n in rows}
+
+    slides = sorted(
+        db.query(CourseSlide).filter(CourseSlide.course_id == course_id).all(),
+        key=lambda s: s.order_index,
+    )
+    if not slides:
+        return {"course_id": course_id, "course_title": course.title,
+                "days_window": days, "slides": []}
+
+    baseline = counts.get(slides[0].id, 0)  # first slide = 100%
+    out = []
+    for i, s in enumerate(slides):
+        viewers = counts.get(s.id, 0)
+        retention = round(viewers / baseline, 4) if baseline > 0 else 0.0
+        prev_viewers = counts.get(slides[i - 1].id, 0) if i > 0 else viewers
+        step_dropoff = round(1 - (viewers / prev_viewers), 4) if prev_viewers > 0 else 0.0
+        out.append({
+            "slide_id": s.id,
+            "order_index": s.order_index,
+            "title": s.title,
+            "unique_viewers": viewers,
+            "retention": min(1.0, max(0.0, retention)),
+            "step_dropoff": min(1.0, max(0.0, step_dropoff)),
+        })
+    return {
+        "course_id": course_id,
+        "course_title": course.title,
+        "days_window": days,
+        "baseline_viewers": baseline,
+        "slides": out,
+    }
+

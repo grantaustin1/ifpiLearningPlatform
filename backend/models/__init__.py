@@ -1205,3 +1205,32 @@ class CourseView(Base):
     # (SQLite-friendly). Stored redundantly so dedup lookups are indexed.
     viewed_on_date = Column(String(10), nullable=False, index=True)
 
+
+
+
+# ── Slide-level engagement tracking (Iter 26) ───────────────────────
+class SlideView(Base):
+    """A recorded impression on a course slide inside the player.
+
+    Fired once per (slide, learner, day) — the frontend calls
+    `POST /api/courses/{cid}/slides/{sid}/track-view` when a slide
+    becomes the active view. Powers the drop-off heatmap on the Course
+    Edit funnel panel."""
+    __tablename__ = "slide_views"
+    __table_args__ = (
+        Index("ix_slide_views_course_slide", "course_id", "slide_id"),
+        UniqueConstraint(
+            "slide_id", "user_id", "viewed_on_date",
+            name="uq_slide_view_per_user_per_day",
+        ),
+    )
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"),
+                       nullable=False, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"),
+                      nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
+    viewed_at = Column(DateTime, default=_utcnow, nullable=False)
+    viewed_on_date = Column(String(10), nullable=False, index=True)
+

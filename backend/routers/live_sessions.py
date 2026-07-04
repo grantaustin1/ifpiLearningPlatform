@@ -538,9 +538,16 @@ def create_subscription_url(kind: str = "admin", db: Session = Depends(get_db),
     """Return a URL the caller can hand to their calendar app. The URL
     is idempotent for a given (user_id, kind, org, secret-version) —
     rotating the org's subscription_secret_version issues a fresh URL
-    and kills all outstanding ones."""
-    if kind not in ("admin", "learner"):
-        raise HTTPException(status_code=400, detail="kind must be 'admin' or 'learner'")
+    and kills all outstanding ones.
+
+    kinds:
+      - `admin`   : every upcoming session in the org (admin/instructor only)
+      - `learner` : all cohort-visible upcoming sessions
+      - `my_rsvps`: only sessions the caller has actively RSVP'd to
+    """
+    if kind not in ("admin", "learner", "my_rsvps"):
+        raise HTTPException(status_code=400,
+                            detail="kind must be 'admin', 'learner' or 'my_rsvps'")
     if kind == "admin":
         if not current.has_any_role({"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}):
             raise HTTPException(status_code=403, detail="Not authorised for admin subscription")
@@ -612,6 +619,16 @@ def subscribe_ics(token: str, db: Session = Depends(get_db)):
         sessions = [s for s in cohort_ok if not s.cohort or s.id in my_rsvps or True]
         # (For simplicity we include all cohort-visible upcoming, matching
         # the /upcoming endpoint semantics. Learner can un-RSVP later.)
+    elif kind == "my_rsvps":
+        # Iter 26 — Personal feed: ONLY sessions the learner has an
+        # active RSVP against. Ignores cohort filter entirely.
+        my_rsvp_ids = [r.session_id for r in db.query(LiveSessionRsvp).filter(
+            LiveSessionRsvp.user_id == user_id,
+            LiveSessionRsvp.status == "RSVP",
+        ).all()]
+        sessions = q.filter(LiveSession.id.in_(my_rsvp_ids)).order_by(
+            LiveSession.start_at.asc()
+        ).all() if my_rsvp_ids else []
     else:
         # Admin kind = all upcoming sessions in the org
         sessions = q.order_by(LiveSession.start_at.asc()).all()
@@ -663,8 +680,8 @@ def subscribe_url_qr(
     learners can scan directly from their phones. Cheap to generate
     (~5ms), no caching needed — regenerated on each request so a
     secret rotation produces a fresh code immediately."""
-    if kind not in ("admin", "learner"):
-        raise HTTPException(status_code=400, detail="kind must be 'admin' or 'learner'")
+    if kind not in ("admin", "learner", "my_rsvps"):
+        raise HTTPException(status_code=400, detail="kind must be 'admin', 'learner' or 'my_rsvps'")
     if kind == "admin" and not current.has_any_role({"ADMIN", "SUPER_ADMIN", "INSTRUCTOR"}):
         raise HTTPException(status_code=403, detail="Not authorised for admin subscription")
 

@@ -1,0 +1,34 @@
+{
+  "summary": "Iter-26 sprint validation (P0 + streak UX). Backend: 10/10 tests in test_iteration26_sprint.py pass through the ingress; previously flaky test_iteration20_retest::test_public_verify_rate_limiter_triggers_429 now passes reliably (env-fix landed). Frontend: end-to-end validated all four features via Playwright on the preview URL. (1) SLIDE-VIEW TRACKING — /learn/1 fires POST /api/catalog/1/slides/{sid}/track-view exactly once per slide as learner walks through (verified network intercept: 3 POSTs for slides 5,4,3 as learner navigated). (2) COURSE FUNNEL PANEL — /courses/1/edit renders the CourseFunnelPanel with the new slide-dropoff-block below the funnel: 5 rows (slide-dropoff-row-5..-1) with retention bars showing '1 · 100%' for first 3 slides (viewed) and '0 · 0%' for last 2 (not viewed). One warning icon (slide-dropoff-warning-2) renders on 'What is IFPI?' (step_dropoff between viewed and unviewed slides > 0.5). Baseline label 'baseline: 1 viewers'. (3) SUBSCRIPTION PICKER — Learner clicking subscribe-calendar-btn opens data-testid='subscription-kind-picker' with BOTH pick-kind-learner + pick-kind-my-rsvps options. Choosing my-rsvps fires POST subscribe-url?kind=my_rsvps + GET qr?kind=my_rsvps and opens subscription-modal with subscription-url-input (embedded JWT payload decodes to kind='my_rsvps') and subscription-qr SVG. Admin clicking the same button skips the picker entirely — goes straight to modal with kind='admin' (verified: POST subscribe-url?kind=admin fired, no picker rendered). (4) STREAK BADGE — On /courses page (learner), learning-streak-badge renders with '1-day streak' text; orange (non-muted) variant since active_today=true; no learning-streak-best because current==longest==1. Underlying GET /api/gamification/learning-streak returns the expected shape. No frontend regressions; UI compiles cleanly; no console errors during the flows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Course edit page (/courses/{id}/edit)", "issues": ["Marketplace-funnel + slide-dropoff card in right rail is tall — 'DAILY TREND' + 'SLIDE DROP-OFF' sections push below the fold on 1080p. Non-blocking cosmetic; a collapsible section or two-column layout would help density. Also: on ai-tutor-toggle floating button intercepts pointer events on next-slide-btn if Playwright clicks without force=True; end users' pointer targets are fine due to CSS z-order + bottom-right offset, but any future overlay work should keep this in mind."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration26_sprint.py",
+    "/app/test_reports/pytest/iter26_sprint.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SLIDE-VIEW TRACKING — LearnPage.tsx line 32-35: useEffect deps [slide?.id, courseId] correctly re-fires per slide switch; error is swallowed with .catch(()=>{}) so player is never derailed — matches PRD intent. Backend track-view endpoint returns tracked=false with reason='already_counted_today' on duplicate, which the frontend correctly ignores.",
+    "COURSE FUNNEL DROP-OFF — CourseFunnelPanel.tsx line 138-184: dropoff renders only when dropoff.slides.length > 0 (correct guard), and shows slide-dropoff-empty when baseline_viewers==0. Retention bar clamped [0,100]%. Severe-drop warning icon renders only when step_dropoff>0.5 AND order_index>0 (correct — no false alarm on slide 1). All required testids present: slide-dropoff-block, slide-dropoff-list, slide-dropoff-row-{id}, slide-dropoff-warning-{id}, slide-dropoff-empty.",
+    "SUBSCRIPTION PICKER — LiveSessionsPage.tsx line 111-116 onSubscribeClick: `if (isAdmin) return getSubscriptionUrl('admin'); setShowKindPicker(true)` — matches the 'admin skips picker' contract exactly. SubscriptionKindPicker renders picker + both testid'd option cards; onClose properly nulls state so users can dismiss.",
+    "STREAK BADGE — LearningStreakBadge.tsx: hides on current_streak==0 (correct 'no shame' behaviour), muted amber when idleToday, orange when active. Best-streak sub-label ONLY when longest>current (correct — avoids '1-day streak · best 1d' redundancy).",
+    "RATE-LIMIT ENV-FIX — X-Test-Client-Ip header successfully pins the rate-limit bucket per test-only value. Verified via ingress: IP-A gets 429 within 60 requests, IP-B stays clean. This unblocks the previously flaky iter-20 rate-limit test which now passes deterministically.",
+    "NO FILE-SIZE / DRY / TESTID VIOLATIONS FOUND in new/modified components (LearnPage 134 lines, CourseFunnelPanel 188 lines, LiveSessionsPage 667 lines — LiveSessionsPage is approaching the 700-line threshold; consider splitting SubscriptionKindPicker + SubscriptionModal + CreateSessionModal into separate files in a future refactor, but not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (10/10 iter26 sprint tests + previously flaky rate-limit test now stable)", "frontend": "100% (all 4 feature areas verified end-to-end with correct data-testids and network calls)"},
+  "test_credentials": "admin@ifpi.org / admin123, learner@ifpi.org / learner123",
+  "seed_data_creation": "Test suite created & cleaned up its own TEST_iter26sprint_* courses. No lingering seed data from this run; the pre-existing seed course id=1 'IFPI Fundamentals' + iter24 cohort live sessions untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-26 sprint fully certified. Learner streak is now '1-day' (current==longest==1) — badge is orange non-muted (active_today=true). Course 1 baseline_viewers=1 with slides 3/4/5 at 100% retention and slides 1/2 at 0% (learner walked through first 3 only). Warning icon renders on slide id=2 (order_index=3, 'What is IFPI?') due to step_dropoff==1.0 between viewed & unviewed slides. Subscription URL JWT payload embeds kind as literal string ('my_rsvps'/'admin'/'learner') — visible in base64-decoded token. Rate-limit test infra is now green through ingress via X-Test-Client-Ip header (ALLOW_TEST_TOKEN_HEADER=true present)."
+}

@@ -92,18 +92,27 @@ export default function LiveSessionsPage() {
   }
 
   const [subscriptionUrl, setSubscriptionUrl] = useState<string | null>(null)
-  const [subscriptionKind, setSubscriptionKind] = useState<'admin' | 'learner'>('admin')
+  const [subscriptionKind, setSubscriptionKind] = useState<'admin' | 'learner' | 'my_rsvps'>('admin')
+  const [showKindPicker, setShowKindPicker] = useState(false)
 
-  const getSubscriptionUrl = async (kind: 'admin' | 'learner') => {
+  const getSubscriptionUrl = async (kind: 'admin' | 'learner' | 'my_rsvps') => {
     try {
       const r = await api.post(`/live-sessions/subscribe-url?kind=${kind}`)
       const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
       const fullUrl = `${backend}${r.data.path}`
       setSubscriptionKind(kind)
       setSubscriptionUrl(fullUrl)
+      setShowKindPicker(false)
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Failed')
     }
+  }
+
+  const onSubscribeClick = () => {
+    // Admins go straight to the admin feed; learners choose between
+    // "everything in my cohort" and "only sessions I RSVP'd to".
+    if (isAdmin) return getSubscriptionUrl('admin')
+    setShowKindPicker(true)
   }
 
   const rotateSubscriptionSecret = async () => {
@@ -178,7 +187,7 @@ export default function LiveSessionsPage() {
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Video className="h-6 w-6 text-indigo-600" /> Live sessions</h1>
           <p className="text-sm text-slate-500 mt-1">Scheduled cohort sessions on your preferred meeting platform.</p>
         </div>
-        <button onClick={() => getSubscriptionUrl(isAdmin ? 'admin' : 'learner')}
+        <button onClick={onSubscribeClick}
           data-testid="subscribe-calendar-btn"
           className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg">
           <Calendar className="h-4 w-4" /> Subscribe to calendar
@@ -284,6 +293,12 @@ export default function LiveSessionsPage() {
 
       {showCreate && <CreateSessionModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
       {detailId !== null && <AttendanceModal sessionId={detailId} onClose={() => { setDetailId(null); load() }} />}
+      {showKindPicker && (
+        <SubscriptionKindPicker
+          onPick={getSubscriptionUrl}
+          onClose={() => setShowKindPicker(false)}
+        />
+      )}
       {subscriptionUrl && (
         <SubscriptionModal
           url={subscriptionUrl}
@@ -298,17 +313,54 @@ export default function LiveSessionsPage() {
 }
 
 
+function SubscriptionKindPicker({ onPick, onClose }: {
+  onPick: (kind: 'learner' | 'my_rsvps') => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" data-testid="subscription-kind-picker">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <h2 className="font-semibold text-slate-900">Which sessions?</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Choose what your calendar app should sync.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" data-testid="close-kind-picker">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5 space-y-2">
+          <button
+            onClick={() => onPick('learner')}
+            data-testid="pick-kind-learner"
+            className="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+          >
+            <p className="font-medium text-slate-900 text-sm">All my cohort sessions</p>
+            <p className="text-xs text-slate-500 mt-1">Everything visible to me — cohort-matched + open sessions.</p>
+          </button>
+          <button
+            onClick={() => onPick('my_rsvps')}
+            data-testid="pick-kind-my-rsvps"
+            className="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+          >
+            <p className="font-medium text-slate-900 text-sm">Only sessions I&apos;ve RSVP&apos;d to</p>
+            <p className="text-xs text-slate-500 mt-1">A tighter feed — updates live as you RSVP or cancel.</p>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function SubscriptionModal({ url, kind, isAdmin, onClose, onRotate }: {
   url: string
-  kind: 'admin' | 'learner'
+  kind: 'admin' | 'learner' | 'my_rsvps'
   isAdmin: boolean
   onClose: () => void
   onRotate: () => void
 }) {
   const [copied, setCopied] = useState(false)
-  // Extract token from url for the QR endpoint call
-  const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
-  const qrSrc = `${backend}/api/live-sessions/subscribe-url/qr?kind=${kind}`
 
   const copyToClipboard = async () => {
     try {

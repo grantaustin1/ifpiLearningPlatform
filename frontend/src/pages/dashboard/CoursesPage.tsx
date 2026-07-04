@@ -6,6 +6,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { LearningStreakBadge } from 'components/LearningStreakBadge'
 
 export default function CoursesPage() {
   const qc = useQueryClient()
@@ -55,7 +56,10 @@ export default function CoursesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 font-display">{isAdmin ? 'Courses' : 'My Courses'}</h1>
-          <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${courses.length} courses available`}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-slate-500">{isLoading ? 'Loading…' : `${courses.length} courses available`}</p>
+            {!isAdmin && <LearningStreakBadge />}
+          </div>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
