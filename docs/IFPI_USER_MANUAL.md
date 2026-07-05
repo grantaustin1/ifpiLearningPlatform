@@ -366,12 +366,12 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/public_catalog.py` | 153 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
-| `routers/scorm_xapi.py` | 499 |
+| `routers/scorm_xapi.py` | 512 |
 | `routers/seo.py` | 257 |
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11089** |
+| **Total** | **11102** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory

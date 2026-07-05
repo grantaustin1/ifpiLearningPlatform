@@ -25,8 +25,21 @@ logger = logging.getLogger("ifpi.scorm.router")
 
 # Where extracted packages live. Disk root — served as static files via
 # /api/scorm/files/<package_id>/<rel_path>.
-SCORM_ROOT = Path(os.environ.get("SCORM_PACKAGE_ROOT", "/app/backend/uploads/scorm"))
-SCORM_ROOT.mkdir(parents=True, exist_ok=True)
+#
+# Defaults to `<backend-root>/uploads/scorm` so the path is portable
+# across dev (/app/backend), CI (/home/runner/.../backend), and prod
+# (any working directory). Override with SCORM_PACKAGE_ROOT env var to
+# point at an S3-mounted persistent volume in production.
+_DEFAULT_SCORM_ROOT = Path(__file__).resolve().parent.parent / "uploads" / "scorm"
+SCORM_ROOT = Path(os.environ.get("SCORM_PACKAGE_ROOT", str(_DEFAULT_SCORM_ROOT)))
+try:
+    SCORM_ROOT.mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError) as _e:
+    # CI / read-only FS: don't crash the import. The upload endpoint
+    # itself will surface a 500 if the dir can't be created at request
+    # time — which is the correct place to signal a config error.
+    logger.warning("SCORM_ROOT mkdir failed at import (%s); dir will be "
+                   "created lazily on first upload", _e)
 
 MAX_SCORM_ZIP = 100 * 1024 * 1024  # 100 MB
 
