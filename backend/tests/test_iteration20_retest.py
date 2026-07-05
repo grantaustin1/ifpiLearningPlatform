@@ -39,6 +39,15 @@ def test_public_verify_rate_limiter_triggers_429(learner):
     certs = learner.get(f"{BASE_URL}/api/certificates", timeout=10).json()
     code = certs[0].get("code") or certs[0].get("cert_code") if certs else "BOGUS-CODE"
 
+    # Iter 26 — Pin our own client IP so parallel CI workers don't
+    # share a bucket with the K8s ingress upstream IP (which throttled
+    # the shared bucket faster than we could hit our own 30/min limit,
+    # producing false negatives). Gated behind ALLOW_TEST_TOKEN_HEADER
+    # server-side; env var is off in prod so this header is ignored.
+    import uuid as _uuid
+    pinned_ip = f"127.0.0.{(int(_uuid.uuid4()) % 200) + 20}"  # 127.0.0.20..127.0.0.219
+    headers = {"X-Test-Client-Ip": pinned_ip}
+
     # Reset redis to a clean state
     try:
         import redis
@@ -50,7 +59,8 @@ def test_public_verify_rate_limiter_triggers_429(learner):
     saw_429 = False
     retry_after = None
     for i in range(60):
-        resp = requests.get(f"{BASE_URL}/api/public/certificates/verify/{code}", timeout=10)
+        resp = requests.get(f"{BASE_URL}/api/public/certificates/verify/{code}",
+                            headers=headers, timeout=10)
         if resp.status_code == 429:
             saw_429 = True
             retry_after = resp.headers.get("Retry-After")
