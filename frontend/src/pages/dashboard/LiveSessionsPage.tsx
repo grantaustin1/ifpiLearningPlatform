@@ -75,6 +75,7 @@ export default function LiveSessionsPage() {
     } finally { setLoading(false) }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [])
 
   const toggleRsvp = async (s: LiveSession, allInSeries = false) => {

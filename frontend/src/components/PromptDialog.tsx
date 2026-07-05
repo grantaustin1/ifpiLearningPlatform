@@ -70,6 +70,7 @@ export function PromptDialogProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, value])
 
   return (

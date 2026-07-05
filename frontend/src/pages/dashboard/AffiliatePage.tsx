@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
-import { Users, Plus, Copy, Check, DollarSign, Loader2, ToggleRight } from 'lucide-react'
+import { Users, Plus, Copy, Check, DollarSign, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Code = {

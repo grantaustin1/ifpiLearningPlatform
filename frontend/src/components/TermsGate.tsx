@@ -30,6 +30,7 @@ export function TermsGate() {
     try { const r = await api.get('/terms/current'); setState(r.data) }
     catch { /* ignore — endpoint may 401 during logout */ }
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (user) load() }, [user?.id])
 
   if (!user || !state?.has_terms || state.accepted) return null
