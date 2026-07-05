@@ -34,6 +34,10 @@ def register_all(app: FastAPI) -> None:
     app.include_router(misc.billing_router)
     app.include_router(misc.catalog_router)
 
+    # Iter 28 — Public SEO endpoints (no /api prefix)
+    from routers import seo
+    app.include_router(seo.router)
+
     # ── Onboarding: invitations + lead capture + org/outbox ──────────
     from routers import invitations, extras
     app.include_router(invitations.admin_router)
@@ -107,4 +111,50 @@ def register_all(app: FastAPI) -> None:
     # ── Iter 30e: Docs Library (downloadable manuals) ────────────────
     from routers import docs_library
     app.include_router(docs_library.router)
+
+    # ── Iter 30i: TOTP-based 2FA ─────────────────────────────────────
+    from routers import totp
+    app.include_router(totp.user_router)
+    app.include_router(totp.admin_router)
+
+    # ── Iter 30k: Owner dashboard widgets ────────────────────────────
+    from routers import owner_dashboard
+    app.include_router(owner_dashboard.router)
+
+    # ── Iter 30l: T&Cs, kiosk, feature flags ────────────────────────
+    from routers import terms_kiosk
+    app.include_router(terms_kiosk.router)
+
+    # ── Iter 30m: AI Tutor v1 ────────────────────────────────────────
+    from routers import ai_tutor
+    app.include_router(ai_tutor.router)
+
+    # ── Iter 30o: Owner onboarding checklist ────────────────────────
+    from routers import onboarding
+    app.include_router(onboarding.router)
+
+    # ── Iter 30p: Scheduled reports ─────────────────────────────────
+    from routers import scheduled_reports
+    app.include_router(scheduled_reports.router)
+
+    # ── Iter 30q: AI Query Builder ──────────────────────────────────
+    from routers import query_builder
+    app.include_router(query_builder.router)
+
+    # ── Iter 30r: Email diagnostics ─────────────────────────────────
+    from routers import email_diagnostics
+    app.include_router(email_diagnostics.router)
+
+    # ── Iter 30s: Affiliate / referral program ──────────────────────
+    from routers import affiliate
+    app.include_router(affiliate.router)
+
+    # ── Iter 22: Live Sessions (cohort meetings + attendance) ────────
+    from routers import live_sessions
+    app.include_router(live_sessions.router)
+
+    # ── Iter 24: Marketplace funnel analytics ────────────────────────
+    from routers import marketplace_analytics
+    app.include_router(marketplace_analytics.public_router)
+    app.include_router(marketplace_analytics.admin_router)
 

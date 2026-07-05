@@ -117,6 +117,15 @@ class Organization(Base):
     # approaching the threshold + recap of those past it.
     cohort_digest_enabled = Column(Boolean, default=True, nullable=False)
     cohort_digest_last_sent_at = Column(DateTime)
+    # Iter 22 — Marketplace opt-in. When true, this org's PUBLISHED courses
+    # appear in the cross-tenant public marketplace (/api/catalog, /marketplace).
+    # Default true so the seeded IFPI org is discoverable out-of-the-box.
+    marketplace_opt_in = Column(Boolean, default=True, nullable=False)
+    # Iter 25 — Subscription URL secret version. Bumping this (via
+    # POST /api/live-sessions/subscribe-url/rotate) invalidates every
+    # outstanding calendar-subscription URL scoped to this org, WITHOUT
+    # touching JWT_SECRET (which would log out every active user).
+    subscription_secret_version = Column(Integer, default=1, nullable=False)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -139,6 +148,18 @@ class User(Base):
     points = Column(Integer, default=0)             # gamification XP
     cohort = Column(String(100), index=True)         # nullable — populated when invited via a cohort batch
     erp360_user_id = Column(Integer, nullable=True, index=True)  # link for SSO
+    # Iter 30i — TOTP-based 2FA (RFC 6238). Secret stored Fernet-
+    # encrypted alongside SMTP passwords. Enabled_at both marks the
+    # user as 2FA-required AND records when they turned it on. Recovery
+    # codes are single-use bcrypt-hashed backups (10 issued at setup).
+    totp_secret_enc = Column(String(500), nullable=True)
+    totp_enabled_at = Column(DateTime, nullable=True)
+    totp_recovery_codes = Column(JSON, nullable=True, default=list)
+    # Iter 27 — streak-break nudge dedup (dont email twice for same lapse)
+    streak_nudge_last_sent_at = Column(DateTime, nullable=True)
+    # Iter 31 — user-level weekly streak digest opt-out (default True)
+    streak_digest_enabled = Column(Boolean, nullable=False, default=True,
+                                   server_default="1")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -309,13 +330,33 @@ class Certificate(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     exam_id = Column(Integer, ForeignKey("exams.id"), nullable=True)
+    # Iter 27 — attach cert to a live session for attendance certs
+    live_session_id = Column(Integer, ForeignKey("live_sessions.id"),
+                             nullable=True, index=True)
     type = Column(String(50), default="COURSE_COMPLETION")
     code = Column(String(40), unique=True, nullable=False, default=_cuid)
     score = Column(Float, nullable=True)
     issued_at = Column(DateTime, default=_utcnow)
+    # Iter 29 — Revocation
+    revoked_at = Column(DateTime, nullable=True, index=True)
+    revoked_reason = Column(String(255), nullable=True)
 
     user = relationship("User", back_populates="certificates")
     course = relationship("Course", back_populates="certificates")
+
+
+class CertificateRevocationEvent(Base):
+    """Iter 30 — Audit trail for cert revocation actions."""
+    __tablename__ = "certificate_revocation_events"
+    id = Column(Integer, primary_key=True)
+    certificate_id = Column(Integer, ForeignKey("certificates.id"),
+                            nullable=False, index=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"),
+                           nullable=False, index=True)
+    action = Column(String(20), nullable=False)  # REVOKE | UNREVOKE
+    reason = Column(String(255), nullable=True)
+    occurred_at = Column(DateTime, nullable=False, index=True,
+                         default=_utcnow)
 
 
 # ── Gamification ─────────────────────────────────────────────────────
@@ -900,3 +941,321 @@ class FlashcardReview(Base):
     last_reviewed_at = Column(DateTime)
     review_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Iter 30l — T&Cs versions + acceptances, per-org kiosk settings,
+# per-org feature-module flags.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class TermsVersion(Base):
+    """A single published version of an organisation's Terms & Conditions.
+
+    Versions are additive: publishing a new version supersedes the
+    previous `current=True` row (a trigger below flips it). Body is
+    markdown; frontend renders + shows a required "I accept" gate the
+    first time a user encounters a fresh version.
+    """
+    __tablename__ = "terms_versions"
+    __table_args__ = (
+        Index("ix_terms_org_version", "organization_id", "version"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    version = Column(String(32), nullable=False)  # e.g. "1.0", "2024-Q3"
+    title = Column(String(255), nullable=False, default="Terms of Service")
+    body_markdown = Column(Text, nullable=False, default="")
+    is_current = Column(Boolean, nullable=False, default=False, index=True)
+    published_by_user_id = Column(Integer, ForeignKey("users.id"))
+    published_at = Column(DateTime, nullable=False, default=_utcnow)
+
+
+class TermsAcceptance(Base):
+    """One row per (user, version). Immutable ledger."""
+    __tablename__ = "terms_acceptances"
+    __table_args__ = (
+        UniqueConstraint("user_id", "terms_version_id", name="uq_terms_ack"),
+    )
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    terms_version_id = Column(Integer, ForeignKey("terms_versions.id"),
+                              nullable=False, index=True)
+    accepted_at = Column(DateTime, nullable=False, default=_utcnow)
+    ip_address = Column(String(45))     # IPv4/IPv6 for audit
+    user_agent = Column(String(500))
+
+
+class KioskSettings(Base):
+    """Per-org kiosk config. One row per org (nullable — orgs without a
+    row default to sensible values)."""
+    __tablename__ = "kiosk_settings"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, unique=True, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    # Idle lock timeout in seconds (0 = never lock)
+    idle_timeout_seconds = Column(Integer, default=300, nullable=False)
+    # Optional PIN (bcrypt-hashed) required to unlock the kiosk. When
+    # NULL the user must re-enter password.
+    unlock_pin_hash = Column(String(200), nullable=True)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)
+
+
+class FeatureFlag(Base):
+    """Per-org feature module toggle. Missing row = default (usually ON).
+    This is a stopgap for granular billing / progressive rollout —
+    NOT a full LaunchDarkly-style targeting engine."""
+    __tablename__ = "feature_flags"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "flag_key", name="uq_flag_org_key"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    flag_key = Column(String(80), nullable=False, index=True)
+    enabled = Column(Boolean, default=True, nullable=False)
+    note = Column(String(500), nullable=True)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)
+
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Iter 30m — AI Tutor v1 (learner-facing course chat).
+# Reuses SourceDocument + SourceChunk + embedding_service for retrieval.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class AITutorSession(Base):
+    """One conversation with the AI tutor. Keyed to (user, course) —
+    persisted so learners can resume mid-chat."""
+    __tablename__ = "ai_tutor_sessions"
+    __table_args__ = (
+        Index("ix_tutor_session_user_course",
+              "user_id", "course_id"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False,
+                     index=True)
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"),
+                       nullable=True, index=True)
+    title = Column(String(200), nullable=False, default="New chat")
+    archived_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    last_message_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class AITutorMessage(Base):
+    """One turn (either user or assistant). Assistant turns carry a JSON
+    `citations` list: `[{chunk_id, document_id, document_title, snippet, score}]`.
+    """
+    __tablename__ = "ai_tutor_messages"
+    __table_args__ = (
+        Index("ix_tutor_msg_session", "session_id", "created_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer,
+                        ForeignKey("ai_tutor_sessions.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    role = Column(String(12), nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    citations = Column(JSON, nullable=True)    # list[dict] on assistant turns
+    tokens_prompt = Column(Integer, nullable=True)
+    tokens_completion = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+
+
+class ScheduledReport(Base):
+    """Iter 30p — Per-admin schedulable reports.
+
+    Report types (report_kind):
+      - `members_needing_action`
+      - `cohort_progress`
+      - `certificate_issuance`
+      - `enrollment_summary`
+
+    Cadence (cadence): `daily | weekly | monthly`. Delivery is via the
+    existing outbox_worker Monday-morning tick — we generate + queue the
+    email into `outbox_messages` when the next_run_at cursor is reached.
+    """
+    __tablename__ = "scheduled_reports"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"),
+                                nullable=False, index=True)
+    report_kind = Column(String(50), nullable=False)
+    cadence = Column(String(20), nullable=False)  # daily/weekly/monthly
+    recipient_emails = Column(JSON, nullable=False, default=list)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=False, default=_utcnow)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow,
+                        nullable=False)
+
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Iter 30s — Affiliate / Referral program.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class AffiliateCode(Base):
+    """A referral code owned by an organisation. Sharing the code with a
+    new org during signup earns the owner a credit on their next invoice.
+    """
+    __tablename__ = "affiliate_codes"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    code = Column(String(40), nullable=False, unique=True, index=True)
+    reward_bps = Column(Integer, nullable=False, default=1000)  # 10% default
+    cap_credits_cents = Column(Integer, nullable=True)  # per-referral cap
+    expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    note = Column(String(500), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class AffiliateReferral(Base):
+    """One row per (code, referred_organization). Status changes are
+    tracked via credited_at."""
+    __tablename__ = "affiliate_referrals"
+    __table_args__ = (
+        UniqueConstraint("code_id", "referred_organization_id",
+                         name="uq_referral_code_org"),
+    )
+    id = Column(Integer, primary_key=True)
+    code_id = Column(Integer, ForeignKey("affiliate_codes.id"),
+                     nullable=False, index=True)
+    referred_organization_id = Column(Integer,
+                                      ForeignKey("organizations.id"),
+                                      nullable=False, index=True)
+    signed_up_at = Column(DateTime, default=_utcnow, nullable=False)
+    credit_cents = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="PENDING",
+                    index=True)  # PENDING | CREDITED | REJECTED
+    credited_at = Column(DateTime, nullable=True)
+    notes = Column(String(500), nullable=True)
+
+
+
+# ── Live Sessions (Iter 22) ──────────────────────────────────────────
+class LiveSession(Base):
+    """A scheduled cohort session hosted on an external meeting provider
+    (Zoom/Meet/Teams — admin pastes the join URL). Learners RSVP, and
+    admins mark attendance after the event."""
+    __tablename__ = "live_sessions"
+    __table_args__ = (
+        Index("ix_live_sessions_org_start", "organization_id", "start_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"),
+                             nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)  # optional link to a course
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    meeting_url = Column(String(1000), nullable=False)  # BYO — any Zoom/Meet/Teams link
+    start_at = Column(DateTime, nullable=False, index=True)
+    duration_minutes = Column(Integer, nullable=False, default=60)
+    host_name = Column(String(200), nullable=True)
+    cohort = Column(String(100), nullable=True, index=True)  # optional cohort filter
+    max_attendees = Column(Integer, nullable=True)
+    # Iter 23 — Recurrence + reminder support
+    recurrence_rule = Column(String(500), nullable=True)  # iCal RRULE string, e.g. "FREQ=WEEKLY;COUNT=8"
+    parent_series_id = Column(Integer, ForeignKey("live_sessions.id"), nullable=True, index=True)
+    reminder_sent_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)  # Iter 24 — single-occurrence cancel (EXDATE)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    rsvps = relationship("LiveSessionRsvp", back_populates="session",
+                         cascade="all,delete-orphan")
+
+
+class LiveSessionRsvp(Base):
+    """Per-learner RSVP + attendance state.
+    Status: RSVP → ATTENDED / NO_SHOW / CANCELLED."""
+    __tablename__ = "live_session_rsvps"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_rsvp_session_user"),
+    )
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("live_sessions.id"),
+                        nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="RSVP", index=True)
+    rsvped_at = Column(DateTime, default=_utcnow, nullable=False)
+    attendance_marked_at = Column(DateTime, nullable=True)
+
+    session = relationship("LiveSession", back_populates="rsvps")
+
+
+
+# ── Marketplace funnel analytics (Iter 24) ──────────────────────────
+class CourseView(Base):
+    """A recorded impression on the public marketplace course-detail page.
+    Deduped upstream by (course_id, viewer_key, day) so refresh-mashers
+    don't inflate the funnel."""
+    __tablename__ = "course_views"
+    __table_args__ = (
+        Index("ix_course_views_course_day", "course_id", "viewed_on_date"),
+        UniqueConstraint(
+            "course_id", "viewer_key", "viewed_on_date",
+            name="uq_course_view_unique_per_day",
+        ),
+    )
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    # Viewer key: `u:<user_id>` for authed viewers, `a:<anon_hash>` for
+    # anon (SHA-256 of IP+UA truncated to 16 hex chars). Never PII on
+    # its own — the anon hash cannot be reversed to an identity.
+    viewer_key = Column(String(80), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    referrer = Column(String(500), nullable=True)
+    viewed_at = Column(DateTime, default=_utcnow, nullable=False)
+    # Day-only column for the dedup unique constraint; ISO date string
+    # (SQLite-friendly). Stored redundantly so dedup lookups are indexed.
+    viewed_on_date = Column(String(10), nullable=False, index=True)
+
+
+
+
+# ── Slide-level engagement tracking (Iter 26) ───────────────────────
+class SlideView(Base):
+    """A recorded impression on a course slide inside the player.
+
+    Fired once per (slide, learner, day) — the frontend calls
+    `POST /api/courses/{cid}/slides/{sid}/track-view` when a slide
+    becomes the active view. Powers the drop-off heatmap on the Course
+    Edit funnel panel."""
+    __tablename__ = "slide_views"
+    __table_args__ = (
+        Index("ix_slide_views_course_slide", "course_id", "slide_id"),
+        UniqueConstraint(
+            "slide_id", "user_id", "viewed_on_date",
+            name="uq_slide_view_per_user_per_day",
+        ),
+    )
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"),
+                       nullable=False, index=True)
+    slide_id = Column(Integer, ForeignKey("course_slides.id"),
+                      nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
+    viewed_at = Column(DateTime, default=_utcnow, nullable=False)
+    viewed_on_date = Column(String(10), nullable=False, index=True)
+

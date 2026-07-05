@@ -87,7 +87,10 @@ class LearnerBehavior(TaskSet):
     @tag("smoke", "learner")
     @task(3)
     def dashboard(self):
-        self.client.get("/api/dashboard", name="/api/dashboard")
+        # Learners land on their own courses view after login. Use the
+        # notifications endpoint as a light "dashboard-shaped" call —
+        # it's <2kB and hits the auth path.
+        self.client.get("/api/notifications", name="/api/notifications (learner)")
 
     @tag("learner")
     @task(2)
@@ -103,8 +106,8 @@ class LearnerBehavior(TaskSet):
     @task(3)
     def flashcards_due(self):
         # Use course_id=1 which the seed provisions deterministically.
-        self.client.get("/api/learn/flashcards/courses/1",
-                        name="/api/learn/flashcards/courses/{id}")
+        self.client.get("/api/learn/flashcards/courses/1/due",
+                        name="/api/learn/flashcards/courses/{id}/due")
 
 
 # ─────────────────────────────────────────────────────────────────────
