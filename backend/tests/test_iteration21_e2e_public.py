@@ -14,12 +14,21 @@ import requests
 
 
 def _public_url() -> str:
+    # Prefer env var (populated by conftest.py or CI). Fall back to
+    # /app/frontend/.env for local dev, but never crash in CI where the
+    # frontend .env is gitignored.
+    v = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+    if v:
+        return v
     path = "/app/frontend/.env"
-    with open(path) as f:
-        for line in f:
-            if line.startswith("REACT_APP_BACKEND_URL"):
-                return line.split("=", 1)[1].strip().rstrip("/")
-    raise RuntimeError("REACT_APP_BACKEND_URL not found")
+    try:
+        with open(path) as f:
+            for line in f:
+                if line.startswith("REACT_APP_BACKEND_URL"):
+                    return line.split("=", 1)[1].strip().rstrip("/")
+    except FileNotFoundError:
+        pass
+    return ""
 
 
 BASE_URL = _public_url()
