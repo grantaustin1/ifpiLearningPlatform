@@ -133,3 +133,67 @@ class GamificationService:
             "longest_streak": max(longest, current_streak),
             "reviewed_today": reviewed_today,
         }
+
+    # ── Learning streak (Iter 26) ─────────────────────────────────
+    def compute_learning_streak(self, user_id: int) -> dict:
+        """Consecutive-day streak of "active learning" — a day counts if
+        the user viewed a course slide OR reviewed a flashcard on it.
+        Same day-boundary rules as `compute_flashcard_streak` (UTC
+        calendar day). Powers the streak badge on the learner
+        dashboard.
+
+        Returns {current_streak, longest_streak, active_today,
+                 last_active_date}.
+        """
+        from datetime import datetime, timezone, timedelta
+        from models import FlashcardReview, SlideView
+
+        # Collect active dates from both signals
+        slide_days = {r[0] for r in self.db.query(SlideView.viewed_on_date).filter(
+            SlideView.user_id == user_id
+        ).all() if r[0]}
+        fc_rows = self.db.query(FlashcardReview.last_reviewed_at).filter(
+            FlashcardReview.user_id == user_id,
+            FlashcardReview.last_reviewed_at.isnot(None),
+        ).all()
+
+        def _to_utc(dt):
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+        fc_days = {_to_utc(r[0]).date().isoformat() for r in fc_rows if r[0]}
+        all_day_strs = slide_days | fc_days
+        if not all_day_strs:
+            return {
+                "current_streak": 0, "longest_streak": 0,
+                "active_today": False, "last_active_date": None,
+            }
+        # Convert to sorted list of date objects, most recent first
+        days = sorted({
+            datetime.strptime(d, "%Y-%m-%d").date() for d in all_day_strs
+        }, reverse=True)
+        today = datetime.now(timezone.utc).date()
+        active_today = today in days
+
+        # Longest — walk consecutive gaps
+        longest = current = 1
+        for i in range(1, len(days)):
+            if (days[i - 1] - days[i]).days == 1:
+                current += 1
+                longest = max(longest, current)
+            else:
+                current = 1
+        # Current — count backward from today (or yesterday if idle today)
+        cursor = today if active_today else (today - timedelta(days=1))
+        current_streak = 0
+        for d in days:
+            if d == cursor:
+                current_streak += 1
+                cursor -= timedelta(days=1)
+            elif d < cursor:
+                break
+        return {
+            "current_streak": current_streak,
+            "longest_streak": max(longest, current_streak),
+            "active_today": active_today,
+            "last_active_date": days[0].isoformat(),
+        }

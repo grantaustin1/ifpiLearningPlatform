@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from auth.cookies import (
-    REFRESH_COOKIE, clear_auth_cookies, set_auth_cookie, set_refresh_cookie,
-    should_include_token_in_body,
+    REFRESH_COOKIE, clear_auth_cookies, generate_csrf_token, set_auth_cookie,
+    set_csrf_cookie, set_refresh_cookie, should_include_token_in_body,
 )
 from auth.dependencies import CurrentUser, get_current_user
 from core.config import settings
@@ -27,30 +27,55 @@ def _to_user_out(user) -> UserOut:
     )
 
 
-def _login_response(response: Response, user, access: str, refresh: str) -> LoginResponse:
+def _login_response(response: Response, user, access: str, refresh: str,
+                    request: Request | None = None) -> LoginResponse:
+    import os
     set_auth_cookie(response, access)
     set_refresh_cookie(response, refresh)
+    set_csrf_cookie(response, generate_csrf_token())
+    # Iter 22 — The `X-Return-Token: true` header used to be honoured
+    # unconditionally as a test/SDK affordance. That was effectively a
+    # backdoor in production: an XSS payload could set the header on a
+    # login retry and exfiltrate the JWT out of the HttpOnly cookie
+    # jar. It is now gated behind `ALLOW_TEST_TOKEN_HEADER=true`, which
+    # is set ONLY in development/test environments. Production deploys
+    # do not set the env var, so the header is inert.
+    test_bypass_allowed = os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() == "true"
+    return_token = should_include_token_in_body() or (
+        test_bypass_allowed and request is not None and
+        request.headers.get("x-return-token", "").lower() == "true"
+    )
     return LoginResponse(
-        access_token=access if should_include_token_in_body() else None,
+        access_token=access if return_token else None,
         expires_in=settings.jwt_expiration_minutes * 60,
         user=_to_user_out(user),
     )
 
 
 @router.post("/register", response_model=LoginResponse)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, response: Response,
+             db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.register(body.email, body.password, body.name)
     access, refresh = svc.issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
 
 
-@router.post("/login", response_model=LoginResponse)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+@router.post("/login")
+def login(body: LoginRequest, request: Request, response: Response,
+          db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.login(body.email, body.password)
+    # Iter 30i — if 2FA is enabled, don't issue tokens yet. Return an
+    # opaque challenge_id that the frontend exchanges for tokens after
+    # collecting the 6-digit code.
+    if user.totp_secret_enc and user.totp_enabled_at:
+        from routers.totp import create_challenge
+        cid, expires_in = create_challenge(user.id)
+        return {"requires_2fa": True, "challenge_id": cid,
+                "expires_in": expires_in}
     access, refresh = svc.issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)
 
 
 @router.post("/refresh", response_model=LoginResponse)
@@ -64,7 +89,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     if not token:
         raise HTTPException(status_code=401, detail="No refresh token")
     access, new_refresh, user = AuthService(db).rotate_refresh(token)
-    return _login_response(response, user, access, new_refresh)
+    return _login_response(response, user, access, new_refresh, request=request)
 
 
 @router.post("/logout")
@@ -151,4 +176,4 @@ def sso_exchange(payload: dict, response: Response, request: Request,
     db.commit()
 
     access, refresh = AuthService(db).issue_tokens(user)
-    return _login_response(response, user, access, refresh)
+    return _login_response(response, user, access, refresh, request=request)

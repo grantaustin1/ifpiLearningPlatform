@@ -78,3 +78,99 @@ def pytest_collection_modifyitems(config, items):
         if any(module_name.startswith(p) for p in static_prefixes):
             continue  # static tests always run
         item.add_marker(skip)
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# Iter 22 — Cookie + CSRF auth helpers for tests.
+#
+# In strict cookie mode (`AUTH_COOKIE_MODE=on`), login responses do not
+# expose `access_token` UNLESS the server-side test bypass env var
+# `ALLOW_TEST_TOKEN_HEADER=true` is set (dev/test only — never in prod).
+#
+# Two auth paths for test code:
+# (1) NEW tests should call `authed_session()` — returns a pure cookie
+#     Session; auth flows through the `ifpi_auth_token` HttpOnly cookie
+#     and the CSRF header is auto-mirrored on every unsafe request via
+#     the `Session.request` monkey-patch below. This is the recommended
+#     path going forward and mirrors the real browser client.
+#
+# (2) LEGACY tests still use the `X-Return-Token: true` header + Bearer
+#     token pattern. They rely on the module-level monkey-patch which
+#     sets that header globally. This is preserved unchanged so ~40
+#     existing test files don't need to be rewritten. Migration to (1)
+#     is on the backlog.
+# ─────────────────────────────────────────────────────────────────
+
+
+def authed_session(email: str, password: str, base_url: str = "") -> "requests.Session":
+    """Log in and return a cookie-authenticated `requests.Session`.
+
+    Uses ONLY the HttpOnly session cookie + CSRF cookie/header pair —
+    no `X-Return-Token` bypass, no Bearer fallback. This mirrors how a
+    real browser client authenticates in production."""
+    import requests
+
+    url = base_url or os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+    s = requests.Session()
+    # Explicitly disable the legacy header on this session so it stays pure.
+    s._skip_x_return_token = True  # type: ignore[attr-defined]
+    r = s.post(f"{url}/api/auth/login",
+               json={"email": email, "password": password}, timeout=15)
+    r.raise_for_status()
+    body = r.json()
+    if body.get("requires_2fa"):
+        pytest.skip("Account has 2FA enabled — clear it first")
+    # CSRF header is auto-mirrored by the monkey-patch below on every
+    # unsafe request; we leave the session bare so cookies alone drive auth.
+    return s
+
+
+import requests as _rq_module  # noqa: E402
+
+_orig_request = _rq_module.api.request
+_orig_session_request = _rq_module.Session.request
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _patched_request(method: str, url: str, **kwargs):  # pragma: no cover
+    """Module-level `requests.get/post/...` calls: legacy tests bypass
+    cookie-only mode via `X-Return-Token: true` (server-side gated behind
+    the `ALLOW_TEST_TOKEN_HEADER` env var — never enabled in production)."""
+    if "headers" not in kwargs or kwargs["headers"] is None:
+        kwargs["headers"] = {}
+    kwargs["headers"].setdefault("X-Return-Token", "true")
+    return _orig_request(method, url, **kwargs)
+
+
+def _patched_session_request(self, method, url, **kwargs):  # pragma: no cover
+    """Session-level requests:
+    - Legacy sessions (default): auto-add `X-Return-Token: true` header.
+    - Pure-cookie sessions (via `authed_session()` — flagged with
+      `_skip_x_return_token=True`): auto-mirror the `ifpi_csrf` cookie
+      into the `X-CSRF-Token` header on unsafe methods."""
+    if getattr(self, "_skip_x_return_token", False):
+        # Pure-cookie path — mirror CSRF header from cookie on unsafe methods
+        if method.upper() in _UNSAFE_METHODS and not getattr(self, "_skip_csrf_autoinject", False):
+            headers = kwargs.get("headers") or {}
+            already_bearer = any(
+                k.lower() == "authorization"
+                for k in list(headers.keys()) + list(self.headers.keys())
+            )
+            already_csrf = any(k.lower() == "x-csrf-token" for k in headers)
+            if not already_bearer and not already_csrf:
+                csrf = self.cookies.get("ifpi_csrf")
+                if csrf:
+                    headers = dict(headers)
+                    headers["X-CSRF-Token"] = csrf
+                    kwargs["headers"] = headers
+    else:
+        # Legacy path — inject X-Return-Token if not already set
+        if "X-Return-Token" not in self.headers:
+            self.headers["X-Return-Token"] = "true"
+    return _orig_session_request(self, method, url, **kwargs)
+
+
+_rq_module.api.request = _patched_request
+_rq_module.request = _patched_request
+_rq_module.Session.request = _patched_session_request
