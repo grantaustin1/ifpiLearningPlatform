@@ -171,7 +171,6 @@ export default function AdminCertificatesPage() {
   }
 
   const exportCsv = () => {
-    const base = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
     // Use fetch so we can inject the cookie/CSRF creds
     api.get('/certificates/admin-export.csv', { responseType: 'blob' })
       .then(r => {

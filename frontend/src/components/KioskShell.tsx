@@ -35,6 +35,7 @@ export function KioskShell({ children }: { children: React.ReactNode }) {
     api.get('/kiosk/settings')
        .then(r => setSettings(r.data))
        .catch(() => setSettings(null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
   // Idle detection: reset timer on any activity; check every 5s.

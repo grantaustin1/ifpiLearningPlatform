@@ -68,6 +68,7 @@ export default function CourseDetailPage() {
     if (autoEnroll && user && data) {
       handleEnroll()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEnroll, user, data?.id])
 
   if (isLoading) {

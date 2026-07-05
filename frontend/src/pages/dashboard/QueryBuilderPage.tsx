@@ -8,7 +8,6 @@
 import { useState } from 'react'
 import { api } from 'lib/api'
 import { Sparkles, Copy, Check, AlertTriangle, Database } from 'lucide-react'
-import { toast } from 'sonner'
 
 type Result = {
   sql: string
