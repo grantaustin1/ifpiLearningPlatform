@@ -99,7 +99,7 @@ pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycodestyle==2.14.0
 pycparser==3.0
-pydantic==2.10.3
+pydantic==2.13.4
 pydantic-settings==2.6.1
 pydantic_core==2.27.1
 pyee==13.0.1
