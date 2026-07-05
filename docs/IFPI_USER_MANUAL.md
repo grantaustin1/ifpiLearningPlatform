@@ -337,29 +337,41 @@ Core entities (see `backend/models/__init__.py` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
+| `routers/affiliate.py` | 263 |
+| `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 154 |
+| `routers/auth.py` | 179 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
 | `routers/courses.py` | 656 |
-| `routers/docs_library.py` | 71 |
+| `routers/docs_library.py` | 103 |
+| `routers/email_diagnostics.py` | 127 |
 | `routers/exams.py` | 212 |
-| `routers/extras.py` | 543 |
+| `routers/extras.py` | 545 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 195 |
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 293 |
 | `routers/learning_paths.py` | 285 |
-| `routers/misc.py` | 372 |
+| `routers/live_sessions.py` | 843 |
+| `routers/marketplace_analytics.py` | 424 |
+| `routers/misc.py` | 1162 |
 | `routers/narration.py` | 204 |
-| `routers/public_catalog.py` | 143 |
-| `routers/scorm_xapi.py` | 501 |
+| `routers/onboarding.py` | 97 |
+| `routers/owner_dashboard.py` | 148 |
+| `routers/public_catalog.py` | 153 |
+| `routers/query_builder.py` | 250 |
+| `routers/scheduled_reports.py` | 188 |
+| `routers/scorm_xapi.py` | 512 |
+| `routers/seo.py` | 257 |
+| `routers/terms_kiosk.py` | 325 |
+| `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **6656** |
+| **Total** | **11102** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -368,39 +380,53 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | Model | Table |
 |---|---|
 | `AIJob` | `ai_jobs` |
+| `AITutorMessage` | `ai_tutor_messages` |
+| `AITutorSession` | `ai_tutor_sessions` |
 | `AIUsageLedger` | `ai_usage_ledger` |
+| `AffiliateCode` | `affiliate_codes` |
+| `AffiliateReferral` | `affiliate_referrals` |
 | `ApiToken` | `api_tokens` |
 | `ApiTokenCall` | `api_token_calls` |
 | `AuditLog` | `audit_logs` |
 | `BadgeTier` | `badge_tiers` |
 | `BillingEvent` | `billing_events` |
 | `Certificate` | `certificates` |
+| `CertificateRevocationEvent` | `certificate_revocation_events` |
 | `Course` | `courses` |
 | `CoursePrerequisite` | `course_prerequisites` |
 | `CourseSlide` | `course_slides` |
+| `CourseView` | `course_views` |
 | `Enrollment` | `enrollments` |
 | `Exam` | `exams` |
 | `ExamAttempt` | `exam_attempts` |
 | `ExamQuestion` | `exam_questions` |
+| `FeatureFlag` | `feature_flags` |
 | `Flashcard` | `flashcards` |
 | `FlashcardReview` | `flashcard_reviews` |
 | `ImportJob` | `import_jobs` |
 | `Invitation` | `invitations` |
+| `KioskSettings` | `kiosk_settings` |
 | `LearningPath` | `learning_paths` |
 | `LearningPathEnrollment` | `learning_path_enrollments` |
 | `LearningPathItem` | `learning_path_items` |
+| `LiveSession` | `live_sessions` |
+| `LiveSessionRsvp` | `live_session_rsvps` |
 | `Notification` | `notifications` |
 | `Organization` | `organizations` |
 | `OutboxMessage` | `outbox_messages` |
 | `Person` | `persons` |
 | `RefreshToken` | `refresh_tokens` |
+| `ScheduledReport` | `scheduled_reports` |
 | `ScormPackage` | `scorm_packages` |
 | `SlideComment` | `slide_comments` |
 | `SlideVersion` | `slide_versions` |
+| `SlideView` | `slide_views` |
 | `SourceChunk` | `source_chunks` |
 | `SourceDocument` | `source_documents` |
 | `SsoJtiSeen` | `sso_jti_seen` |
 | `Subscription` | `subscriptions` |
+| `TermsAcceptance` | `terms_acceptances` |
+| `TermsVersion` | `terms_versions` |
 | `User` | `users` |
 | `UserBadge` | `user_badges` |
 | `UserRole` | `user_roles` |
@@ -408,7 +434,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **40** ORM models._
+_Total: **54** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -423,6 +449,12 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api` | GET |  |
 | `/api/academies` | GET | List all academies with optional search (name/slug), status filter, and sort. |
 | `/api/academies` | POST |  |
+| `/api/admin/affiliate/codes` | GET |  |
+| `/api/admin/affiliate/codes` | POST |  |
+| `/api/admin/affiliate/codes/{code_id}` | PATCH |  |
+| `/api/admin/affiliate/earnings` | GET | Aggregate earnings by status. Cents-based to avoid float drift. |
+| `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
+| `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
 | `/api/admin/analytics` | GET |  |
 | `/api/admin/api-tokens` | GET |  |
 | `/api/admin/api-tokens` | POST |  |
@@ -434,9 +466,14 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/audit-log` | GET |  |
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
+| `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
+| `/api/admin/dashboard/members-needing-action` | GET |  |
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
 | `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
+| `/api/admin/email/send-test` | POST | Queue a test email and dispatch it synchronously so the admin |
+| `/api/admin/email/transport-status` | GET | Report which delivery transports are active for THIS org, in |
+| `/api/admin/feature-flags/{flag_key}` | PUT |  |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
@@ -446,22 +483,42 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/invitations` | POST |  |
 | `/api/admin/invitations/bulk` | POST | Issue up to 500 invitations in one call. Each row returns its own |
 | `/api/admin/invitations/{invitation_id}` | DELETE |  |
+| `/api/admin/kiosk/settings` | PUT |  |
 | `/api/admin/leaderboard.csv` | GET |  |
+| `/api/admin/marketplace-funnel` | GET | Iter 25 — Cross-course marketplace funnel roll-up for the current |
+| `/api/admin/marketplace-funnel/{course_id}` | GET |  |
+| `/api/admin/onboarding/checklist` | GET |  |
 | `/api/admin/outbox` | GET |  |
 | `/api/admin/outbox/stats` | GET |  |
 | `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
+| `/api/admin/query-builder/build` | POST |  |
 | `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort, or for |
+| `/api/admin/scheduled-reports` | GET |  |
+| `/api/admin/scheduled-reports` | POST |  |
+| `/api/admin/scheduled-reports/{report_id}` | DELETE |  |
+| `/api/admin/scheduled-reports/{report_id}` | PUT |  |
+| `/api/admin/scheduled-reports/{report_id}/run-now` | POST |  |
 | `/api/admin/scorm` | GET |  |
 | `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
 | `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
+| `/api/admin/terms` | GET |  |
+| `/api/admin/terms` | POST |  |
+| `/api/admin/terms/acceptances` | GET |  |
 | `/api/admin/users` | GET |  |
+| `/api/admin/users/{user_id}/2fa/disable` | POST |  |
 | `/api/admin/webhooks` | GET |  |
 | `/api/admin/webhooks` | POST |  |
 | `/api/admin/webhooks/{sub_id}` | DELETE |  |
 | `/api/admin/webhooks/{sub_id}` | PUT |  |
 | `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
 | `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
+| `/api/affiliate/lookup/{code}` | GET | Public — thin preview so signup forms can show |
 | `/api/ai/course-builder` | POST |  |
+| `/api/auth/2fa/challenge` | POST | Public — accepts {challenge_id, code} and returns the standard |
+| `/api/auth/2fa/disable` | POST |  |
+| `/api/auth/2fa/setup` | POST |  |
+| `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
+| `/api/auth/2fa/status` | GET |  |
 | `/api/auth/login` | POST |  |
 | `/api/auth/logout` | POST |  |
 | `/api/auth/me` | GET |  |
@@ -509,10 +566,24 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/billing/webhook` | POST | Receives ERP360 billing webhooks. Verified via X-Signature header. |
 | `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
 | `/api/catalog` | GET |  |
+| `/api/catalog/organizations` | GET | Iter 27 — Cross-tenant marketplace search: list opted-in |
+| `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
+| `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
+| `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
+| `/api/certificates/admin-export.csv` | GET | Iter 30 — CSV export for compliance / auditors. All org certs |
+| `/api/certificates/admin-list` | GET | Iter 30 — Admin view: paginated list of ALL certs in the org. |
+| `/api/certificates/bulk-email` | POST | Iter 31 — Bulk re-email certificate download links to owners. |
+| `/api/certificates/bulk-revoke` | POST | Iter 30 — Bulk revoke. Skips already-revoked certs (idempotent) |
+| `/api/certificates/bulk-unrevoke` | POST | Iter 31 — Bulk lift-revocation. Skips currently-active certs |
+| `/api/certificates/bulk-zip` | POST | Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
 | `/api/certificates/verify/{code}` | GET |  |
+| `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
+| `/api/certificates/{cert_id}/revocation-history` | GET | Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events |
+| `/api/certificates/{cert_id}/revoke` | POST | Iter 29 — Revoke a certificate. Requires ADMIN role. Idempotent |
+| `/api/certificates/{cert_id}/unrevoke` | POST | Iter 29 — Clear a revocation flag. In case of a mistaken |
 | `/api/courses` | GET |  |
 | `/api/courses` | POST |  |
 | `/api/courses/reorder` | PATCH | Body: {"course_ids": [id1, id2, ...]} — sets display_order to the |
@@ -544,11 +615,18 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}` | PATCH |  |
 | `/api/exams/{exam_id}/attempts` | POST |  |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
+| `/api/feature-flags` | GET |  |
 | `/api/gamification/leaderboard` | GET |  |
+| `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
+| `/api/gamification/preferences` | GET | Iter 31 — per-user gamification preferences. |
+| `/api/gamification/preferences` | PATCH | Iter 31 — toggle weekly streak digest opt-in/out. |
+| `/api/gamification/streak-leaderboard` | GET | Iter 28 — Org-wide "top streaks this week" leaderboard. |
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
 | `/api/invitations/{token}/accept` | POST |  |
+| `/api/kiosk/settings` | GET |  |
+| `/api/kiosk/unlock` | POST |  |
 | `/api/leads` | POST | Public endpoint for partner sites / marketing pages to drop a lead in. |
 | `/api/leads/embed.js` | GET | Self-contained JS widget that partner sites drop on their page. |
 | `/api/learn/flashcards/courses/{course_id}/due` | GET | Return the learner's due-today queue for a course. Mixes: |
@@ -565,6 +643,21 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/learning-paths/{path_id}/items/reorder` | PATCH | Accepts {"item_ids": [id1, id2, ...]}. |
 | `/api/learning-paths/{path_id}/items/{course_id}` | DELETE |  |
 | `/api/learning-paths/{path_id}/publish` | POST |  |
+| `/api/live-sessions` | GET |  |
+| `/api/live-sessions` | POST |  |
+| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
+| `/api/live-sessions/subscribe-url/qr` | GET | Iter 25 — Return an SVG QR code encoding the current user's |
+| `/api/live-sessions/subscribe-url/rotate` | POST | Iter 25 — Bump the org's subscription_secret_version. Every |
+| `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
+| `/api/live-sessions/upcoming` | GET | List sessions the current user can RSVP to: their cohort (or |
+| `/api/live-sessions/{session_id}` | DELETE |  |
+| `/api/live-sessions/{session_id}` | GET |  |
+| `/api/live-sessions/{session_id}` | PATCH |  |
+| `/api/live-sessions/{session_id}/cancel` | POST | Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics). |
+| `/api/live-sessions/{session_id}/ics` | GET |  |
+| `/api/live-sessions/{session_id}/mark-attendance` | POST |  |
+| `/api/live-sessions/{session_id}/rsvp` | POST | RSVP to a single session (default) OR the whole series when |
+| `/api/live-sessions/{session_id}/uncancel` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
 | `/api/openapi.json` | GET |  |
@@ -584,9 +677,20 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/rich-text/sanitize` | POST | Server-side HTML sanitizer for the rich-text editor preview. |
 | `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
 | `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
+| `/api/seo/certificates/share/{code}` | GET | Iter 28 — Public shareable brag-card for a certificate. |
+| `/api/seo/robots.txt` | GET |  |
+| `/api/seo/sitemap-{org_id}.xml` | GET |  |
+| `/api/seo/sitemap.xml` | GET |  |
 | `/api/slides/{slide_id}/comments` | GET |  |
 | `/api/slides/{slide_id}/comments` | POST |  |
 | `/api/slides/{slide_id}/comments/{comment_id}` | DELETE |  |
+| `/api/terms/accept` | POST |  |
+| `/api/terms/current` | GET |  |
+| `/api/tutor/ask` | POST |  |
+| `/api/tutor/save-as-flashcard` | POST |  |
+| `/api/tutor/sessions` | GET |  |
+| `/api/tutor/sessions/{session_id}` | GET |  |
+| `/api/tutor/sessions/{session_id}/archive` | POST |  |
 | `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
 | `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
@@ -594,7 +698,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **173** registered API endpoints._
+_Total: **251** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
