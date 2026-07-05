@@ -187,6 +187,7 @@ class OrgUpdate(BaseModel):
     cert_signature_text: Optional[str] = None
     cert_signature_image_url: Optional[str] = None
     cert_footer_text: Optional[str] = None
+    marketplace_opt_in: Optional[bool] = None
 
 
 @org_router.get("")
@@ -208,6 +209,7 @@ def get_org(db: Session = Depends(get_db),
         "cohort_celebration_webhook_url": o.cohort_celebration_webhook_url,
         "cohort_digest_enabled": bool(o.cohort_digest_enabled) if o.cohort_digest_enabled is not None else True,
         "cohort_digest_last_sent_at": o.cohort_digest_last_sent_at.isoformat() if o.cohort_digest_last_sent_at else None,
+        "marketplace_opt_in": bool(o.marketplace_opt_in) if o.marketplace_opt_in is not None else True,
     }
 
 
