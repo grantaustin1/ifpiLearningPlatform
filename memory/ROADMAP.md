@@ -3,23 +3,12 @@
 Prioritized backlog. Completed items live in `CHANGELOG.md`.
 
 ## P0 — Next up
-_Nothing currently blocking; iter-30 shipped 5 planned items + 1 UX
-improvement (bulk certificate operations). Waiting on user for next
-sprint._
+_Nothing product-side. Only external provisioning remains
+(see `/app/DEPLOYMENT.md`): Postgres, S3 bucket, SMTP relay,
+production secrets rotation._
 
 ## P1 — High value
-- **Absolute SQLite path** — flip `DATABASE_URL` from `sqlite:///./ifpi_lms.db`
-  to `sqlite:////app/backend/ifpi_lms.db` so pytest from any cwd hits
-  the right DB. Prevents the iter-30 stale-fixture flake.
-- **Bulk-revoke reason modal** — replace `window.prompt()` in
-  `AdminCertificatesPage` with an in-brand text-input modal.
-- **HR-system webhook payload docs** — publish an `IFPI_WEBHOOK_EVENTS.md`
-  documenting `certificate.revoked` + `certificate.unrevoked` payload
-  shape for external integrators.
-- **Bulk unrevoke + bulk email + bulk download-zip** — extend the
-  admin-certs table with reverse bulk ops (currently only revoke).
-- **Streak-digest opt-out** — some admins may not want the weekly
-  email; per-user preference or org toggle.
+_All shipped in iter-31. Empty backlog._
 
 ## P2 — Nice to have
 - **pgvector migration** for advanced RAG on AI Tutor. Spec in

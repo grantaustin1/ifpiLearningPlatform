@@ -1,6 +1,37 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 32 — Deployment Readiness Kit (2026-02-11)
+
+### Deliverables
+- ✅ **`/app/DEPLOYMENT.md`** — Single-source-of-truth production deploy
+  guide. Covers Neon Postgres setup, Cloudflare R2 (S3-compatible)
+  storage, Resend SMTP, exhaustive env var reference, rollback
+  playbook, and known deploy-time gotchas.
+- ✅ **`backend/scripts/deploy_precheck.py`** — Boot-time validator.
+  Fails loudly in prod (exit 1) if any of 15 critical env vars is
+  missing or set to a dev-only default. In non-prod acts as a soft
+  advisor. Also runs `alembic upgrade head` and pre-warms the
+  Postgres pool.
+- ✅ **Dead-code removal** — `motor==3.3.1` and `pymongo==4.5.0`
+  stripped from `requirements.txt`. Zero MongoDB usage in the app —
+  removes future ambiguity for other agents/tooling.
+
+### Architectural clarification (very important — record for posterity)
+- Emergent's stock `deployment_agent` incorrectly recommends rewriting
+  SQLAlchemy apps to MongoDB. Emergent Support confirmed on 2026-02-11:
+  **external PostgreSQL via `DATABASE_URL` is the correct path** for
+  SQLAlchemy apps. IFPI has 98 SQLAlchemy files + 36 Alembic
+  migrations and MUST NOT be converted to MongoDB. The MongoDB
+  conversion trap has now been documented in DEPLOYMENT.md §0.
+
+### Provisioning still required from the user
+- External Postgres (recommend Neon)
+- S3-compatible bucket (recommend Cloudflare R2)
+- SMTP provider (recommend Resend)
+- Rotate `JWT_SECRET` + `SMTP_ENCRYPTION_KEY`
+
+
 ## Iteration 31 — Bulk cert ops UX + Compliance Auto-Report + Preferences (2026-02-11)
 
 ### Backend
