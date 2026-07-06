@@ -1,6 +1,36 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 34 — P3 Models Split + P2 (a) pgvector-Ready (2026-02-06)
+
+### P3: Models refactor
+- Split `models/__init__.py` (1329 lines, 57 classes) into a proper
+  package with 9 domain files: `_common`, `identity`, `learning`,
+  `certificates`, `governance`, `integrations`, `billing`, `ai`,
+  `engagement`. `__init__.py` re-exports everything so no external
+  code needed to change (`from models import User` still works).
+- 149+ backend tests remain green post-split, including auth, TOTP,
+  certs, bulk ops, docs library, affiliate, GDPR, and Sentry.
+
+### P2 option (a): pgvector-ready RAG
+- `models/ai.py::SourceChunk.embedding` now picks its column type at
+  import time — `Vector(1536)` when `USE_PGVECTOR=true` AND `pgvector`
+  is installed, otherwise `JSON` (dev / no-op fallback). No app code
+  changes needed at cutover.
+- `services/embedding_service.py::semantic_search` gains a fast-path
+  branch that pushes ANN into Postgres via the `<=>` cosine-distance
+  operator when the flag is on. Python-cosine fallback preserved.
+- New Alembic migration `d2e3f4a5b6c7_pgvector_ready.py`:
+  * NO-OP on SQLite
+  * NO-OP on Postgres without the `vector` extension available
+  * Runs `CREATE EXTENSION vector`, alters column to `vector(1536)`,
+    adds HNSW cosine index when both conditions + `USE_PGVECTOR=true`.
+- Added `pgvector==0.4.2` to `requirements.txt` (optional at runtime).
+- New tests: `test_iteration34_pgvector_ready.py` — column-type gate,
+  service branch gate, migration importability. All green.
+- Setup Manual §G.7 documents the activation flow end-to-end.
+
+
 ## Iter 33c — Docs Engagement Tile + Final Sweep (2026-02-06)
 - Backend: new `GET /api/admin/dashboard/docs-engagement?days=N` endpoint
   in `routers/owner_dashboard.py`. Rolls up `DOC_PREVIEWED` +
