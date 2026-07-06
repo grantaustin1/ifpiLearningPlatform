@@ -100,7 +100,7 @@ def _summarize_route(route) -> Tuple[str, str, str]:
 def _collect_routes(router_or_app) -> List:
     """Recursively collect all route objects from a FastAPI app or router.
 
-    FastAPI ≥ 0.100 may store included routers as ``_IncludedRouter``
+    FastAPI ≥ 0.139 stores included routers as ``_IncludedRouter``
     wrappers rather than immediately flattening them into the parent's
     ``routes`` list.  We unwrap those transparently so route introspection
     works correctly regardless of FastAPI version.
