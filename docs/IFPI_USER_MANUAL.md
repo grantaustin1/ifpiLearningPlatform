@@ -24,6 +24,8 @@
 11. [Roles Deep-Dive](#11-roles-deep)
 12. [Data Model Overview](#12-data-model)
 13. [API Reference (Selective)](#13-api)
+14. [Security & Observability](#14-security)
+15. [Documentation Library (in-app)](#15-docs-library)
 
 ---
 
@@ -53,14 +55,16 @@ IFPI Learning Academy is a **multi-tenant Learning Management System (LMS)** bui
 
 | Metric | Value |
 |---|---|
-| Backend routers | 23 |
-| Backend services | 33 |
-| SQLAlchemy models | 40+ |
-| Alembic migrations | 18 |
-| Frontend pages (React) | 45+ |
-| Backend integration tests | 32 files, 142 tests |
+| Backend routers | 35 |
+| Backend services | 40+ |
+| SQLAlchemy models | 57 |
+| Alembic migrations | 36+ |
+| Frontend pages (React) | 65+ |
+| Backend integration tests | 62+ (pytest, all green) |
 | Supported roles | 6 (OWNER, SUPER_ADMIN, ADMIN, INSTRUCTOR, LEARNER, API_TOKEN) |
 | AI providers wired | 5 (GPT-4o, Claude 4.5, Gemini 3, Nano Banana, Sora 2) |
+| Public/anonymous endpoints | 12 (all rate-limited) |
+| GDPR self-service endpoints | 6 (export, delete-request, delete, verify-email, forgot/reset password) |
 
 ---
 
@@ -76,7 +80,11 @@ IFPI Learning Academy is a **multi-tenant Learning Management System (LMS)** bui
 
 - **URL:** `https://<your-tenant>.ifpi.example.com/login`
 - **Credentials source:** Owner + any invited users. See Setup Manual Phase B.
-- **Session:** Bearer JWT (60 min access + refresh) stored in localStorage.
+- **Session:** HttpOnly cookie in production (bearer JWT fallback for tests only).
+- **Forced password change (Iter 32):** Any account with `must_change_password=true` (all seeded admins) is redirected to `/change-password?forced=1` before reaching the dashboard.
+- **2FA (TOTP) (Iter 30i):** If enabled on the account, `POST /api/auth/login` returns `{challenge_id, requires_2fa: true}`. Complete via `POST /api/auth/2fa/challenge` with the 6-digit code or one of the 10 recovery codes.
+- **Forgot password (Iter 33):** `/login → Forgot password?` → emails a single-use reset link (24 h TTL). Rate-limited to 3/hr per email + 10/hr per IP.
+- **Email verification (Iter 33):** New self-registrations must click a verification email before accessing sensitive routes. Re-send via `Profile → Security → Resend verification` (rate-limited to 2/hr).
 
 ## 2.3 Main navigation
 
@@ -261,8 +269,23 @@ GET /api/public/certificates/verify/{code}
 ## 8.3 LinkedIn "Add to Profile"
 Every cert card has an "Add to LinkedIn" button that pre-fills the [add-to-profile URL](https://www.linkedin.com/profile/add) with the cert code + course + issuing org.
 
-## 8.4 Revocation
-Owner/Admin can revoke via `PATCH /api/certificates/{id}` → verify endpoint returns `revoked: true`, PDF regen is blocked.
+## 8.4 Revocation & bulk operations
+
+**Single cert (Iter 29):**
+- `POST /api/certificates/{id}/revoke` — idempotent, requires ADMIN
+- `POST /api/certificates/{id}/unrevoke` — lift a mistaken revoke
+- `GET /api/certificates/{id}/revocation-history` — full audit trail of revoke/unrevoke events
+
+**Bulk ops (Iter 30–31):**
+- `POST /api/certificates/bulk-revoke` — revoke up to 500 certs in one call. Skips already-revoked (idempotent).
+- `POST /api/certificates/bulk-unrevoke` — inverse; skips already-active.
+- `POST /api/certificates/bulk-email` — re-email download links to holders.
+- `POST /api/certificates/bulk-zip` — bundle up to 100 cert PDFs into a single ZIP.
+
+The frontend surfaces these on `AdminCertificatesPage.tsx` via row-checkboxes + a `PromptDialog` that requires a typed confirmation ("REVOKE") plus a mandatory reason string. Every event streams to the audit log AND `IFPI_WEBHOOK_EVENTS.md` outgoing webhooks.
+
+## 8.5 Compliance auto-reports (Iter 31)
+Env-gated worker emails a monthly PDF summary to `COMPLIANCE_REPORT_RECIPIENTS`. Covers issued, revoked, unrevoked, and lapsed certificates + deletion requests, failed logins, top audit events. Manual trigger via `POST /api/admin/compliance/run-now` (Owner-only).
 
 ---
 
@@ -301,7 +324,33 @@ HMAC-signed, retried with exponential backoff. Events: `course.published`, `enro
 `GET /api/courses/{id}/export-pptx` → downloadable deck.
 
 ## 10.6 Full data export (GDPR)
-`POST /api/admin/exports/full` → email delivered ZIP of all your org's data.
+
+Two flows depending on scope:
+
+- **Org-wide (admin, Iter 30):** `POST /api/admin/exports/full` → email-delivered ZIP of all org data.
+- **Self-service (learner, Iter 33):** `GET /api/auth/me/export` → streaming ZIP of every row that references the caller: `profile.json`, `courses.json` (enrolments + progress), `certificates.json`, `flashcards.json`, `audit.json`. No admin approval needed.
+
+## 10.7 Self-service account deletion (GDPR Right to Erasure, Iter 33)
+
+Two-step to prevent accidental / hijacked deletes:
+
+1. `POST /api/auth/me/delete-request` — emails a 6-digit code to the user, TTL 10 min.
+2. `DELETE /api/auth/me` `{code}` — anonymises PII (`email → deleted+<uuid>@ifpi.local`, name/avatar wiped), revokes all live sessions + API tokens, marks certificates as `holder_anonymised=true` (verification still works, holder name shown as "IFPI Learner"). Audit-logged forever.
+
+Frontend surface: `Profile → Privacy → Delete my account` (`PreferencesPage.tsx`).
+
+## 10.8 Rate limits on public endpoints (Iter 33)
+
+Redis-backed sliding window. Falls back to in-memory for single-replica dev.
+
+| Endpoint | Limit |
+|---|---|
+| `POST /api/auth/login` | 5/min per IP + 10/hr per email |
+| `POST /api/auth/register` | 3/hr per IP |
+| `POST /api/auth/forgot-password` | 3/hr per email + 10/hr per IP |
+| `POST /api/auth/verify-email/resend` | 2/hr per user |
+| `GET /api/public/certificates/verify/{code}` | 30/min per IP |
+| `GET /api/public/catalog` | 60/min per IP |
 
 ---
 
@@ -737,4 +786,73 @@ Highlights (curated):
 
 ---
 
-*Regenerate this manual whenever routers are added: `python /app/backend/scripts/build_user_manual.py` — the script scans `router.routes`, `role_registry.py`, and model tables to keep everything in sync.*
+# 14. Security & Observability {#14-security}
+
+**Shipped in Iterations 32–33.** All items below apply automatically to every tenant — no per-org config needed.
+
+## 14.1 Security headers
+Injected on every response by `core/middleware.py::SecurityHeadersMiddleware`:
+
+- `Content-Security-Policy` — locked to self + integrated third-parties (Sentry, Tavily)
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: same-origin`
+- `Permissions-Policy: camera=(), microphone=(self), geolocation=()`
+
+## 14.2 Sentry + correlation IDs
+- Backend + frontend both initialise `sentry-sdk`. Trace sample-rate `0.2` in prod.
+- Every request receives an `X-Correlation-ID` (generated or forwarded). Frontend Axios interceptor echoes it back so stack traces link across tiers.
+- Add a DSN via `SENTRY_DSN` (backend) and `REACT_APP_SENTRY_DSN` (frontend). No DSN = Sentry silently no-ops.
+
+## 14.3 Rate limiting
+See § 10.8 for the endpoint table. Redis-backed (`RATE_LIMIT_REDIS_URL`) with in-memory fallback for dev.
+
+## 14.4 Audit log
+Every mutating admin action + every sensitive read (cert download, doc preview, GDPR export) writes to the `audit_logs` table. Immutable, retained 3 years, viewable at `/dashboard/audit`. Export via `GET /api/admin/audit-log?format=csv`.
+
+## 14.5 Deployment fail-closed check
+`python backend/scripts/deploy_precheck.py` runs at container startup and refuses to boot if:
+- `ENVIRONMENT` unset (assumed prod)
+- Dev secrets present (`JWT_SECRET=changeme`, `SEED_ADMIN_PASSWORD=admin123`, …)
+- Mongo config detected (IFPI is PostgreSQL-only)
+- CORS wildcard in prod
+- `STORAGE_BACKEND=local` in prod
+
+## 14.6 Locked-out rescue tool
+`python backend/scripts/reset_admin_password.py --email <owner>` prints a random 20-char password and re-sets `must_change_password=true`. Idempotent seed script guarantees no user's password is ever overwritten by a redeploy.
+
+---
+
+# 15. Documentation Library (in-app) {#15-docs-library}
+
+**Where to find these manuals inside IFPI:**
+
+> `Dashboard → Organization Settings → Documents` (ADMIN+ only).
+
+The tab (see `frontend/src/pages/dashboard/OrganizationDocumentsTab.tsx`) lists every manual with:
+- Live line count, size, last-modified timestamp
+- **Inline preview** — click a row to render the PDF in an iframe below (no download friction)
+- **Download PDF** — server-rendered from the source markdown via `xhtml2pdf`, cached 1 h
+- **Download Markdown** — raw source for import into Notion / Confluence
+- Every preview and download is written to the audit log so admins can measure engagement.
+
+**Catalog served by `/api/admin/docs`:**
+
+| Slug | Title | Audience |
+|---|---|---|
+| `setup-manual` | IFPI Setup Manual | Owner, Super Admin |
+| `user-manual` | IFPI User Manual | All roles |
+| `integration-matrix` | IFPI ↔ ERP360 Integration Matrix | Platform Ops, Owner |
+| `assessment` | IFPI vs ERP360 Comparative Assessment | Owner, Platform Ops |
+
+**Endpoints (all `requires_admin`):**
+- `GET /api/admin/docs` — manifest
+- `GET /api/admin/docs/{slug}/pdf?preview=true|false` — streamed PDF
+- `GET /api/admin/docs/{slug}/raw` — raw markdown
+
+Manuals stay in sync with the codebase: AUTO-BLOCK sections (route index, model index, role matrix) are regenerated by `python backend/scripts/build_docs.py`. Human-written prose outside those markers is preserved.
+
+---
+
+*Regenerate this manual whenever routers or models change: `python /app/backend/scripts/build_docs.py`.*
