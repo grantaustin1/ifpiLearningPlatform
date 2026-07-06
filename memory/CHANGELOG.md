@@ -1,6 +1,82 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 33 — GDPR + Deploy Hardening (2026-02-11)
+
+Full "aggressive" scope: P1 refinements + P2 GDPR + P3 CI lint. Target
+markets are EU + USA, so GDPR items are day-1 requirements.
+
+### Backend — Email verification
+- ✅ `users.email_verified_at` column (nullable). Migration backfills
+  existing users as verified so we don't lock them out.
+- ✅ `EmailVerificationToken` model — 24hr TTL, single-use, SHA-256
+  hashed in DB.
+- ✅ `POST /api/auth/verify-email` — consumes token, sets timestamp.
+- ✅ `POST /api/auth/resend-verification` — rate-limited (2/hr),
+  no-op if already verified.
+- ✅ `/register` now queues a verification email automatically.
+
+### Backend — GDPR Right to Portability
+- ✅ `GET /api/auth/me/export` — returns full JSON bundle: profile,
+  enrollments, exam_attempts, certificates, notifications, audit_records,
+  active_sessions. Format v1.0. Auth-only, not accessible to API tokens.
+
+### Backend — GDPR Right to Erasure
+- ✅ `POST /api/auth/me/delete-request` — emails a 6-digit confirmation
+  code. Rate-limited (3/hr).
+- ✅ `DELETE /api/auth/me` — consumes code, anonymises the User row
+  (email → `deleted-<id>@anon.invalid`, name → "Deleted User",
+  password_hash → NULL, is_active → False, deleted_at set). Preserves
+  FK integrity for certs/audit records. Also anonymises Person row.
+- ✅ `AccountDeletionRequest` model — 30-min TTL, single-use, hashed.
+
+### Backend — Rate limiting
+- ✅ `/forgot-password` — 5/hr per IP, 3/hr per email
+- ✅ `/resend-verification` — 2/hr per user
+- ✅ `/me/delete-request` — 3/hr per user
+
+### Backend — Seed hardening
+- ✅ `_seed_admin_password()` helper — reads `SEED_ADMIN_PASSWORD` env
+  var. In prod, hard-fails if unset. In dev, warns + falls back to
+  `admin123`. No more literal password in `seed_minimal.py`.
+- ✅ Deploy precheck `check_seed_admin_password()` — new BLOCKER that
+  refuses to boot prod without `SEED_ADMIN_PASSWORD` set + ≥12 chars.
+
+### Backend — CI lint
+- ✅ `scripts/lint_hardcoded_passwords.py` — scans backend + frontend
+  for hardcoded password literals + known-default strings. Whitelists
+  tests, dev tools, comments. Exits 1 on any new match outside the
+  allowlist.
+
+### Backend — Test-only endpoint
+- ✅ `POST /api/auth/_test/reset-rate-limit` — gated on
+  `ALLOW_TEST_TOKEN_HEADER=true`. Lets the test suite clear the
+  backend's in-memory rate-limit buckets between runs.
+
+### Frontend
+- ✅ `/verify-email/:token` — auto-consumes token on mount (with
+  `useRef` guard against React.StrictMode double-invoke), shows
+  success/failure card.
+- ✅ Preferences page — new **"Your data & privacy"** section with:
+  - **Download my data** button (streams JSON export as file).
+  - **Delete my account** flow (confirm → send code → prompt for
+    6-digit code → DELETE → auto-logout).
+- ✅ Preferences page — **email-verification card** shown to
+  unverified users with "Resend link" button.
+- ✅ `User.email_verified` field on the auth context.
+
+### Tests
+- ✅ New `tests/test_iteration33_sprint.py` — 14/14 passing.
+- ✅ Regression: 55/55 across iter30 + iter31 + iter32 + iter33 in a
+  single pytest run.
+- ✅ testing_agent_v3_fork iteration_33.json: two issues caught +
+  fixed in-session (StrictMode double-invoke + rate-limit test
+  isolation).
+
+### Env additions
+- `SEED_ADMIN_PASSWORD` (required in prod, ≥12 chars)
+
+
 ## Iteration 32b — Pre-Deploy Security Hardening (2026-02-11)
 
 Independent audit by SureThing AI validated my earlier gap analysis

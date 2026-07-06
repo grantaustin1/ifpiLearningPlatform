@@ -340,7 +340,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 257 |
+| `routers/auth.py` | 403 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -371,7 +371,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11180** |
+| **Total** | **11326** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -383,6 +383,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `AITutorMessage` | `ai_tutor_messages` |
 | `AITutorSession` | `ai_tutor_sessions` |
 | `AIUsageLedger` | `ai_usage_ledger` |
+| `AccountDeletionRequest` | `account_deletion_requests` |
 | `AffiliateCode` | `affiliate_codes` |
 | `AffiliateReferral` | `affiliate_referrals` |
 | `ApiToken` | `api_tokens` |
@@ -396,6 +397,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `CoursePrerequisite` | `course_prerequisites` |
 | `CourseSlide` | `course_slides` |
 | `CourseView` | `course_views` |
+| `EmailVerificationToken` | `email_verification_tokens` |
 | `Enrollment` | `enrollments` |
 | `Exam` | `exams` |
 | `ExamAttempt` | `exam_attempts` |
@@ -435,7 +437,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **55** ORM models._
+_Total: **57** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -524,12 +526,17 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/auth/forgot-password` | POST | Emails a single-use reset link if the address matches an active |
 | `/api/auth/login` | POST |  |
 | `/api/auth/logout` | POST |  |
+| `/api/auth/me` | DELETE | Step 2 of self-deletion. Consumes the emailed code + anonymises |
 | `/api/auth/me` | GET |  |
+| `/api/auth/me/delete-request` | POST | Step 1 of self-deletion. Emails a 6-digit confirmation code that |
+| `/api/auth/me/export` | GET | GDPR Right to Data Portability. Returns a JSON bundle of every |
 | `/api/auth/refresh` | POST |  |
 | `/api/auth/register` | POST |  |
+| `/api/auth/resend-verification` | POST | Re-issue + email a verification link. Rate-limited (2/hr per |
 | `/api/auth/reset-password` | POST | Consume a reset token + set a new password. On success, logs the |
 | `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Body: {"erp_token": "..."}. |
 | `/api/auth/sso-status` | GET | Public endpoint — the login page calls this on mount to decide whether |
+| `/api/auth/verify-email` | POST | Consume an email-verification token. Called by the /verify-email/:token |
 | `/api/authoring/budget` | GET |  |
 | `/api/authoring/budget` | PUT |  |
 | `/api/authoring/flashcards/bulk-save` | POST | Persist a reviewed batch. Overwrites nothing — creates fresh rows. |
@@ -702,7 +709,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **254** registered API endpoints._
+_Total: **259** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

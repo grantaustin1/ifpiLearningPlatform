@@ -48,11 +48,12 @@ def test_learner_no_must_change():
 @pytest.fixture(autouse=True)
 def _reset_pwreset_ratelimit():
     """Iter 33 added rate limits to /forgot-password (3/hr per email,
-    5/hr per IP). Clear the in-memory limiter buckets before each test
-    so parallel or repeat runs don't spuriously 429."""
+    5/hr per IP). Clear the backend's in-memory limiter buckets before
+    each test via the test-only /_test/reset-rate-limit endpoint (gated
+    on ALLOW_TEST_TOKEN_HEADER=true which is on in dev)."""
     try:
-        from services import rate_limit_service
-        rate_limit_service.reset()
+        requests.post(f"{BASE_URL}/api/auth/_test/reset-rate-limit",
+                      timeout=3)
     except Exception:  # noqa: BLE001
         pass
     yield
