@@ -1,6 +1,22 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 33c — Docs Engagement Tile + Final Sweep (2026-02-06)
+- Backend: new `GET /api/admin/dashboard/docs-engagement?days=N` endpoint
+  in `routers/owner_dashboard.py`. Rolls up `DOC_PREVIEWED` +
+  `DOC_DOWNLOADED` audit events over a rolling window; returns
+  `{window_days, total_events, unique_docs, unique_readers, top_docs, latest_at}`.
+- Frontend: new `DocsEngagementTile.tsx` on the Owner dashboard right
+  column (next to Quick Actions). Shows 3 stat boxes + top-5 opened
+  manuals with counts; "Open library" link routes to `/settings`.
+  Data-testids cover empty state, loading, stats, and each doc row.
+- Tests: 3 dedicated tests in `test_iteration33c_docs_engagement.py`
+  (learner 403, shape + rollup, edge-case 1-day window). Testing agent
+  added 14 more in `test_iteration33c_docs_library_full.py` covering
+  full docs library regression. **17/17 green.**
+- Testing agent full-sweep on preview URL: 100% pass — no critical or
+  minor issues, no action items, no retest needed.
+
 ## Iter 33b — Docs Refresh (2026-02-06)
 - Updated `IFPI_SETUP_MANUAL.md` (388 → 512 lines): added Iter 32 forced
   password change, Iter 33 email verification + forgot/reset password sections,
