@@ -166,6 +166,19 @@ class User(Base):
     # endpoint once the user picks a new one.
     must_change_password = Column(Boolean, nullable=False, default=False,
                                   server_default="0")
+    # Iter 33 — GDPR compliance columns.
+    # `email_verified_at` is NULL until the user clicks the verification
+    # link. Sensitive actions (e.g. becoming an instructor, publishing a
+    # course to the marketplace) SHOULD gate on this — see
+    # routers/auth.py:verify_email + services/auth_service.py.
+    email_verified_at = Column(DateTime, nullable=True)
+    # `deleted_at` — GDPR Right to Erasure. We soft-delete + anonymise
+    # rather than hard-delete because certificates, exam attempts, and
+    # audit records reference this row via foreign keys. Anonymisation
+    # replaces email with `deleted-<userid>@anon.invalid` and name
+    # with "Deleted User". The row itself remains for referential
+    # integrity, is_active=False, password_hash=None.
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -223,6 +236,37 @@ class PasswordResetToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     requested_ip = Column(String(45), nullable=True)  # audit trail
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class EmailVerificationToken(Base):
+    """Iter 33 — Email-verification tokens issued at signup and via
+    the resend endpoint. Same shape/semantics as PasswordResetToken —
+    single-use, 24-hour TTL, only the SHA-256 hash is persisted."""
+    __tablename__ = "email_verification_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class AccountDeletionRequest(Base):
+    """Iter 33 — GDPR Right to Erasure two-step confirmation.
+
+    User POSTs to /api/user/me/delete-request → row created with a
+    hashed 6-digit confirmation code, emailed to them. User then
+    DELETEs to /api/user/me with the code → this row is stamped
+    `confirmed_at` and the User row is anonymised.
+    """
+    __tablename__ = "account_deletion_requests"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    code_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    confirmed_at = Column(DateTime, nullable=True)
+    requested_ip = Column(String(45), nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
 
