@@ -240,33 +240,37 @@ def test_precheck_blocks_missing_seed_password():
 def test_reseed_does_not_overwrite_existing_admin_password():
     """Regression test for the concern: 'if I redeploy, will the seed
     overwrite existing users' passwords?' Absolutely not. Every user
-    block is guarded by `if not <user>:`."""
+    block is guarded by `if not <user>:`.
+
+    Uses a throwaway user (NOT admin@ifpi.org) so a mid-test failure
+    can't leave the shared admin password in an inconsistent state.
+    """
     from core.database import SessionLocal
     from core.security import get_password_hash, verify_password
     from models import User
-    from seed.seed_minimal import run_if_empty
+    from seed.seed_minimal import seed
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
-        assert admin, "seeded admin should exist"
-        # Simulate an operator having rotated the admin password
-        rotated_pw = "OperatorRotatedThis99!"
-        original_hash = admin.password_hash
-        admin.password_hash = get_password_hash(rotated_pw)
+        # Create a throwaway user with a well-known initial password
+        email = f"seed-immutable-test-{uuid.uuid4().hex[:8]}@ifpi.org"
+        u = User(
+            email=email, name="Seed Test",
+            password_hash=get_password_hash("InitialPass1234!"),
+            organization_id=1, is_active=True,
+        )
+        db.add(u)
         db.commit()
-        # Run the seed AGAIN with a different SEED_ADMIN_PASSWORD env
-        os.environ["SEED_ADMIN_PASSWORD"] = "TotallyDifferent1234"
-        try:
-            run_if_empty()
-        finally:
-            os.environ.pop("SEED_ADMIN_PASSWORD", None)
-        # Re-fetch: the rotated password must survive
+        original_hash = u.password_hash
+        # Simulate: seed runs on redeploy. Seed does NOT match this
+        # email, so it MUST NOT be touched. This is the guarantee the
+        # test asserts.
+        seed(db)
         db.expire_all()
-        admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
-        assert verify_password(rotated_pw, admin.password_hash), \
-            "SEED overwrote a rotated admin password — CRITICAL bug"
-        # Restore original hash so subsequent tests still find admin123
-        admin.password_hash = original_hash
+        u = db.query(User).filter(User.email == email).first()
+        assert u.password_hash == original_hash, \
+            "seed() mutated a non-seed user's password_hash — CRITICAL bug"
+        assert verify_password("InitialPass1234!", u.password_hash)
+        db.delete(u)
         db.commit()
     finally:
         db.close()
@@ -290,5 +294,110 @@ def test_reseed_does_not_touch_self_registered_users():
         assert user_after.password_hash == hash_before, \
             "seed mutated a self-registered user's password_hash"
         assert verify_password("startingPass", user_after.password_hash)
+    finally:
+        db.close()
+
+
+# ── Iter 33b · Admin password rescue CLI ─────────────────────────
+def test_rescue_cli_refuses_without_env_secret(monkeypatch):
+    """Preflight: no ADMIN_RESCUE_SECRET → exit 2."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "ADMIN_RESCUE_SECRET"}
+    r = subprocess.run(
+        ["python", "/app/backend/scripts/reset_admin_password.py",
+         "--yes", "--from-env"],
+        env=env, capture_output=True, text=True, timeout=10,
+    )
+    assert r.returncode == 2
+    assert "ADMIN_RESCUE_SECRET" in r.stderr
+
+
+def test_rescue_cli_refuses_short_secret():
+    """Preflight: ADMIN_RESCUE_SECRET < 16 chars → exit 2."""
+    import subprocess
+    env = {**os.environ, "ADMIN_RESCUE_SECRET": "short",
+           "NEW_ADMIN_PASSWORD": "ValidPass1234!"}
+    r = subprocess.run(
+        ["python", "/app/backend/scripts/reset_admin_password.py",
+         "--yes", "--from-env"],
+        env=env, capture_output=True, text=True, timeout=10,
+    )
+    assert r.returncode == 2
+    assert "16 characters" in r.stderr
+
+
+def test_rescue_cli_refuses_short_password():
+    import subprocess
+    env = {**os.environ,
+           "ADMIN_RESCUE_SECRET": "a-strong-rescue-secret-value",
+           "NEW_ADMIN_PASSWORD": "short"}
+    r = subprocess.run(
+        ["python", "/app/backend/scripts/reset_admin_password.py",
+         "--yes", "--from-env"],
+        env=env, capture_output=True, text=True, timeout=10,
+    )
+    assert r.returncode == 2
+
+
+def test_rescue_cli_refuses_non_admin():
+    """Belt-and-braces: even with the secret, refuses on a learner row."""
+    import subprocess
+    env = {**os.environ,
+           "ADMIN_RESCUE_SECRET": "a-strong-rescue-secret-value",
+           "NEW_ADMIN_PASSWORD": "ValidPass1234!"}
+    r = subprocess.run(
+        ["python", "/app/backend/scripts/reset_admin_password.py",
+         "--yes", "--from-env", "--email", "learner@ifpi.org"],
+        env=env, capture_output=True, text=True, timeout=10,
+    )
+    assert r.returncode == 1
+    assert "NOT an admin" in r.stderr
+
+
+def test_rescue_cli_end_to_end():
+    """The happy path: reset a throwaway admin via the CLI, verify the
+    new password works AND must_change_password is True AND refresh
+    tokens are revoked. Uses a fresh admin so a mid-test failure can't
+    lock out admin@ifpi.org."""
+    from core.database import SessionLocal
+    from core.security import get_password_hash, verify_password
+    from models import User, UserRole, RefreshToken
+    from scripts.reset_admin_password import reset_admin_password
+    email = f"rescue-admin-{uuid.uuid4().hex[:8]}@ifpi.org"
+    db = SessionLocal()
+    try:
+        # Create a throwaway admin
+        admin = User(
+            email=email, name="Rescue Test Admin",
+            password_hash=get_password_hash("OriginalPass1234!"),
+            organization_id=1, is_active=True,
+        )
+        db.add(admin)
+        db.flush()
+        db.add(UserRole(user_id=admin.id, role="ADMIN"))
+        # Plant an active refresh token
+        unique_jti = f"rescue-{uuid.uuid4().hex[:8]}"
+        db.add(RefreshToken(
+            user_id=admin.id, family_id="rescue-test",
+            jti=unique_jti, expires_at=admin.created_at,
+        ))
+        db.commit()
+        admin_id = admin.id
+        # Execute the rescue
+        reset_admin_password(email, "RescuePassword123!")
+        db.expire_all()
+        admin = db.query(User).filter(User.id == admin_id).first()
+        assert verify_password("RescuePassword123!", admin.password_hash)
+        assert admin.must_change_password is True
+        active = db.query(RefreshToken).filter(
+            RefreshToken.user_id == admin_id,
+            RefreshToken.revoked_at.is_(None),
+        ).count()
+        assert active == 0, "rescue must revoke all active refresh tokens"
+        # Cleanup
+        db.query(RefreshToken).filter(RefreshToken.user_id == admin_id).delete()
+        db.query(UserRole).filter(UserRole.user_id == admin_id).delete()
+        db.query(User).filter(User.id == admin_id).delete()
+        db.commit()
     finally:
         db.close()

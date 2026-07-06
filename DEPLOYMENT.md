@@ -285,11 +285,32 @@ same incident deleted R2/S3 objects too, use R2 versioning restore
 **Cost:** Restore branches count toward your Neon storage quota until
 deleted. Delete the pre-incident primary once promotion is confirmed.
 
+### 6.2 Admin lockout recovery (Iter 33b)
+
+If the admin has lost their password AND the reset email is bouncing
+(e.g. their SMTP relay is misconfigured or the domain was decommissioned):
+
+```bash
+# From the deploy container's shell:
+ADMIN_RESCUE_SECRET="a-long-secret-only-you-know-at-least-16-chars" \
+  python -m scripts.reset_admin_password
+```
+
+The script:
+- Prompts twice for the new password (or reads it from `NEW_ADMIN_PASSWORD`
+  env with `--from-env`).
+- Sets `must_change_password=True` so the emergency password can't
+  survive past first login.
+- Revokes every active refresh token for the admin.
+- Never logs the password value — only its length and source.
+
+Communicate the new password to the admin via a **secure out-of-band
+channel** (Signal, encrypted email, in person), then rotate
+`ADMIN_RESCUE_SECRET` so the same value can't be used twice.
+
 ---
 
-## 7. Known deploy-time gotchas
-
-| Symptom | Cause | Fix |
+## 7. Known deploy-time gotchas| Symptom | Cause | Fix |
 | --- | --- | --- |
 | `sqlalchemy.exc.OperationalError: could not translate host name "None"` | `DATABASE_URL` not set | Set it (§2) |
 | Login succeeds but subsequent requests 401 | `AUTH_COOKIE_SECURE=true` on HTTP-only preview URL | Either use HTTPS or flip to `false` for the preview host |
