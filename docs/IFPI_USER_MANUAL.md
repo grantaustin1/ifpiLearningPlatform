@@ -340,7 +340,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 179 |
+| `routers/auth.py` | 257 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -371,7 +371,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11102** |
+| **Total** | **11180** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -414,6 +414,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `Notification` | `notifications` |
 | `Organization` | `organizations` |
 | `OutboxMessage` | `outbox_messages` |
+| `PasswordResetToken` | `password_reset_tokens` |
 | `Person` | `persons` |
 | `RefreshToken` | `refresh_tokens` |
 | `ScheduledReport` | `scheduled_reports` |
@@ -434,7 +435,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **54** ORM models._
+_Total: **55** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -519,11 +520,14 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/auth/2fa/setup` | POST |  |
 | `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
 | `/api/auth/2fa/status` | GET |  |
+| `/api/auth/change-password` | POST | Self-service password change. Verifies the old password, sets the |
+| `/api/auth/forgot-password` | POST | Emails a single-use reset link if the address matches an active |
 | `/api/auth/login` | POST |  |
 | `/api/auth/logout` | POST |  |
 | `/api/auth/me` | GET |  |
 | `/api/auth/refresh` | POST |  |
 | `/api/auth/register` | POST |  |
+| `/api/auth/reset-password` | POST | Consume a reset token + set a new password. On success, logs the |
 | `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Body: {"erp_token": "..."}. |
 | `/api/auth/sso-status` | GET | Public endpoint — the login page calls this on mount to decide whether |
 | `/api/authoring/budget` | GET |  |
@@ -698,7 +702,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **251** registered API endpoints._
+_Total: **254** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

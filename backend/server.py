@@ -6,9 +6,34 @@ This file owns: app construction, CORS, lifecycle hooks, root + health.
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# ── Iter 32 · Sentry error tracking ─────────────────────────────────
+# Initialised BEFORE any FastAPI app / router import so exceptions
+# raised during startup are captured. No-op when SENTRY_DSN is unset,
+# which is the case in dev / preview — Sentry never sees test noise.
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        environment=os.environ.get("ENVIRONMENT", "unknown"),
+        release=os.environ.get("APP_RELEASE") or None,
+        # Sample rate is intentionally conservative — 10% of transactions
+        # for tracing. Errors are always captured at 100%.
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,  # never send PII/email/ip without consent
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            SqlalchemyIntegration(),
+        ],
+        ignore_errors=[KeyboardInterrupt],
+    )
 
 from core.config import settings
 from core.database import Base, engine

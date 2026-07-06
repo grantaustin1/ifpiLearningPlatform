@@ -160,6 +160,12 @@ class User(Base):
     # Iter 31 — user-level weekly streak digest opt-out (default True)
     streak_digest_enabled = Column(Boolean, nullable=False, default=True,
                                    server_default="1")
+    # Iter 32 — force password change on next login (foot-gun guard for
+    # seeded admin@ifpi.org). Set to True on the seed row so shipping
+    # with `admin123` becomes impossible. Cleared by the change-password
+    # endpoint once the user picks a new one.
+    must_change_password = Column(Boolean, nullable=False, default=False,
+                                  server_default="0")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -200,6 +206,24 @@ class RefreshToken(Base):
     created_at = Column(DateTime, default=_utcnow)
 
     user = relationship("User", back_populates="refresh_tokens")
+
+
+class PasswordResetToken(Base):
+    """Iter 32 — Email-delivered password-reset tokens.
+
+    Row is created by POST /api/auth/forgot-password. Only the SHA-256
+    hash of the token is stored — the raw value only ever exists in the
+    outgoing email. Single-use: `used_at` gets stamped by
+    /api/auth/reset-password and any further attempts 400.
+    """
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    requested_ip = Column(String(45), nullable=True)  # audit trail
+    created_at = Column(DateTime, default=_utcnow)
 
 
 # ── Course & slides ──────────────────────────────────────────────────

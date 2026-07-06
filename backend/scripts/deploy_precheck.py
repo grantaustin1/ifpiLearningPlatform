@@ -61,10 +61,15 @@ def check_environment_flag() -> Result:
     v = _val("ENVIRONMENT").lower()
     if v == "production":
         return Result(True, "INFO", "ENVIRONMENT", "production")
+    if v in ("development", "dev", "staging", "test"):
+        return Result(True, "WARN", "ENVIRONMENT",
+                      f"'{v}' — soft-advisor mode; blockers will be "
+                      "downgraded to warnings. Set to 'production' to "
+                      "enforce all deploy blockers.")
+    # Empty/unset OR unknown value → treated as production (fail-closed)
     return Result(False, "WARN", "ENVIRONMENT",
-                  f"expected 'production', got {v or 'unset'} — most other "
-                  f"blockers become warnings in non-prod. Set to production "
-                  f"to enforce.")
+                  f"'{v or 'unset'}' — treating as PRODUCTION (fail-closed). "
+                  "Set ENVIRONMENT=development to unlock soft-advisor mode.")
 
 
 def check_jwt_secret() -> Result:
@@ -260,6 +265,19 @@ def main() -> int:
     print(f"  ENVIRONMENT = {_val('ENVIRONMENT') or 'unset'}")
     print("─" * 60)
 
+    # Iter 32 — Fail-closed on unset ENVIRONMENT.
+    # A missing ENVIRONMENT env var USED to downgrade blockers to
+    # warnings, meaning a deploy that forgot to set it would boot with
+    # dev secrets. Now we treat empty/unset as production so forgetting
+    # the flag = safe (deploy refuses to boot), not dangerous.
+    # Explicit ENVIRONMENT=development or ENVIRONMENT=staging is
+    # required to unlock the soft-advisor mode.
+    env = _val("ENVIRONMENT").lower()
+    if env in ("development", "dev", "staging", "test"):
+        is_prod = False or strict  # explicit dev-ish → soft mode
+    else:
+        is_prod = True  # unset OR "production" OR anything else → fail-closed
+
     results: list[Result] = []
     results.append(check_environment_flag())
     results.append(check_jwt_secret())
@@ -272,7 +290,7 @@ def main() -> int:
     results.append(check_public_base_url())
     results.append(check_llm_key())
 
-    is_prod = _val("ENVIRONMENT").lower() == "production" or strict
+    # is_prod already computed at top of main() — fail-closed on unset ENVIRONMENT
 
     blockers = [r for r in results if r.level == "BLOCKER"]
     warns = [r for r in results if r.level == "WARN"]

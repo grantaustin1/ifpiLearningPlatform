@@ -15,7 +15,7 @@ from core.security import (
     create_access_token, create_refresh_token, decode_token,
     get_password_hash, password_needs_rehash, verify_password,
 )
-from models import LifecycleStage, Organization, Person, RefreshToken, User, UserRole
+from models import LifecycleStage, Organization, PasswordResetToken, Person, RefreshToken, User, UserRole
 
 
 MAX_FAILED_ATTEMPTS = 5
@@ -149,3 +149,85 @@ class AuthService:
             RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None),
         ).update({"revoked_at": datetime.now(timezone.utc)})
         self.db.commit()
+
+    # ── Password change (self-service) ──────────────────────────────
+    def change_password(self, user_id: int, current_password: str,
+                        new_password: str) -> None:
+        """Iter 32 — used by /api/auth/change-password.
+        Verifies the current password before setting the new one.
+        Clears `must_change_password` and revokes every existing
+        refresh token so the user has to re-login on every device.
+        """
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user or not user.password_hash:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not verify_password(current_password, user.password_hash):
+            raise HTTPException(status_code=400,
+                                detail="Current password is incorrect")
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400,
+                                detail="New password must be at least 8 characters")
+        user.password_hash = get_password_hash(new_password)
+        user.must_change_password = False
+        self.db.commit()
+        # Revoke all refresh tokens so sessions on other devices die
+        self.revoke_all(user.id)
+
+    # ── Password reset (email-token flow) ──────────────────────────
+    def request_password_reset(self, email: str, ip: Optional[str]
+                               ) -> Optional[Tuple[User, str]]:
+        """Iter 32 — issue a single-use reset token.
+
+        Returns (user, raw_token) if the email matches an active user,
+        else None. Callers should NOT reveal to the client whether the
+        email existed (enumeration guard) — always respond 200.
+        """
+        email = (email or "").lower().strip()
+        user = self.db.query(User).filter(User.email == email).first()
+        if not user or not user.is_active or not user.password_hash:
+            return None
+        # Invalidate outstanding tokens for this user
+        self.db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        ).update({"used_at": datetime.now(timezone.utc)})
+        raw = secrets.token_urlsafe(32)
+        import hashlib
+        token_hash = hashlib.sha256(raw.encode()).hexdigest()
+        self.db.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            requested_ip=(ip or "")[:45] or None,
+        ))
+        self.db.commit()
+        return user, raw
+
+    def consume_password_reset(self, raw_token: str, new_password: str) -> User:
+        import hashlib
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400,
+                                detail="Password must be at least 8 characters")
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        row = self.db.query(PasswordResetToken).filter(
+            PasswordResetToken.token_hash == token_hash
+        ).first()
+        if not row:
+            raise HTTPException(status_code=400, detail="Invalid or expired token")
+        if row.used_at is not None:
+            raise HTTPException(status_code=400, detail="Token has already been used")
+        # Compare in UTC — expires_at is naive UTC in the DB
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if row.expires_at < now:
+            raise HTTPException(status_code=400, detail="Token has expired")
+        user = self.db.query(User).filter(User.id == row.user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(status_code=400, detail="Account inactive")
+        user.password_hash = get_password_hash(new_password)
+        user.must_change_password = False
+        user.failed_login_attempts = 0  # unlock any brute-force lockout
+        row.used_at = datetime.now(timezone.utc)
+        self.db.commit()
+        # Revoke all refresh tokens (paranoia: session hijack scenario)
+        self.revoke_all(user.id)
+        return user

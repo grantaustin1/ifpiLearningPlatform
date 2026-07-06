@@ -3,6 +3,9 @@ import { useAuth } from 'contexts/AuthContext'
 import LandingPage from 'pages/LandingPage'
 import LoginPage from 'pages/auth/LoginPage'
 import RegisterPage from 'pages/auth/RegisterPage'
+import ForgotPasswordPage from 'pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from 'pages/auth/ResetPasswordPage'
+import ChangePasswordPage from 'pages/auth/ChangePasswordPage'
 import VerifyCertPage from 'pages/VerifyCertPage'
 import AcceptInvitePage from 'pages/AcceptInvitePage'
 import DashboardLayout from 'components/layout/DashboardLayout'
@@ -51,6 +54,10 @@ function Protected({ children, adminOnly = false }:
   const { user, loading } = useAuth()
   if (loading) return <FullPageSpinner />
   if (!user) return <Navigate to="/login" replace />
+  // Iter 32 — force password rotation for seeded admin / anyone with
+  // the flag set. The /change-password route itself is NOT wrapped
+  // in <Protected> so it's still reachable when the flag is on.
+  if (user.must_change_password) return <Navigate to="/change-password?forced=1" replace />
   if (adminOnly && !['ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR'].some(r => user.roles.includes(r)))
     return <Navigate to="/courses" replace />
   return <>{children}</>
@@ -72,6 +79,9 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/catalog" element={<CatalogPage />} />
       <Route path="/catalog/:id" element={<CourseDetailPage />} />
       <Route path="/marketplace" element={<CatalogPage />} />

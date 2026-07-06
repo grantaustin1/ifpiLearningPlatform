@@ -36,6 +36,9 @@ def seed(db: Session) -> None:
             email="admin@ifpi.org", name="IFPI Admin",
             password_hash=get_password_hash("admin123"),
             organization_id=org.id, is_active=True,
+            # Iter 32 — force password rotation on first login so
+            # nobody ships prod with `admin123` still active.
+            must_change_password=True,
         )
         db.add(admin)
         db.flush()
