@@ -427,6 +427,8 @@ Wire this into your container `ENTRYPOINT` so bad configs never reach a healthy 
 - `SENTRY_DSN` (both backend + frontend; separate DSNs recommended)
 - `ALLOWED_ORIGINS=https://academy.<your-org>.com` (exact, no wildcards)
 - `RATE_LIMIT_REDIS_URL` (optional but recommended for multi-replica)
+- **`AUTH_COOKIE_SECURE=true`** — MUST be `true` in any HTTPS deployment (Iter 33e). Modern browsers silently drop the `Secure`-less auth cookie on HTTPS in many contexts, which shows up as "login succeeds then the very next request 401s." Set to `false` only for local HTTP dev.
+- `AUTH_COOKIE_SAMESITE=lax` (default) — flip to `none` **only** if the frontend and API are on different subdomains AND you're also setting `Secure=true`.
 
 ## Step G.3 — Security headers
 
@@ -509,6 +511,8 @@ Run this before your first learner cohort goes live.
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Login succeeds but the next API call 401s | `AUTH_COOKIE_SECURE=false` on an HTTPS deployment — browser dropped the cookie | Set `AUTH_COOKIE_SECURE=true` in `.env`, restart backend, hard-refresh browser (Iter 33e) |
+| "Change password page disappears" | Fixed in Iter 33d — API interceptor no longer bounces users off auth-flow pages | If still happening, hard-refresh; you're on a stale bundle |
 | Users can't log in | JWT_SECRET rotated without invalidation broadcast | Restart backend; users re-login |
 | SSO returns 401 SSO_INVALID_TOKEN | Clock skew or wrong shared secret | Sync NTP + confirm `ERP360_SSO_SHARED_SECRET` matches |
 | Course fails to publish | Slide `order_index` non-contiguous | Rebalance via `POST /api/courses/{id}/slides/reorder` |
