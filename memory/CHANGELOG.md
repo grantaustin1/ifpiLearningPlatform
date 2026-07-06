@@ -1,6 +1,23 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 33b — Docs Refresh (2026-02-06)
+- Updated `IFPI_SETUP_MANUAL.md` (388 → 512 lines): added Iter 32 forced
+  password change, Iter 33 email verification + forgot/reset password sections,
+  TOTP 2FA status flip, GDPR self-service endpoints, and a new
+  **Phase G — Production Deployment & Observability** (deploy_precheck,
+  Sentry, security headers, rate-limiting, `reset_admin_password.py` rescue).
+  Expanded audit checklist + failure matrix.
+- Updated `IFPI_USER_MANUAL.md` (741 → 858 lines): refreshed the
+  "Numbers you should know" table, expanded §2.2 Login (2FA, forced-change,
+  forgot-password), §8.4 Revocation (bulk revoke/unrevoke/email/zip),
+  §8.5 Compliance auto-reports, §10 GDPR self-service + rate-limit table,
+  and new §14 Security & Observability + §15 Documentation Library.
+- Regenerated AUTO-BLOCKs via `build_docs.py`; cleared PDF cache.
+- Verified: `/api/admin/docs` manifest fresh, PDF downloads valid `%PDF-1.4`,
+  Documents tab in `Settings → Documents` shows updated catalog.
+
+
 ## Iteration 33 — GDPR + Deploy Hardening (2026-02-11)
 
 Full "aggressive" scope: P1 refinements + P2 GDPR + P3 CI lint. Target

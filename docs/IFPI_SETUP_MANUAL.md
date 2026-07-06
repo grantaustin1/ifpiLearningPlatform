@@ -18,8 +18,9 @@
 4. [Phase D — AI Authoring Suite Configuration](#phase-d)
 5. [Phase E — Integrations (ERP360 SSO, Webhooks, API Tokens, SCORM)](#phase-e)
 6. [Phase F — Compliance, Certificates & Public Catalog](#phase-f)
-7. [Audit & Verification Checklist](#audit)
-8. [Failure Scenario Matrix](#failures)
+7. [Phase G — Production Deployment & Observability](#phase-g)
+8. [Audit & Verification Checklist](#audit)
+9. [Failure Scenario Matrix](#failures)
 
 ---
 
@@ -46,6 +47,25 @@
 
 ### Zero-blocker check
 Change the Owner password immediately (`Profile → Security → Change Password`). The default password is shared with Platform Ops.
+
+### Iter 32 — Forced password change on first login
+Every seeded admin account is created with `must_change_password=true`. On first login the app **auto-redirects** to `/change-password?forced=1`. You cannot reach the dashboard until the password is rotated. This eliminates the "shared default password" attack surface.
+
+- Endpoint: `POST /api/auth/change-password` (JWT-gated, requires the current password)
+- Frontend page: `frontend/src/pages/auth/ChangePasswordPage.tsx`
+- Rescue CLI (locked-out admin): `python /app/backend/scripts/reset_admin_password.py --email admin@ifpi.org` — will set a new random password and mark `must_change_password=true` again so the human still has to rotate on next login.
+
+### Iter 33 — Email verification enforcement
+New self-registrations receive a verification email. Until they click the link, `user.email_verified_at` is `NULL` and access to sensitive routes is denied (403 `EMAIL_NOT_VERIFIED`). Re-issue via `POST /api/auth/resend-verification` (rate-limited to 2/hour per user).
+
+- Verify endpoint: `POST /api/auth/verify-email` — consumes the single-use token.
+- Frontend pages: `VerifyEmailPage.tsx`, `ForgotPasswordPage.tsx`, `ResetPasswordPage.tsx`.
+
+### Iter 33 — Forgot password / reset flow
+`Profile → Sign in → Forgot password?` sends a single-use link (24 h TTL) via SMTP. Rate limit: 3/hr per email + 10/hr per IP. Tokens are hashed at rest in the `password_reset_tokens` table.
+
+- `POST /api/auth/forgot-password` `{email}` → always returns 200 (does not leak existence).
+- `POST /api/auth/reset-password` `{token, new_password}` → 200 on success, invalidates the token.
 
 ---
 
@@ -144,7 +164,15 @@ Cohorts group learners for:
 
 ## Step B.4 — Two-Factor Authentication (RECOMMENDED)
 
-> **Status: Backlog for IFPI v1.1** — TOTP + SMS 2FA are on the roadmap. If enabling now, use ERP360 SSO (Phase E.1) which enforces its own 2FA.
+**Status: SHIPPED in Iter 30i.** IFPI supports TOTP (Google Authenticator / 1Password / Authy) with recovery codes.
+
+- Enable: `Profile → Security → Two-Factor Authentication → Set up`.
+- Flow: `POST /api/auth/2fa/setup-init` → scan QR → confirm 6-digit code → `POST /api/auth/2fa/setup` returns 10 one-time recovery codes.
+- Disable (self): `POST /api/auth/2fa/disable` (requires current password + a valid TOTP or recovery code).
+- Admin override: `POST /api/admin/users/{id}/2fa/disable` — audit-logged.
+- Login challenge: When 2FA is on, `/api/auth/login` returns `{challenge_id}` with `2FA_REQUIRED`; complete via `POST /api/auth/2fa/challenge`.
+
+SSO users continue to inherit MFA from ERP360 (Phase E.1) instead.
 
 ---
 
@@ -341,9 +369,23 @@ Rate limit: 30/min per IP (Redis-backed, shared across replicas).
 | Data class | Retention | Deletion path |
 |---|---|---|
 | Learner PII | 7 y after last activity | Owner-only `DELETE /api/users/{id}?hard=true` (audit-logged) |
-| Certificate | Forever (verifiability) | Revoke via `PATCH /api/certificates/{id}` (status = REVOKED); PDF re-issue blocked |
+| Certificate | Forever (verifiability) | Revoke via `POST /api/certificates/{id}/revoke`; PDF re-issue blocked. Bulk: `/api/certificates/bulk-revoke`, `/api/certificates/bulk-unrevoke` (Iter 30–31) |
 | AI logs / prompts | 90 d | Auto-purged by `outbox_worker` |
 | Audit log | 3 y | Not user-deletable |
+
+### Iter 33 — Self-service GDPR endpoints
+Learners no longer need to email support to exercise their data rights:
+
+| Right | Endpoint | Notes |
+|---|---|---|
+| **Data portability** | `GET /api/auth/me/export` | Streams a ZIP with `profile.json`, `courses.json`, `certificates.json`, `flashcards.json`, `audit.json`. |
+| **Erasure — request** | `POST /api/auth/me/delete-request` | Emails a 6-digit confirmation code (10 min TTL). |
+| **Erasure — confirm** | `DELETE /api/auth/me` | Consumes the code, anonymises PII, revokes certificates, purges sessions. Certificate PDFs remain verifiable via the anonymised holder token. |
+
+Frontend surface: `Profile → Privacy` (`PreferencesPage.tsx`).
+
+### Iter 31 — Compliance auto-reports
+Env-gated worker (`COMPLIANCE_REPORT_ENABLED=true`) that emails a monthly PDF summary to `COMPLIANCE_REPORT_RECIPIENTS`. Covers active users, certs issued/revoked, deletion requests, failed logins, and top audit events. See `IFPI_WEBHOOK_EVENTS.md` for the parallel event stream.
 
 ## Step F.4 — Streaks, Badges & Cohort Digests
 
@@ -351,6 +393,76 @@ Enable in `Organization Settings → Gamification`:
 - **Streaks** — daily activity counter, resets at TZ-midnight
 - **Badges** — earned per course + exam completion (see `badge_tiers` table)
 - **Cohort digest** — weekly recap emailed to every learner in a cohort
+
+---
+
+# Phase G — Production Deployment & Observability {#phase-g}
+
+**Status:** Iter 32 hardening. All items below are **required** before flipping the tenant to a public URL.
+
+## Step G.1 — Pre-flight config validation
+
+`python /app/backend/scripts/deploy_precheck.py` is a **fail-closed** script that boot-blocks the backend if any of these are wrong:
+
+| Rule | What it checks |
+|---|---|
+| `ENVIRONMENT` set | Missing → assumed `production` (strictest mode). |
+| No dev secrets in prod | Rejects `JWT_SECRET=changeme`, `SEED_ADMIN_PASSWORD=admin123`, etc. |
+| `MONGO_URL` absent | IFPI is **PostgreSQL-only**. Any Mongo config aborts boot. |
+| Storage backend | `STORAGE_BACKEND=s3` requires `S3_*` vars. `local` blocks prod boot. |
+| CORS | Wildcard `*` rejected when `ENVIRONMENT=production`. |
+| Sentry DSN | Warning if missing (not fatal). |
+
+Wire this into your container `ENTRYPOINT` so bad configs never reach a healthy pod.
+
+## Step G.2 — Environment template
+
+`/app/.env.production.template` — copy to `.env.production` and fill:
+
+- `DATABASE_URL` (Neon / RDS Postgres — must be `postgresql+psycopg2://…`)
+- `JWT_SECRET` (32+ random bytes; rotate every 90 d)
+- `SEED_ADMIN_PASSWORD` (governs the seeded owner in prod — never `admin123`)
+- `STORAGE_BACKEND=s3` + `S3_*` (Cloudflare R2 or AWS S3)
+- `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (Resend / SES / Mailgun)
+- `SENTRY_DSN` (both backend + frontend; separate DSNs recommended)
+- `ALLOWED_ORIGINS=https://academy.<your-org>.com` (exact, no wildcards)
+- `RATE_LIMIT_REDIS_URL` (optional but recommended for multi-replica)
+
+## Step G.3 — Security headers
+
+`core/middleware.py::SecurityHeadersMiddleware` adds on every response:
+
+- `Content-Security-Policy` — locked to self + integrated third-parties (Sentry, Tavily)
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`
+- `Permissions-Policy: camera=(), microphone=(self), geolocation=()`
+
+Verify with `curl -I https://<your-host>/api/health | grep -i "content-security"`.
+
+## Step G.4 — Sentry & correlation IDs
+
+- `sentry_sdk` initialised in `server.py` with tracing sample-rate `0.2` and `environment` tag from `ENVIRONMENT`.
+- Every request gets an `X-Correlation-ID` header (generated or forwarded). Logged via `CorrelationIdMiddleware` and attached to every Sentry event.
+- Frontend forwards the same header via the Axios interceptor so front + back stack traces link automatically.
+
+## Step G.5 — Rate limiting
+
+- Redis-backed via `services/rate_limit_service.py`. Falls back to an in-memory bucket if `RATE_LIMIT_REDIS_URL` is unset (single-replica dev only).
+- Endpoints covered: `/auth/login`, `/auth/forgot-password`, `/auth/register`, `/auth/verify-email/resend`, `/public/certificates/verify/{code}`, `/marketplace/*`.
+- Client IP resolved from `X-Forwarded-For` (K8s ingress). Test override: `X-Test-Client-Ip` header, only when `ALLOW_TEST_TOKEN_HEADER=true`.
+
+## Step G.6 — Locked-out admin rescue
+
+If the owner rotates the seeded password wrong twice and gets locked out:
+
+```bash
+cd /app/backend
+python scripts/reset_admin_password.py --email admin@ifpi.org
+# Prints a random 20-char password, sets must_change_password=true.
+# Hand this to the admin over a secure channel; they'll rotate on next login.
+```
+
+The seed script itself (`seed/seed_minimal.py`) is **idempotent** — it will NEVER overwrite an existing user's password. Proved by test `test_iteration33_sprint.py::test_seed_does_not_overwrite_existing_admin`.
 
 ---
 
@@ -368,6 +480,12 @@ Run this before your first learner cohort goes live.
 - [ ] SSO-status endpoint reachable (if enabling ERP360 SSO)
 - [ ] At least one webhook subscribed and delivered a `test.ping` event
 - [ ] Backup / export: run `POST /api/admin/exports/full` and download the ZIP
+- [ ] **Iter 32:** `python backend/scripts/deploy_precheck.py` exits 0
+- [ ] **Iter 32:** `curl -I` shows `Strict-Transport-Security` + `Content-Security-Policy`
+- [ ] **Iter 32:** Trigger a test Sentry event; confirm it appears in the project
+- [ ] **Iter 33:** New user receives verification email; unverified access returns 403
+- [ ] **Iter 33:** `GET /api/auth/me/export` returns a ZIP with 5 JSON files
+- [ ] **Iter 33:** Rate-limiter blocks 6th failed login within 60 s (`429`)
 
 ---
 
@@ -382,6 +500,12 @@ Run this before your first learner cohort goes live.
 | Certificate verify returns 429 | Bot enumeration | Rate limit fired (Redis); wait 60 s or raise the limit in `services/rate_limit_service.py` |
 | Webhook stuck FAILED | Endpoint 5xx > 3 attempts | Fix endpoint, click "Retry" in `/dashboard/webhooks` |
 | SCORM package won't import | Missing `imsmanifest.xml` root | Re-export via `/dashboard/courses/{id}/export-scorm` |
+| Backend refuses to boot in prod | `deploy_precheck.py` found a dev secret or missing config | Read the printed error, fix the env var, redeploy |
+| Admin locked out after password rotation | Wrong password entered on forced-change screen | Run `python backend/scripts/reset_admin_password.py --email admin@…` |
+| Users report "please verify your email" 403 | `email_verified_at` is NULL | Ask user to click link, or `POST /api/auth/resend-verification` |
+| Forgot-password email never arrives | SMTP mis-configured OR rate limit hit (3/hr per email) | Check `Organization → SMTP → Send test`; check `outbox_messages` for FAILED rows |
+| Sentry not receiving events | `SENTRY_DSN` missing OR sample-rate `0.0` | Confirm env var; trigger `/api/_test/raise` (dev only) |
+| CSP blocks a legit third-party script | Domain not in the allow-list | Edit `SecurityHeadersMiddleware.CSP_POLICY` in `core/middleware.py` |
 
 ---
 
