@@ -5,6 +5,7 @@ import { BookOpen, ClipboardList, Users, Award, ArrowRight, Plus, Sparkles, Tren
 import { timeAgo } from 'lib/utils'
 import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
 import { OnboardingBoard } from './OnboardingBoard'
+import { DocsEngagementTile } from './DocsEngagementTile'
 
 export default function DashboardPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -65,15 +66,18 @@ export default function DashboardPage() {
         <div className="xl:col-span-2">
           <MembersNeedingActionWidget />
         </div>
-        <div className="bg-white rounded-2xl card-glow p-5">
-          <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {actions.map(a => (
-              <Link key={a.href} to={a.href}
-                className={`flex flex-col items-center gap-2 ${a.color} text-white text-xs font-semibold py-4 rounded-xl shadow transition-all hover:-translate-y-0.5`}>
-                <a.icon className="h-5 w-5" /> {a.label}
-              </Link>
-            ))}
+        <div className="space-y-5">
+          <DocsEngagementTile />
+          <div className="bg-white rounded-2xl card-glow p-5">
+            <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {actions.map(a => (
+                <Link key={a.href} to={a.href}
+                  className={`flex flex-col items-center gap-2 ${a.color} text-white text-xs font-semibold py-4 rounded-xl shadow transition-all hover:-translate-y-0.5`}>
+                  <a.icon className="h-5 w-5" /> {a.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
