@@ -85,6 +85,15 @@ export default function LoginPage() {
       }
       const u = outcome.user
       toast.success(`Welcome back, ${u.name || u.email}`)
+      // Iter 33d — Route forced-password-change users DIRECTLY to the
+      // change-password page. Going via /dashboard first creates a
+      // flash/race with <Protected> and can be aborted mid-transition
+      // by any background API 401 (KioskShell, TermsGate). Direct nav
+      // guarantees the form stays put until the user completes it.
+      if (u.must_change_password) {
+        nav('/change-password?forced=1', { replace: true })
+        return
+      }
       nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
     } catch (err: any) {
       setError(err?.response?.data?.error?.message || err?.response?.data?.detail || 'Invalid email or password')
@@ -98,6 +107,10 @@ export default function LoginPage() {
     try {
       const u = await challenge2FA(twoFA.challengeId, twoFACode.trim())
       toast.success(`Welcome back, ${u.name || u.email}`)
+      if (u.must_change_password) {
+        nav('/change-password?forced=1', { replace: true })
+        return
+      }
       nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || err?.response?.data?.detail || 'Invalid code'
