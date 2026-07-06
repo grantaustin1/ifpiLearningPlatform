@@ -345,54 +345,87 @@ See [`docs/IFPI_INTEGRATION_MATRIX.md`](../IFPI_INTEGRATION_MATRIX.md) for the s
 
 ---
 
-# Phase F — Compliance, Certificates & Public Catalog {#phase-f}
+# Phase F — Certificates, Public Sharing & Data Rules {#phase-f}
 
-## Step F.1 — Certificate Verification
+> **In plain English:** This is where you decide (a) how the world verifies a certificate you've issued, (b) whether outsiders can browse your course catalogue without logging in, and (c) how long we keep learner data before we delete it.
 
-Every issued certificate carries:
-- Unique 22-char alphanumeric `certificate_code`
-- Signed `verifier_token` (JWT, cannot be forged)
-- Public QR + click-through link on the PDF (Iter 30b)
-- `GET /api/public/certificates/verify/{code}` returns holder + course + issued-at
+---
 
-Rate limit: 30/min per IP (Redis-backed, shared across replicas).
+## F.1 — Making certificates trustworthy
 
-## Step F.2 — Public Catalog
+Every certificate IFPI issues is designed to be **impossible to fake**. Here's what a recipient (or their future employer) gets:
 
-`Organization Settings → Public Access → Enable`  
-- Anonymous browsing at `/catalog?token=<read:catalog token>` (or an internal API token)
-- Only `PUBLISHED` courses appear
-- Verify pane at `/catalog?verify=<code>` for third parties (recruiters, regulators)
+- **A unique 22-character code** printed on the certificate — think of it like a passport number.
+- **A hidden digital signature** built in — anyone can check it's genuine, but nobody can forge one.
+- **A QR code** on the PDF. Point a phone camera at it and it opens the verification page automatically.
+- **A public link** anyone can visit to confirm the certificate is real. No login needed.
 
-## Step F.3 — Retention & Deletion (GDPR / POPIA)
+The verification page shows: **who the certificate was issued to, which course they completed, and when.** That's it — no other personal info leaks.
 
-| Data class | Retention | Deletion path |
-|---|---|---|
-| Learner PII | 7 y after last activity | Owner-only `DELETE /api/users/{id}?hard=true` (audit-logged) |
-| Certificate | Forever (verifiability) | Revoke via `POST /api/certificates/{id}/revoke`; PDF re-issue blocked. Bulk: `/api/certificates/bulk-revoke`, `/api/certificates/bulk-unrevoke` (Iter 30–31) |
-| AI logs / prompts | 90 d | Auto-purged by `outbox_worker` |
-| Audit log | 3 y | Not user-deletable |
+**Protection against abuse:** the public verification page allows 30 checks per minute per visitor. Enough for a recruiter checking a candidate; not enough for someone scraping the site.
 
-### Iter 33 — Self-service GDPR endpoints
-Learners no longer need to email support to exercise their data rights:
+---
 
-| Right | Endpoint | Notes |
-|---|---|---|
-| **Data portability** | `GET /api/auth/me/export` | Streams a ZIP with `profile.json`, `courses.json`, `certificates.json`, `flashcards.json`, `audit.json`. |
-| **Erasure — request** | `POST /api/auth/me/delete-request` | Emails a 6-digit confirmation code (10 min TTL). |
-| **Erasure — confirm** | `DELETE /api/auth/me` | Consumes the code, anonymises PII, revokes certificates, purges sessions. Certificate PDFs remain verifiable via the anonymised holder token. |
+## F.2 — Letting outsiders browse your courses
 
-Frontend surface: `Profile → Privacy` (`PreferencesPage.tsx`).
+You can turn on a **Public Catalogue** so people can see what courses you offer without needing an account. Useful for:
+- Sales & marketing pages
+- Recruitment ("what training does IFPI provide?")
+- Regulators checking your programme
 
-### Iter 31 — Compliance auto-reports
-Env-gated worker (`COMPLIANCE_REPORT_ENABLED=true`) that emails a monthly PDF summary to `COMPLIANCE_REPORT_RECIPIENTS`. Covers active users, certs issued/revoked, deletion requests, failed logins, and top audit events. See `IFPI_WEBHOOK_EVENTS.md` for the parallel event stream.
+**How to switch it on:** `Organisation Settings → Public Access → Enable`.
 
-## Step F.4 — Streaks, Badges & Cohort Digests
+**What visitors see:**
+- Only **Published** courses appear (drafts and archived courses stay hidden)
+- They can browse, but can't enrol — enrolling still requires signing up
+- They can also verify a certificate they've been shown, using the same public catalogue page
 
-Enable in `Organization Settings → Gamification`:
-- **Streaks** — daily activity counter, resets at TZ-midnight
-- **Badges** — earned per course + exam completion (see `badge_tiers` table)
-- **Cohort digest** — weekly recap emailed to every learner in a cohort
+**How to switch it off:** flip the same toggle back to off. Everything becomes login-only again immediately.
+
+---
+
+## F.3 — How long we keep data (GDPR / POPIA)
+
+Different types of information are kept for different reasons. Here's the shape of it in plain English:
+
+- **Learner personal details** (name, email, profile) — kept for **7 years after they last used the platform**, then only the Owner can permanently delete them. Every delete is written to the audit log.
+- **Certificates** — kept **forever**, because the whole point is that they can still be verified 20 years later. If you need to invalidate one (e.g. plagiarism found after the fact), use **Revoke** — the certificate stays in the system but marked as revoked, and the PDF cannot be re-downloaded.
+- **AI conversation logs & prompts** — automatically deleted **after 90 days**. No manual clean-up needed.
+- **Audit log** (record of who did what, when) — kept for **3 years**. Users cannot delete their own audit entries; only Platform Ops with database access can.
+
+### What learners can do themselves (Iter 33)
+
+Users no longer need to email support to exercise their data rights. From `Profile → Privacy` they can:
+
+- **Download a copy of everything** — one click, gets a ZIP containing their profile, enrolments, certificates, flashcard progress and audit trail as JSON files.
+- **Request account deletion** — click delete, receive a 6-digit code by email (expires in 10 minutes), enter the code, done. All personal details are wiped; certificates remain verifiable but show "IFPI Learner" instead of the person's name.
+
+### Bulk certificate operations (for admins)
+
+If an entire cohort's certificates need to be revoked or reactivated (e.g. an accreditation issue), you can do it in one go from `Certificates → Bulk actions`:
+
+- **Revoke many** — up to 500 at once. Skips any already revoked (safe to re-run).
+- **Un-revoke many** — the reverse, in case the revocation was a mistake.
+- **Re-email download links** — sends every affected holder a fresh email.
+- **Download a ZIP of PDFs** — up to 100 certificates bundled into one file.
+
+Every bulk action requires typing a confirmation word and adding a reason, and all of it goes into the audit log.
+
+### Monthly compliance report
+
+If your team has enabled it, IFPI automatically **emails a monthly PDF summary** to whoever you've listed. It covers: active users, certificates issued and revoked in the month, deletion requests, failed logins, and the most common admin actions. Nothing to schedule — it just arrives.
+
+---
+
+## F.4 — Motivation & engagement (streaks, badges, digests)
+
+Under `Organisation Settings → Gamification` you have three levers to keep learners engaged:
+
+- **Daily streaks** — counts consecutive days a learner has been active. Resets at midnight in your organisation's timezone. Shown on their dashboard.
+- **Badges** — automatically awarded for milestones (finish a course, get 100% on an exam, complete 5 courses, etc.). Badge names and thresholds are configurable per organisation.
+- **Weekly cohort digest** — a friendly recap email sent every Monday morning to every learner in a cohort, showing what their peers achieved and nudging them toward what's next.
+
+All three are opt-in for the learner (they can silence digests from `Profile → Notifications`).
 
 ---
 
