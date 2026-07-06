@@ -411,7 +411,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/misc.py` | 1162 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
-| `routers/owner_dashboard.py` | 148 |
+| `routers/owner_dashboard.py` | 226 |
 | `routers/public_catalog.py` | 153 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
@@ -420,7 +420,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11341** |
+| **Total** | **11419** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -519,6 +519,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
 | `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
+| `/api/admin/dashboard/docs-engagement` | GET | Iter 33c — Docs engagement tile for the Owner dashboard. |
 | `/api/admin/dashboard/members-needing-action` | GET |  |
 | `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
 | `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
@@ -759,7 +760,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **260** registered API endpoints._
+_Total: **261** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

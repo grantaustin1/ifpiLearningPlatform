@@ -464,6 +464,22 @@ python scripts/reset_admin_password.py --email admin@ifpi.org
 
 The seed script itself (`seed/seed_minimal.py`) is **idempotent** — it will NEVER overwrite an existing user's password. Proved by test `test_iteration33_sprint.py::test_seed_does_not_overwrite_existing_admin`.
 
+## Step G.7 — pgvector activation (P2 option a, Iter 34)
+
+The RAG tutor is **pgvector-ready** but ships in Python-cosine fallback mode. To activate the fast path in production:
+
+1. **Provision** — Neon Postgres (or any Postgres 15+) with the `vector` extension enabled. Neon: `Settings → Extensions → vector`. Self-hosted: `sudo apt install postgresql-15-pgvector`.
+2. **Flip flag** — set `USE_PGVECTOR=true` in `.env.production` (or your K8s config-map). Model-level column type + service query branch both read this at import / call time.
+3. **Migrate** — `alembic upgrade head`. Migration `d2e3f4a5b6c7_pgvector_ready.py`:
+   - Is a **NO-OP on SQLite** (dev)
+   - Is a **NO-OP on Postgres without the `vector` extension available** (safe cluster)
+   - When both conditions are met, runs `CREATE EXTENSION vector`, alters `source_chunks.embedding` from `json` to `vector(1536)` (cast in-place, no data loss), and creates an HNSW cosine index.
+4. **Verify** — `SELECT indexname FROM pg_indexes WHERE tablename='source_chunks'` should show `ix_source_chunks_embedding_hnsw`. Any semantic-search request will now use `<=>` cosine distance in Postgres instead of the Python fallback.
+
+**Rollback** — the same migration downgrade path casts the column back to `json`. Application code adapts automatically because `services/embedding_service.py::_use_pgvector()` short-circuits when the flag flips off.
+
+**Capacity note** — pgvector's design ceiling on a modest Neon compute (1 vCPU, 4 GB) is ~1M chunks with sub-100ms search. Above that, tune the HNSW `m` / `ef_construction` params in the migration.
+
 ---
 
 # Audit & Verification Checklist {#audit}
