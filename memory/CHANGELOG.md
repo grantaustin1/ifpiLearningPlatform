@@ -1,6 +1,73 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 32b — Pre-Deploy Security Hardening (2026-02-11)
+
+Independent audit by SureThing AI validated my earlier gap analysis
+and caught one new issue (fail-closed ENVIRONMENT). Both agent's
+recommendations were adopted in this sprint.
+
+### Backend
+- ✅ **Password reset flow** — 3 new endpoints on `/api/auth`:
+  - `POST /forgot-password` — enumeration-guarded; identical 200
+    response whether email exists or not. Queues an OutboxMessage
+    with `template='password_reset'` for real users.
+  - `POST /reset-password` — consumes single-use token, sets new
+    password, auto-logs the user in.
+  - `POST /change-password` — self-service password change; verifies
+    current password, clears `must_change_password`, revokes all
+    refresh tokens so other devices sign out.
+- ✅ **Force admin password change** — `users.must_change_password`
+  column (Alembic migration `b0c1d2e3f4a5`). Seeded admin now ships
+  with this flag ON so `admin123` cannot survive first login.
+- ✅ **Security headers middleware** — `SecurityHeadersMiddleware` in
+  `core/middleware.py`. Adds `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
+  `Permissions-Policy`, HSTS (HTTPS-only), and a CSP that's
+  Report-Only in non-prod / enforced in prod.
+- ✅ **Sentry integration** — `sentry-sdk[fastapi]==2.19.2` initialised
+  at top of `server.py`, gated on `SENTRY_DSN` env var. No-op when
+  unset (dev/preview never send data).
+- ✅ **Deploy precheck: fail-closed on unset `ENVIRONMENT`** —
+  SureThing AI's catch. Previously, forgetting the env var
+  downgraded blockers to warnings. Now unset/empty is treated as
+  production and enforces every blocker. Explicit
+  `ENVIRONMENT=development` unlocks soft-advisor mode.
+
+### Frontend
+- ✅ `/forgot-password` — enumeration-guarded UI mirroring backend.
+- ✅ `/reset-password/:token` — password + confirm form, auto-login on success.
+- ✅ `/change-password` — with forced-mode amber banner when the flag is on.
+- ✅ **Protected route gate** — hard-redirects any user with
+  `must_change_password=true` to `/change-password?forced=1` before
+  serving any dashboard page.
+- ✅ **"Forgot your password?" link** on LoginPage.
+- ✅ AuthContext `User.must_change_password` field.
+
+### Docs
+- ✅ `DEPLOYMENT.md §6.1` — Neon Point-in-Time Restore walkthrough
+  (SureThing AI's ask).
+
+### Tests
+- ✅ New `tests/test_iteration32_sprint.py` — 12/12 passing.
+- ✅ Regression: 11/11 iter30 + 16/16 iter31 still pass.
+- ✅ testing_agent_v3_fork iteration_32.json: **100% backend + 100%
+  frontend E2E**. Zero bugs.
+
+### Env additions (backend/.env & DEPLOYMENT.md)
+- `SENTRY_DSN=` (optional; no-op if unset)
+- `SENTRY_TRACES_SAMPLE_RATE=0.1` (default)
+- `APP_RELEASE=` (optional Sentry release tag)
+
+### Notable hard-won lessons
+- Emergent's stock `deployment_agent` **incorrectly recommends
+  MongoDB rewrite** for SQLAlchemy apps. Confirmed by Emergent
+  Support: use external Postgres via `DATABASE_URL`. Documented in
+  DEPLOYMENT.md §0 to prevent future agents from falling into this.
+- Independent agent review (SureThing AI) caught a real fail-open
+  configuration flaw in my own precheck script. Peer review works.
+
+
 ## Iteration 32 — Deployment Readiness Kit (2026-02-11)
 
 ### Deliverables
