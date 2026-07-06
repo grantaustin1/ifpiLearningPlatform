@@ -70,6 +70,22 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get(self.HEADER, "")
         cid = raw.strip()[:self.MAX_LEN] or uuid.uuid4().hex
         token = _correlation_id_var.set(cid)
+        # Iter 32b — Propagate correlation ID into Sentry's per-request
+        # scope. sentry-sdk 2.x isolates scopes per FastAPI request via
+        # FastApiIntegration, so `set_tag()` here attaches to any
+        # exception/breadcrumb captured during THIS request only.
+        # No-op when SENTRY_DSN is unset (client is Noop).
+        try:
+            import sentry_sdk
+            if sentry_sdk.get_client().dsn:
+                sentry_sdk.set_tag("correlation_id", cid)
+                sentry_sdk.set_context("request", {
+                    "correlation_id": cid,
+                    "path": request.url.path,
+                    "method": request.method,
+                })
+        except Exception:  # noqa: BLE001 - never let observability break the request
+            pass
         try:
             response = await call_next(request)
             response.headers[self.HEADER] = cid

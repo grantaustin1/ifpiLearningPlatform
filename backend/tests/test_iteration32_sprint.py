@@ -234,3 +234,41 @@ def test_precheck_soft_advisor_when_dev_explicit():
     )
     # Non-strict dev boot must exit 0
     assert r.returncode == 0
+
+
+# ── Correlation ID → log breadcrumbs (Iter 32b observability) ────
+def test_log_records_have_cid_field():
+    """The LogRecordFactory in server.py MUST attach a `cid` attr to
+    every LogRecord — background jobs get '-', request-scoped logs get
+    the current correlation ID. Without this, the log format string
+    would raise KeyError on any log emitted outside a request."""
+    import logging
+    # Trigger a fresh log record and inspect
+    record = logging.LogRecord(
+        name="ifpi.test", level=logging.INFO, pathname=__file__,
+        lineno=1, msg="test", args=(), exc_info=None,
+    )
+    # Simulate the factory (server.py registers it as global)
+    from server import _record_factory  # noqa: F401 — importing loads factory
+    # Now creating a new record via the factory should have `cid`
+    r2 = logging.getLogRecordFactory()(
+        "ifpi.test", logging.INFO, __file__, 1, "hello", (), None,
+    )
+    assert hasattr(r2, "cid"), "LogRecord missing `cid` attribute"
+    assert r2.cid == "-" or isinstance(r2.cid, str)
+
+
+def test_correlation_id_propagates_to_sentry_scope():
+    """Under a real request, CorrelationIdMiddleware.dispatch calls
+    sentry_sdk.set_tag('correlation_id', ...). We can't easily inspect
+    the per-request scope from outside, so instead we verify the
+    middleware code path executes without raising when Sentry is a
+    Noop client (the common dev case)."""
+    r = requests.get(
+        f"{BASE_URL}/api/health",
+        headers={"x-correlation-id": "iter32b-observability-test"},
+        timeout=10,
+    )
+    assert r.status_code == 200
+    # Middleware echoes the cid we sent back on the response
+    assert r.headers.get("X-Correlation-Id") == "iter32b-observability-test"
