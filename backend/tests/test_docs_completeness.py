@@ -64,6 +64,25 @@ def test_docs_have_no_drift():
     )
 
 
+def _collect_routes(router_or_app):
+    """Recursively collect all route objects.
+
+    FastAPI ≥ 0.139 stores included routers as ``_IncludedRouter`` wrappers
+    rather than immediately flattening them into ``routes``.  We unwrap those
+    transparently so introspection works across FastAPI versions.
+    """
+    from fastapi.routing import APIRoute
+    collected = []
+    for r in getattr(router_or_app, "routes", []):
+        if isinstance(r, APIRoute):
+            collected.append(r)
+        elif hasattr(r, "original_router"):
+            collected.extend(_collect_routes(r.original_router))
+        elif hasattr(r, "routes"):
+            collected.extend(_collect_routes(r))
+    return collected
+
+
 def test_every_api_route_mentioned_in_a_manual():
     """New routes must at least appear somewhere in a manual.
 
@@ -83,7 +102,7 @@ def test_every_api_route_mentioned_in_a_manual():
             combined += p.read_text(encoding="utf-8") + "\n"
 
     missing = []
-    for route in app.routes:
+    for route in _collect_routes(app):
         path = getattr(route, "path", "") or ""
         if not path.startswith("/api"):
             continue
