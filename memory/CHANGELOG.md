@@ -1,6 +1,43 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 34a — Plain-English Manuals + Embedded Screenshots (2026-02-06)
+
+### User Manual — full plain-English rewrite
+- Retitled "IFPI Learning Academy — Staff Handbook" (was "User Manual v1.0")
+- Rewrote §1 (What IFPI Is), §2 (Getting In), §3 (Roles), §4 (Dashboard),
+  §5 (Building a Course), §6 (AI Authoring Suite), §7 (Learner
+  Experience), §8 (Certificates), §9 (Reports), §10 (Sharing) in
+  plain English — no code paths, no `POST /api/…`, no jargon.
+- New "Your Account" section for every user (profile, password,
+  privacy, GDPR export/delete).
+- New "Rate Limits & Fair Use" section — friendly explanation of why
+  a login might get temporarily throttled.
+- All auto-generated router/model tables + API reference banished to
+  §12 "Technical Reference" with a clear "skip if not a coder" banner.
+- Embedded 8 live screenshots (login, admin dashboard, courses list,
+  course editor, AI authoring, certificates admin, learner
+  dashboard, learner courses, mind map, profile).
+
+### Setup Manual — plain-English rewrite of Phases 0, A, B, C, D, E, F
+- Added `> In plain English:` intro paragraph to every Phase.
+- Rewrote step-by-step content in sentences (was in code + table form).
+- Preserved every technical detail inside a collapsible
+  `<details>Technical reference for Platform Ops</details>` block
+  at the bottom of each Phase.
+- Phase G (production deploy) kept technical — it's Platform Ops-only.
+- Added new failure-matrix rows for the `AUTH_COOKIE_SECURE=false` bug
+  and the "change-password page disappears" quirk (both fixed today).
+
+### Docs Library PDF renderer
+- Added `link_callback` to xhtml2pdf so relative `screenshots/xxx.png`
+  paths resolve to `/app/docs/screenshots/`. Path-traversal guarded.
+- Added `img { max-width: 100%; }` CSS so screenshots render at full
+  width inside A4 pages.
+- Verified: User Manual PDF grew from ~40 KB → 520 KB with embedded
+  images, all `/XObject /Image` entries confirmed in the PDF binary.
+
+
 ## Iter 34 — P3 Models Split + P2 (a) pgvector-Ready (2026-02-06)
 
 ### P3: Models refactor
