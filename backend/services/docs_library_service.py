@@ -166,6 +166,8 @@ def _md_to_pdf(src: Path, title: str) -> bytes:
         blockquote { border-left: 3px solid #94a3b8; margin: 8pt 0;
                      padding: 4pt 10pt; color: #475569; }
         hr { border: none; border-top: 1px solid #cbd5e1; margin: 10pt 0; }
+        img { max-width: 100%; margin: 8pt 0; border: 1px solid #e2e8f0;
+              border-radius: 4pt; }
         .cover { text-align: center; padding-top: 60mm; }
         .cover h1 { font-size: 30pt; border: none; }
         .cover .meta { color: #64748b; font-size: 12pt; margin-top: 12pt; }
@@ -194,7 +196,28 @@ def _md_to_pdf(src: Path, title: str) -> bytes:
     )
 
     buf = io.BytesIO()
-    result = pisa.CreatePDF(src=full_html, dest=buf, encoding="utf-8")
+
+    def _resolve_asset(uri: str, _rel: str) -> str:
+        """xhtml2pdf link callback — resolves relative image paths in
+        the markdown (e.g. `screenshots/03-owner-dashboard.png`) to real
+        files inside /app/docs. Also allows absolute /app paths for
+        Platform Ops flexibility."""
+        if uri.startswith(("http://", "https://", "data:")):
+            return uri
+        if uri.startswith("/"):
+            return uri if os.path.exists(uri) else uri
+        candidate = (DOCS_ROOT / uri).resolve()
+        # Path traversal guard — must remain under DOCS_ROOT
+        try:
+            candidate.relative_to(DOCS_ROOT)
+        except ValueError:
+            return uri
+        return str(candidate) if candidate.exists() else uri
+
+    result = pisa.CreatePDF(
+        src=full_html, dest=buf, encoding="utf-8",
+        link_callback=_resolve_asset,
+    )
     if result.err:
         raise RuntimeError(f"xhtml2pdf reported {result.err} errors")
     return buf.getvalue()
