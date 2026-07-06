@@ -362,6 +362,85 @@ class CSRFProtectMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Iter 32 · Security headers
+# ─────────────────────────────────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds defense-in-depth response headers on every request.
+
+    Rationale (per OWASP secure-headers project):
+      - `Strict-Transport-Security` — pins browsers to HTTPS for 1 year
+        after first visit. Prevents ssl-strip MITM downgrades.
+      - `X-Content-Type-Options: nosniff` — kills MIME sniffing which
+        can turn a text/plain upload into executable JS.
+      - `X-Frame-Options: DENY` — blocks the app from being iframed,
+        defeats clickjacking.
+      - `Referrer-Policy: strict-origin-when-cross-origin` — leaks the
+        path portion of the URL only to same-origin navigations.
+      - `Permissions-Policy` — disables geolocation, camera, mic APIs
+        by default (we don't use them; opt-in individual endpoints if
+        we ever need to).
+      - `Content-Security-Policy` — restricts what the browser will
+        execute. Report-Only in non-prod so devs still get warnings
+        without breakage. Enforced in prod.
+
+    HSTS is intentionally NOT set when serving over HTTP (dev/preview
+    without HTTPS) — that would prevent the browser from ever
+    reaching the site via HTTP again, breaking local dev.
+    """
+
+    # A permissive-but-safer-than-nothing CSP. Frontend inlines some
+    # styles and uses Google Fonts + our own CDN. Adjust once we've
+    # scoped every legitimate origin.
+    CSP = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # CRA/React inline runtime chunks
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob: https:; "
+        "media-src 'self' data: blob: https:; "
+        "connect-src 'self' https: wss:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'"
+    )
+    PERMISSIONS_POLICY = (
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=(), "
+        "magnetometer=(), gyroscope=(), accelerometer=()"
+    )
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # OpenAPI/Swagger docs need looser inline-script rules — skip
+        # CSP there or the docs page white-screens.
+        is_docs = request.url.path.startswith(("/api/docs", "/api/redoc",
+                                                "/api/openapi.json"))
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        headers.setdefault("Permissions-Policy", self.PERMISSIONS_POLICY)
+        # Only set HSTS when we know the request came in over HTTPS
+        # (either directly or via an X-Forwarded-Proto=https from the
+        # ingress). Setting HSTS on plain HTTP would brick localhost.
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+        is_https = request.url.scheme == "https" or forwarded_proto == "https"
+        if is_https:
+            headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        if not is_docs:
+            # In non-prod deployments we emit Report-Only so devs see
+            # violations in the console without breaking pages.
+            from core.config import settings as _s
+            csp_header = ("Content-Security-Policy" if _s.environment == "production"
+                          else "Content-Security-Policy-Report-Only")
+            headers.setdefault(csp_header, self.CSP)
+        return response
+
+
 def _consteq(a: str, b: str) -> bool:
     """Constant-time string compare — resists timing oracle attacks."""
     import hmac
@@ -387,4 +466,5 @@ def install_middleware(app: FastAPI) -> None:
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(LoginBruteForceMiddleware)
     app.add_middleware(CSRFProtectMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     install_exception_handlers(app)

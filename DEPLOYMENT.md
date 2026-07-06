@@ -259,6 +259,32 @@ If a deployment misbehaves:
    you enable versioning; restore individual objects from the console.
    Enable versioning on your bucket if not already.
 
+### 6.1 Neon Point-in-Time Restore (recommended for accidental data loss)
+
+Neon retains 7 days of WAL history on the free tier (30 on Pro), which
+means you can restore the **entire database** to any second in that
+window without a manual backup schedule.
+
+1. **console.neon.tech** → your project → **Branches** → **Create branch**.
+2. In the branch dialog:
+   - Source: your primary branch (`main`).
+   - **"Include data up to"** → pick the exact timestamp *before* the bad
+     write / migration.
+3. Copy the new branch's connection string.
+4. Repoint `DATABASE_URL` in the Emergent Deploy tab to the new
+   branch's URL, redeploy.
+5. Verify the app is healthy against the restored data.
+6. **Promote** the restored branch to primary in Neon
+   (Branches → ⋯ → Set as default). Delete the old branch after you're
+   confident the restore is good.
+
+**Caveat:** Neon PITR restores the *database*, not object storage. If the
+same incident deleted R2/S3 objects too, use R2 versioning restore
+(step 3 above) alongside the DB rollback.
+
+**Cost:** Restore branches count toward your Neon storage quota until
+deleted. Delete the pre-incident primary once promotion is confirmed.
+
 ---
 
 ## 7. Known deploy-time gotchas

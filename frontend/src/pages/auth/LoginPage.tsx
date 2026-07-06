@@ -261,6 +261,16 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Iter 32 — Forgot-password link. Hidden during 2FA challenge. */}
+          {!twoFA && (
+            <div className="text-center mt-4">
+              <Link to="/forgot-password" data-testid="login-forgot-password"
+                className="text-xs text-slate-500 hover:text-indigo-600 hover:underline">
+                Forgot your password?
+              </Link>
+            </div>
+          )}
+
           <p className="text-center text-sm text-slate-500 mt-6">
             Don&apos;t have an account?{' '}
             <Link to="/register" style={{ color: brand.primary_color }}
