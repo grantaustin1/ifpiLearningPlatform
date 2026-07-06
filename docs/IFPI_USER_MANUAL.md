@@ -605,7 +605,6 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
 | `/api/courses/{course_id}/unpublish` | POST |  |
-| `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
 | `/api/exams` | GET |  |
 | `/api/exams` | POST |  |
@@ -660,7 +659,6 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/live-sessions/{session_id}/uncancel` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
-| `/api/openapi.json` | GET |  |
 | `/api/organization` | GET |  |
 | `/api/organization` | PATCH |  |
 | `/api/organization/apply-theme/{slug}` | POST | Copy a preset's branding values onto the caller's organization. |
@@ -698,7 +696,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **251** registered API endpoints._
+_Total: **249** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
