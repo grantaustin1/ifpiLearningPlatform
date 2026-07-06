@@ -45,6 +45,19 @@ def test_learner_no_must_change():
 
 
 # ── /forgot-password (enumeration guard) ─────────────────────────
+@pytest.fixture(autouse=True)
+def _reset_pwreset_ratelimit():
+    """Iter 33 added rate limits to /forgot-password (3/hr per email,
+    5/hr per IP). Clear the in-memory limiter buckets before each test
+    so parallel or repeat runs don't spuriously 429."""
+    try:
+        from services import rate_limit_service
+        rate_limit_service.reset()
+    except Exception:  # noqa: BLE001
+        pass
+    yield
+
+
 def test_forgot_password_unknown_email_returns_200():
     r = requests.post(f"{BASE_URL}/api/auth/forgot-password",
                       json={"email": "no-such-user@nowhere.io"}, timeout=10)

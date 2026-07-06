@@ -9,6 +9,7 @@ export interface User {
   roles: string[]
   points: number
   must_change_password?: boolean
+  email_verified?: boolean
 }
 
 interface AuthCtx {

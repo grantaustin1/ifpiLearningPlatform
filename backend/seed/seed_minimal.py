@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,24 @@ from models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _seed_admin_password() -> str:
+    """Iter 33 — Never commit a literal admin password. Prefer the
+    SEED_ADMIN_PASSWORD env var; hard-fail in prod, warn in dev."""
+    val = (os.environ.get("SEED_ADMIN_PASSWORD") or "").strip()
+    if val:
+        return val
+    if os.environ.get("ENVIRONMENT", "").lower() == "production":
+        raise RuntimeError(
+            "SEED_ADMIN_PASSWORD is unset in production. Refusing to seed "
+            "with a well-known default. Set the env var and redeploy."
+        )
+    logger.warning(
+        "SEED_ADMIN_PASSWORD not set — falling back to 'admin123' for dev "
+        "seed. UNSAFE in production; deploy_precheck.py will block this."
+    )
+    return "admin123"
 
 
 def seed(db: Session) -> None:
@@ -34,10 +53,10 @@ def seed(db: Session) -> None:
     if not admin:
         admin = User(
             email="admin@ifpi.org", name="IFPI Admin",
-            password_hash=get_password_hash("admin123"),
+            password_hash=get_password_hash(_seed_admin_password()),
             organization_id=org.id, is_active=True,
             # Iter 32 — force password rotation on first login so
-            # nobody ships prod with `admin123` still active.
+            # nobody ships prod with the seeded password still active.
             must_change_password=True,
         )
         db.add(admin)

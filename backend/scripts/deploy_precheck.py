@@ -222,6 +222,24 @@ def check_llm_key() -> Result:
     return Result(True, "INFO", "EMERGENT_LLM_KEY", "set")
 
 
+def check_seed_admin_password() -> Result:
+    """Iter 33 — Prevent the seed script from generating an admin
+    with the well-known `admin123` password in prod."""
+    v = _val("SEED_ADMIN_PASSWORD")
+    if not v:
+        return Result(False, "BLOCKER", "SEED_ADMIN_PASSWORD",
+                      "unset — seed_minimal would fall back to a "
+                      "well-known default password. Set to a strong "
+                      "value; the seeded admin is created with "
+                      "must_change_password=True regardless, so this "
+                      "is defense-in-depth.")
+    if v == "admin123" or len(v) < 12:
+        return Result(False, "BLOCKER", "SEED_ADMIN_PASSWORD",
+                      f"weak value ({len(v)} chars). Use ≥12 chars.")
+    return Result(True, "INFO", "SEED_ADMIN_PASSWORD",
+                  f"set ({len(v)} chars)")
+
+
 # ── side-effects ────────────────────────────────────────────────
 def run_alembic() -> Result:
     """Idempotent: `alembic upgrade head`."""
@@ -289,6 +307,7 @@ def main() -> int:
     results.append(check_smtp())
     results.append(check_public_base_url())
     results.append(check_llm_key())
+    results.append(check_seed_admin_password())
 
     # is_prod already computed at top of main() — fail-closed on unset ENVIRONMENT
 

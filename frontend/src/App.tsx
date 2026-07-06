@@ -6,6 +6,7 @@ import RegisterPage from 'pages/auth/RegisterPage'
 import ForgotPasswordPage from 'pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from 'pages/auth/ResetPasswordPage'
 import ChangePasswordPage from 'pages/auth/ChangePasswordPage'
+import VerifyEmailPage from 'pages/auth/VerifyEmailPage'
 import VerifyCertPage from 'pages/VerifyCertPage'
 import AcceptInvitePage from 'pages/AcceptInvitePage'
 import DashboardLayout from 'components/layout/DashboardLayout'
@@ -82,6 +83,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/catalog" element={<CatalogPage />} />
       <Route path="/catalog/:id" element={<CourseDetailPage />} />
       <Route path="/marketplace" element={<CatalogPage />} />

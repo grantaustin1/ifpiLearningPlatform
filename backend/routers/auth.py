@@ -13,8 +13,9 @@ from core.config import settings
 from core.database import get_db
 from core.role_registry import normalize_role_names
 from schemas import (
-    ChangePasswordRequest, ForgotPasswordRequest, LoginRequest, LoginResponse,
-    RegisterRequest, ResetPasswordRequest, UserOut,
+    AccountDeletionConfirmRequest, ChangePasswordRequest, ForgotPasswordRequest,
+    LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest, UserOut,
+    VerifyEmailRequest,
 )
 from services.auth_service import AuthService
 from services.sso_service import SSOService
@@ -29,6 +30,7 @@ def _to_user_out(user) -> UserOut:
         organization_id=user.organization_id, roles=roles,
         points=user.points or 0,
         must_change_password=bool(getattr(user, "must_change_password", False)),
+        email_verified=bool(getattr(user, "email_verified_at", None) is not None),
     )
 
 
@@ -62,8 +64,40 @@ def register(body: RegisterRequest, request: Request, response: Response,
              db: Session = Depends(get_db)):
     svc = AuthService(db)
     user = svc.register(body.email, body.password, body.name)
+    # Iter 33 — issue + email the verification token. Failures here are
+    # non-fatal (user can request a resend from the banner in-app).
+    try:
+        _send_verification_email(db, svc, user)
+    except Exception:  # noqa: BLE001
+        pass
     access, refresh = svc.issue_tokens(user)
     return _login_response(response, user, access, refresh, request=request)
+
+
+def _send_verification_email(db: Session, svc: AuthService, user) -> None:
+    """Shared helper used by /register and /resend-verification."""
+    from services.mail_service import MailService
+    raw = svc.issue_email_verification(user)
+    base = (settings.public_base_url or "").rstrip("/")
+    link = f"{base}/verify-email/{raw}"
+    html = (
+        f"<h2>Welcome to IFPI Learning</h2>"
+        f"<p>Hi {user.name or user.email},</p>"
+        f"<p>Please confirm your email address by clicking the link below. "
+        f"The link is valid for 24 hours.</p>"
+        f"<p><a href='{link}' style='background:#4f46e5;color:#fff;padding:10px 16px;"
+        f"border-radius:8px;text-decoration:none;font-weight:600;display:inline-block'>"
+        f"Verify email</a></p>"
+        f"<p style='color:#64748b;font-size:12px'>Or paste this URL: <code>{link}</code></p>"
+    )
+    text = f"Confirm your IFPI Learning email: {link}\n\nLink expires in 24 hours."
+    MailService(db).send_email(
+        to_email=user.email, to_name=user.name or user.email,
+        subject="Verify your IFPI Learning email",
+        body_html=html, body_text=text, template="email_verification",
+        organization_id=user.organization_id, user_id=user.id,
+    )
+    db.commit()
 
 
 @router.post("/login")
@@ -212,8 +246,17 @@ def forgot_password(body: ForgotPasswordRequest, request: Request,
     identical whether the email was found or not.
     """
     from services.mail_service import MailService
+    from services import rate_limit_service
     ip = (request.headers.get("x-forwarded-for", "")
           or (request.client.host if request.client else "")).split(",")[0].strip()
+    # Iter 33 — Rate limit both by IP and by email so attackers can't
+    # spam reset emails to a victim's inbox nor probe from many IPs
+    # for a single address.
+    rate_limit_service.check(
+        f"pwreset:ip:{ip or 'unknown'}", max_requests=5, window_secs=3600.0)
+    rate_limit_service.check(
+        f"pwreset:email:{body.email.lower()}",
+        max_requests=3, window_secs=3600.0)
     result = AuthService(db).request_password_reset(body.email, ip=ip)
     if result:
         user, raw = result
@@ -255,3 +298,106 @@ def reset_password(body: ResetPasswordRequest, request: Request,
     user = AuthService(db).consume_password_reset(body.token, body.new_password)
     access, refresh = AuthService(db).issue_tokens(user)
     return _login_response(response, user, access, refresh, request=request)
+
+
+# ── Iter 33 · Email verification (GDPR-aligned) ─────────────────────
+@router.post("/verify-email")
+def verify_email(body: VerifyEmailRequest, db: Session = Depends(get_db)):
+    """Consume an email-verification token. Called by the /verify-email/:token
+    frontend page. Idempotent — a stale link returns 400."""
+    user = AuthService(db).consume_email_verification(body.token)
+    return {"ok": True, "email": user.email, "verified_at":
+            user.email_verified_at.isoformat() if user.email_verified_at else None}
+
+
+@router.post("/resend-verification")
+def resend_verification(request: Request,
+                        current: CurrentUser = Depends(get_current_user),
+                        db: Session = Depends(get_db)):
+    """Re-issue + email a verification link. Rate-limited (2/hr per
+    user) so a compromised session can't spam its own inbox."""
+    from services import rate_limit_service
+    from models import User
+    rate_limit_service.check(
+        f"verify-resend:{current.id}", max_requests=2, window_secs=3600.0)
+    user = db.query(User).filter(User.id == current.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.email_verified_at is not None:
+        return {"ok": True, "message": "Email already verified"}
+    _send_verification_email(db, AuthService(db), user)
+    return {"ok": True, "message": "Verification email queued"}
+
+
+# ── Iter 33 · GDPR: data export + account deletion ──────────────────
+@router.get("/me/export")
+def export_my_data(current: CurrentUser = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    """GDPR Right to Data Portability. Returns a JSON bundle of every
+    piece of PII we hold about the requester. Frontend saves the
+    response body as a file. API tokens cannot invoke this — must be
+    a real user session."""
+    if current.id < 0:
+        raise HTTPException(status_code=400,
+                            detail="API tokens cannot export user data")
+    return AuthService(db).export_user_data(current.id)
+
+
+@router.post("/me/delete-request")
+def request_account_deletion(request: Request,
+                             current: CurrentUser = Depends(get_current_user),
+                             db: Session = Depends(get_db)):
+    """Step 1 of self-deletion. Emails a 6-digit confirmation code that
+    must be POSTed back within 30 minutes to complete the erasure."""
+    if current.id < 0:
+        raise HTTPException(status_code=400,
+                            detail="API tokens cannot delete user accounts")
+    from services.mail_service import MailService
+    from services import rate_limit_service
+    from models import User
+    rate_limit_service.check(
+        f"delete-req:{current.id}", max_requests=3, window_secs=3600.0)
+    ip = (request.headers.get("x-forwarded-for", "")
+          or (request.client.host if request.client else "")).split(",")[0].strip()
+    code = AuthService(db).request_account_deletion(current.id, ip=ip)
+    user = db.query(User).filter(User.id == current.id).first()
+    if user:
+        html = (
+            f"<h2>Confirm account deletion</h2>"
+            f"<p>You've asked to delete your IFPI Learning account. "
+            f"To confirm, enter this 6-digit code in the app within "
+            f"the next 30 minutes:</p>"
+            f"<p style='font-size:32px;font-weight:700;letter-spacing:0.3em;"
+            f"font-family:monospace;color:#dc2626;text-align:center;margin:24px 0;'>"
+            f"{code}</p>"
+            f"<p style='color:#64748b;font-size:12px'>If you didn't request "
+            f"this, ignore this email and change your password immediately.</p>"
+        )
+        text = f"Account deletion confirmation code: {code}\n\nExpires in 30 minutes."
+        MailService(db).send_email(
+            to_email=user.email, to_name=user.name or user.email,
+            subject="Confirm your IFPI Learning account deletion",
+            body_html=html, body_text=text, template="account_deletion",
+            organization_id=user.organization_id, user_id=user.id,
+        )
+        db.commit()
+    return {"ok": True,
+            "message": "A confirmation code has been sent to your email."}
+
+
+@router.delete("/me")
+def confirm_account_deletion(body: AccountDeletionConfirmRequest,
+                             response: Response,
+                             current: CurrentUser = Depends(get_current_user),
+                             db: Session = Depends(get_db)):
+    """Step 2 of self-deletion. Consumes the emailed code + anonymises
+    the account. Not a hard delete — the row stays for FK integrity
+    (certs, audit records) but every PII field is scrubbed.
+    Cookies are cleared on success."""
+    if current.id < 0:
+        raise HTTPException(status_code=400,
+                            detail="API tokens cannot delete user accounts")
+    AuthService(db).confirm_account_deletion(current.id, body.code)
+    from auth.cookies import clear_auth_cookies
+    clear_auth_cookies(response)
+    return {"ok": True, "message": "Your account has been erased."}
