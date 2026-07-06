@@ -87,9 +87,17 @@ api.interceptors.response.use(
         }
         return api.request(original)
       }
-      // Hard fail — clear token, redirect
+      // Hard fail — clear token, redirect. Iter 33d: don't bounce the
+      // user off auth-flow pages (change-password, forgot-password,
+      // reset-password, verify-email, accept-invite) — a stale/spurious
+      // 401 from a background probe (KioskShell, TermsGate, branding)
+      // would otherwise blow away the form the user is actively typing
+      // in, causing "the page disappears too quickly" bug reports.
       accessTokenMem = null
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      const AUTH_FLOW_PATHS = ['/login', '/change-password', '/forgot-password',
+        '/reset-password', '/verify-email', '/accept-invite']
+      if (typeof window !== 'undefined'
+          && !AUTH_FLOW_PATHS.some(p => window.location.pathname.startsWith(p))) {
         window.location.href = '/login'
       }
     }
