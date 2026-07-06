@@ -234,3 +234,61 @@ def test_precheck_blocks_missing_seed_password():
     )
     assert r.returncode == 1
     assert "SEED_ADMIN_PASSWORD" in r.stdout
+
+
+# ── Seed idempotency — critical safety guarantee ────────────────
+def test_reseed_does_not_overwrite_existing_admin_password():
+    """Regression test for the concern: 'if I redeploy, will the seed
+    overwrite existing users' passwords?' Absolutely not. Every user
+    block is guarded by `if not <user>:`."""
+    from core.database import SessionLocal
+    from core.security import get_password_hash, verify_password
+    from models import User
+    from seed.seed_minimal import run_if_empty
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
+        assert admin, "seeded admin should exist"
+        # Simulate an operator having rotated the admin password
+        rotated_pw = "OperatorRotatedThis99!"
+        original_hash = admin.password_hash
+        admin.password_hash = get_password_hash(rotated_pw)
+        db.commit()
+        # Run the seed AGAIN with a different SEED_ADMIN_PASSWORD env
+        os.environ["SEED_ADMIN_PASSWORD"] = "TotallyDifferent1234"
+        try:
+            run_if_empty()
+        finally:
+            os.environ.pop("SEED_ADMIN_PASSWORD", None)
+        # Re-fetch: the rotated password must survive
+        db.expire_all()
+        admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
+        assert verify_password(rotated_pw, admin.password_hash), \
+            "SEED overwrote a rotated admin password — CRITICAL bug"
+        # Restore original hash so subsequent tests still find admin123
+        admin.password_hash = original_hash
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_reseed_does_not_touch_self_registered_users():
+    """Self-registered users must be invisible to the seed."""
+    from core.database import SessionLocal
+    from core.security import verify_password
+    from models import User
+    from seed.seed_minimal import run_if_empty
+    email = _register_throwaway()
+    db = SessionLocal()
+    try:
+        user_before = db.query(User).filter(User.email == email).first()
+        assert user_before is not None
+        hash_before = user_before.password_hash
+        run_if_empty()
+        db.expire_all()
+        user_after = db.query(User).filter(User.email == email).first()
+        assert user_after.password_hash == hash_before, \
+            "seed mutated a self-registered user's password_hash"
+        assert verify_password("startingPass", user_after.password_hash)
+    finally:
+        db.close()

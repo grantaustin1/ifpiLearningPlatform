@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
@@ -7,10 +7,9 @@ import { CheckCircle2, XCircle, GraduationCap, Loader2 } from 'lucide-react'
 /**
  * Iter 33 — /verify-email/:token
  *
- * Auto-invokes the backend verify endpoint on mount. Shows an
- * appropriate success/failure card. If the user is already logged
- * in when they land here, we refresh the auth context so the
- * "please verify" banner disappears immediately.
+ * Auto-invokes the backend verify endpoint on mount. Uses a ref-guard
+ * so React.StrictMode's double-invoke in dev doesn't consume the
+ * single-use token twice (second call → 400 → wrong "error" card).
  */
 export default function VerifyEmailPage() {
   const nav = useNavigate()
@@ -18,13 +17,15 @@ export default function VerifyEmailPage() {
   const { refresh } = useAuth()
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [message, setMessage] = useState('')
+  const invoked = useRef(false)
 
   useEffect(() => {
+    if (invoked.current) return
+    invoked.current = true
     if (!token) { setState('error'); setMessage('No verification token in link'); return }
     api.post('/auth/verify-email', { token })
       .then(async () => {
         setState('ok')
-        // Refresh so `email_verified` flips on the current session
         try { await refresh() } catch { /* not logged in — fine */ }
       })
       .catch(err => {

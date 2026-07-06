@@ -401,3 +401,18 @@ def confirm_account_deletion(body: AccountDeletionConfirmRequest,
     from auth.cookies import clear_auth_cookies
     clear_auth_cookies(response)
     return {"ok": True, "message": "Your account has been erased."}
+
+
+# ── Iter 33 · Test-only rate-limit reset ────────────────────────────
+# Gated on ALLOW_TEST_TOKEN_HEADER (same env var that unlocks other
+# test-only bypasses). Never registered in production. Lets the test
+# suite clear the in-memory rate-limit buckets between runs so parallel
+# tests aren't affected by earlier tests' 429-generating requests.
+@router.post("/_test/reset-rate-limit")
+def test_reset_rate_limit():
+    import os as _os
+    if _os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() != "true":
+        raise HTTPException(status_code=404, detail="Not found")
+    from services import rate_limit_service
+    rate_limit_service.reset()
+    return {"ok": True, "reset": True}
