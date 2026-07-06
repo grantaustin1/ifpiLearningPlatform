@@ -76,6 +76,21 @@ markets are EU + USA, so GDPR items are day-1 requirements.
 ### Env additions
 - `SEED_ADMIN_PASSWORD` (required in prod, ≥12 chars)
 
+### Iter 33b addendum — Admin rescue CLI + seed defense-in-depth
+- ✅ `scripts/reset_admin_password.py` — one-shot rescue tool for
+  lost-password + bouncing-reset-email edge case. Gated behind
+  `ADMIN_RESCUE_SECRET` env var (≥16 chars). Sets
+  `must_change_password=True` + revokes all refresh tokens.
+- ✅ Seed now logs "already exists (id=…) — leaving password
+  untouched" when the admin row is present, so operators can see the
+  idempotency guarantee in stdout.
+- ✅ Seed skips creating the `learner@ifpi.org` demo account entirely
+  when `ENVIRONMENT=production`.
+- ✅ Two new regression tests prove existing users are untouchable
+  by re-seeds.
+- ✅ Five new tests cover the rescue CLI (env-secret guard, short-
+  secret/password guards, non-admin refusal, end-to-end happy path).
+
 
 ## Iteration 32b — Pre-Deploy Security Hardening (2026-02-11)
 

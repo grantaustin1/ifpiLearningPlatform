@@ -340,7 +340,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 403 |
+| `routers/auth.py` | 418 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -371,7 +371,7 @@ Core entities (see `backend/models/__init__.py` for the full list):
 | `routers/terms_kiosk.py` | 325 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11326** |
+| **Total** | **11341** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -522,6 +522,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/auth/2fa/setup` | POST |  |
 | `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
 | `/api/auth/2fa/status` | GET |  |
+| `/api/auth/_test/reset-rate-limit` | POST |  |
 | `/api/auth/change-password` | POST | Self-service password change. Verifies the old password, sets the |
 | `/api/auth/forgot-password` | POST | Emails a single-use reset link if the address matches an active |
 | `/api/auth/login` | POST |  |
@@ -709,7 +710,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **259** registered API endpoints._
+_Total: **260** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
