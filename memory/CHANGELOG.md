@@ -59,6 +59,19 @@ recommendations were adopted in this sprint.
 - `SENTRY_TRACES_SAMPLE_RATE=0.1` (default)
 - `APP_RELEASE=` (optional Sentry release tag)
 
+### Iter 32b addendum — Observability polish (same-day)
+- ✅ **Correlation ID → Sentry breadcrumbs pipeline.** Every log line
+  now includes `[cid=…]` (LogRecordFactory injects the field on ALL
+  records — inc. uvicorn/apscheduler/sqlalchemy loggers). Sentry's
+  new `LoggingIntegration` turns those log lines into breadcrumbs
+  auto-attached to any error captured during the same request. Also
+  installed a `before_send` hook that stamps `tags.correlation_id`
+  on every event as a belt-and-braces guarantee (covers background
+  workers that don't go through the FastAPI scope isolator).
+- ✅ Result: **one click** to trace a single failed request from
+  browser console → Sentry error → server log line, all sharing the
+  same correlation-id.
+
 ### Notable hard-won lessons
 - Emergent's stock `deployment_agent` **incorrectly recommends
   MongoDB rewrite** for SQLAlchemy apps. Confirmed by Emergent
