@@ -494,7 +494,9 @@ Wire this into your container `ENTRYPOINT` so bad configs never reach a healthy 
 - `STORAGE_BACKEND=s3` + `S3_*` (Cloudflare R2 or AWS S3)
 - `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (Resend / SES / Mailgun)
 - `SENTRY_DSN` (both backend + frontend; separate DSNs recommended)
-- `ALLOWED_ORIGINS=https://academy.<your-org>.com` (exact, no wildcards)
+- `ALLOWED_ORIGINS=https://academy.<your-org>.com` (legacy alias — still honoured for backwards compat)
+- **`CORS_ORIGINS=https://academy.<your-org>.com,https://<other-approved-origin>`** — this is the **deployment-surface env var name** per Emergent deploy support. Set this in **Manage Deployments → Secrets** on the deployed app. Comma-separated, exact origins only, **no wildcards**. Deploy secret wins if both `CORS_ORIGINS` and `ALLOWED_ORIGINS` are set.
+  - Emergent preview URLs (`*.preview.emergentagent.com`) inject `Access-Control-Allow-Origin: *` at the Cloudflare edge and cannot be reconfigured; cross-origin credentialed flows (e.g. SSO click-through with ERP360) **only work on the deployed surface** where the ingress passes through app-emitted CORS headers unchanged.
 - `RATE_LIMIT_REDIS_URL` (optional but recommended for multi-replica)
 - **`AUTH_COOKIE_SECURE=true`** — MUST be `true` in any HTTPS deployment (Iter 33e). Modern browsers silently drop the `Secure`-less auth cookie on HTTPS in many contexts, which shows up as "login succeeds then the very next request 401s." Set to `false` only for local HTTP dev.
 - `AUTH_COOKIE_SAMESITE=lax` (default) — flip to `none` **only** if the frontend and API are on different subdomains AND you're also setting `Secure=true`.
