@@ -97,6 +97,16 @@ async def erp360_webhook_user(
         raise HTTPException(status_code=400, detail="Body is not valid JSON")
 
     event = payload.get("event")
+    # Iter 34b-fix — accept both undotted (canonical, ERP360's shape)
+    # and dotted forms so a single deployment supports both dispatcher
+    # conventions. ERP360's handoff doc uses the undotted form.
+    _EVENT_ALIASES = {
+        "role_changed": "role_changed",
+        "user.role_changed": "role_changed",
+        "user_deactivated": "user_deactivated",
+        "user.deactivated": "user_deactivated",
+    }
+    event = _EVENT_ALIASES.get(event, event)
     user_block = payload.get("user") or {}
     email = (user_block.get("email") or "").lower().strip()
     sub = user_block.get("sub")
@@ -117,7 +127,7 @@ async def erp360_webhook_user(
         _audit_stub(db, event, email, note="unknown_user")
         return {"status": "accepted", "action": "noop_unknown_user"}
 
-    if event == "user.role_changed":
+    if event == "role_changed":
         new_roles = (payload.get("data") or {}).get("new_roles") or []
         _replace_roles(db, user, new_roles)
         _audit_stub(db, event, email, user_id=user.id,
@@ -126,7 +136,7 @@ async def erp360_webhook_user(
         return {"status": "accepted", "action": "roles_updated",
                 "new_roles": [r.role for r in user.user_roles]}
 
-    if event == "user.deactivated":
+    if event == "user_deactivated":
         user.is_active = False
         _audit_stub(db, event, email, user_id=user.id, note="deactivated")
         db.commit()
