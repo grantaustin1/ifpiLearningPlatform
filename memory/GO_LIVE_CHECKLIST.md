@@ -65,16 +65,17 @@
 
 ### Compliance gaps in the ERP360 contract (from `IFPI_INTEGRATION_HANDOFF.md` §7)
 
-- [ ] ⏳ **§7.4 Per-org connection state** — retire global `SSO_ENABLED` env flag; move to `organizations.integrations` JSONB (`{erp360_connected, billing_mode, sso_enabled}` per org keyed on `org_slug`). Handlers must resolve users **only within the payload's `org_slug`** — no cross-tenant email-collision matching. **Biggest architectural gap remaining.** Blocks true multi-tenant prod.
+- [x] ✅ **§7.4 Per-org connection state** (Iter 36) — `organizations.integrations` JSONB shipped with `erp360_settings` / `is_erp360_connected` / `erp360_org_slug` / `erp360_sso_enabled` helpers. Webhook receiver + SSO JIT-provisioner now resolve users **only within the org identified by payload/claim `org_slug`** — no more cross-tenant email-collision matching. Fallback to default org preserved for single-tenant preview. **Small remaining item:** admin endpoint `PATCH /api/admin/organizations/{id}/integrations/erp360` to actually configure the mapping in multi-tenant prod. Today it works for single-tenant preview via `slug` auto-match.
 - [ ] ⏳ **§7.1 Entitlement abstraction** — must land BEFORE any Stripe integration or that becomes rip-and-replace. Create `Entitlement { org_id, user_id, course_id, source: 'stripe'|'erp360'|'admin_grant', valid_until }`; wire enrollment reads through it; Stripe webhooks (later) write into it; ERP360 lite-billing webhooks (P2.1) write the same shape.
-- [ ] ⏳ **§7.2 Verified-email link tightening** — current JIT link on first SSO matches ANY existing native user by email; harden to require `email_verified_at IS NOT NULL` (else treat as new account). Prevents account-takeover if an unverified native signup pre-exists with the same email an ERP360 user later claims.
-- [ ] ⏳ **§6.3 Timestamp replay window** — enforce `X-ERP360-Timestamp` within ±5 min. Header is currently ignored on inbound (spec says receivers SHOULD check, MAY reject). Mandatory `X-ERP360-Event-Id` dedupe is already in place.
+- [x] ✅ **§7.2 Verified-email link tightening** (Iter 36) — `jit_provision` refuses first-time link with 409 Conflict if a matching native account has `email_verified_at IS NULL`. Ops must reconcile before the user can SSO. Blocks the account-takeover vector where an attacker signs up native (unverified) then hopes an ERP360 user later shares that email.
+- [x] ✅ **§6.3 Timestamp replay window** (Iter 36) — `X-ERP360-Timestamp` enforced within ±5 min (configurable via `ERP360_TIMESTAMP_SKEW_SECONDS`). Missing header still accepted (dedup mandatory downstream); malformed → 400; out-of-window → 401. Supports both ISO-8601 UTC and unix epoch seconds.
 
 ### API surface hardening
 
 - [ ] ⏳ **`/api/v1/` versioning namespace** — add versioned aliases for `/api/auth/sso-exchange`, `/api/erp360/webhooks/user`, `/api/erp360/sync/status`. Keep unversioned aliases for ≥1 sprint. Prevents shape-change breakage for any 3rd party consumer.
-- [ ] ⏳ **Idempotency store for `X-ERP360-Event-Id`** — currently in-memory (`_SEEN_EVENT_IDS` dict). Move to SQL table `erp360_seen_events (event_id PK, received_at)` like `sso_jti_seen` already does. In-memory works for a single replica; breaks the moment we scale to 2+.
+- [x] ✅ **SQL-backed idempotency store for `X-ERP360-Event-Id`** (Iter 36) — new `erp360_seen_events` table with PK on `event_id`. Uses INSERT-with-unique-conflict semantics; concurrent workers can't both accept the same event. Regression test proves persistence across backend restart.
 - [ ] ⏳ **Shared contract test fixture** — 🟨 waiting on ERP360 to publish their `contract_fixtures.json`; when they do, wire it into `backend/tests/` as a nightly CI check.
+- [ ] ⏳ **Admin endpoint to configure ERP360 connection per-org** — `PATCH /api/admin/organizations/{id}/integrations/erp360` with `{connected, org_slug, sso_enabled, billing_mode}`. Backing model (`Organization.integrations` JSONB) shipped in Iter 36; only the admin route + UI remaining.
 
 ### Payments (only if commercial launch)
 

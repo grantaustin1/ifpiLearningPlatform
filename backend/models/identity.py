@@ -59,10 +59,51 @@ class Organization(Base):
     # touching JWT_SECRET (which would log out every active user).
     subscription_secret_version = Column(Integer, default=1, nullable=False)
     status = Column(SQLEnum(OrganizationStatus), default=OrganizationStatus.ACTIVE)
+    # §7.4 — Per-org integration state (agreed 2026-07). Replaces the
+    # global `SSO_ENABLED` env flag for the ERP360 bolt-on. Global env
+    # remains a master feature-switch; per-org state controls WHICH orgs
+    # participate. Shape:
+    #   {
+    #     "erp360": {
+    #       "connected": bool,
+    #       "org_slug": str,           # ERP360-side slug used in payloads
+    #       "sso_enabled": bool,       # allow SSO for this org
+    #       "billing_mode": "native_stripe" | "erp360",
+    #       "connected_at": iso8601,   # audit
+    #     }
+    #   }
+    # Handlers MUST resolve users only within the org whose ERP360 slug
+    # matches `payload.org_slug` — never match standalone-org users by
+    # email collision. See ERP360_BOLT_ON_WORK_LIST §7.4.
+    integrations = Column(JSON, nullable=False, default=dict, server_default="{}")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     users = relationship("User", back_populates="organization")
+
+    # ── §7.4 helpers ────────────────────────────────────────────────
+    @property
+    def erp360_settings(self) -> dict:
+        """Convenience view — never returns None."""
+        return (self.integrations or {}).get("erp360", {}) or {}
+
+    @property
+    def is_erp360_connected(self) -> bool:
+        return bool(self.erp360_settings.get("connected"))
+
+    @property
+    def erp360_org_slug(self) -> str | None:
+        """ERP360-side slug used in webhook payloads. Falls back to our
+        own `slug` so single-tenant preview setups don't need explicit
+        configuration."""
+        return self.erp360_settings.get("org_slug") or self.slug
+
+    @property
+    def erp360_sso_enabled(self) -> bool:
+        """True if this org accepts ERP360 SSO. Falls back to connected
+        state so a freshly-connected org gets SSO by default."""
+        s = self.erp360_settings
+        return bool(s.get("sso_enabled", s.get("connected", False)))
 
 
 class User(Base):
@@ -272,3 +313,21 @@ class SsoJtiSeen(Base):
     __table_args__ = (Index("ix_sso_jti_seen_at", "seen_at"),)
     jti = Column(String(120), primary_key=True)
     seen_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class Erp360SeenEvent(Base):
+    """Idempotency store for inbound ERP360 webhook events (§6.4).
+
+    ERP360 may re-deliver the same `event_id` (retry after timeout, manual
+    re-queue of a dead-letter, network hiccup). This table gives us a
+    replica-safe dedup key that survives restart and scale-out — replaces
+    the in-memory `_SEEN_EVENT_IDS` dict.
+
+    Rows are keyed on `event_id` (uuid from `X-ERP360-Event-Id`). A
+    background sweeper purges rows older than the retention window
+    (default 30 days) to keep the table bounded.
+    """
+    __tablename__ = "erp360_seen_events"
+    __table_args__ = (Index("ix_erp360_seen_events_at", "received_at"),)
+    event_id = Column(String(120), primary_key=True)
+    received_at = Column(DateTime, default=_utcnow, nullable=False)

@@ -24,15 +24,14 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin
 from core.database import get_db
-from models import AuditLog, User, UserRole
+from models import AuditLog, Erp360SeenEvent, Organization, User, UserRole
 
 router = APIRouter(prefix="/api/erp360", tags=["ERP360"])
 logger = logging.getLogger(__name__)
 
-# In-memory idempotency guard. Prod deployments with >1 replica should
-# swap this for the same `sso_jti_seen` table pattern used for SSO.
-_SEEN_EVENT_IDS: set[str] = set()
-_SEEN_LIMIT = 10_000  # bound memory
+# §6.3 — Replay window for `X-ERP360-Timestamp`. Spec: SHOULD check
+# within ±5 min. Configurable via env for ops (tighten in prod).
+_TIMESTAMP_SKEW_SECONDS = int(os.environ.get("ERP360_TIMESTAMP_SKEW_SECONDS", "300"))
 
 
 def _shared_secret() -> Optional[str]:
@@ -57,14 +56,89 @@ def _verify_signature(raw: bytes, header_value: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Signature mismatch")
 
 
-def _remember_event(event_id: str) -> bool:
-    """Returns True if newly seen, False if duplicate. Bounded memory."""
-    if event_id in _SEEN_EVENT_IDS:
+def _remember_event(db: Session, event_id: str) -> bool:
+    """SQL-backed idempotency (§6.4). Returns True if newly seen,
+    False if duplicate. Uses INSERT-with-conflict-on-PK semantics so
+    concurrent workers can't both accept the same event."""
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.add(Erp360SeenEvent(event_id=event_id))
+        db.flush()
+        return True
+    except IntegrityError:
+        db.rollback()
         return False
-    if len(_SEEN_EVENT_IDS) >= _SEEN_LIMIT:
-        _SEEN_EVENT_IDS.clear()  # coarse but safe — worst case we re-process
-    _SEEN_EVENT_IDS.add(event_id)
-    return True
+
+
+def _verify_timestamp(header_value: Optional[str]) -> None:
+    """§6.3 — replay guard. Reject if `X-ERP360-Timestamp` is outside
+    ±5 min from now. Header MAY be missing (spec says SHOULD check);
+    if missing we allow through and rely on `event_id` dedup alone.
+    If present but malformed, we treat it as a signal of tampering
+    and reject.
+    """
+    if not header_value:
+        return  # not sent — dedup is still mandatory downstream
+    header_value = header_value.strip()
+    ts: Optional[datetime] = None
+    # Try ISO-8601 UTC (ERP360's canonical format per §2 header spec).
+    try:
+        # Support both '2026-06-10T11:37:08.123456+00:00' and trailing 'Z'.
+        ts = datetime.fromisoformat(header_value.replace("Z", "+00:00"))
+    except ValueError:
+        # Fall back to unix epoch seconds (integer or float).
+        try:
+            ts = datetime.fromtimestamp(float(header_value), tz=timezone.utc)
+        except (TypeError, ValueError):
+            ts = None
+    if ts is None:
+        raise HTTPException(status_code=400,
+                            detail="Malformed X-ERP360-Timestamp header")
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    delta = abs((now - ts).total_seconds())
+    if delta > _TIMESTAMP_SKEW_SECONDS:
+        raise HTTPException(
+            status_code=401,
+            detail=(f"Timestamp outside ±{_TIMESTAMP_SKEW_SECONDS}s replay window "
+                    f"(drift {int(delta)}s) — possible replay or clock skew"),
+        )
+
+
+def _resolve_org(db: Session, org_slug: Optional[str]) -> Organization:
+    """§7.4 — resolve the target organization from the webhook payload's
+    `org_slug`. Matches against `Organization.integrations.erp360.org_slug`
+    first (explicit ERP360-side mapping), then falls back to our own
+    `Organization.slug` for single-tenant preview setups.
+
+    Fails closed: if `org_slug` is present but no matching connected
+    org exists, refuse the event. Empty `org_slug` falls back to the
+    default org for backwards compatibility with the pre-§7.4 handoff.
+    """
+    if not org_slug:
+        # Pre-§7.4 payloads or preview mode — use the default (first) org.
+        org = db.query(Organization).order_by(Organization.id.asc()).first()
+        if not org:
+            raise HTTPException(status_code=500,
+                                detail="No academy configured")
+        return org
+
+    # Match by explicit ERP360 mapping first.
+    for candidate in db.query(Organization).all():
+        if (candidate.erp360_settings.get("org_slug") == org_slug
+                and candidate.is_erp360_connected):
+            return candidate
+
+    # Fallback: match by native slug (preview convention).
+    org = db.query(Organization).filter(Organization.slug == org_slug).first()
+    if org:
+        return org
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"No IFPI organization connected to ERP360 org_slug={org_slug!r}",
+    )
 
 
 @router.post("/webhooks/user", status_code=status.HTTP_202_ACCEPTED)
@@ -72,6 +146,7 @@ async def erp360_webhook_user(
     request: Request,
     x_erp360_signature: Optional[str] = Header(None),
     x_erp360_event_id: Optional[str] = Header(None),
+    x_erp360_timestamp: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ) -> dict:
     """Receive `user.role_changed` and `user.deactivated` events from ERP360.
@@ -82,12 +157,13 @@ async def erp360_webhook_user(
     """
     raw = await request.body()
     _verify_signature(raw, x_erp360_signature)
+    _verify_timestamp(x_erp360_timestamp)  # §6.3 ±5 min replay window
 
     if not x_erp360_event_id:
         raise HTTPException(status_code=400,
                             detail="Missing X-ERP360-Event-Id header")
 
-    if not _remember_event(x_erp360_event_id):
+    if not _remember_event(db, x_erp360_event_id):
         # Duplicate — ERP360 may be retrying. Return 200 idempotently.
         return {"status": "duplicate", "event_id": x_erp360_event_id}
 
@@ -110,21 +186,38 @@ async def erp360_webhook_user(
     user_block = payload.get("user") or {}
     email = (user_block.get("email") or "").lower().strip()
     sub = user_block.get("sub")
+    payload_org_slug = (payload.get("org_slug") or "").strip() or None
     if not event or not email:
         raise HTTPException(status_code=400,
                             detail="Payload must include event + user.email")
 
-    user = (
-        db.query(User).filter_by(erp360_user_id=int(sub)).first()
-        if isinstance(sub, (int, str)) and str(sub).isdigit() else None
-    ) or db.query(User).filter(User.email == email).first()
+    # §7.4 — scope every lookup to the org identified by payload.org_slug.
+    # Standalone-org users MUST NOT be matched by email collision.
+    org = _resolve_org(db, payload_org_slug)
+
+    user = None
+    if isinstance(sub, (int, str)) and str(sub).isdigit():
+        user = (
+            db.query(User)
+            .filter(User.erp360_user_id == int(sub),
+                    User.organization_id == org.id)
+            .first()
+        )
+    if user is None:
+        user = (
+            db.query(User)
+            .filter(User.email == email,
+                    User.organization_id == org.id)
+            .first()
+        )
 
     if user is None:
         # Not provisioned in IFPI yet — record and move on. First SSO
         # sign-in will JIT-provision with the correct roles.
-        logger.info("ERP360 webhook for unknown user %s (event=%s) — noop",
-                    email, event)
-        _audit_stub(db, event, email, note="unknown_user")
+        logger.info("ERP360 webhook for unknown user %s in org=%s (event=%s) — noop",
+                    email, org.slug, event)
+        _audit_stub(db, event, email, note=f"unknown_user org={org.slug}")
+        db.commit()  # persist idempotency + audit row
         return {"status": "accepted", "action": "noop_unknown_user"}
 
     if event == "role_changed":

@@ -10,14 +10,15 @@ browser click-through smoke test on deployed URLs, infra provisioning:
 Neon Postgres, Cloudflare R2, Resend SMTP, Sentry DSN, staff dogfooding)._
 
 ## P1 — Should close before or shortly after cutover
-_Also tracked in `GO_LIVE_CHECKLIST.md`:_
-- §7.4 per-org connection state (retire global `SSO_ENABLED`)
-- §7.1 entitlement abstraction (blocks Stripe rework)
-- §7.2 verified-email link tightening on JIT first-link
-- §6.3 timestamp replay window (±5 min on `X-ERP360-Timestamp`)
-- `/api/v1/` versioning namespace with unversioned aliases ≥1 sprint
-- SQL-backed idempotency store for `X-ERP360-Event-Id` (currently in-memory)
-- Stripe integration (only if commercial launch; depends on §7.1)
+_Also tracked in `GO_LIVE_CHECKLIST.md`. Post-Iter-36 status:_
+- ✅ §7.4 per-org connection state (Iter 36)
+- ✅ §7.2 verified-email link tightening (Iter 36)
+- ✅ §6.3 timestamp replay window (Iter 36)
+- ✅ SQL-backed idempotency store (Iter 36)
+- ⏳ §7.1 entitlement abstraction (blocks Stripe rework) — **biggest remaining P1 item**
+- ⏳ `/api/v1/` versioning namespace with unversioned aliases ≥1 sprint
+- ⏳ Stripe integration (only if commercial launch; depends on §7.1)
+- ⏳ Admin endpoint `PATCH /api/admin/organizations/{id}/integrations/erp360` — model shipped in Iter 36; UI + route remaining
 
 ## P2 — Nice to have
 - **§4 Outbound webhook dispatcher (IFPI → ERP360)** — sender for
