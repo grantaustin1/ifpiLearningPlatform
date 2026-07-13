@@ -1,260 +1,49 @@
-# ERP360-Side Work List — Making IFPI a Bolt-On
-
-> **⚠️ CANONICAL SOURCE:** the authoritative integration contract lives at `IFPI_INTEGRATION_HANDOFF.md` §1–§7 on the ERP360 repo. This document is a shadow copy + IFPI compliance delta — kept locally so this codebase can be understood end-to-end without cross-repo lookups. On any conflict, the ERP360-side doc wins.
->
-> **IFPI compliance status** (updated 2026-02-12):
-> - ✅ §1.1 Form-POST binding on `/api/auth/sso-exchange` (JSON + `application/x-www-form-urlencoded` both accepted; form-POST responds `303 See Other → /dashboard`, cookies land first-party, CORS-immune).
-> - ✅ §6.1 Dedup key on `user.sub` (ERP360 `person_id`) — email is a fallback only for first-time links.
-> - ✅ §6.2 `data.new_roles` object shape `{role_name, scope, branch_id}` — `role_name` unpacked, `scope`/`branch_id` accepted-and-ignored per v1 policy.
-> - ✅ §6.2 Role enum coerce policy — unknown ERP360 roles → `LEARNER` + warn-log, never reject.
-> - ✅ §6.3 HMAC-SHA256 raw-body signing via `X-ERP360-Signature: sha256=<hex>`. Replay window (±5 min via `X-ERP360-Timestamp`) — **PENDING** (mandatory dedupe on `X-ERP360-Event-Id` in place; timestamp window not yet enforced).
-> - ✅ §7.3 Scoped role rewrite — inbound `role_changed` only wipes `user_roles WHERE source='erp360'`; native grants (INSTRUCTOR, cohort assignments) survive every webhook. Same fix applied to `SSOService.jit_provision`.
-> - ✅ §7.2 Identity-link columns present (`users.erp360_user_id`, `persons.erp360_person_id`). **PENDING** verified-email-only link on first SSO for previously-native users.
-> - ⏳ §7.1 Entitlement abstraction (per-org `billing_mode`) — scaffold not yet started.
-> - ⏳ §7.4 Per-org connection state (`organizations.integrations` JSONB) — global `SSO_ENABLED` still used.
-> - ⏳ §1 `/api/v1/` versioned aliases — not yet added.
-
-## The five interfaces ERP360 must implement
-
-Every interaction between the two apps is one of these five patterns. Everything below hangs off one of them.
-
-1. **SSO mint (ERP360 → IFPI)** — sign a JWT, redirect the user with it.
-2. **Webhook receive (IFPI → ERP360)** — HTTP POST endpoints that accept signed events.
-3. **Webhook send (ERP360 → IFPI)** — HTTP POST calls with an HMAC signature.
-4. **API token consume (ERP360 → IFPI)** — a stored bearer token, used server-to-server.
-5. **UI embed (ERP360 → IFPI)** — a tile / link / iframe in the ERP360 frontend that opens IFPI.
-
----
-
-## Priority 0 — Absolute must-haves (est. 1–2 weeks)
-
-### P0.1 Mint SSO tokens
-
-**Where in ERP360:** wherever `Person` identity lives, plus wherever the "Open Learning" button will be.
-
-**Contract:** produce an HS256 JWT with the exact payload shape below and redirect the user's browser to `POST /api/auth/sso-exchange` on IFPI with the token as JSON body.
-
-```json
-{
-  "iss": "erp360",
-  "aud": "ifpi-lms",
-  "sub": "<erp360_person_id>",
-  "email": "user@company.com",
-  "name": "Full Name",
-  "roles": ["TRAINER", "MANAGER"],
-  "org_slug": "acme",
-  "iat": 1707000000,
-  "exp": 1707000060,       // ≤ 60 s TTL — mint fresh every click
-  "jti": "<uuidv4>"         // required, single-use
-}
-```
-
-**Signing:** HMAC-SHA256 using a shared secret. ERP360 must keep this secret in a vault, never in git.
-
-**Estimate:** 1 day (a few hours if ERP360 already has a JWT library).
-
-**Success test:** `POST https://<ifpi>/api/erp360/sync/handshake-dry-run` with a sample token returns `{valid: true, jit_provisioned: false}` without persisting anything.
-
-### P0.2 Store the IFPI shared secret in ERP360's environment
-
-- Environment variable: `IFPI_SSO_SHARED_SECRET`
-- Loaded by ERP360's JWT signer above
-- **Rotate every 90 days** — coordinate with IFPI Ops so both sides swap on the same clock
-
-**Estimate:** 30 minutes plus a runbook entry for rotations.
-
-### P0.3 Add the "Open Learning Academy" UI entry point
-
-A tile / button somewhere sensible in the ERP360 frontend (dashboard, top-nav, or Person profile). On click:
-
-1. Front-end calls ERP360's own `POST /internal/mint-ifpi-sso` (P0.1 endpoint).
-2. Gets back the JWT.
-3. Redirects: `window.location = "https://<ifpi>/sso/land?token=<jwt>"` OR posts the token in a hidden form to `/api/auth/sso-exchange`.
-
-**Estimate:** half a day, mostly design/copy decisions.
-
-### P0.4 Send `role_changed` and `user_deactivated` webhooks to IFPI
-
-When ERP360 fires either event internally, POST it to IFPI so IFPI's local user cache stays in sync:
-
-```
-POST https://<ifpi>/api/erp360/webhooks/user
-X-ERP360-Signature: sha256=<hmac_of_body>
-X-ERP360-Event-Id: <uuid>
-X-ERP360-Timestamp: <unix_seconds>
-Content-Type: application/json
-
-{
-  "event": "role_changed"  |  "user_deactivated",
-  "event_id": "<uuid>",
-  "occurred_at": "2026-02-06T14:00:00Z",
-  "org_slug": "acme",
-  "user": {
-    "sub": "12345",              // ERP360 person_id — dedup key
-    "email": "user@company.com",
-    "name": "Full Name"
-  },
-  "data": {
-    "old_roles": [{"role_name": "TRAINER", "scope": "ORG", "branch_id": null}],
-    "new_roles": [{"role_name": "MANAGER", "scope": "ORG", "branch_id": null}],
-    "reason": "manual_admin_edit"
-  }
-}
-```
-
-**§6.2 role objects:** `scope` is an enum (`ORG | BRANCH | PLATFORM`), `branch_id` is nullable numeric. IFPI v1 accepts-and-ignores both — every role is treated as org-wide. Scope-aware auth is jointly designed for v2; don't rely on IFPI honouring `branch_id` today.
-
-**Signing:** HMAC-SHA256 of the raw request body, using the outbound secret ERP360 already has for other webhooks.
-
-**Retry policy:** exponential backoff, at least 3 attempts over 15 minutes. Dead-letter to whatever queue ERP360 already uses.
-
-**Estimate:** 2 days. Most of it is testing the retry path.
-
----
-
-## Priority 1 — Really should be there for smooth Day 1 (est. 1 week)
-
-### P1.1 Receive IFPI's outbound webhooks
-
-IFPI will emit events on your endpoint (`WEBHOOK_OUTBOUND_TO_ERP360_URL`). ERP360 needs an inbound handler that:
-
-- Verifies `X-IFPI-Signature: sha256=<hmac>` against the raw request body
-- Records the event
-- Idempotency: check `event_id` header — if you've seen it, return 200 and ignore
-
-**Events ERP360 will receive:**
-- `learner.invited` — someone was invited into an academy
-- `enrollment.completed` — a learner finished a course
-- `certificate.issued` — someone earned a certificate (⚠️ **surface this in the person's ERP360 profile — this is the whole point of the integration**)
-- `ai.spend.threshold` — IFPI hit the AI budget alert threshold
-- `course.published` — a course was published
-
-**Estimate:** 3 days. Half a day is the HMAC verify; the rest is deciding what UI to show each event in ERP360.
-
-### P1.2 Add "IFPI Training" section to the Person profile
-
-The whole point of P1.1 above. On any Person page in ERP360, show:
-
-- Live count of enrolments in progress
-- List of certificates earned (with clickable IFPI verify links)
-- Last activity date
-- "Assign training" button that pre-fills an invitation on IFPI
-
-Data comes from either (a) the webhook stream ERP360 stored locally, or (b) real-time calls to IFPI's API using an ERP360-owned API token (see P1.4).
-
-**Estimate:** 2 days including designs.
-
-### P1.3 SSO-cookie same-domain configuration
-
-Both apps must serve from the same **eTLD+1** (e.g. `academy.acme.com` and `erp.acme.com` both under `acme.com`) so cookies work correctly.
-
-If they must be on different domains, IFPI's cookie needs `SameSite=None; Secure` (already supported by `AUTH_COOKIE_SAMESITE=none`).
-
-**Estimate:** DNS work — half a day if you own the domain, longer if IT change control involved.
-
-### P1.4 Mint an ERP360-owned API token in IFPI
-
-For server-to-server calls (e.g. rendering the "IFPI Training" widget from P1.2), ERP360 needs a long-lived API token from IFPI. This is a one-time setup:
-
-1. Admin in IFPI creates a token from `Tokens → New Token` with scopes `read:catalog`, `read:analytics`, `write:learners`.
-2. Copy the token once at creation. Paste into ERP360's `IFPI_API_TOKEN` env var.
-3. Every ERP360 → IFPI call sends `Authorization: Bearer <token>`.
-
-**Estimate:** 30 minutes for the human, plus wiring in ERP360's HTTP client (2 hours).
-
----
-
-## Priority 2 — Nice to have, defer if pressed (est. 1–2 weeks)
-
-### P2.1 Route IFPI billing through ERP360's lite-billing
-
-When a customer subscribes to a paid IFPI course, ERP360 handles the money. IFPI just marks the enrolment as paid once ERP360 confirms via webhook.
-
-**Contract:**
-- IFPI redirects checkout to `${ERP360_BILLING_BASE_URL}/checkout?product=ifpi_course&course_id=X&customer_id=Y`.
-- ERP360 handles the Stripe/PayFast flow.
-- On success, ERP360 POSTs back to IFPI: `/api/billing/webhooks/erp360` with event `billing.subscription.activated`.
-
-**Estimate:** 1 week. Most of it is Stripe flow work in ERP360, not IFPI integration.
-
-### P2.2 Bidirectional branding sync
-
-When someone changes their logo / primary colour in ERP360, push it to IFPI via `org.branding_changed` webhook. IFPI has already built the receiving side.
-
-**Estimate:** 2 days.
-
-### P2.3 Cross-app search
-
-One search bar in ERP360's top-nav queries both apps. Requires:
-- IFPI exposes `/api/search?q=…` (already exists)
-- ERP360's search widget calls both, merges results, tags source
-
-**Estimate:** 3 days.
-
-### P2.4 Shared feature flags
-
-Wire ERP360's LaunchDarkly (or whatever) into IFPI so a single flag toggle affects both. IFPI's `FeatureFlag` model already accepts per-org overrides — a webhook on flag change would do it.
-
-**Estimate:** 2 days.
-
----
-
-## Priority 3 — Long-term integration polish (defer to post-launch)
-
-- Unified audit log — replicate IFPI's audit events into ERP360's central stream
-- SSO to third apps too (Slack, Notion) via ERP360 as the identity broker
-- Shared "team" abstraction — a cohort in IFPI == a department in ERP360
-
----
-
-## The environment variables ERP360 needs to hold
-
-| Variable | Purpose | Set by |
-|---|---|---|
-| `IFPI_SSO_SHARED_SECRET` | HMAC secret for signing SSO JWTs | Platform Ops (shared with IFPI Ops) |
-| `IFPI_BASE_URL` | Root URL of IFPI (e.g. `https://academy.acme.com`) | Platform Ops |
-| `IFPI_API_TOKEN` | Bearer token for server-to-server calls | Admin creates in IFPI, one-time paste |
-| `IFPI_WEBHOOK_INBOUND_SECRET` | HMAC secret ERP360 uses to verify webhooks FROM IFPI | Platform Ops (shared with IFPI Ops) |
-| `IFPI_WEBHOOK_OUTBOUND_URL` | Where ERP360 sends webhooks TO IFPI | Platform Ops |
-| `IFPI_WEBHOOK_OUTBOUND_SECRET` | HMAC secret for signing webhooks TO IFPI | Platform Ops |
-
-Six secrets total. Store them all in ERP360's existing secrets vault. Rotate every 90 days on a shared calendar.
-
----
-
-## Verifying the integration works
-
-Once ERP360's work is done, run these three checks against a staging tenant:
-
-1. **`GET https://<ifpi>/api/erp360/sync/status`** — should return `{"sso": true, "webhook_outbound_healthy": true}`.
-2. **`POST https://<ifpi>/api/erp360/sync/test-ping`** — fires a synthetic outbound webhook to ERP360; ERP360 must return 200.
-3. **Click "Open Learning Academy" from a real ERP360 Person page** — user lands on IFPI already signed in, with the correct role, and their Person profile in ERP360 now shows an "IFPI training" section.
-
-If all three green, the bolt-on is live.
-
----
-
-## Total estimate
-
-| Priority | Effort | Delivered value |
-|---|---|---|
-| **P0 (must-have)** | 1–2 weeks of one engineer | Basic SSO + user sync working |
-| **P1 (Day-1 polish)** | 1 week | Full staff-facing UX — cert widgets, cross-app awareness |
-| **P2 (nice-to-have)** | 1–2 weeks | Billing consolidation, branding sync |
-| **P3 (long-term)** | Backlog | Search, unified audit, feature flags |
-
-**Realistic go-live with P0 + P1 only:** ~3 weeks of ERP360 engineering time.
-
----
-
-## What IFPI already does not need from ERP360
-
-For clarity, so ERP360's team don't waste effort:
-
-- ❌ Don't build a "user management" screen in ERP360 for IFPI users — IFPI has one and it's the source of truth for anything IFPI-specific (cohorts, roles like INSTRUCTOR).
-- ❌ Don't build a course editor in ERP360. IFPI's Course Builder is the workflow.
-- ❌ Don't build certificate rendering in ERP360. IFPI generates PDFs; ERP360 just links to them.
-- ❌ Don't sync IFPI's audit log wholesale — it grows fast. Only mirror the critical events.
-- ❌ Don't cache IFPI course data in ERP360. Always fetch live via the API token — IFPI's response times are <100ms.
-
-*Owner: Platform Ops joint session with ERP360 engineering. Update whenever a new bolt-on point is agreed.*
+# ERP360 ↔ IFPI Integration — Local Compliance Delta
+
+> **📌 Canonical contract:** `/app/docs/IFPI_INTEGRATION_HANDOFF.md` (§1–§7). Mirrored verbatim from the ERP360-side single-source-of-truth. **All contract questions resolve there.** This document tracks *only* IFPI's compliance state against that spec — no re-derivation, no parallel vocabulary.
+
+## Compliance status (updated 2026-02-12, Iter 35)
+
+| Spec § | Item | Status | IFPI code path |
+|---|---|---|---|
+| §1 | SSO exchange (JSON binding) | ✅ shipped | `routers/auth.py::sso_exchange` |
+| §1 | HS256 verify, `iss=erp360`, `aud=ifpi-lms`, jti replay | ✅ shipped | `services/sso_service.py::verify_inbound_token` + `_check_replay` |
+| §1 | `iat` freshness (≤5 min) | ✅ shipped | `MAX_TOKEN_AGE_SECONDS = 300` |
+| §1.1 | Form-POST binding (`Content-Type: application/x-www-form-urlencoded` → 303) | ✅ shipped Iter 35 | `routers/auth.py::sso_exchange` (Content-Type branch) |
+| §1.1 | `return_to` same-origin allowlist (must start `/`, not `//`) | ✅ shipped | same |
+| §2 | HMAC-SHA256 raw-body verification via `X-ERP360-Signature: sha256=<hex>` | ✅ shipped | `routers/erp360_sync.py::_verify_signature` |
+| §2 | Idempotency on `X-ERP360-Event-Id` | ✅ shipped | `_SEEN_EVENT_IDS` (in-mem; TODO: move to SQL like `sso_jti_seen` for multi-replica) |
+| §2 | 2xx within 10s + supports re-delivery | ✅ shipped | route returns 202 with no long-running work inside |
+| §2 | `user_deactivated` handler (revoke access) | ✅ shipped | `routers/erp360_sync.py` `is_active = False` |
+| §3 | Env vars `ERP360_SSO_SHARED_SECRET`, `IFPI_WEBHOOK_OUTBOUND_SECRET` | ✅ configured | `backend/.env` + `core/config.py` |
+| §4 | `GET /api/erp360/sync/status` | ✅ shipped | `routers/erp360_sync.py::erp360_sync_status` |
+| §4 | `POST /api/erp360/sync/test-ping` | ✅ shipped (admin-gated) | `routers/erp360_sync.py::erp360_sync_test_ping` |
+| §4 | Outbound webhooks IFPI → ERP360 (`learner.invited`, `enrollment.completed`, `certificate.issued`, `ai.spend.threshold`, `course.published`) | ⏳ not started | future — sender/dispatcher not yet built |
+| §4 | `IFPI_API_TOKEN` server-to-server bearer (scoped) | ✅ shipped (mint via `/api/admin/api-tokens`) | `models/api_token.py` + admin router |
+| §6.1 | Dedup/join on `user.sub` (never on email) | ✅ shipped | `services/sso_service.py::jit_provision` first checks `erp360_user_id == sub`, email is fallback only |
+| §6.2 | Role vocabulary: OWNER, MANAGER, ACCOUNTANT, HEAD_OF_ADMIN, FRONT_DESK, SALES, TRAINER, HR_ADMIN, HR_MANAGER, RSM, VIEWER | ✅ shipped | `services/sso_service.py::ERP360_TO_IFPI_ROLE` — unmapped names coerce to LEARNER via `.get(key, "LEARNER")` |
+| §6.2 | Unknown-role coerce → LEARNER + warn-log | ✅ shipped | `routers/erp360_sync.py::_replace_erp360_roles` warn-logs unmapped names |
+| §6.2 | `data.new_roles` object shape `{role_name, scope, branch_id}` unpacked; `scope`/`branch_id` accept-and-ignore v1 | ✅ shipped Iter 35 | `routers/erp360_sync.py::_extract_role_names` — raw shape preserved in audit_metadata |
+| §6.3 | HMAC signing spec (raw body bytes, `sha256=<hex>`) | ✅ shipped | `_verify_signature` |
+| §6.3 | Replay window `X-ERP360-Timestamp` ±5 min | ⏳ header ignored on inbound today; MAY per spec (dedupe on `event_id` mandatory and shipped) | future — cheap add when we tighten |
+| §6.4 | Accept re-delivered payloads (ERP360 re-signs from current env every attempt) | ✅ shipped (idempotency handles this) | `_SEEN_EVENT_IDS` |
+| §6.5 | `SameSite=None; Secure` on cookies + explicit `ALLOWED_ORIGINS` list | ✅ shipped | `AUTH_COOKIE_SAMESITE=none`, `AUTH_COOKIE_SECURE=true`, deploy-surface `CORS_ORIGINS` reads through `core/config.py` |
+| §7.1 | Billing abstraction (per-org `billing_mode`, `Entitlement` intermediate) | ⏳ not started | next chunk of IFPI work |
+| §7.2 | `users.erp360_user_id` + `persons.erp360_person_id` columns | ✅ shipped | `models/identity.py` |
+| §7.2 | Verified-email-only link on first SSO for previously-native user | ⏳ email match is any-email today, not `email_verified_at IS NOT NULL` | small tightening in `SSOService.jit_provision` |
+| §7.3 | Scoped role rewrite (only `source='erp360'` rows wiped; IFPI-native survives) | ✅ shipped Iter 35 | `user_roles.source` column + scoped DELETE in `_replace_erp360_roles` AND `SSOService.jit_provision` |
+| §7.4 | Per-org connection state (`organizations.integrations` JSONB) | ⏳ global `SSO_ENABLED` still in use | next chunk of IFPI work |
+| §7.4 | `user_deactivated`/`role_changed` only match users in payload's `org_slug` | ⏳ currently matches globally by `erp360_user_id`/email | tighten alongside §7.4 |
+
+## Legend
+- ✅ Shipped and tested (regression tests in `backend/tests/test_iteration35_erp360_scoped_roles_and_form_post.py` and iter14/iter17 SSO suites).
+- ⏳ Known gap — tracked here to prevent silent drift from spec.
+
+## What's next
+Priority order for the next IFPI work chunk:
+1. **§7.4 per-org connection state** — retire global `SSO_ENABLED`; scope handlers to payload's `org_slug`. Blocks multi-tenant prod.
+2. **§7.1 entitlement abstraction** — must land BEFORE any Stripe P1 work, or that becomes rip-and-replace.
+3. **§7.2 verified-email tightening** — small guard on `jit_provision` first-time link path.
+4. **§6.3 replay window** — enforce ±5 min on `X-ERP360-Timestamp`.
+5. **§4 outbound webhooks** — IFPI → ERP360 dispatcher (`learner.invited`, `enrollment.completed`, `certificate.issued`).
+6. **`/api/v1/` versioning namespace** — keep unversioned aliases ≥1 sprint.
