@@ -183,9 +183,9 @@ def sso_exchange(payload: dict, response: Response, request: Request,
             status_code=503,
             detail="SSO is not enabled. Set SSO_ENABLED=true and ERP360_SSO_SHARED_SECRET to activate.",
         )
-    token = payload.get("erp_token")
+    token = payload.get("erp_token") or payload.get("token")  # accept both field names (Iter 34b — ERP360 uses `token`, docs said `erp_token`)
     if not token:
-        raise HTTPException(status_code=400, detail="erp_token is required")
+        raise HTTPException(status_code=400, detail="token is required")
     claims = sso.verify_inbound_token(token)
     user, created = sso.jit_provision(claims)
 

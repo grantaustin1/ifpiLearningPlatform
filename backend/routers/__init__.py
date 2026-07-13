@@ -16,6 +16,10 @@ def register_all(app: FastAPI) -> None:
     from routers import auth
     app.include_router(auth.router)
 
+    # Iter 34b — ERP360 inbound integration surface
+    from routers import erp360_sync
+    app.include_router(erp360_sync.router)
+
     # ── Core LMS: courses, exams, learning paths ─────────────────────
     from routers import courses, exams, learning_paths
     app.include_router(courses.router)
