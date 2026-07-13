@@ -1,6 +1,18 @@
 # ERP360-Side Work List — Making IFPI a Bolt-On
 
-> **Purpose:** hand this to the ERP360 engineering lead. Every item below is work that lives in the ERP360 codebase (or ERP360's config), not in IFPI. IFPI is already built for this — the contracts are stable and documented in `IFPI_INTEGRATION_MATRIX.md`.
+> **⚠️ CANONICAL SOURCE:** the authoritative integration contract lives at `IFPI_INTEGRATION_HANDOFF.md` §1–§7 on the ERP360 repo. This document is a shadow copy + IFPI compliance delta — kept locally so this codebase can be understood end-to-end without cross-repo lookups. On any conflict, the ERP360-side doc wins.
+>
+> **IFPI compliance status** (updated 2026-02-12):
+> - ✅ §1.1 Form-POST binding on `/api/auth/sso-exchange` (JSON + `application/x-www-form-urlencoded` both accepted; form-POST responds `303 See Other → /dashboard`, cookies land first-party, CORS-immune).
+> - ✅ §6.1 Dedup key on `user.sub` (ERP360 `person_id`) — email is a fallback only for first-time links.
+> - ✅ §6.2 `data.new_roles` object shape `{role_name, scope, branch_id}` — `role_name` unpacked, `scope`/`branch_id` accepted-and-ignored per v1 policy.
+> - ✅ §6.2 Role enum coerce policy — unknown ERP360 roles → `LEARNER` + warn-log, never reject.
+> - ✅ §6.3 HMAC-SHA256 raw-body signing via `X-ERP360-Signature: sha256=<hex>`. Replay window (±5 min via `X-ERP360-Timestamp`) — **PENDING** (mandatory dedupe on `X-ERP360-Event-Id` in place; timestamp window not yet enforced).
+> - ✅ §7.3 Scoped role rewrite — inbound `role_changed` only wipes `user_roles WHERE source='erp360'`; native grants (INSTRUCTOR, cohort assignments) survive every webhook. Same fix applied to `SSOService.jit_provision`.
+> - ✅ §7.2 Identity-link columns present (`users.erp360_user_id`, `persons.erp360_person_id`). **PENDING** verified-email-only link on first SSO for previously-native users.
+> - ⏳ §7.1 Entitlement abstraction (per-org `billing_mode`) — scaffold not yet started.
+> - ⏳ §7.4 Per-org connection state (`organizations.integrations` JSONB) — global `SSO_ENABLED` still used.
+> - ⏳ §1 `/api/v1/` versioned aliases — not yet added.
 
 ## The five interfaces ERP360 must implement
 
@@ -68,16 +80,29 @@ When ERP360 fires either event internally, POST it to IFPI so IFPI's local user 
 ```
 POST https://<ifpi>/api/erp360/webhooks/user
 X-ERP360-Signature: sha256=<hmac_of_body>
+X-ERP360-Event-Id: <uuid>
+X-ERP360-Timestamp: <unix_seconds>
 Content-Type: application/json
 
 {
-  "event": "user.role_changed"  |  "user.deactivated",
-  "erp360_person_id": "12345",
-  "email": "user@company.com",
-  "new_roles": ["TRAINER"],           // only for role_changed
-  "occurred_at": "2026-02-06T14:00:00Z"
+  "event": "role_changed"  |  "user_deactivated",
+  "event_id": "<uuid>",
+  "occurred_at": "2026-02-06T14:00:00Z",
+  "org_slug": "acme",
+  "user": {
+    "sub": "12345",              // ERP360 person_id — dedup key
+    "email": "user@company.com",
+    "name": "Full Name"
+  },
+  "data": {
+    "old_roles": [{"role_name": "TRAINER", "scope": "ORG", "branch_id": null}],
+    "new_roles": [{"role_name": "MANAGER", "scope": "ORG", "branch_id": null}],
+    "reason": "manual_admin_edit"
+  }
 }
 ```
+
+**§6.2 role objects:** `scope` is an enum (`ORG | BRANCH | PLATFORM`), `branch_id` is nullable numeric. IFPI v1 accepts-and-ignores both — every role is treated as org-wide. Scope-aware auth is jointly designed for v2; don't rely on IFPI honouring `branch_id` today.
 
 **Signing:** HMAC-SHA256 of the raw request body, using the outbound secret ERP360 already has for other webhooks.
 

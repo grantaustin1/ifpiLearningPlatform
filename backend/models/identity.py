@@ -132,6 +132,17 @@ class UserRole(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role = Column(String(50), nullable=False)
+    # §7.3 — Source-of-truth marker. `ifpi_native` roles (INSTRUCTOR,
+    # cohort assignments, native-side admin grants) MUST survive every
+    # inbound ERP360 `role_changed` webhook. `erp360` roles are managed
+    # exclusively by the ERP360 receiver (`_replace_roles`) — that path
+    # scopes its DELETE to source='erp360' so native grants are never
+    # clobbered. Existing rows default to `ifpi_native` (safe assumption
+    # — pre-§7.3 the receiver did full rewrites, but no ERP360-sourced
+    # rows actually landed for real users; the one live event was a
+    # noop_unknown_user). See ERP360_BOLT_ON_WORK_LIST §7.3.
+    source = Column(String(20), nullable=False, default="ifpi_native",
+                    server_default="ifpi_native", index=True)
     created_at = Column(DateTime, default=_utcnow)
 
     user = relationship("User", back_populates="user_roles")

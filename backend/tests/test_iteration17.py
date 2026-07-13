@@ -173,7 +173,14 @@ def test_sso_replay_protection_persists_across_sessions(sso_setup):
     r2 = requests.post(f"{BASE_URL}/api/auth/sso-exchange",
                        json={"erp_token": token}, timeout=15)
     assert r2.status_code == 401, r2.text
-    assert "replay" in r2.json()["detail"].lower()
+    # Iter 30d — error envelope moved from `{detail: ...}` to
+    # `{error: {code, message, ...}}`. Accept either shape so this test
+    # is robust to future envelope changes.
+    body = r2.json()
+    msg = (body.get("detail")
+           or (body.get("error") or {}).get("message")
+           or "").lower()
+    assert "replay" in msg or "already used" in msg, body
 
     # And — the proof of multi-process safety — the row is in SQL,
     # so a fresh DB session sees the marker.

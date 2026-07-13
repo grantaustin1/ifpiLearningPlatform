@@ -171,11 +171,27 @@ def sso_status():
     return {"enabled": enabled, "initiate_url": initiate_url}
 
 
-@router.post("/sso-exchange", response_model=LoginResponse)
-def sso_exchange(payload: dict, response: Response, request: Request,
-                 db: Session = Depends(get_db)):
-    """Inbound SSO from ERP360. Body: {"erp_token": "..."}.
-    Returns same shape as login so the frontend handles it identically.
+@router.post("/sso-exchange")
+async def sso_exchange(request: Request, response: Response,
+                       db: Session = Depends(get_db)):
+    """Inbound SSO from ERP360. Supports two response modes:
+
+    - **JSON binding** (Content-Type: application/json) — legacy path
+      for programmatic clients. Body `{"token": "..."}`. Response is
+      the standard `LoginResponse` JSON shape (same as `/login`), with
+      auth cookies set on the response.
+
+    - **Form-POST binding** (Content-Type: application/x-www-form-urlencoded) —
+      preferred path for browser SSO click-throughs. Body field `token`
+      (optional `return_to` for a same-origin redirect target). Response
+      is `303 See Other` → `/dashboard` (or the validated `return_to`),
+      with auth cookies set. Because this is a top-level navigation
+      driven by an HTML form submission, browsers do not subject it to
+      CORS preflight and cookies land first-party on the IFPI domain.
+      This matches the SAML/OIDC `form_post` response mode and is the
+      recommended integration path for ERP360.
+
+    Both paths call the same `SSOService.jit_provision` + audit sequence.
     """
     sso = SSOService(db)
     if not sso.is_enabled():
@@ -183,9 +199,29 @@ def sso_exchange(payload: dict, response: Response, request: Request,
             status_code=503,
             detail="SSO is not enabled. Set SSO_ENABLED=true and ERP360_SSO_SHARED_SECRET to activate.",
         )
-    token = payload.get("erp_token") or payload.get("token")  # accept both field names (Iter 34b — ERP360 uses `token`, docs said `erp_token`)
+
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    form_post_mode = content_type == "application/x-www-form-urlencoded"
+
+    token: str | None = None
+    return_to: str | None = None
+    if form_post_mode:
+        form = await request.form()
+        token = (form.get("token") or form.get("erp_token") or "").strip() or None
+        return_to = (form.get("return_to") or "").strip() or None
+    else:
+        try:
+            payload = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400,
+                                detail="Body must be JSON or application/x-www-form-urlencoded")
+        # Iter 34b — ERP360 uses `token`, our earlier docs said `erp_token`.
+        # Accept both to avoid a breaking-change dance.
+        token = payload.get("erp_token") or payload.get("token")
+
     if not token:
         raise HTTPException(status_code=400, detail="token is required")
+
     claims = sso.verify_inbound_token(token)
     user, created = sso.jit_provision(claims)
 
@@ -203,18 +239,41 @@ def sso_exchange(payload: dict, response: Response, request: Request,
             target_type="user", target_id=str(user.id),
             metadata={"erp360_user_id": user.erp360_user_id,
                       "email": user.email,
-                      "roles": [ur.role for ur in user.user_roles]},
+                      "roles": [ur.role for ur in user.user_roles],
+                      "binding": "form_post" if form_post_mode else "json"},
             request=request,
         )
     audit_service.record(
         db, actor, "SSO_LOGIN_SUCCESS",
         target_type="user", target_id=str(user.id),
-        metadata={"erp360_user_id": user.erp360_user_id, "email": user.email},
+        metadata={"erp360_user_id": user.erp360_user_id,
+                  "email": user.email,
+                  "binding": "form_post" if form_post_mode else "json"},
         request=request,
     )
     db.commit()
 
     access, refresh = AuthService(db).issue_tokens(user)
+
+    if form_post_mode:
+        # Form-POST binding: 303 See Other with cookies set on this
+        # response. `return_to` is validated against a same-origin
+        # allowlist — must be a relative path (no scheme/host) and
+        # must start with '/'. Anything else falls back to /dashboard
+        # to prevent open-redirect abuse (an attacker who somehow gets
+        # a valid ERP360 token could otherwise redirect the user's
+        # authenticated session to a phishing page).
+        target = "/dashboard"
+        if return_to and return_to.startswith("/") and not return_to.startswith("//"):
+            target = return_to
+        set_auth_cookie(response, access)
+        set_refresh_cookie(response, refresh)
+        set_csrf_cookie(response, generate_csrf_token())
+        response.headers["Location"] = target
+        response.status_code = 303
+        return response
+
+    # JSON binding: unchanged legacy path
     return _login_response(response, user, access, refresh, request=request)
 
 

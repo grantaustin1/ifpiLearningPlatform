@@ -198,10 +198,21 @@ class SSOService:
         if not ifpi_roles:
             ifpi_roles = {"LEARNER"}
 
-        # Replace role rows
-        self.db.query(UserRole).filter(UserRole.user_id == user.id).delete()
+        # §7.3 — Replace ONLY the ERP360-managed subset. IFPI-native
+        # grants (INSTRUCTOR, cohort assignments, native admin) survive.
+        # If a role landing from ERP360 is already held natively, we
+        # skip inserting a duplicate erp360-sourced row so the unique
+        # `(user_id, role)` constraint isn't violated — the user keeps
+        # the role regardless of ERP360 state changes.
+        self.db.query(UserRole).filter(
+            UserRole.user_id == user.id,
+            UserRole.source == "erp360",
+        ).delete()
+        native_roles = {ur.role for ur in user.user_roles if ur.source != "erp360"}
         for r in ifpi_roles:
-            self.db.add(UserRole(user_id=user.id, role=r))
+            if r in native_roles:
+                continue
+            self.db.add(UserRole(user_id=user.id, role=r, source="erp360"))
 
         self.db.commit()
         self.db.refresh(user)
