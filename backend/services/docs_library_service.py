@@ -65,6 +65,13 @@ CATALOG: Dict[str, dict] = {
         "audience": "Owner, Platform Ops",
         "auto_regenerated": False,
     },
+    "erp360-bolt-on": {
+        "file": "ERP360_BOLT_ON_WORK_LIST.md",
+        "title": "ERP360 Bolt-On Work List",
+        "subtitle": "What ERP360's team must build to make IFPI a sibling app",
+        "audience": "Platform Ops, ERP360 engineering lead",
+        "auto_regenerated": False,
+    },
 }
 
 
