@@ -1,6 +1,53 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 35 — ERP360 §7.3 Scoped Role Rewrite + §1.1 Form-POST SSO Binding (2026-02-12)
+
+### §7.3 — Scoped role rewrite (P0 clobber-bug fix)
+- **Bug found & fixed:** both `routers/erp360_sync.py::_replace_roles()` and `services/sso_service.py::jit_provision()` did a full `DELETE FROM user_roles WHERE user_id=?` before re-inserting the ERP360-mapped set. Any INSTRUCTOR / cohort-assignment / native admin grant a user held was silently wiped on every inbound `role_changed` webhook or every subsequent SSO login. Zero live impact (the one production event was a `noop_unknown_user`), but a latent P0 that would have activated the moment ERP360 fired an event for a user who had ever been touched by IFPI-native role assignment.
+- **Fix:** new `user_roles.source` column (`'erp360' | 'ifpi_native'`, default `'ifpi_native'`, indexed). ERP360 code paths now scope their DELETE to `source='erp360'`. If an ERP360-sourced role already exists natively, we skip the erp360 duplicate to respect the `(user_id, role)` unique constraint — user keeps the role regardless of ERP360 state.
+- **Migration:** `alembic/versions/20260722_1000_e3f4a5b6c7d8_user_role_source_column.py` — idempotent, applied.
+- **§6.2 role-object shape unpacking:** `data.new_roles` items are now unpacked from `{role_name, scope, branch_id}` objects. `scope`/`branch_id` accept-and-ignore per v1 policy (raw shape preserved in audit log for v2 scope-aware auth).
+- **Unknown-role coerce policy:** unknown ERP360 role names → `LEARNER` + warn-log, never reject.
+
+### §1.1 — Form-POST binding on `/api/auth/sso-exchange` (CORS-immune SSO)
+- **Motivation:** Emergent preview Cloudflare edge injects `Access-Control-Allow-Origin: *` + `Access-Control-Allow-Credentials: true` (browser-forbidden combo) — confirmed unfixable by Emergent support. Deploy would fix it, but requires infra work. Form-POST bypasses CORS entirely because top-level HTML form submissions are not subject to preflight, and cookies land first-party on the IFPI domain (matches SAML/OIDC `form_post` response mode).
+- **Implementation:** `/api/auth/sso-exchange` now inspects `Content-Type`.
+  - `application/json` → unchanged legacy path, returns 200 + `LoginResponse` JSON.
+  - `application/x-www-form-urlencoded` → auth cookies set on response, returns `303 See Other` with `Location: /dashboard` (or the validated `return_to` if same-origin relative path).
+- **Open-redirect guard:** `return_to` MUST start with `/` and MUST NOT start with `//`. Absolute URLs, protocol-relative URLs, and `javascript:` schemes silently fall back to `/dashboard`.
+
+### Config
+- `backend/core/config.py`: `Settings.cors_origins` now reads `CORS_ORIGINS` (deployment-surface name per Emergent support) with `ALLOWED_ORIGINS` as legacy fallback. Deploy secret wins if both are set.
+- `docs/IFPI_SETUP_MANUAL.md §G.2`: documents `CORS_ORIGINS` as the deploy-time canonical env var + notes that Emergent preview URLs cannot serve cross-origin credentialed flows.
+
+### Tests (all green — 27/27 in the ERP360/SSO/roles cluster, 85/85 across the broader auth+integration surface)
+- `tests/test_iteration35_erp360_scoped_roles_and_form_post.py` — 7 new tests covering:
+  - `test_role_changed_preserves_native_roles` (§7.3 core invariant)
+  - `test_role_object_shape_unpacked` (§6.2 shape handling)
+  - `test_second_sso_login_does_not_clobber_native` (SSO JIT clobber-bug sibling)
+  - `test_form_post_returns_303`
+  - `test_form_post_return_to_relative_path_honoured`
+  - `test_form_post_return_to_open_redirect_blocked` (fresh token per iteration, jti replay-safe)
+  - `test_json_binding_still_returns_200_json` (legacy path untouched)
+- Fixed pre-existing `test_iteration17.py::test_sso_replay_protection_persists_across_sessions` — assertion expected `{detail}` error shape but Iter 30d changed it to `{error: {code, message}}`. Test now accepts either.
+
+### Doc updates
+- `docs/ERP360_BOLT_ON_WORK_LIST.md`: added compliance-status preamble at top (delta vs ERP360-side `IFPI_INTEGRATION_HANDOFF.md` §1–§7). Corrected the `role_changed` payload example to match §6.2 field names (`event`, `user.sub`, `data.new_roles` as object array).
+
+### Files touched
+- `backend/models/identity.py` (UserRole.source column)
+- `backend/routers/erp360_sync.py` (scoped rewrite + role-object unpacking)
+- `backend/routers/auth.py` (form-POST + JSON dual binding)
+- `backend/services/sso_service.py` (scoped rewrite in JIT-provisioner)
+- `backend/core/config.py` (CORS_ORIGINS env var + Field alias)
+- `backend/alembic/versions/20260722_1000_e3f4a5b6c7d8_user_role_source_column.py` (new)
+- `backend/tests/test_iteration35_erp360_scoped_roles_and_form_post.py` (new)
+- `backend/tests/test_iteration17.py` (error-envelope tolerance)
+- `docs/ERP360_BOLT_ON_WORK_LIST.md`
+- `docs/IFPI_SETUP_MANUAL.md`
+
+
 ## Iter 34a — Plain-English Manuals + Embedded Screenshots (2026-02-06)
 
 ### User Manual — full plain-English rewrite

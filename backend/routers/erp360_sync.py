@@ -128,10 +128,16 @@ async def erp360_webhook_user(
         return {"status": "accepted", "action": "noop_unknown_user"}
 
     if event == "role_changed":
-        new_roles = (payload.get("data") or {}).get("new_roles") or []
-        _replace_roles(db, user, new_roles)
+        raw_new = (payload.get("data") or {}).get("new_roles") or []
+        # §6.2 — `data.new_roles` is an array of objects
+        # `{role_name, scope, branch_id}`. In v1 we accept-and-ignore
+        # `scope` (enum ORG|BRANCH|PLATFORM) and `branch_id`, treating
+        # every role as org-wide. Preserve the raw shape in the audit
+        # log so v2 scope-aware auth can reconstruct history.
+        new_role_names = _extract_role_names(raw_new)
+        _replace_erp360_roles(db, user, new_role_names)
         _audit_stub(db, event, email, user_id=user.id,
-                    note=f"new_roles={new_roles}")
+                    note=f"raw_new_roles={raw_new} canonical={new_role_names}")
         db.commit()
         return {"status": "accepted", "action": "roles_updated",
                 "new_roles": [r.role for r in user.user_roles]}
@@ -146,17 +152,62 @@ async def erp360_webhook_user(
                         detail=f"Unsupported event type: {event}")
 
 
-def _replace_roles(db: Session, user: User, new_role_names: list[str]) -> None:
-    """Idempotent role replacement. ERP360 role names go through the
-    same alias map used at SSO JIT time."""
+def _extract_role_names(raw_new_roles) -> list[str]:
+    """Unpack §6.2 role objects to their canonical `role_name` strings.
+
+    ERP360 sends `data.new_roles` as an array of objects
+    `{role_name, scope, branch_id}`. For back-compat we also accept
+    bare strings (pre-§6 payloads and tests). `scope` and `branch_id`
+    are accepted-and-ignored in v1 (see §6.2 pin).
+    """
+    out: list[str] = []
+    for item in raw_new_roles or []:
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, dict):
+            name = item.get("role_name") or item.get("role")
+            if isinstance(name, str) and name:
+                out.append(name)
+        # Anything else is silently ignored — v1 policy is
+        # accept-and-forward, don't reject on unknown vocabulary.
+    return out
+
+
+def _replace_erp360_roles(db: Session, user: User,
+                          new_role_names: list[str]) -> None:
+    """§7.3 — Idempotent role replacement scoped to ERP360-managed rows.
+
+    Only rows with `source='erp360'` are wiped and rebuilt. IFPI-native
+    roles (INSTRUCTOR, cohort assignments, native admin grants) are
+    preserved across every inbound webhook. Unknown ERP360 role names
+    coerce to LEARNER + warn-log per §6.2.
+    """
     from core.role_registry import normalize_role_name  # local — avoid cycle
-    canonical = {normalize_role_name(r) for r in new_role_names if r}
+    canonical: set[str] = set()
+    for r in new_role_names:
+        if not r:
+            continue
+        norm = normalize_role_name(r)
+        if norm is None or norm == "":
+            logger.warning("ERP360 role_changed: unknown role %r → coerced to LEARNER", r)
+            canonical.add("LEARNER")
+        else:
+            canonical.add(norm)
     if not canonical:
-        canonical = {"LEARNER"}
-    # Wipe and re-insert — simpler than diffing
-    db.query(UserRole).filter_by(user_id=user.id).delete()
+        canonical.add("LEARNER")
+
+    # Wipe ONLY the ERP360-managed subset. Native roles survive.
+    db.query(UserRole).filter_by(user_id=user.id, source="erp360").delete()
+
+    # Re-insert the new ERP360 set. Skip roles the user already holds
+    # from the native side to respect the unique constraint on (user, role).
+    native_roles = {ur.role for ur in user.user_roles if ur.source != "erp360"}
     for role in canonical:
-        db.add(UserRole(user_id=user.id, role=role))
+        if role in native_roles:
+            # Already granted natively — no need to duplicate as erp360-sourced.
+            # The user keeps the role regardless of ERP360's later state.
+            continue
+        db.add(UserRole(user_id=user.id, role=role, source="erp360"))
 
 
 def _audit_stub(db: Session, event: str, email: str, *,
