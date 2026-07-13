@@ -88,6 +88,36 @@ class SSOService:
     def is_enabled(self) -> bool:
         return settings.sso_enabled and bool(settings.erp360_sso_shared_secret)
 
+    def _resolve_org_for_sso(self, claim_org_slug: Optional[str]) -> Organization:
+        """§7.4 — resolve the target organization from the SSO claim's
+        `org_slug`. Matches against `Organization.integrations.erp360.org_slug`
+        first (explicit ERP360-side mapping), then falls back to native
+        `Organization.slug`, then to the default (first) org for
+        preview compatibility. Fails closed only if the claim explicitly
+        names an org and nothing matches.
+        """
+        if claim_org_slug:
+            # Explicit mapping via integrations.erp360.org_slug
+            for candidate in self.db.query(Organization).all():
+                if (candidate.erp360_settings.get("org_slug") == claim_org_slug
+                        and candidate.is_erp360_connected):
+                    return candidate
+            # Fallback: match by native slug
+            org = self.db.query(Organization).filter(
+                Organization.slug == claim_org_slug
+            ).first()
+            if org is not None:
+                return org
+            raise HTTPException(
+                status_code=404,
+                detail=f"No IFPI academy connected to ERP360 org_slug={claim_org_slug!r}",
+            )
+        # Pre-§7.4 tokens or single-tenant preview — use the default org.
+        org = self.db.query(Organization).order_by(Organization.id.asc()).first()
+        if not org:
+            raise HTTPException(status_code=500, detail="No academy configured")
+        return org
+
     def verify_inbound_token(self, token: str) -> dict:
         if not self.is_enabled():
             raise HTTPException(status_code=503, detail="SSO is not enabled")
@@ -119,15 +149,22 @@ class SSOService:
 
         Returns (user, created) — `created` is True when this is the first
         time IFPI has seen this user (i.e. JIT just provisioned them).
+
+        §7.4 — Scoped to the org identified by claims.org_slug. Falls
+        back to the default org for single-tenant preview compatibility.
+        §7.2 — Native-user linking on first SSO requires a
+        verified-email match (`email_verified_at IS NOT NULL`). If the
+        native account is unverified, we refuse the link with 409 and
+        require operator intervention rather than silently seizing it.
         """
         erp_user_id = claims.get("sub")
         email = (claims.get("email") or "").lower().strip()
         if not email:
             raise HTTPException(status_code=400, detail="SSO token missing email")
 
-        org = self.db.query(Organization).order_by(Organization.id.asc()).first()
-        if not org:
-            raise HTTPException(status_code=500, detail="No academy configured")
+        # §7.4 — resolve target org from the claim, not "first org wins".
+        claim_org_slug = (claims.get("org_slug") or "").strip() or None
+        org = self._resolve_org_for_sso(claim_org_slug)
 
         user: Optional[User] = None
         if erp_user_id:
@@ -136,12 +173,40 @@ class SSOService:
             except (TypeError, ValueError):
                 _erp_id = None
             if _erp_id is not None:
-                user = self.db.query(User).filter(User.erp360_user_id == _erp_id).first()
+                user = (
+                    self.db.query(User)
+                    .filter(User.erp360_user_id == _erp_id,
+                            User.organization_id == org.id)
+                    .first()
+                )
         else:
             _erp_id = None
 
         if not user:
-            user = self.db.query(User).filter(User.email == email).first()
+            # §7.2 — first-time link path. Look for a native account with
+            # matching verified email; refuse if unverified.
+            candidate = (
+                self.db.query(User)
+                .filter(User.email == email,
+                        User.organization_id == org.id)
+                .first()
+            )
+            if candidate is not None:
+                if candidate.email_verified_at is None:
+                    # Unverified native signup exists — potential
+                    # takeover if we auto-link. Refuse and require ops.
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "A native account with this email exists but the "
+                            "email is not verified. Contact IFPI support to "
+                            "resolve — SSO cannot safely link an unverified "
+                            "native account."
+                        ),
+                    )
+                # Verified native user — one-time link. `sub` becomes
+                # authoritative from here.
+                user = candidate
 
         created = user is None
         if created:

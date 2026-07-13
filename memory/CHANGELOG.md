@@ -1,6 +1,57 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 36 — P1 Integration Hardening (2026-02-12)
+
+Batch of four tightly-related integration-hardening items — cleared 4 of the 6 P1 items in one focused pass.
+
+### §7.4 — Per-org connection state (retires global `SSO_ENABLED` as source of truth)
+- New `Organization.integrations` JSON column (default `{}`). Shape: `{erp360: {connected, org_slug, sso_enabled, billing_mode, connected_at}}`.
+- Helper properties on Organization: `erp360_settings`, `is_erp360_connected`, `erp360_org_slug` (with fallback to native slug), `erp360_sso_enabled`.
+- **Webhook receiver** now calls `_resolve_org(db, payload.org_slug)` before user lookup; all `User` queries are scoped by `organization_id=org.id`. Unknown `org_slug` → **404** (fails closed). Missing `org_slug` in the payload falls back to the default org (single-tenant preview compatibility).
+- **SSO JIT provisioner** now calls `_resolve_org_for_sso(claim.org_slug)`; unknown claim `org_slug` → **404**. Cross-tenant email collision is impossible now.
+- Global `SSO_ENABLED` env flag remains as a master feature switch; per-org state controls WHICH orgs participate.
+- Admin endpoint to CONFIGURE `Organization.integrations.erp360` is the last remaining piece — not blocking single-tenant preview, needed for multi-tenant prod.
+
+### §7.2 — Verified-email link tightening (blocks account-takeover)
+- `SSOService.jit_provision` now refuses first-time link with **409 Conflict** if a matching native account exists but `email_verified_at IS NULL`.
+- Closes the vector where an attacker signs up native (never verifies), then an ERP360 user later shares that email → attacker's unverified account would have been auto-linked and seized.
+- Error message signals the ops action: "Contact IFPI support to resolve — SSO cannot safely link an unverified native account".
+
+### §6.3 — Timestamp replay window enforcement
+- New `_verify_timestamp()` in `routers/erp360_sync.py`. `X-ERP360-Timestamp` outside ±5 min → **401**.
+- Configurable via `ERP360_TIMESTAMP_SKEW_SECONDS` env (default 300).
+- Supports both ISO-8601 UTC (`2026-06-10T11:37:08.123456+00:00` or trailing `Z`) and unix epoch seconds.
+- Missing header still **accepted** (spec says receivers SHOULD check, MAY reject) — dedup on `event_id` is mandatory and does the safety work. Backwards-compatible with dispatchers that don't send it yet.
+- Malformed header → **400** (treated as tampering signal, not silent-ignore).
+
+### §6.4 — SQL-backed idempotency store (survives restart + multi-replica)
+- New `erp360_seen_events` table: `event_id str PK, received_at DateTime` + index on `received_at` for future sweeper.
+- `_remember_event()` uses INSERT-with-`IntegrityError`-catch semantics. Concurrent workers can't both accept the same event; race is decided by PK constraint.
+- Regression test proves the store persists across `supervisorctl restart backend` — a duplicate `event_id` replayed after restart returns `202 duplicate`.
+- Retires the in-memory `_SEEN_EVENT_IDS` dict.
+
+### Migration
+- `alembic/versions/20260722_1400_f4a5b6c7d8e9_per_org_integrations_and_webhook_idempotency.py` — idempotent (adds `organizations.integrations` column + creates `erp360_seen_events` table + index only if missing).
+
+### Tests
+- `tests/test_iteration36_per_org_and_hardening.py` — 13 new tests across 4 classes:
+  - `TestTimestampReplayWindow` (6): missing/current/old/future/malformed/epoch.
+  - `TestSqlIdempotency` (2): duplicate detection + **persistence across backend restart**.
+  - `TestPerOrgScoping` (3): unknown `org_slug` → 404 on both SSO and webhooks; missing `org_slug` falls back to default org.
+  - `TestVerifiedEmailLink` (2): verified native → linked; unverified → 409.
+- All 13 pass. Regression on iter 11/14/17/34/35 suites — **98/98 green**.
+
+### Files touched
+- `backend/models/identity.py` — `Organization.integrations` + helper properties; new `Erp360SeenEvent` model.
+- `backend/models/__init__.py` — export `Erp360SeenEvent`.
+- `backend/routers/erp360_sync.py` — `_verify_timestamp`, `_resolve_org`, SQL-backed `_remember_event`, org-scoped user lookup, `x_erp360_timestamp` header dependency.
+- `backend/services/sso_service.py` — `_resolve_org_for_sso`, verified-email link guard.
+- `backend/alembic/versions/20260722_1400_f4a5b6c7d8e9_per_org_integrations_and_webhook_idempotency.py` (new).
+- `backend/tests/test_iteration36_per_org_and_hardening.py` (new).
+- `docs/ERP360_BOLT_ON_WORK_LIST.md`, `memory/GO_LIVE_CHECKLIST.md`, `memory/ROADMAP.md` — status updates.
+
+
 ## Iter 35 — ERP360 §7.3 Scoped Role Rewrite + §1.1 Form-POST SSO Binding (2026-02-12)
 
 ### §7.3 — Scoped role rewrite (P0 clobber-bug fix)

@@ -45,6 +45,7 @@ from .identity import (
     Person,
     RefreshToken,
     SsoJtiSeen,
+    Erp360SeenEvent,
     User,
     UserRole,
 )
@@ -120,7 +121,7 @@ __all__ = [
     # identity
     "AccountDeletionRequest", "EmailVerificationToken", "Invitation",
     "Organization", "PasswordResetToken", "Person", "RefreshToken",
-    "SsoJtiSeen", "User", "UserRole",
+    "SsoJtiSeen", "Erp360SeenEvent", "User", "UserRole",
     # learning
     "Course", "CoursePrerequisite", "CourseSlide", "Enrollment", "Exam",
     "ExamAttempt", "ExamQuestion", "LearningPath",
