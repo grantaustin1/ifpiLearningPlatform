@@ -77,6 +77,17 @@
 - [ ] ⏳ **Shared contract test fixture** — 🟨 waiting on ERP360 to publish their `contract_fixtures.json`; when they do, wire it into `backend/tests/` as a nightly CI check.
 - [ ] ⏳ **Admin endpoint to configure ERP360 connection per-org** — `PATCH /api/admin/organizations/{id}/integrations/erp360` with `{connected, org_slug, sso_enabled, billing_mode}`. Backing model (`Organization.integrations` JSONB) shipped in Iter 36; only the admin route + UI remaining.
 
+### Load-readiness (before or shortly after cutover)
+
+- [x] ✅ **Webhook rate limiter** (Iter 37) — 200 req/min per signing-key prefix, sliding window, in-process LRU eviction. Returns `429 Too Many Requests` with `Retry-After: 60` before signature verification. Located: `services/rate_limits.py::erp360_webhook_limiter`. Unit + integration tests locked in.
+- [x] ✅ **Postgres advisory lock on `(org_id, user_sub)`** (Iter 37) — applied in the webhook `role_changed`/`user_deactivated` handlers AND `SSOService.jit_provision`. Concurrent events for the SAME user serialize outside the transaction; different users run in parallel. No-op on SQLite (single-writer already serializes). Located: `services/db_locks.py::advisory_lock`.
+- [x] ✅ **`@retry_on_deadlock()` decorator** (Iter 37) — wraps `_replace_erp360_roles`; catches Postgres `40P01`/`40001` and retries once with 50-200ms jitter. Non-retriable codes (e.g. `23505` unique violation) propagate immediately. Located: `services/db_locks.py::retry_on_deadlock`.
+- [x] ✅ **Background-task audit offload** (Iter 37) — `role_changed` and `user_deactivated` handlers ship the 202 response before writing the audit row. Audit writer opens its own DB session and swallows exceptions (background failures never affect the already-sent response). Located: `routers/erp360_sync.py::_audit_bg`.
+- [x] ✅ **Locust scenario scaffold** (Iter 37) — 3 concurrent user classes (WebhookUser, SsoUser, ReadHeavyUser) at `backend/loadtests/locustfile.py` + README with headless + web-UI invocations. Meaningful numbers require the deployed Postgres surface (SQLite in preview dominates measurement).
+- [ ] ⏳ **Actual 10× load-test run against the deployed environment** — establishes real p95/p99 numbers; either validates the four hardening items above are sufficient, or names the exact worker/pool sizes to configure. Deferred to post-deploy step 7.
+- [ ] ⏳ **Postgres connection pool tuning** — `pool_size`, `max_overflow`, `pool_pre_ping` on the production `DATABASE_URL`. Env-driven, no code changes. Set defaults after the load-test run gives us real numbers.
+- [ ] ⏳ **Sentry alert rules** — pool exhaustion, `429 Too Many Requests` spike, any 5xx on SSO or webhook routes.
+
 ### Payments (only if commercial launch)
 
 - [ ] ⏳ **Stripe integration** (native path, `billing_mode: "native_stripe"`) — currently learners can enroll in paid courses for free; no enforcement logic. Required only if we're charging for courses at launch.

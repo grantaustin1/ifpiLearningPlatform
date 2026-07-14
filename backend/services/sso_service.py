@@ -166,6 +166,13 @@ class SSOService:
         claim_org_slug = (claims.get("org_slug") or "").strip() or None
         org = self._resolve_org_for_sso(claim_org_slug)
 
+        # Iter 37 — Advisory lock on (org_id, sub) so concurrent SSO
+        # logins for the SAME user serialize outside the transaction.
+        # Removes the login-stampede deadlock risk during a launch or
+        # after a full-org secret rotation. No-op on SQLite.
+        from services.db_locks import advisory_lock
+        advisory_lock(self.db, org.id, erp_user_id or email)
+
         user: Optional[User] = None
         if erp_user_id:
             try:

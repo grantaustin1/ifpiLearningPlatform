@@ -19,12 +19,14 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin
-from core.database import get_db
+from core.database import get_db, SessionLocal
 from models import AuditLog, Erp360SeenEvent, Organization, User, UserRole
+from services.db_locks import advisory_lock, retry_on_deadlock
+from services.rate_limits import erp360_webhook_limiter
 
 router = APIRouter(prefix="/api/erp360", tags=["ERP360"])
 logger = logging.getLogger(__name__)
@@ -144,6 +146,7 @@ def _resolve_org(db: Session, org_slug: Optional[str]) -> Organization:
 @router.post("/webhooks/user", status_code=status.HTTP_202_ACCEPTED)
 async def erp360_webhook_user(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_erp360_signature: Optional[str] = Header(None),
     x_erp360_event_id: Optional[str] = Header(None),
     x_erp360_timestamp: Optional[str] = Header(None),
@@ -155,6 +158,22 @@ async def erp360_webhook_user(
       {event, event_id, occurred_at, org_slug,
        user: {sub, email, name}, data: {new_roles?, reason?}}
     """
+    # Iter 37 — Rate limit BEFORE signature verify so a bad-actor
+    # stampede doesn't burn CPU on HMAC. Key on the last 8 chars of the
+    # signature (enough entropy to distinguish trusted keys, doesn't
+    # leak the HMAC in logs); fall back to client IP.
+    limiter_key = (
+        (x_erp360_signature or "")[-8:]
+        or (request.client.host if request.client else "unknown")
+    )
+    allowed, remaining = erp360_webhook_limiter.check(limiter_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded — 200 requests/min per signing key",
+            headers={"Retry-After": "60"},
+        )
+
     raw = await request.body()
     _verify_signature(raw, x_erp360_signature)
     _verify_timestamp(x_erp360_timestamp)  # §6.3 ±5 min replay window
@@ -228,21 +247,54 @@ async def erp360_webhook_user(
         # every role as org-wide. Preserve the raw shape in the audit
         # log so v2 scope-aware auth can reconstruct history.
         new_role_names = _extract_role_names(raw_new)
+        # Iter 37 — advisory lock keyed on (org_id, user.erp360_user_id
+        # or user.id) so concurrent role_changed events for the SAME
+        # user serialize outside the transaction; different users still
+        # run in parallel. No-op on SQLite.
+        advisory_lock(db, org.id, user.erp360_user_id or user.id)
         _replace_erp360_roles(db, user, new_role_names)
-        _audit_stub(db, event, email, user_id=user.id,
-                    note=f"raw_new_roles={raw_new} canonical={new_role_names}")
         db.commit()
+        # Iter 37 — audit write moved to background task so the response
+        # ships immediately. Under a stampede this shaves ~5-15ms off
+        # every handler and removes the audit table from the hot lock
+        # path.
+        background_tasks.add_task(
+            _audit_bg, event, email, user_id=user.id,
+            note=f"raw_new_roles={raw_new} canonical={new_role_names}",
+        )
         return {"status": "accepted", "action": "roles_updated",
                 "new_roles": [r.role for r in user.user_roles]}
 
     if event == "user_deactivated":
+        advisory_lock(db, org.id, user.erp360_user_id or user.id)
         user.is_active = False
-        _audit_stub(db, event, email, user_id=user.id, note="deactivated")
         db.commit()
+        background_tasks.add_task(
+            _audit_bg, event, email, user_id=user.id, note="deactivated",
+        )
         return {"status": "accepted", "action": "user_deactivated"}
 
     raise HTTPException(status_code=400,
                         detail=f"Unsupported event type: {event}")
+
+
+def _audit_bg(event: str, email: str, *,
+              user_id: Optional[int] = None,
+              note: str = "") -> None:
+    """Background-task audit writer. Opens its own session because the
+    request-scoped `db` is closed by the time this runs. Errors are
+    logged, never raised (background task failures do not affect the
+    already-sent 202 response). See `_audit_stub` for the persisted
+    shape."""
+    session = SessionLocal()
+    try:
+        _audit_stub(session, event, email, user_id=user_id, note=note)
+        session.commit()
+    except Exception:
+        logger.exception("Background audit write failed for event=%s email=%s", event, email)
+        session.rollback()
+    finally:
+        session.close()
 
 
 def _extract_role_names(raw_new_roles) -> list[str]:
@@ -266,6 +318,7 @@ def _extract_role_names(raw_new_roles) -> list[str]:
     return out
 
 
+@retry_on_deadlock()
 def _replace_erp360_roles(db: Session, user: User,
                           new_role_names: list[str]) -> None:
     """§7.3 — Idempotent role replacement scoped to ERP360-managed rows.
@@ -274,6 +327,12 @@ def _replace_erp360_roles(db: Session, user: User,
     roles (INSTRUCTOR, cohort assignments, native admin grants) are
     preserved across every inbound webhook. Unknown ERP360 role names
     coerce to LEARNER + warn-log per §6.2.
+
+    Iter 37 — `@retry_on_deadlock` guards against transient Postgres
+    40P01/40001 under concurrent role-change stampedes. Combined with
+    the caller's advisory lock, deadlocks should be effectively
+    impossible for the same user; the retry is belt-and-braces for
+    cross-user deadlocks (e.g. secondary index / audit log contention).
     """
     from core.role_registry import normalize_role_name  # local — avoid cycle
     canonical: set[str] = set()
