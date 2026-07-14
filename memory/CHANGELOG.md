@@ -1,6 +1,45 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 P1 sweep — Admin UIs + Stripe payments (2026-02-13)
+
+Ships the three deferred P1 items in one pass. Testing-agent verified end-to-end (backend + frontend E2E, no bugs surfaced).
+
+### Admin: Per-org ERP360 integration UI
+
+- **Backend**: `GET/PATCH /api/admin/organizations/{id}/integrations/erp360` in `routers/admin_organizations.py`. Merge-update semantics: empty string clears, unspecified fields preserved, `billing_mode` whitelist ({erp360, native_stripe}). SUPER_ADMIN sees `/api/admin/organizations` list; regular admin scoped to own org. Every PATCH emits `ORG_ERP360_INTEGRATION_UPDATED` audit row + invalidates per-org feature-flags cache.
+- **Frontend**: `/integrations/erp360` route (admin-only). Toggles for `connected` + `sso_enabled`, inputs for `org_slug` + `billing_mode`, raw JSON debug view. Sidebar nav link "ERP360" (Link2 icon).
+- **9 tests** in `tests/test_iteration39_admin_org_integrations.py` (1 skipped — SUPER_ADMIN negative test).
+
+### Admin: Entitlements Inspector
+
+- **Backend**: `GET /api/admin/entitlements/user/{id}` (list) + `.../course/{id}` (single). Cross-tenant lookups return **410 GONE** (not 404) to prevent org-existence fingerprinting. `?include_free=true` widens the list. Per-course response includes `remediation` text for support-workflow use.
+- **Frontend**: `/entitlements` route (admin-only). User-id input, "Include free" toggle, sortable list with color-coded reason chips (Free/Comp/Subscription/No access). Sidebar nav link "Entitlements" (Search icon).
+- **7 tests** in `tests/test_iteration39_admin_entitlement_inspection.py`.
+
+### Stripe payments (test mode)
+
+- **Env**: `STRIPE_API_KEY=sk_test_emergent` (from pod).
+- **Model**: new `PaymentTransaction` (models/payments.py) — one row per checkout session with server-authoritative `amount_cents` (never trusted from client), `status`, `fulfilled_at`, `stripe_session_id` unique-indexed for idempotency.
+- **Backend router**: `routers/stripe_payments.py` with three endpoints:
+  - `POST /api/payments/v1/checkout/session` — creates Stripe hosted checkout, writes `PaymentTransaction` row (status='initiated') **before** returning the redirect URL.
+  - `GET /api/payments/v1/checkout/status/{sid}` — polls Stripe, fulfills entitlement (activates `Subscription`) on first `paid` observation. Scoped to the owning user.
+  - `POST /api/webhook/stripe` — Stripe webhook receiver. Signature verification via `emergentintegrations.payments.stripe.checkout.StripeCheckout.handle_webhook`. Idempotent with the poll path (whichever hits `paid` first fulfills; the other is a no-op).
+- **Frontend**: `CourseDetailPage` paid-course button now redirects to Stripe hosted checkout. New `BillingSuccessPage` at `/billing/success?session_id=X` polls 8× at 2s intervals, auto-enrolls once paid, then routes to the classroom.
+- **Entitlement seam usage**: Stripe success writes into the same `Subscription` model the `EntitlementService` reads. Enrollment code (`courses.py`) unchanged — proves the §7.1 abstraction landed correctly.
+- **7 tests** in `tests/test_iteration39_stripe_payments.py`.
+
+### Test totals
+
+- **Backend**: 47 new tests across 6 iter39 files (all pass, 1 skipped).
+- **Frontend E2E** (testing_agent_v3_fork iteration_35): all three admin flows + Stripe redirect + polling verified against preview URL.
+
+### Files added / modified
+
+- New: `models/payments.py`, `routers/admin_organizations.py`, `routers/admin_entitlements.py`, `routers/stripe_payments.py`, `services/entitlement_service.py`, `core/api_versioning.py`, 6 iter39 test files, `pages/dashboard/Erp360IntegrationsPage.tsx`, `pages/dashboard/EntitlementsInspectorPage.tsx`, `pages/billing/BillingSuccessPage.tsx`
+- Modified: `services/sso_service.py`, `routers/auth.py`, `routers/courses.py`, `server.py`, `routers/__init__.py`, `models/__init__.py`, `App.tsx`, `components/layout/DashboardLayout.tsx`, `pages/catalog/CourseDetailPage.tsx`, `backend/.env` (added `STRIPE_API_KEY`), docs (auto-regenerated)
+
+
 ## Iter 39 follow-up — Admin entitlement inspection (2026-02-13)
 
 Small support-tool endpoint riding the §7.1 entitlement seam:
