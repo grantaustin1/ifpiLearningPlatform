@@ -469,7 +469,7 @@ Core entities (see `backend/models/` for the full list):
 | File | Lines |
 |---|---|
 | `routers/admin_entitlements.py` | 185 |
-| `routers/admin_organizations.py` | 189 |
+| `routers/admin_organizations.py` | 202 |
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
@@ -487,7 +487,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/extras.py` | 545 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
-| `routers/invitations.py` | 195 |
+| `routers/invitations.py` | 206 |
 | `routers/iter5.py` | 337 |
 | `routers/iter8.py` | 305 |
 | `routers/learning_paths.py` | 285 |
@@ -505,8 +505,8 @@ Core entities (see `backend/models/` for the full list):
 | `routers/stripe_payments.py` | 303 |
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
-| `routers/webhooks.py` | 203 |
-| **Total** | **12698** |
+| `routers/webhooks.py` | 204 |
+| **Total** | **12723** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory

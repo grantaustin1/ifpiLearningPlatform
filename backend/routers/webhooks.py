@@ -23,6 +23,7 @@ KNOWN_EVENT_TYPES = [
     "course.completed",
     "certificate.issued",
     "cohort.milestone_reached",
+    "learner.invited",
     "user.provisioned",
 ]
 

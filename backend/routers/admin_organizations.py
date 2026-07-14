@@ -165,6 +165,19 @@ def patch_erp360_integration(
     current_integrations["erp360"] = current_erp360
     org.integrations = current_integrations
 
+    # §5.2 — auto-provision the ERP360 outbound webhook subscription
+    # so IFPI can dispatch `learner.invited` / `certificate.issued` /
+    # etc. to ERP360 as soon as an admin flips connected=true.
+    # Idempotent + starts in dry-run mode until ERP360 exposes their
+    # inbound URL (or IFPI_WEBHOOK_TARGET_URL env is set).
+    from services.erp360_webhook_dispatcher import (
+        ensure_erp360_subscription, deactivate_erp360_subscription,
+    )
+    if org.is_erp360_connected:
+        ensure_erp360_subscription(db, org)
+    else:
+        deactivate_erp360_subscription(db, org)
+
     audit_service.record(
         db, current, "ORG_ERP360_INTEGRATION_UPDATED",
         target_type="organization", target_id=str(org.id),
