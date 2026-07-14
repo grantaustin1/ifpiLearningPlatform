@@ -1,6 +1,54 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 · Outbound webhook dispatcher (dry-run) — no longer MOCKED (2026-02-13)
+
+The handoff previously marked IFPI → ERP360 outbound webhooks as MOCKED. Turns out `webhook_service.py` already had HMAC-signing, retry-with-backoff, and DEAD_LETTER handling — only wired to admin-managed generic subscriptions. This iteration lifts the "MOCKED" flag by auto-provisioning a canonical ERP360 subscription that starts in dry-run mode and goes live with a single URL flip.
+
+### Dry-run mode (dispatch without an endpoint)
+
+- New sentinel URL scheme: any `WebhookSubscription.target_url` starting with `dry-run://` short-circuits the HTTP POST. The signed payload is persisted in `WebhookDelivery` with `status='DELIVERED', status_code=204, error='dry-run: no HTTP request sent'` — full audit trail, zero external traffic.
+- Purpose: bootstrap the ERP360 direction before ERP360 exposes their inbound URL. The moment they do, ops flips `target_url` (via existing admin webhook endpoint) and future events go live; historical dry-run rows stay for verification.
+
+### Auto-provisioning
+
+- New `services/erp360_webhook_dispatcher.py::ensure_erp360_subscription(db, org)` — idempotent creator/updater of the canonical ERP360 subscription. Marked with `description='erp360-managed'` for uniqueness.
+- Event subscription list (whitelist, not `*`): `learner.invited`, `certificate.issued`, `course.completed`, `cohort.milestone_reached`.
+- Default target URL resolution: `ERP360_WEBHOOK_TARGET_URL` env > `ERP360_BASE_URL/api/ifpi/webhooks` > `dry-run://erp360`.
+- Signing secret: `IFPI_WEBHOOK_OUTBOUND_SECRET` env (with fallback + warning log).
+
+### Wired into admin PATCH
+
+- `PATCH /api/admin/organizations/{id}/integrations/erp360` with `connected=true` now auto-calls `ensure_erp360_subscription`. `connected=false` calls `deactivate_erp360_subscription` (preserves row for audit, sets `is_active=False`).
+
+### New emit sites
+
+- `POST /api/admin/invitations` now emits `learner.invited` via `emit_safely` (fails-open — invite still succeeds even if webhook plumbing breaks).
+- `certificate.issued` was already emitted at `routers/courses.py:575` (unchanged).
+
+### Tests
+
+- 6 new tests in `tests/test_iteration39_erp360_outbound_dispatcher.py` covering:
+  - Auto-provisioning creates + is idempotent
+  - Deactivate preserves the row
+  - Dry-run persists a DELIVERED delivery with valid HMAC signature and matching envelope
+  - Unrelated event types are NOT queued to the ERP360 subscription (whitelist works)
+  - Full HTTP round-trip: PATCH connected → invite learner → `learner.invited` delivery row exists
+
+**Total after this iter: 80 backend tests passing, 1 skipped, 0 failed.**
+
+### Files added / modified
+
+- New: `services/erp360_webhook_dispatcher.py`, `tests/test_iteration39_erp360_outbound_dispatcher.py`
+- Modified: `services/webhook_service.py` (dry-run URL scheme), `routers/admin_organizations.py` (auto-provision wire-up), `routers/invitations.py` (emit learner.invited), `routers/webhooks.py` (add learner.invited to KNOWN_EVENT_TYPES)
+
+### Cutover checklist for deploy day
+
+1. Set `IFPI_WEBHOOK_OUTBOUND_SECRET` (coordinated with ERP360)
+2. When ERP360 exposes their inbound URL: `curl -X PUT /api/admin/webhooks/{id} -d '{"target_url": "https://erp360.example.com/api/ifpi/webhooks"}'` (existing endpoint) OR set `ERP360_WEBHOOK_TARGET_URL` env + PATCH the org integration again
+3. Verify at `/webhooks` admin UI: recent deliveries should transition from `DELIVERED (status_code=204, dry-run)` → `DELIVERED (status_code=200)`
+
+
 ## Iter 39 P1 sweep — Admin UIs + Stripe payments (2026-02-13)
 
 Ships the three deferred P1 items in one pass. Testing-agent verified end-to-end (backend + frontend E2E, no bugs surfaced).

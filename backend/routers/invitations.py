@@ -68,6 +68,17 @@ def create_invitation(body: InvitationCreate, request: Request,
         email=body.email, name=body.name, role=body.role,
         app_base_url=base_url,
     )
+    # §5.2 — outbound event so ERP360 (and any other subscriber) can
+    # sync their identity graph on first-invite.
+    from services.webhook_service import emit_safely
+    emit_safely(db, current.organization_id, "learner.invited", {
+        "invitation_id": inv.id,
+        "email": inv.email,
+        "name": inv.name,
+        "role": inv.role,
+        "invited_by_user_id": inv.invited_by_id,
+        "expires_at": inv.expires_at.isoformat() if inv.expires_at else None,
+    })
     return InvitationOut(
         id=inv.id, email=inv.email, name=inv.name, role=inv.role,
         invited_by_id=inv.invited_by_id, accepted_at=inv.accepted_at,

@@ -61,7 +61,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Integration hardening (Iter 39): per-org SSO enablement retires global
   `SSO_ENABLED`; ERP360 claim-side `email_verified` required for
   native-account auto-linking; `EntitlementService` decouples enrollment
-  from payment-provider specifics (ready for Stripe drop-in).
+  from payment-provider specifics; Stripe test-mode wired end-to-end;
+  outbound webhook dispatcher IFPI → ERP360 operational in dry-run
+  (auto-provisions on org PATCH; flip URL to go live).
 - Storage: SQLite (dev + preview) at absolute path
   `sqlite:////app/backend/ifpi_lms.db`. Postgres migration deferred to P2.
 - Tests: 585+ pytest tests + 50+ Playwright E2E flows via
