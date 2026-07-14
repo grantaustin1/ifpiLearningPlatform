@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -30,6 +30,8 @@ const ADMIN_NAV = [
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
   { href: '/webhooks',      label: 'Webhooks',     icon: Webhook },
+  { href: '/integrations/erp360', label: 'ERP360',  icon: Link2 },
+  { href: '/entitlements',  label: 'Entitlements', icon: Search },
   { href: '/imports',       label: 'Content imports', icon: FolderInput },
   { href: '/research',      label: 'Deep research', icon: Sparkles },
   { href: '/tokens',        label: 'API tokens',   icon: KeyRound },

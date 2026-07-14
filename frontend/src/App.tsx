@@ -20,6 +20,7 @@ import UsersPage from 'pages/dashboard/UsersPage'
 import ReportsPage from 'pages/dashboard/ReportsPage'
 import LeaderboardPage from 'pages/dashboard/LeaderboardPage'
 import BillingPage from 'pages/dashboard/BillingPage'
+import BillingSuccessPage from 'pages/billing/BillingSuccessPage'
 import OutboxPage from 'pages/dashboard/OutboxPage'
 import OrganizationSettingsPage from 'pages/dashboard/OrganizationSettingsPage'
 import AcademiesPage from 'pages/dashboard/AcademiesPage'
@@ -47,6 +48,8 @@ import AffiliatePage from 'pages/dashboard/AffiliatePage'
 import LiveSessionsPage from 'pages/dashboard/LiveSessionsPage'
 import MarketplaceAnalyticsPage from 'pages/dashboard/MarketplaceAnalyticsPage'
 import PreferencesPage from 'pages/dashboard/PreferencesPage'
+import Erp360IntegrationsPage from 'pages/dashboard/Erp360IntegrationsPage'
+import EntitlementsInspectorPage from 'pages/dashboard/EntitlementsInspectorPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -117,6 +120,8 @@ export default function App() {
         <Route path="/live-sessions" element={<LiveSessionsPage />} />
         <Route path="/marketplace-analytics" element={<Protected adminOnly><MarketplaceAnalyticsPage /></Protected>} />
         <Route path="/preferences" element={<PreferencesPage />} />
+        <Route path="/integrations/erp360" element={<Protected adminOnly><Erp360IntegrationsPage /></Protected>} />
+        <Route path="/entitlements" element={<Protected adminOnly><EntitlementsInspectorPage /></Protected>} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
@@ -127,6 +132,7 @@ export default function App() {
 
       <Route path="/public" element={<PublicCatalogPage />} />
       <Route path="/verify" element={<PublicCatalogPage />} />
+      <Route path="/billing/success" element={<Protected><BillingSuccessPage /></Protected>} />
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
       <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />

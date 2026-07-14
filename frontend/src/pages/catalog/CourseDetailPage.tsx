@@ -54,7 +54,18 @@ export default function CourseDetailPage() {
     }
     try {
       if (data.price_cents > 0) {
-        await api.post('/billing/subscribe', { course_id: data.id })
+        // Iter 39: Stripe checkout for paid courses. Backend returns a
+        // hosted checkout URL; we redirect the browser to it. On
+        // return the /billing/success page polls status and enrolls.
+        const r = await api.post('/payments/v1/checkout/session', {
+          course_id: data.id,
+          origin_url: window.location.origin,
+        })
+        if (r.data?.url) {
+          window.location.href = r.data.url
+          return
+        }
+        throw new Error('Checkout URL missing from response')
       }
       await api.post(`/courses/${data.id}/enroll`)
       nav(`/learn/${data.id}`)

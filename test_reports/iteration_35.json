@@ -1,0 +1,41 @@
+{
+  "summary": "Iter 39 P1 full sweep — Backend: 37 PASS / 1 SKIP / 0 FAIL across the 5 new iter39 test files (admin org integrations, admin entitlement inspection, api v1 alias, entitlement service layer, stripe payments). All invariants verified: (a) ERP360 GET/PATCH round-trip with merge updates, empty-string clears, billing_mode validation (erp360/native_stripe accepted, 'stripe' 400s), learner 403; (b) admin entitlements listing with paid-only default, include_free widens, per-course endpoint returns remediation for entitled=False, cross-tenant lookup returns 410, learner 403, missing course 404; (c) Stripe checkout session creation returns real https://checkout.stripe.com/... URL + cs_test_ session_id, PaymentTransaction row persisted at status='initiated' with amount_cents pulled from Course.price_cents (not client), free course refuses with 400, unknown course 404, cross-user status lookup 404, status-before-payment shows entitled=false/payment_status=unpaid; (d) /api/v1/* alias mirrors every /api/* route with X-API-Version=v1 header (unversioned omits it), shares cache buckets, preserves query/body/path params, 404s on bogus paths; (e) entitlement service: free courses skip check, paid without entitlement raises 402, active Subscription grants access (reason='subscription'), same-org ADMIN/INSTRUCTOR gets comp access (reason='comp_role'), cross-tenant admin gets NO access (reason='none') — closes cross-tenant leak; POST /api/courses/{id}/enroll on paid course returns 402 with 'entitlement' in the detail message. Frontend E2E on preview URL as admin: ERP360 page /integrations/erp360 renders all 6 testids (connected/sso toggles, org_slug input, billing_mode select, save btn, raw json details); toggled sso_enabled false→true, saved, saw 'ERP360 integration updated' toast, reloaded and confirmed persistence (fresh GET returned sso_enabled=true), restored to false. Entitlements page /entitlements: entered user_id=2 (learner), 54 paid-only rows rendered; toggled 'Include free' → 65 rows; reason chips 'Free'/'Subscription'/'No access' correctly rendered per row. Learner E2E: logged in, opened paid course /catalog/285 (US$49), clicked cta-enroll ('Get access') → browser redirected to https://checkout.stripe.com/c/pay/cs_test_... showing the real hosted Sandbox checkout page for US$49.00; a PaymentTransaction row (id=17, status='initiated', amount_cents=4900, user_id=2, currency='usd') was written before the redirect. BillingSuccessPage polling: hit /billing/success?session_id=<real_unpaid_session>, watched all 8 polling attempts increment ('Attempt N of 8'), then final state = 'Waiting for confirmation' as spec'd. Admin.must_change_password restored to True after run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration39_admin_org_integrations.py",
+    "/app/backend/tests/test_iteration39_admin_entitlement_inspection.py",
+    "/app/backend/tests/test_iteration39_api_v1_alias.py",
+    "/app/backend/tests/test_iteration39_entitlement_layer.py",
+    "/app/backend/tests/test_iteration39_stripe_payments.py",
+    "/app/test_reports/pytest/iter39_all.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/admin_organizations.py — GET/PATCH scoped by dependency (ADMIN of the same org, or SUPER_ADMIN); merge-update semantics correctly implemented (empty string CLEARS via nullify, unspecified fields preserved). billing_mode whitelist ('erp360','native_stripe') returns 400 on unknown value with the field name in detail — good defense against client-side dropdown drift. Every PATCH emits ORG_ERP360_INTEGRATION_UPDATED audit row + invalidates feature-flags cache (verified via test).",
+    "routers/admin_entitlements.py — Cross-tenant lookup correctly returns 410 GONE (not 404) so the caller can't fingerprint whether the user exists in another org. include_free query param cleanly widens the SQL filter without a second endpoint. Per-course response includes 'remediation' human-string that references '/api/billing/subscribe' — matches the Entitlements Inspector chip UX.",
+    "routers/stripe_payments.py — Amount always taken from Course.price_cents (client 'origin_url' passthrough is only for success_url templating). PaymentTransaction row is committed BEFORE the Stripe URL is returned (proven by test_transaction_row_written_before_redirect). Status endpoint scoped to owning user (cross-user returns 404, verified). Free courses correctly 400 with 'free' in message.",
+    "services/entitlement_service.py — Three-source resolution (free / comp_role / subscription) with cross-tenant guard on comp_role; require_course_entitlement raises 402 (not 403) which is the correct semantic for 'payment required'. reason() vocabulary is enum-like ('subscription'|'comp_role'|'none'|'free') and matches both admin inspector chips and test assertions.",
+    "core/api_versioning.py — ApiV1AliasMiddleware rewrites /api/v1/* → /api/* and stamps X-API-Version=v1 on the way out. Cache buckets are shared (verified via checked_at equality on erp360/sync/status), which is the correct behaviour for identical semantics.",
+    "frontend/Erp360IntegrationsPage.tsx — onSuccess snapshot into local draft is a react-query v5 anti-pattern (onSuccess removed from useQuery in v5) — the current code uses `as any` cast to bypass TS. It works because the draft falls through to `data || null` in the render selector. Recommend migrating to a useEffect[data] draft-initialiser in a future iteration; not a blocker.",
+    "frontend/BillingSuccessPage.tsx — 8-attempt × 2s poll (16s wall clock) then 'Waiting for confirmation' is friendly UX; auto-enroll on paid state uses enrolledRef guard against re-renders and idempotent server-side POST; correctly handles missing session_id (error state)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (37/37 executed iter39 tests; 1 skipped by design — SUPER_ADMIN negative test skipped because preview admin has SUPER_ADMIN)",
+    "frontend": "100% (all 3 flows verified: ERP360 GET-PATCH-GET persistence + toast, Entitlements Inspector paid-vs-with-free widening, Stripe checkout redirect + PaymentTransaction row + BillingSuccessPage polling)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123 (must_change_password cleared for testing then restored to True); learner@ifpi.org / learner123",
+  "seed_data_creation": "Created 1 paid course during frontend E2E: Course id=285 'Stripe Frontend E2E 9951da' (price_cents=4900, currency=usd, PUBLISHED) plus PaymentTransaction id=17 (status='initiated', amount_cents=4900, product_id=285, user_id=2, session_id=cs_test_a1hTu7SFyRNi...). Backend test files also created several TEST-prefixed courses via _seed_paid_course/_make_paid_course helpers — these are throwaway per-test fixtures and left in DB (consistent with existing iter test patterns).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter 39 P1 ships GREEN. All 37 new backend tests pass under both /api/* and /api/v1/* prefixes. Frontend admin UI at /integrations/erp360 and /entitlements is production-ready with full data-testid coverage. Learner Stripe checkout redirect works end-to-end against the live Stripe test-mode API (screenshot in .screenshots/stripe redirect landed on real https://checkout.stripe.com/c/pay/cs_test_...). BillingSuccessPage 8-attempt polling correctly falls through to 'Waiting for confirmation' when the session hasn't been paid. Only follow-up worth flagging is a nit in Erp360IntegrationsPage.tsx: useQuery onSuccess is a react-query v5 removed API — currently patched with `as any` and the draft fallback path still works. Consider migrating to useEffect[data] pattern in a future iter for TS-clean code.",
+  "rca of the issue": "No issues found."
+}
