@@ -3,7 +3,9 @@
 > **Purpose:** the single sheet to run through when we're ready to pull the trigger. Every item here is either (a) blocking go-live, (b) a coordination step with the ERP360 team, or (c) a known compliance gap that should be closed before / soon after cutover.
 >
 > **Status legend:** ✅ done · ⏳ open / not yet started · 🔧 in progress · 🟨 waiting on external
-> **Last updated:** 2026-02-13 (Iter 39 P1 sweep complete: ERP360 admin UI, Entitlements Inspector, Stripe payments test-mode)
+> **Last updated:** 2026-02-13 (Iter 39 P1 sweep complete + Deploy Runbook ready)
+
+**Deploy readiness:** `/app/memory/DEPLOY_RUNBOOK.md` + `/app/backend/.env.production.example` shipped. All env-var checks in `deploy_precheck.py --strict` pass against a fully-populated sample; only real gate on deploy day is Neon connectivity. Storage service now supports `AWS_S3_ENDPOINT_URL` for Cloudflare R2.
 
 ---
 
