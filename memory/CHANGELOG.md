@@ -1,6 +1,71 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 38 — Phase A: Observability + N+1 Audit + Pagination (2026-02-12)
+
+Phase A of the 3-phase scalability refactor (per operator brief). Ships observability infrastructure that would have flagged the n+1 bombs long ago, uses it to find and fix the four worst offenders, and adds regression locks so they can't come back.
+
+### Observability infrastructure
+
+**Per-request query counter — `core/query_counter.py`** (new)
+- Instruments SQLAlchemy so every DB round-trip within a request scope increments a per-`correlation_id`-keyed counter.
+- Critical design note: contextvars DON'T work here (SQLAlchemy runs sync DB ops on anyio's threadpool; contextvar mutations don't propagate back to the async caller). We key on `correlation_id` instead, which is set by the middleware BEFORE the handler runs and copies cleanly into the threadpool.
+- Bounded memory (10k live requests cap, dropped on request completion).
+- Env-toggle `EXPOSE_QUERY_COUNT_HEADER=true` adds `X-Query-Count` response header for dev/staging.
+
+**Request summary log line — `core/middleware.py`**
+- One-line-per-request structured log: `[req] method=X path=Y status=N duration_ms=T queries=Q cid=...`
+- Greppable, Sentry-ready, exportable to Grafana/Loki/Datadog without transformation.
+- Warns at `[n+1?]` prefix when a single request exceeds `N_PLUS_ONE_THRESHOLD` (env, default 25) — real-time n+1 alarm.
+- Skips static assets and health probes to reduce log noise.
+
+### N+1 offenders found and fixed
+
+Real audit (login as admin → hit each hot endpoint → measure):
+
+| Endpoint | Before | After | Reduction | Fix |
+|---|---:|---:|---:|---|
+| `/api/admin/users` | **1542** | **7** | 99.5% ↓ | `selectinload(user_roles, enrollments, certificates)` + pagination via `?limit=&offset=` + `X-Total-Count` header |
+| `/api/gamification/leaderboard` | 103 | 5 | 95% ↓ | `selectinload(User.enrollments, User.badges)` |
+| `/api/live-sessions` (both routes) | 86 | 4 | 95% ↓ | `selectinload(LiveSession.rsvps)` on list + upcoming |
+| `/api/catalog` | 52 | 6 | 88% ↓ | `selectinload(Course.slides, Course.enrollments)` |
+
+Wall-clock times dropped proportionally: `/api/admin/users` went 239ms → 21ms.
+
+### Pagination gap fixes
+
+- `/api/admin/users` — added `?limit=&offset=` (default 200, max 500) + `X-Total-Count`/`X-Limit`/`X-Offset` headers (Github/Stripe convention). Response body stays as raw array for backwards-compat with existing `UsersPage.tsx` consumer.
+- `/api/admin/audit-digest` — was loading ALL audit rows for the last N days (would OOM under 10× traffic when audit hits 100k+ rows/month). Now uses SQL `COUNT(*) GROUP BY action` for the stats + a 300-row `.limit()` for the LLM sample. Constant memory regardless of tenant size.
+
+### Regression locks — `tests/test_iteration38_observability_and_n_plus_one.py`
+
+7 new tests:
+- 2× query counter smoke tests (proves cross-thread propagation works; proves we don't leak counts between requests).
+- 4× n+1 regression thresholds (fails the suite if any of the four fixed endpoints regresses to 3× its post-fix baseline).
+- 1× request summary log line format (locks the field names + order so log-parsing infra doesn't silently break).
+
+### Files touched
+- `backend/core/query_counter.py` (new)
+- `backend/core/middleware.py` — request summary + query count integration
+- `backend/core/database.py` — install query counter on engine
+- `backend/routers/misc.py` — n+1 fixes on `/admin/users`, `/gamification/leaderboard`, `/catalog`
+- `backend/routers/live_sessions.py` — n+1 fixes on `list_sessions` + `list_upcoming_for_learner`
+- `backend/routers/iter8.py` — audit-digest pagination via COUNT-then-sample
+- `backend/tests/test_iteration38_observability_and_n_plus_one.py` (new)
+
+### Remaining pagination gaps (deferred — lower churn)
+
+Not yet paginated but flagged in the audit — safe under current traffic, add limits when we hit real scale:
+- `/api/admin/affiliate/codes`, `/referrals`, `/earnings`
+- `/api/admin/terms`
+- `/api/subscriptions`
+- `/api/catalog/organizations`
+
+### Next up (Phase B)
+
+Progress decoupling via Postgres outbox pattern + atomic transaction hardening on multi-step enrollment/assessment flows + `@retry_on_deadlock` extended to all mutation endpoints.
+
+
 ## Iter 37 — Load-Readiness Hardening (2026-02-12)
 
 Ships items 1–4 of the 6-item load-readiness plan (option b). Items 5 (Postgres pool tuning) and 6 (actual 10× locust run) are deferred to the deployed environment since preview's SQLite dominates measurement.

@@ -145,15 +145,27 @@ async def audit_digest(
     when the LLM call fails so the page always renders something useful."""
     days = max(1, min(days, 90))
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    rows = db.query(AuditLog).filter(
-        AuditLog.organization_id == current.organization_id,
-        AuditLog.created_at >= since,
-    ).all()
-    by_action: dict[str, int] = {}
-    for r in rows:
-        by_action[r.action] = by_action.get(r.action, 0) + 1
+    # Iter 38 — was `.all()` unbounded: at 10× traffic the audit log
+    # can hit 100k+ rows/month. Load COUNTS via SQL aggregation (one
+    # row per distinct action) and a small sample (300 rows) for the
+    # LLM digest. Prevents OOM on large tenants.
+    from sqlalchemy import func as _func
+    action_counts = (db.query(AuditLog.action, _func.count(AuditLog.id))
+                     .filter(AuditLog.organization_id == current.organization_id,
+                             AuditLog.created_at >= since)
+                     .group_by(AuditLog.action)
+                     .all())
+    by_action: dict[str, int] = {a: n for a, n in action_counts}
+    total_rows = sum(by_action.values())
+    # Bounded sample for LLM context — the digest doesn't benefit from
+    # more than the most recent few hundred rows anyway.
+    rows = (db.query(AuditLog)
+            .filter(AuditLog.organization_id == current.organization_id,
+                    AuditLog.created_at >= since)
+            .order_by(AuditLog.created_at.desc())
+            .limit(300).all())
     deterministic = (
-        f"In the last {days} days: {len(rows)} admin action(s) recorded."
+        f"In the last {days} days: {total_rows} admin action(s) recorded."
         + ((" "
             + ", ".join(f"{k.replace('_', ' ').title()}: {v}"
                         for k, v in sorted(by_action.items(), key=lambda kv: -kv[1])[:6])

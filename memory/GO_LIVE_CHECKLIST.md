@@ -84,9 +84,18 @@
 - [x] ✅ **`@retry_on_deadlock()` decorator** (Iter 37) — wraps `_replace_erp360_roles`; catches Postgres `40P01`/`40001` and retries once with 50-200ms jitter. Non-retriable codes (e.g. `23505` unique violation) propagate immediately. Located: `services/db_locks.py::retry_on_deadlock`.
 - [x] ✅ **Background-task audit offload** (Iter 37) — `role_changed` and `user_deactivated` handlers ship the 202 response before writing the audit row. Audit writer opens its own DB session and swallows exceptions (background failures never affect the already-sent response). Located: `routers/erp360_sync.py::_audit_bg`.
 - [x] ✅ **Locust scenario scaffold** (Iter 37) — 3 concurrent user classes (WebhookUser, SsoUser, ReadHeavyUser) at `backend/loadtests/locustfile.py` + README with headless + web-UI invocations. Meaningful numbers require the deployed Postgres surface (SQLite in preview dominates measurement).
-- [ ] ⏳ **Actual 10× load-test run against the deployed environment** — establishes real p95/p99 numbers; either validates the four hardening items above are sufficient, or names the exact worker/pool sizes to configure. Deferred to post-deploy step 7.
-- [ ] ⏳ **Postgres connection pool tuning** — `pool_size`, `max_overflow`, `pool_pre_ping` on the production `DATABASE_URL`. Env-driven, no code changes. Set defaults after the load-test run gives us real numbers.
-- [ ] ⏳ **Sentry alert rules** — pool exhaustion, `429 Too Many Requests` spike, any 5xx on SSO or webhook routes.
+- [x] ✅ **Observability: per-request query counter + latency log line** (Iter 38 Phase A) — `[req] method=X path=Y status=N duration_ms=T queries=Q cid=...` on every request; real-time `[n+1?]` warning above `N_PLUS_ONE_THRESHOLD` (default 25). Sentry-ready format (drops into `SENTRY_DSN` when set, no code change).
+- [x] ✅ **N+1 audit + fixes on 4 hot endpoints** (Iter 38 Phase A) — `/api/admin/users` (1542→7), `/api/gamification/leaderboard` (103→5), `/api/live-sessions` (86→4), `/api/catalog` (52→6). Regression tests lock in the gains at 3× baseline.
+- [x] ✅ **Pagination on `/api/admin/users` + `/api/admin/audit-digest`** (Iter 38 Phase A) — audit-digest now uses SQL `COUNT` + 300-row sample (constant memory regardless of audit table size).
+- [ ] ⏳ **Progress decoupling via Postgres outbox** (Iter 38 Phase B — next) — retires synchronous progress-write path, learners get instant response.
+- [ ] ⏳ **Atomic-transaction audit on multi-step enrollment/assessment** (Iter 38 Phase B).
+- [ ] ⏳ **Extend `@retry_on_deadlock` to all mutation endpoints** (Iter 38 Phase B).
+- [ ] ⏳ **In-process TTL cache + graceful degrade on pool exhaustion** (Iter 38 Phase C).
+- [ ] ⏳ **Circuit breaker on certificate PDF generation** (Iter 38 Phase C).
+- [ ] ⏳ **Actual 10× load-test run against the deployed environment** — establishes real p95/p99 numbers.
+- [ ] ⏳ **Postgres connection pool tuning** — env-driven, no code changes; set defaults after load-test.
+- [ ] ⏳ **Sentry DSN + alert rules** — pool exhaustion, `429` spike, any 5xx on SSO or webhook routes. Code is already Sentry-ready; just needs the DSN.
+- [ ] ⏳ **Remaining pagination gaps** — `/api/admin/affiliate/*`, `/api/admin/terms`, `/api/subscriptions`, `/api/catalog/organizations`. Safe at current traffic, add limits when we hit scale.
 
 ### Payments (only if commercial launch)
 

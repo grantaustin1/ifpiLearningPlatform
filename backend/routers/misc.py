@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import desc, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
@@ -747,9 +747,13 @@ gam_router = APIRouter(prefix="/api/gamification", tags=["Gamification"])
 def leaderboard(cohort: Optional[str] = None,
                 db: Session = Depends(get_db),
                 current: CurrentUser = Depends(get_current_user)):
-    q = db.query(User).filter(
-        User.organization_id == current.organization_id, User.is_active.is_(True),
-    )
+    # Iter 38 — was 103 queries via lazy-load of `enrollments` and
+    # `badges` for each of 50 users. `selectinload` collapses to 3
+    # queries total.
+    q = (db.query(User)
+         .options(selectinload(User.enrollments), selectinload(User.badges))
+         .filter(User.organization_id == current.organization_id,
+                 User.is_active.is_(True)))
     if cohort:
         q = q.filter(User.cohort == cohort)
     rows = q.order_by(desc(User.points)).limit(50).all()
@@ -961,11 +965,32 @@ def analytics(db: Session = Depends(get_db),
 
 
 @admin_router.get("/users")
-def list_users(db: Session = Depends(get_db),
+def list_users(response: Response,
+               db: Session = Depends(get_db),
+               limit: int = 200,
+               offset: int = 0,
                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
-    rows = db.query(User).filter(
-        User.organization_id == current.organization_id,
-    ).order_by(User.created_at.desc()).all()
+    # Iter 38 — was 1542 queries via lazy-load of user_roles/enrollments/
+    # certificates for each user. `selectinload` collapses this to 4 SQL
+    # statements total (1 for users + 1 per relationship, regardless of
+    # user count). Added pagination via query params + response headers
+    # (Github/Stripe convention) so the list-shaped body stays
+    # backwards-compatible with existing frontend consumers.
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    q = (db.query(User)
+         .options(
+             selectinload(User.user_roles),
+             selectinload(User.enrollments),
+             selectinload(User.certificates),
+         )
+         .filter(User.organization_id == current.organization_id)
+         .order_by(User.created_at.desc()))
+    total = q.count()
+    rows = q.offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Limit"] = str(limit)
+    response.headers["X-Offset"] = str(offset)
     return [{
         "id": u.id, "email": u.email, "name": u.name,
         "roles": [ur.role for ur in u.user_roles],
@@ -1088,6 +1113,7 @@ def catalog(q: str | None = Query(None),
         courses = (
             query.outerjoin(enroll_sq, enroll_sq.c.course_id == Course.id)
                  .order_by(func.coalesce(enroll_sq.c.n, 0).desc(), Course.created_at.desc())
+                 .options(selectinload(Course.slides), selectinload(Course.enrollments))
                  .limit(6).all()
         )
     else:
@@ -1106,7 +1132,12 @@ def catalog(q: str | None = Query(None),
                                     Course.created_at.desc()))
         else:  # newest
             query = query.order_by(Course.created_at.desc())
-        courses = query.offset((page - 1) * page_size).limit(page_size).all()
+        # Iter 38 — was 52 queries (n+1 on `c.slides` and `c.enrollments`
+        # per course). `selectinload` collapses to 3 queries: the paged
+        # course rows + one for slides + one for enrollments.
+        courses = (query
+                   .options(selectinload(Course.slides), selectinload(Course.enrollments))
+                   .offset((page - 1) * page_size).limit(page_size).all())
     # Bulk-load orgs for the resulting courses
     org_ids = {c.organization_id for c in courses}
     orgs = {o.id: o for o in db.query(Organization).filter(Organization.id.in_(org_ids)).all()} if org_ids else {}
