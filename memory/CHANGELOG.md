@@ -1,6 +1,22 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 · Webhook Deliveries admin page (read-only) (2026-02-13)
+
+Small ops-visibility addition on top of the outbound dispatcher. Zero interactive complexity — read-only list, auto-refresh 15s, two filters.
+
+### Backend
+- New endpoint `GET /api/admin/webhooks/deliveries` in `routers/webhooks.py`. Cross-subscription within the caller's org. Query params: `status`, `event_type`, `limit` (1-200, default 50). Response joins `WebhookSubscription` so each row exposes `target_url`, `subscription_description`, and a computed `is_dry_run` flag.
+
+### Frontend
+- New page `/webhooks/deliveries` (admin-only). Simple table: Status icon (✅/⏳/⚠️/❌) + Event name+id + Target (dry-run chip or URL) + Attempts + HTTP response + Timestamp. Auto-refresh every 15s. Sidebar nav entry "Deliveries" (Send icon) under Webhooks.
+
+### Tests
+- `tests/test_iteration39_webhook_deliveries_endpoint.py` — 5 tests: admin can list, dry-run flag present, status filter, learner forbidden, v1 alias.
+
+**Total: 88 backend tests passing, 1 skipped.**
+
+
 ## Iter 39 · Outbound webhook dispatcher (dry-run) — no longer MOCKED (2026-02-13)
 
 The handoff previously marked IFPI → ERP360 outbound webhooks as MOCKED. Turns out `webhook_service.py` already had HMAC-signing, retry-with-backoff, and DEAD_LETTER handling — only wired to admin-managed generic subscriptions. This iteration lifts the "MOCKED" flag by auto-provisioning a canonical ERP360 subscription that starts in dry-run mode and goes live with a single URL flip.
