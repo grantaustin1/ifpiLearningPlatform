@@ -27,7 +27,7 @@ import bcrypt
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -38,8 +38,17 @@ from models import (
     FeatureFlag, KioskSettings, TermsAcceptance, TermsVersion, User,
 )
 from services import audit_service
+from services.cache import cached_view, degrade_on_db_error, cache_delete
 
 router = APIRouter(tags=["Terms & Kiosk"])
+
+
+def _feature_flags_cache_key(
+    response: Response = None, current: CurrentUser = None,
+    db: Session = None, **_: object,
+) -> str:
+    org_id = getattr(current, "organization_id", "anon")
+    return f"feature_flags:{org_id}"
 
 
 # ── T&Cs schemas ──────────────────────────────────────────────────────
@@ -283,7 +292,10 @@ KNOWN_FLAGS: dict[str, tuple[bool, str]] = {
 
 
 @router.get("/api/feature-flags")
-def get_feature_flags(current: CurrentUser = Depends(get_current_user),
+@cached_view(_feature_flags_cache_key, ttl_seconds=60.0)
+@degrade_on_db_error(_feature_flags_cache_key)
+def get_feature_flags(response: Response,
+                      current: CurrentUser = Depends(get_current_user),
                       db: Session = Depends(get_db)):
     rows = db.query(FeatureFlag).filter(
         FeatureFlag.organization_id == current.organization_id).all()
@@ -321,5 +333,7 @@ def set_feature_flag(flag_key: str, body: FeatureFlagIn, request: Request,
                          target_type="feature_flag", target_id=flag_key,
                          metadata={"enabled": body.enabled}, request=request)
     db.commit()
+    # Invalidate the per-org cache so the admin sees their change on next GET.
+    cache_delete(f"feature_flags:{current.organization_id}")
     return {"flag_key": flag_key, "enabled": body.enabled,
             "note": body.note}

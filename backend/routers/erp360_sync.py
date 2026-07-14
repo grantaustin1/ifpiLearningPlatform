@@ -19,7 +19,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin
@@ -27,6 +27,11 @@ from core.database import get_db, SessionLocal
 from models import AuditLog, Erp360SeenEvent, Organization, User, UserRole
 from services.db_locks import advisory_lock, retry_on_deadlock
 from services.rate_limits import erp360_webhook_limiter
+from services.cache import cached_view
+
+
+def _sync_status_cache_key(*_a: object, **_kw: object) -> str:
+    return "erp360_sync_status:v1"
 
 router = APIRouter(prefix="/api/erp360", tags=["ERP360"])
 logger = logging.getLogger(__name__)
@@ -379,9 +384,14 @@ def _audit_stub(db: Session, event: str, email: str, *,
 
 
 @router.get("/sync/status")
-def erp360_sync_status() -> dict:
+@cached_view(_sync_status_cache_key, ttl_seconds=15.0)
+def erp360_sync_status(response: Response) -> dict:
     """Public probe. Returns whether IFPI is ready to receive ERP360
-    inbound traffic. No auth so ERP360 can call this during boot."""
+    inbound traffic. No auth so ERP360 can call this during boot.
+
+    Cached 15s in-process to absorb high-frequency readiness probes
+    without recomputing env-var lookups + timestamps on every hit.
+    """
     secret_configured = bool(_shared_secret())
     sso_configured = bool(os.environ.get("ERP360_SSO_SHARED_SECRET"))
     return {
