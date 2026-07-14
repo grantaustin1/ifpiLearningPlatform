@@ -52,6 +52,14 @@ def get_correlation_id() -> Optional[str]:
     return _correlation_id_var.get()
 
 
+# Iter 38 — request-summary logger + n+1 threshold. Threshold is
+# generous (real n+1s bloat to hundreds of queries — 25 is a signal,
+# not a hard cap). Adjust via env `N_PLUS_ONE_THRESHOLD`.
+import os as _os_iter38
+_req_logger = logging.getLogger("ifpi.request")
+_N_PLUS_ONE_THRESHOLD = int(_os_iter38.environ.get("N_PLUS_ONE_THRESHOLD", "25"))
+
+
 # ─────────────────────────────────────────────────────────────────────
 # 1. Correlation-ID middleware
 # ─────────────────────────────────────────────────────────────────────
@@ -70,6 +78,14 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get(self.HEADER, "")
         cid = raw.strip()[:self.MAX_LEN] or uuid.uuid4().hex
         token = _correlation_id_var.set(cid)
+        # Iter 38 — Reset the per-request query counter at request start.
+        # Reads at request end feed the [req] log line + optional
+        # X-Query-Count response header for n+1 hunting.
+        try:
+            from core.query_counter import reset_query_count
+            reset_query_count()
+        except Exception:  # noqa: BLE001
+            pass
         # Iter 32b — Propagate correlation ID into Sentry's per-request
         # scope. sentry-sdk 2.x isolates scopes per FastAPI request via
         # FastApiIntegration, so `set_tag()` here attaches to any
@@ -86,11 +102,51 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
                 })
         except Exception:  # noqa: BLE001 - never let observability break the request
             pass
+        start = time.perf_counter()
         try:
             response = await call_next(request)
             response.headers[self.HEADER] = cid
+            # Iter 38 — dev/staging aid for n+1 hunting; production
+            # ships with EXPOSE_QUERY_COUNT_HEADER unset (default).
+            import os
+            if os.environ.get("EXPOSE_QUERY_COUNT_HEADER") == "true":
+                try:
+                    from core.query_counter import get_query_count
+                    response.headers["X-Query-Count"] = str(get_query_count())
+                except Exception:  # noqa: BLE001
+                    pass
+            # Iter 38 — structured request summary line. One line per
+            # request, greppable via `[req]` prefix, exportable to
+            # Grafana/Loki/Datadog without further transformation.
+            try:
+                from core.query_counter import get_query_count
+                elapsed_ms = int((time.perf_counter() - start) * 1000)
+                qcount = get_query_count()
+                path = request.url.path
+                # Skip noise: static assets, health probes, docs UI
+                if not (path.startswith("/static") or path in ("/health", "/docs", "/openapi.json", "/redoc")):
+                    _req_logger.info(
+                        "[req] method=%s path=%s status=%d duration_ms=%d queries=%d cid=%s",
+                        request.method, path, response.status_code,
+                        elapsed_ms, qcount, cid,
+                    )
+                    # Flag likely n+1 offenders in real time.
+                    if qcount >= _N_PLUS_ONE_THRESHOLD:
+                        _req_logger.warning(
+                            "[n+1?] path=%s method=%s queries=%d duration_ms=%d cid=%s "
+                            "— audit selectinload/joinedload",
+                            path, request.method, qcount, elapsed_ms, cid,
+                        )
+            except Exception:  # noqa: BLE001
+                pass
             return response
         finally:
+            # Iter 38 — release the query counter slot for this request
+            try:
+                from core.query_counter import drop_query_count
+                drop_query_count()
+            except Exception:  # noqa: BLE001
+                pass
             _correlation_id_var.reset(token)
 
 

@@ -23,7 +23,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
@@ -187,7 +187,12 @@ def list_sessions(
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
 ):
-    q = db.query(LiveSession).filter(LiveSession.organization_id == current.organization_id)
+    # Iter 38 — was 86 queries via `s.rsvps` lazy-load per session
+    # (twice — for rsvp_count and attendance_count). `selectinload`
+    # collapses to 2 queries total.
+    q = (db.query(LiveSession)
+         .options(selectinload(LiveSession.rsvps))
+         .filter(LiveSession.organization_id == current.organization_id))
     if upcoming:
         q = q.filter(LiveSession.start_at >= datetime.now(timezone.utc) - timedelta(minutes=30))
     if cohort:
@@ -205,11 +210,14 @@ def list_upcoming_for_learner(
     sessions with no cohort restriction)."""
     user = db.query(User).filter(User.id == current.id).first()
     now = datetime.now(timezone.utc)
-    q = db.query(LiveSession).filter(
-        LiveSession.organization_id == current.organization_id,
-        LiveSession.start_at >= now - timedelta(minutes=30),
-        LiveSession.cancelled_at.is_(None),  # Iter 24 — hide cancelled from learners
-    )
+    # Iter 38 — eager-load rsvps for the _serialize call
+    q = (db.query(LiveSession)
+         .options(selectinload(LiveSession.rsvps))
+         .filter(
+             LiveSession.organization_id == current.organization_id,
+             LiveSession.start_at >= now - timedelta(minutes=30),
+             LiveSession.cancelled_at.is_(None),  # Iter 24 — hide cancelled from learners
+         ))
     rows = q.order_by(LiveSession.start_at.asc()).all()
     # Filter cohort in Python (small N)
     visible = [
