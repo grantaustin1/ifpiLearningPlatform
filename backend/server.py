@@ -177,13 +177,25 @@ async def _api_token_call_logger(request, call_next):
 register_all(app)
 
 
+# ── Iter 39 · `/api/v1/*` versioned namespace alias ─────────────────
+# Added LAST so it wraps as the OUTERMOST middleware — path rewriting
+# happens before any routing/auth/logging so downstream layers see the
+# canonical `/api/...` path.
+from core.api_versioning import ApiV1AliasMiddleware
+app.add_middleware(ApiV1AliasMiddleware)
+
+
 @app.get("/api")
 def root():
     return {
         "name": "IFPI Learning Platform",
         "status": "ok",
         "environment": settings.environment,
-        "sso_enabled": settings.sso_enabled,
+        # Informational only. Per §7.4 the effective SSO enablement is
+        # decided per-org via `Organization.integrations.erp360.sso_enabled`;
+        # this field is retained as a preview-mode fallback indicator.
+        "sso_signing_secret_configured": bool(settings.erp360_sso_shared_secret),
+        "sso_enabled": settings.sso_enabled,  # legacy preview flag
         "billing_live_mode": settings.billing_live_mode,
     }
 

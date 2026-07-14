@@ -447,14 +447,10 @@ def enroll(course_id: int, db: Session = Depends(get_db),
             },
         )
     if c.price_cents > 0:
-        # Caller should hit /api/billing/subscribe instead
-        from models import Subscription, SubscriptionStatus
-        sub = db.query(Subscription).filter(
-            Subscription.user_id == current.id, Subscription.course_id == course_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        ).first()
-        if not sub:
-            raise HTTPException(status_code=402, detail="Subscription required for paid course")
+        # §7.1 — enrollment code must NOT branch on billing_mode.
+        # Delegate to the single-question entitlement service.
+        from services.entitlement_service import require_course_entitlement
+        require_course_entitlement(db, current.id, c)
     existing = db.query(Enrollment).filter(
         Enrollment.user_id == current.id, Enrollment.course_id == course_id,
     ).first()
