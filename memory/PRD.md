@@ -45,16 +45,22 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 7. **Documentation drift protection** — every new endpoint must appear in
    `IFPI_USER_MANUAL.md` after running `python backend/scripts/build_docs.py`.
 
-## Health snapshot (2026-02, post iter-31)
+## Health snapshot (2026-02, post iter-38)
 - Backend routes: 260+ endpoints (auto-indexed in the manual).
 - Frontend: React 19, 65+ pages/components.
 - Background workers: outbox drain, webhook retry, cohort celebrations,
   weekly digest, live-session reminders, nightly test-debris cleanup,
   streak-break nudge (Iter 27), scheduled reports, streak leaderboard
-  digest (Iter 30), **compliance auto-report (Iter 31, env-gated)**.
+  digest (Iter 30), compliance auto-report (Iter 31, env-gated),
+  **progress-outbox drain @ 2s (Iter 38 Phase B)**.
+- Scalability guards (Iter 38 A/B/C): per-request query-count middleware,
+  N+1 fixes on 4 hot endpoints, retry-on-deadlock on mutations,
+  in-process TTL cache (`X-Cache: HIT|MISS`) + graceful-degrade on
+  `/api/erp360/sync/status`, `/api/feature-flags`, `/api/public/catalog`,
+  circuit breaker on certificate PDF generation.
 - Storage: SQLite (dev + preview) at absolute path
   `sqlite:////app/backend/ifpi_lms.db`. Postgres migration deferred to P2.
-- Tests: 566+ pytest tests + 50+ Playwright E2E flows via
+- Tests: 570+ pytest tests + 50+ Playwright E2E flows via
   `testing_agent_v3_fork`.
 
 ## Related docs

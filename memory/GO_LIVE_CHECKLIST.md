@@ -3,7 +3,7 @@
 > **Purpose:** the single sheet to run through when we're ready to pull the trigger. Every item here is either (a) blocking go-live, (b) a coordination step with the ERP360 team, or (c) a known compliance gap that should be closed before / soon after cutover.
 >
 > **Status legend:** ✅ done · ⏳ open / not yet started · 🔧 in progress · 🟨 waiting on external
-> **Last updated:** 2026-02-12 (Iter 35)
+> **Last updated:** 2026-02-13 (Iter 38 Phase C follow-up: hot-read caching wired)
 
 ---
 
@@ -90,7 +90,7 @@
 - [x] ✅ **Progress decoupling via Postgres outbox** (Iter 38 Phase B) — new `progress_outbox` table + background worker polling `SELECT FOR UPDATE SKIP LOCKED` every 2s. `track_slide_view` enqueues instead of inserting synchronously; SlideView writes happen asynchronously. Idempotent via SlideView's unique constraint. Exponential backoff + MAX_ATTEMPTS on failed rows.
 - [x] ✅ **Atomic-transaction audit on multi-step enrollment/assessment** (Iter 38 Phase B) — audit performed, existing code already follows single-commit-boundary pattern for enrollment / complete_course / assessment submission. ERP360 webhook path uses background-task audit (stronger than atomic — never blocks response).
 - [x] ✅ **`@retry_on_deadlock` extended to mutation endpoints** (Iter 38 Phase B) — applied to `POST /api/courses/{id}/enroll` and `POST /api/courses/{id}/complete`. Regression tests lock in the `__wrapped__` attribute so a refactor can't silently drop it.
-- [x] ✅ **In-process TTL cache with graceful degrade** (Iter 38 Phase C) — `services/cache.py` with `@cached_view` decorator and `@degrade_on_db_error` decorator that serves stale value + `X-Served-Stale: true` header on `OperationalError`. Ready for wiring onto specific hot public reads (deferred to keep this iteration bounded).
+- [x] ✅ **In-process TTL cache with graceful degrade** (Iter 38 Phase C) — `services/cache.py` with `@cached_view` decorator and `@degrade_on_db_error` decorator that serves stale value + `X-Served-Stale: true` header on `OperationalError`. **Wired onto three hot public reads in Iter 38 Phase C follow-up: `/api/erp360/sync/status` (15s TTL), `/api/feature-flags` (60s TTL, per-org keyed, invalidated on admin toggle), and `/api/public/catalog` (30s TTL, per-org + query params).** `X-Cache: HIT/MISS` response header emitted for ops observability.
 - [x] ✅ **Circuit breaker on certificate PDF generation** (Iter 38 Phase C) — 3-state breaker (CLOSED/OPEN/HALF_OPEN) on `download_certificate_pdf`. After 5 consecutive failures, returns 503 + Retry-After: 30 instead of 500. Learning flow stays fully live.
 - [ ] ⏳ **Actual 10× load-test run against the deployed environment** — establishes real p95/p99 numbers.
 - [ ] ⏳ **Postgres connection pool tuning** — env-driven, no code changes; set defaults after load-test.

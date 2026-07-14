@@ -75,6 +75,12 @@ def cache_clear() -> None:
         _cache.clear()
 
 
+def cache_delete(key: str) -> None:
+    """Remove a single key from the cache (targeted invalidation)."""
+    with _cache_lock:
+        _cache.pop(key, None)
+
+
 def cached_view(key_fn: Callable[..., str], ttl_seconds: float = 30.0):
     """Decorator: cache the JSON-serializable return value of a GET
     handler under a key derived from its arguments.
@@ -82,19 +88,35 @@ def cached_view(key_fn: Callable[..., str], ttl_seconds: float = 30.0):
     `key_fn(*args, **kwargs) -> str` — must produce a stable, unique
     key. Only decorate SAFE endpoints (no user-scoped data unless the
     key includes the user id).
+
+    Emits an `X-Cache: HIT` (or `MISS`) response header when a
+    FastAPI `Response` is present in the handler kwargs — useful for
+    ops and integration testing to verify the cache is wired.
     """
     def _decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(fn)
         def _wrapped(*args, **kwargs):
             key = key_fn(*args, **kwargs)
             cached = cache_get(key)
+            response = _find_response(args, kwargs)
             if cached is not None:
+                if response is not None:
+                    response.headers["X-Cache"] = "HIT"
                 return cached
             result = fn(*args, **kwargs)
             cache_set(key, result, ttl_seconds)
+            if response is not None:
+                response.headers["X-Cache"] = "MISS"
             return result
         return _wrapped
     return _decorator
+
+
+def _find_response(args: tuple, kwargs: dict) -> Optional[Response]:
+    for arg in list(args) + list(kwargs.values()):
+        if isinstance(arg, Response):
+            return arg
+    return None
 
 
 def degrade_on_db_error(cache_key_fn: Callable[..., str]):

@@ -1,6 +1,33 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 38 Phase C follow-up — Hot-read caching wired (2026-02-13)
+
+Applies the Phase C `@cached_view` + `@degrade_on_db_error` decorators to three hot public reads that were called out in the original brief. Everything is process-local (no new infra); TTLs are conservative and per-org.
+
+### Endpoints now cached
+
+| Endpoint | TTL | Key scheme | Notes |
+|---|---|---|---|
+| `GET /api/erp360/sync/status` | 15s | global (`erp360_sync_status:v1`) | No DB reads, but public probe — cache absorbs ERP360 boot-loop probes. |
+| `GET /api/feature-flags` | 60s | per-org (`feature_flags:{org_id}`) | Invalidated immediately on `PUT /api/admin/feature-flags/{key}` via `cache_delete`. |
+| `GET /api/public/catalog` | 30s | per-org + query params (`public_catalog:{org_id}:{q}:{category}:{limit}`) | `q` and `category` are trimmed + lowercased so `Python` and `python` collide in the cache. |
+
+### Observability
+
+- `X-Cache: HIT|MISS` response header emitted whenever the handler receives a `Response` param (added to all three cached handlers). Trivially observable in curl / browser devtools / ingress logs. Complements the existing `X-Served-Stale: true` header from `@degrade_on_db_error`.
+- Added `cache_delete(key)` helper for targeted invalidation (used by the feature-flags admin toggle).
+
+### Tests
+
+New file `tests/test_iteration38_hot_read_caching.py`, 5 tests, all passing:
+- Second call to sync/status is `X-Cache: HIT` with identical `checked_at`.
+- Feature-flags second call is HIT; admin PUT invalidates → next GET is MISS with updated value.
+- Public catalog second call is HIT; distinct query strings produce independent cache buckets (both MISS on first hit).
+
+Existing Phase B+C suite (`test_iteration38_phase_bc_outbox_breaker_cache.py`) still green — 11/11.
+
+
 ## Iter 38 — Phases B + C: Outbox, Retry Sweep, Cache/Degrade, Circuit Breaker (2026-02-12)
 
 Closes out the operator brief's 5 remaining Phase B/C items in one session. Per operator's Redis-vs-Postgres decision, everything is Postgres-native — no new infrastructure dependency.
