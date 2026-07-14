@@ -468,6 +468,7 @@ Core entities (see `backend/models/` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
+| `routers/admin_entitlements.py` | 185 |
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
@@ -503,7 +504,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **12021** |
+| **Total** | **12206** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -611,6 +612,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
 | `/api/admin/email/send-test` | POST | Queue a test email and dispatch it synchronously so the admin |
 | `/api/admin/email/transport-status` | GET | Report which delivery transports are active for THIS org, in |
+| `/api/admin/entitlements/user/{user_id}` | GET | List every paid course in the caller's org + whether the target |
+| `/api/admin/entitlements/user/{user_id}/course/{course_id}` | GET | One user, one course — the "why can't they enroll?" answer. |
 | `/api/admin/feature-flags/{flag_key}` | PUT |  |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
@@ -848,7 +851,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **264** registered API endpoints._
+_Total: **266** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
