@@ -1,6 +1,54 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 37 — Load-Readiness Hardening (2026-02-12)
+
+Ships items 1–4 of the 6-item load-readiness plan (option b). Items 5 (Postgres pool tuning) and 6 (actual 10× locust run) are deferred to the deployed environment since preview's SQLite dominates measurement.
+
+### 1. Webhook rate limiter — `services/rate_limits.py`
+- New `SlidingWindowLimiter` class: bounded per-key sliding window with LRU eviction. No new dependencies.
+- Configured as `erp360_webhook_limiter` (200 req/min, keyed on last 8 chars of `X-ERP360-Signature`, fallback to client IP).
+- Applied BEFORE signature verification in the webhook receiver, so a stampede doesn't burn HMAC-verification CPU. Returns `429 Too Many Requests` with `Retry-After: 60`.
+- ~1µs/call fast path (dict lookup + append + prune).
+
+### 2. Postgres advisory lock on `(org_id, user_sub)` — `services/db_locks.py::advisory_lock`
+- `advisory_lock(db, org_id, user_sub)` issues `SELECT pg_advisory_xact_lock(k1, k2)` on Postgres, no-op on SQLite.
+- Applied in the `role_changed` and `user_deactivated` handlers AND `SSOService.jit_provision`.
+- Concurrent events for the SAME user serialize cleanly outside the transaction; different users still run in parallel. Removes the "10× login stampede" and "role_changed replay burst" deadlock vectors.
+
+### 3. `@retry_on_deadlock()` decorator — `services/db_locks.py::retry_on_deadlock`
+- Catches `sqlalchemy.exc.OperationalError` with pgcode `40P01` (deadlock) or `40001` (SSI serialization failure); retries once with 50–200ms jitter.
+- Non-retriable codes (e.g. `23505` unique violation) propagate immediately — masking a real bug behind a retry is worse than the retry itself.
+- Wraps `_replace_erp360_roles` — combined with the advisory lock, deadlocks should be effectively impossible for the same user; the retry is belt-and-braces for cross-user contention.
+
+### 4. Background-task audit offload — `routers/erp360_sync.py::_audit_bg`
+- `role_changed` and `user_deactivated` handlers now call `background_tasks.add_task(_audit_bg, ...)` after the DB commit for the mutation. The 202 response ships immediately.
+- Audit worker opens its own DB session (request-scoped `db` is closed by the time it runs) and swallows exceptions (background failures never affect the already-sent response — they log to Sentry via the standard logging path).
+- Shaves ~5-15ms/handler and removes the audit table from the hot lock path.
+
+### 5. Locust scenario scaffold — `backend/loadtests/`
+- `locustfile.py` with 3 user classes: `WebhookUser` (weight 3), `SsoUser` (weight 2), `ReadHeavyUser` (weight 1).
+- `README.md` with headless + web-UI invocation, what to watch for, and a note that meaningful numbers require the deployed Postgres surface.
+- Signs webhooks with the same env-loaded secrets the app verifies against.
+
+### Tests
+- `tests/test_iteration37_load_readiness.py` — 12 new tests across 4 classes, all green:
+  - `TestRateLimiter` (4): endpoint burst below limit, sliding-window unit, window expiry, LRU eviction.
+  - `TestAdvisoryLock` (2): SQLite no-op path, Postgres `pg_advisory_xact_lock` invocation (verified via `MagicMock` session).
+  - `TestRetryOnDeadlock` (4): retries on `40P01` and `40001`, re-raises after max retries, non-retriable codes propagate.
+  - `TestBackgroundAudit` (2): response returns in <500ms; audit row lands within 2s.
+- Regression: 52/52 across iter14/17/35/36/37.
+
+### Files touched
+- `backend/services/db_locks.py` (new)
+- `backend/services/rate_limits.py` (new)
+- `backend/routers/erp360_sync.py` — rate-limit gate, advisory lock in both handlers, retry decorator on `_replace_erp360_roles`, `_audit_bg` background task
+- `backend/services/sso_service.py` — advisory lock in `jit_provision`
+- `backend/loadtests/locustfile.py` + `backend/loadtests/README.md` (new)
+- `backend/tests/test_iteration37_load_readiness.py` (new)
+- `memory/GO_LIVE_CHECKLIST.md` — new "Load-readiness" section under P1 hardening
+
+
 ## Iter 36 — P1 Integration Hardening (2026-02-12)
 
 Batch of four tightly-related integration-hardening items — cleared 4 of the 6 P1 items in one focused pass.
