@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import ADMIN_ROLES, INSTRUCTOR_ROLES
+from services.db_locks import retry_on_deadlock
 from models import (
     Course, CourseSlide, CourseStatus, Enrollment, EnrollmentStatus,
     SlideType,
@@ -422,6 +423,7 @@ def delete_slide(course_id: int, slide_id: int, db: Session = Depends(get_db),
 
 # ── Enrollment & completion ────────────────────────────────────────
 @router.post("/{course_id}/enroll")
+@retry_on_deadlock()
 def enroll(course_id: int, db: Session = Depends(get_db),
            current: CurrentUser = Depends(get_current_user)):
     from services.gamification_service import (
@@ -471,6 +473,7 @@ def enroll(course_id: int, db: Session = Depends(get_db),
 
 
 @router.post("/{course_id}/complete")
+@retry_on_deadlock()
 def complete_course(course_id: int, request: Request, db: Session = Depends(get_db),
                     current: CurrentUser = Depends(get_current_user)):
     from datetime import datetime, timezone
