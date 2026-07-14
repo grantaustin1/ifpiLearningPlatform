@@ -157,6 +157,11 @@ def register_all(app: FastAPI) -> None:
     from routers import live_sessions
     app.include_router(live_sessions.router)
 
+    # ── Iter 39: Admin entitlement inspection (support-tool for
+    #     "why can/can't user X access course Y?") ──────────────────
+    from routers import admin_entitlements
+    app.include_router(admin_entitlements.router)
+
     # ── Iter 24: Marketplace funnel analytics ────────────────────────
     from routers import marketplace_analytics
     app.include_router(marketplace_analytics.public_router)

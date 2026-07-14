@@ -1,6 +1,18 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 follow-up — Admin entitlement inspection (2026-02-13)
+
+Small support-tool endpoint riding the §7.1 entitlement seam:
+
+- `GET /api/admin/entitlements/user/{user_id}` — lists every paid course in the caller's org + whether the target user can access it and why. Optional `?include_free=true` widens to all courses.
+- `GET /api/admin/entitlements/user/{user_id}/course/{course_id}` — single-course explanation with `remediation` text for the "why can't this user enroll?" flow.
+
+Admin/Super-admin only. Cross-tenant lookups return 410 (not 404) so support agents can tell "user in wrong org" apart from "endpoint gone". Both endpoints work identically under `/api/v1/*`.
+
+**7 new tests** in `tests/test_iteration39_admin_entitlement_inspection.py` — all passing.
+
+
 ## Iter 39 — §7 P1 sweep: per-org SSO, verified-link tightening, /api/v1/ alias, entitlement layer (2026-02-13)
 
 Closes the §7.1, §7.2, §7.4 and API-versioning line items from `IFPI_INTEGRATION_HANDOFF.md`. Sets the seam Stripe (P1 future) plugs into with zero enrollment-code changes.
