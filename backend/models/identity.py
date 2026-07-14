@@ -331,3 +331,38 @@ class Erp360SeenEvent(Base):
     __table_args__ = (Index("ix_erp360_seen_events_at", "received_at"),)
     event_id = Column(String(120), primary_key=True)
     received_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
+class ProgressOutbox(Base):
+    """Iter 38 Phase B — Postgres outbox for decoupled progress writes.
+
+    Under 10× traffic, learners clicking through slides generate a
+    firehose of `SlideView` inserts. Doing them synchronously ties up
+    web workers on lock contention (unique constraint on (slide, user,
+    day) can serialize). The outbox splits this into two paths:
+
+      1. **Enqueue (fast)**: web worker inserts one small row here,
+         returns 202 to the learner immediately.
+      2. **Process (background)**: a worker polls `pending` rows with
+         `SELECT ... FOR UPDATE SKIP LOCKED LIMIT N` (Postgres 9.5+),
+         performs the actual `SlideView` insert, marks the row `done`.
+
+    Uses a Postgres-friendly locking pattern that also works on SQLite
+    (falls back to unlocked SELECT — safe on single-writer). Retries
+    failed rows up to `max_attempts` (default 5) with exponential
+    backoff via `next_attempt_at`.
+    """
+    __tablename__ = "progress_outbox"
+    __table_args__ = (
+        Index("ix_progress_outbox_pending", "status", "next_attempt_at"),
+    )
+    id = Column(Integer, primary_key=True)
+    event_type = Column(String(50), nullable=False)  # 'slide_view' | 'lesson_complete' | ...
+    payload_json = Column(JSON, nullable=False)
+    status = Column(String(20), nullable=False, default="pending",
+                    server_default="pending")  # pending | processing | done | failed
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    next_attempt_at = Column(DateTime, default=_utcnow, nullable=False)
+    processed_at = Column(DateTime, nullable=True)

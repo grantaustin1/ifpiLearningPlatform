@@ -690,21 +690,38 @@ def download_certificate_pdf(
         title = c.course.title if c.course else "IFPI Course"
         cert_type = "Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title()
 
-    pdf = render_certificate(
-        recipient_name=c.user.name or c.user.email,
-        course_title=title,
-        certificate_code=c.code,
-        issued_at=c.issued_at,
-        verify_url=verify_url,
-        score=c.score,
-        cert_type=cert_type,
-        organisation_name=org.name if org else "IFPI Learning",
-        organisation_logo_url=org.logo_url if org else None,
-        accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
-        signature_text=org.cert_signature_text if org else None,
-        signature_image_url=org.cert_signature_image_url if org else None,
-        footer_text=org.cert_footer_text if org else None,
-    )
+    # Iter 38 Phase C — wrap PDF render in a circuit breaker. If the
+    # renderer wedges (memory pressure, font stall, playwright crash),
+    # after 5 consecutive failures we OPEN the breaker for 30s and
+    # return `503 Service Unavailable + Retry-After` to the learner
+    # instead of a hard 500. Learning flow (enrollment, progress,
+    # quizzes) stays live regardless.
+    from services.circuit_breaker import cert_generation_breaker, CircuitBreakerOpen
+    breaker = cert_generation_breaker()
+    try:
+        pdf = breaker.call(
+            render_certificate,
+            recipient_name=c.user.name or c.user.email,
+            course_title=title,
+            certificate_code=c.code,
+            issued_at=c.issued_at,
+            verify_url=verify_url,
+            score=c.score,
+            cert_type=cert_type,
+            organisation_name=org.name if org else "IFPI Learning",
+            organisation_logo_url=org.logo_url if org else None,
+            accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
+            signature_text=org.cert_signature_text if org else None,
+            signature_image_url=org.cert_signature_image_url if org else None,
+            footer_text=org.cert_footer_text if org else None,
+        )
+    except CircuitBreakerOpen:
+        raise HTTPException(
+            status_code=503,
+            detail="Certificate PDF renderer is temporarily unavailable. "
+                   "Your certificate is safe — please try again in 30 seconds.",
+            headers={"Retry-After": "30"},
+        )
     filename = f"IFPI-Certificate-{c.code}.pdf"
     return Response(
         content=pdf, media_type="application/pdf",
