@@ -469,6 +469,7 @@ Core entities (see `backend/models/` for the full list):
 | File | Lines |
 |---|---|
 | `routers/admin_entitlements.py` | 185 |
+| `routers/admin_organizations.py` | 189 |
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
@@ -501,10 +502,11 @@ Core entities (see `backend/models/` for the full list):
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 512 |
 | `routers/seo.py` | 257 |
+| `routers/stripe_payments.py` | 303 |
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **12206** |
+| **Total** | **12698** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -551,6 +553,7 @@ Core entities (see `backend/models/` for the full list):
 | `Organization` | `organizations` |
 | `OutboxMessage` | `outbox_messages` |
 | `PasswordResetToken` | `password_reset_tokens` |
+| `PaymentTransaction` | `payment_transactions` |
 | `Person` | `persons` |
 | `ProgressOutbox` | `progress_outbox` |
 | `RefreshToken` | `refresh_tokens` |
@@ -572,7 +575,7 @@ Core entities (see `backend/models/` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **59** ORM models._
+_Total: **60** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -629,6 +632,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/marketplace-funnel` | GET | Iter 25 — Cross-course marketplace funnel roll-up for the current |
 | `/api/admin/marketplace-funnel/{course_id}` | GET |  |
 | `/api/admin/onboarding/checklist` | GET |  |
+| `/api/admin/organizations` | GET | List every org in the deployment (super-admin only — regular |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | GET |  |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | PATCH | Merge-update the org's ERP360 integration config. Only the |
 | `/api/admin/outbox` | GET |  |
 | `/api/admin/outbox/stats` | GET |  |
 | `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
@@ -824,6 +830,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/organization/smtp` | PUT |  |
 | `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
 | `/api/organization/themes` | GET | Read-only list of curated theme presets an ADMIN can apply in one click. |
+| `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
+| `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
 | `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
 | `/api/public/catalog` | GET | List PUBLISHED courses in the caller's org. Read-only, no PII. |
 | `/api/public/certificates/verify/{code}` | GET | Anonymous verification. Rate-limited to 30/min per IP (Redis |
@@ -848,10 +856,11 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
 | `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
+| `/api/webhook/stripe` | POST | Stripe webhook receiver. Idempotent — the poll path and the |
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **266** registered API endpoints._
+_Total: **272** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

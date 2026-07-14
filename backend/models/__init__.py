@@ -95,6 +95,9 @@ from .billing import (
     BillingEvent,
     Subscription,
 )
+from .payments import (
+    PaymentTransaction,
+)
 from .ai import (
     AIJob,
     AITutorMessage,
@@ -138,6 +141,7 @@ __all__ = [
     "ApiToken", "ApiTokenCall", "WebhookDelivery", "WebhookSubscription",
     # billing
     "AffiliateCode", "AffiliateReferral", "BillingEvent", "Subscription",
+    "PaymentTransaction",
     # ai
     "AIJob", "AITutorMessage", "AITutorSession", "AIUsageLedger",
     "Flashcard", "FlashcardReview", "SourceChunk", "SourceDocument",

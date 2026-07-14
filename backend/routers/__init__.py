@@ -162,6 +162,15 @@ def register_all(app: FastAPI) -> None:
     from routers import admin_entitlements
     app.include_router(admin_entitlements.router)
 
+    # ── Iter 39: Admin per-org ERP360 integration configuration ────
+    from routers import admin_organizations
+    app.include_router(admin_organizations.router)
+
+    # ── Iter 39: Stripe payments (checkout session + webhook) ──────
+    from routers import stripe_payments
+    app.include_router(stripe_payments.router)
+    app.include_router(stripe_payments.webhook_router)
+
     # ── Iter 24: Marketplace funnel analytics ────────────────────────
     from routers import marketplace_analytics
     app.include_router(marketplace_analytics.public_router)
