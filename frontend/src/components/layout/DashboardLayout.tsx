@@ -30,6 +30,7 @@ const ADMIN_NAV = [
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
   { href: '/webhooks',      label: 'Webhooks',     icon: Webhook },
+  { href: '/webhooks/deliveries', label: 'Deliveries', icon: Send },
   { href: '/integrations/erp360', label: 'ERP360',  icon: Link2 },
   { href: '/entitlements',  label: 'Entitlements', icon: Search },
   { href: '/imports',       label: 'Content imports', icon: FolderInput },

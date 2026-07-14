@@ -505,8 +505,8 @@ Core entities (see `backend/models/` for the full list):
 | `routers/stripe_payments.py` | 303 |
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
-| `routers/webhooks.py` | 204 |
-| **Total** | **12723** |
+| `routers/webhooks.py` | 253 |
+| **Total** | **12772** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -655,6 +655,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/users/{user_id}/2fa/disable` | POST |  |
 | `/api/admin/webhooks` | GET |  |
 | `/api/admin/webhooks` | POST |  |
+| `/api/admin/webhooks/deliveries` | GET | Recent WebhookDelivery rows across ALL subscriptions in the |
 | `/api/admin/webhooks/{sub_id}` | DELETE |  |
 | `/api/admin/webhooks/{sub_id}` | PUT |  |
 | `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
@@ -860,7 +861,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **272** registered API endpoints._
+_Total: **273** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

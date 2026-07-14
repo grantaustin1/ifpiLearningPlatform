@@ -50,6 +50,7 @@ import MarketplaceAnalyticsPage from 'pages/dashboard/MarketplaceAnalyticsPage'
 import PreferencesPage from 'pages/dashboard/PreferencesPage'
 import Erp360IntegrationsPage from 'pages/dashboard/Erp360IntegrationsPage'
 import EntitlementsInspectorPage from 'pages/dashboard/EntitlementsInspectorPage'
+import WebhookDeliveriesPage from 'pages/dashboard/WebhookDeliveriesPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
 
@@ -122,6 +123,7 @@ export default function App() {
         <Route path="/preferences" element={<PreferencesPage />} />
         <Route path="/integrations/erp360" element={<Protected adminOnly><Erp360IntegrationsPage /></Protected>} />
         <Route path="/entitlements" element={<Protected adminOnly><EntitlementsInspectorPage /></Protected>} />
+        <Route path="/webhooks/deliveries" element={<Protected adminOnly><WebhookDeliveriesPage /></Protected>} />
         <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
         <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
         <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
