@@ -1,6 +1,49 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 — §7 P1 sweep: per-org SSO, verified-link tightening, /api/v1/ alias, entitlement layer (2026-02-13)
+
+Closes the §7.1, §7.2, §7.4 and API-versioning line items from `IFPI_INTEGRATION_HANDOFF.md`. Sets the seam Stripe (P1 future) plugs into with zero enrollment-code changes.
+
+### §7.4 — Per-org SSO enablement (retire global `SSO_ENABLED`)
+
+- `SSOService.jit_provision` now checks `Organization.integrations.erp360.sso_enabled=true` FIRST. Legacy `SSO_ENABLED=true` env is a migration-window fallback (logs a warning when it kicks in).
+- `SSOService.is_enabled()` reduced to "signature verification is configurable" (checks `ERP360_SSO_SHARED_SECRET` only) — per-org enforcement lives in `jit_provision` after `org_slug` resolves.
+- `GET /api/auth/sso-status` now reports `enabled=true` if ANY org has SSO turned on, or (legacy) if `SSO_ENABLED=true`.
+- `/api` root endpoint exposes `sso_signing_secret_configured` alongside legacy `sso_enabled`.
+
+### §7.2 — Verified-email link tightening (defense-in-depth)
+
+- Auto-link on first SSO now requires BOTH:
+  - native `email_verified_at IS NOT NULL` (unchanged from Iter 36), AND
+  - ERP360 claim asserts `email_verified: true` (new).
+- Either side unverified or claim omits the field → 409 with a specific error message pointing ops at the resolution path.
+
+### `/api/v1/` versioned namespace alias
+
+- New `core/api_versioning.py::ApiV1AliasMiddleware`. ASGI-level path rewriter — `/api/v1/foo` → `/api/foo` transparently at the entry gate, no router duplication.
+- Adds `X-API-Version: v1` response header on the versioned surface for ops visibility.
+- Zero touch on the 30+ router files. Fully reversible (remove one `add_middleware` call).
+
+### §7.1 — Entitlement abstraction layer
+
+- New `services/entitlement_service.py::EntitlementService` with two methods:
+  - `has_course_entitlement(user_id, course_id) -> bool` (hot path)
+  - `reason(user_id, course_id) -> "comp_role" | "subscription" | "none"` (diagnostic)
+- `require_course_entitlement(db, user_id, course)` sugar: no-op for free courses, raises 402 with a payment-provider-agnostic message on paid courses without access.
+- `POST /api/courses/{id}/enroll` no longer imports `Subscription` inline — delegates to the entitlement seam. When Stripe (P1 future) lands, the Stripe webhook writes an entitlement source and enrollment code doesn't change.
+- Sources considered today: active `Subscription`, comp-role (ADMIN/SUPER_ADMIN/INSTRUCTOR in the course's org).
+
+### Tests
+
+3 new files, all passing:
+- `tests/test_iteration39_per_org_sso_and_verified_link.py` — 7 tests (§7.4 gate + §7.2 tightening)
+- `tests/test_iteration39_api_v1_alias.py` — 8 tests (path rewrite invariants)
+- `tests/test_iteration39_entitlement_layer.py` — 6 tests (unit + e2e enrollment gate + cross-tenant guard)
+
+**Full Iter 38+39 suite: 51/51 passing.**
+
+
 ## Iter 38 Phase C follow-up — Hot-read caching wired (2026-02-13)
 
 Applies the Phase C `@cached_view` + `@degrade_on_db_error` decorators to three hot public reads that were called out in the original brief. Everything is process-local (no new infra); TTLs are conservative and per-org.

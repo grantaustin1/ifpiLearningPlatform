@@ -156,11 +156,16 @@ def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(g
 
 # ── SSO bridge (stubbed until ERP360 is wired) ───────────────────────
 @router.get("/sso-status")
-def sso_status():
+def sso_status(db: Session = Depends(get_db)):
     """Public endpoint — the login page calls this on mount to decide whether
     to render the "Continue with ERP360" button. Returns the redirect URL
-    where ERP360 will mint the token and bounce back to IFPI."""
-    enabled = settings.sso_enabled and bool(settings.erp360_sso_shared_secret)
+    where ERP360 will mint the token and bounce back to IFPI.
+
+    §7.4 — Enablement is now per-org: we report `enabled=true` if
+    ANY organization has `integrations.erp360.sso_enabled=true`, or
+    (preview fallback) if the legacy `SSO_ENABLED` env is set."""
+    sso = SSOService(db)
+    enabled = sso.any_org_has_sso_enabled() and bool(settings.erp360_sso_shared_secret)
     initiate_url = None
     if enabled and settings.erp360_base_url:
         # ERP360 hands off to IFPI by redirecting back to /sso/return?erp_token=...
@@ -197,7 +202,12 @@ async def sso_exchange(request: Request, response: Response,
     if not sso.is_enabled():
         raise HTTPException(
             status_code=503,
-            detail="SSO is not enabled. Set SSO_ENABLED=true and ERP360_SSO_SHARED_SECRET to activate.",
+            detail=(
+                "SSO signature verification is not configured. Set "
+                "ERP360_SSO_SHARED_SECRET in the environment. Per-org "
+                "enablement is controlled via "
+                "`Organization.integrations.erp360.sso_enabled`."
+            ),
         )
 
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()

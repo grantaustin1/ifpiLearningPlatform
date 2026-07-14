@@ -86,7 +86,34 @@ class SSOService:
         self.db = db
 
     def is_enabled(self) -> bool:
-        return settings.sso_enabled and bool(settings.erp360_sso_shared_secret)
+        """Global signature-verification prerequisite. SSO is signature-
+        verifiable if a shared secret is configured. Per-org enablement
+        is enforced separately in `jit_provision` after we resolve the
+        target org from the token's `org_slug` claim (§7.4).
+
+        NOTE: `settings.sso_enabled` (the global `SSO_ENABLED` env flag)
+        is retained ONLY for the sso-status public probe fallback in
+        single-tenant preview setups. Per §7.4 it is NO LONGER checked
+        on the exchange path — the per-org `erp360_sso_enabled` flag on
+        `Organization.integrations.erp360` is the source of truth once
+        we know which org the claim targets.
+        """
+        return bool(settings.erp360_sso_shared_secret)
+
+    def any_org_has_sso_enabled(self) -> bool:
+        """True if ANY organization in this deployment has ERP360 SSO
+        enabled — powers the public `/sso-status` probe on the login
+        page. Falls back to the legacy global `SSO_ENABLED` flag for
+        preview environments that haven't populated per-org settings
+        yet."""
+        # Per-org signal takes precedence — if operators have set at least
+        # one org's `integrations.erp360.sso_enabled=true`, that's the
+        # authoritative "SSO is live somewhere in this deployment" flag.
+        for candidate in self.db.query(Organization).all():
+            if candidate.erp360_sso_enabled:
+                return True
+        # Preview / single-tenant fallback: honor the legacy env flag.
+        return bool(settings.sso_enabled)
 
     def _resolve_org_for_sso(self, claim_org_slug: Optional[str]) -> Organization:
         """§7.4 — resolve the target organization from the SSO claim's
@@ -166,6 +193,32 @@ class SSOService:
         claim_org_slug = (claims.get("org_slug") or "").strip() or None
         org = self._resolve_org_for_sso(claim_org_slug)
 
+        # §7.4 — per-org enablement gate. Prefer the per-org
+        # `integrations.erp360.sso_enabled=true` opt-in. During the
+        # migration window we fall back to the legacy global
+        # `SSO_ENABLED=true` env flag so preview + existing deployments
+        # keep working. Once every prod org has an explicit per-org
+        # setting, `SSO_ENABLED` can be dropped from the environment.
+        per_org_enabled = org.erp360_sso_enabled
+        legacy_env_enabled = bool(settings.sso_enabled)
+        if not per_org_enabled and not legacy_env_enabled:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"SSO is not enabled for organization {org.slug!r}. "
+                    f"An admin must set "
+                    f"`integrations.erp360.sso_enabled=true` on the "
+                    f"organization record to enable it."
+                ),
+            )
+        if not per_org_enabled and legacy_env_enabled:
+            logger.warning(
+                "sso.jit_provision: falling back to legacy SSO_ENABLED "
+                "env flag for org_id=%s slug=%s — set "
+                "integrations.erp360.sso_enabled=true to migrate.",
+                org.id, org.slug,
+            )
+
         # Iter 37 — Advisory lock on (org_id, sub) so concurrent SSO
         # logins for the SAME user serialize outside the transaction.
         # Removes the login-stampede deadlock risk during a launch or
@@ -191,7 +244,17 @@ class SSOService:
 
         if not user:
             # §7.2 — first-time link path. Look for a native account with
-            # matching verified email; refuse if unverified.
+            # matching email. Both sides must attest email verification
+            # before we link:
+            #   1. Native account's `email_verified_at` must be set
+            #      (proves the native signup completed email confirmation).
+            #   2. ERP360 claim MUST assert `email_verified: true`
+            #      (proves ERP360 also considers the email verified —
+            #      defense-in-depth against a compromised ERP360 SSO
+            #      claiming an unverified email).
+            # Either side unverified → refuse the auto-link and require
+            # operator intervention rather than silently seizing the
+            # native account.
             candidate = (
                 self.db.query(User)
                 .filter(User.email == email,
@@ -199,6 +262,7 @@ class SSOService:
                 .first()
             )
             if candidate is not None:
+                claim_email_verified = claims.get("email_verified") is True
                 if candidate.email_verified_at is None:
                     # Unverified native signup exists — potential
                     # takeover if we auto-link. Refuse and require ops.
@@ -211,7 +275,16 @@ class SSOService:
                             "native account."
                         ),
                     )
-                # Verified native user — one-time link. `sub` becomes
+                if not claim_email_verified:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "SSO cannot link a native account unless ERP360 "
+                            "asserts `email_verified: true` in the token "
+                            "claim. Contact IFPI support to resolve."
+                        ),
+                    )
+                # Both sides verified — one-time link. `sub` becomes
                 # authoritative from here.
                 user = candidate
 

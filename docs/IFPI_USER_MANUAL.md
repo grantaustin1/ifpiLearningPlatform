@@ -471,38 +471,39 @@ Core entities (see `backend/models/` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 418 |
+| `routers/auth.py` | 487 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 656 |
+| `routers/courses.py` | 655 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
+| `routers/erp360_sync.py` | 426 |
 | `routers/exams.py` | 212 |
 | `routers/extras.py` | 545 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 195 |
 | `routers/iter5.py` | 337 |
-| `routers/iter8.py` | 293 |
+| `routers/iter8.py` | 305 |
 | `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 843 |
-| `routers/marketplace_analytics.py` | 424 |
-| `routers/misc.py` | 1162 |
+| `routers/live_sessions.py` | 851 |
+| `routers/marketplace_analytics.py` | 430 |
+| `routers/misc.py` | 1210 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
-| `routers/public_catalog.py` | 153 |
+| `routers/public_catalog.py` | 173 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 512 |
 | `routers/seo.py` | 257 |
-| `routers/terms_kiosk.py` | 325 |
+| `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 203 |
-| **Total** | **11419** |
+| **Total** | **12021** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -530,6 +531,7 @@ Core entities (see `backend/models/` for the full list):
 | `CourseView` | `course_views` |
 | `EmailVerificationToken` | `email_verification_tokens` |
 | `Enrollment` | `enrollments` |
+| `Erp360SeenEvent` | `erp360_seen_events` |
 | `Exam` | `exams` |
 | `ExamAttempt` | `exam_attempts` |
 | `ExamQuestion` | `exam_questions` |
@@ -549,6 +551,7 @@ Core entities (see `backend/models/` for the full list):
 | `OutboxMessage` | `outbox_messages` |
 | `PasswordResetToken` | `password_reset_tokens` |
 | `Person` | `persons` |
+| `ProgressOutbox` | `progress_outbox` |
 | `RefreshToken` | `refresh_tokens` |
 | `ScheduledReport` | `scheduled_reports` |
 | `ScormPackage` | `scorm_packages` |
@@ -568,7 +571,7 @@ Core entities (see `backend/models/` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **57** ORM models._
+_Total: **59** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -667,7 +670,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/auth/register` | POST |  |
 | `/api/auth/resend-verification` | POST | Re-issue + email a verification link. Rate-limited (2/hr per |
 | `/api/auth/reset-password` | POST | Consume a reset token + set a new password. On success, logs the |
-| `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Body: {"erp_token": "..."}. |
+| `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Supports two response modes: |
 | `/api/auth/sso-status` | GET | Public endpoint — the login page calls this on mount to decide whether |
 | `/api/auth/verify-email` | POST | Consume an email-verification token. Called by the /verify-email/:token |
 | `/api/authoring/budget` | GET |  |
@@ -751,6 +754,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/unpublish` | POST |  |
 | `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
+| `/api/erp360/sync/status` | GET | Public probe. Returns whether IFPI is ready to receive ERP360 |
+| `/api/erp360/sync/test-ping` | POST | Round-trip verification. Currently a stub — synthetic outbound |
+| `/api/erp360/webhooks/user` | POST | Receive `user.role_changed` and `user.deactivated` events from ERP360. |
 | `/api/exams` | GET |  |
 | `/api/exams` | POST |  |
 | `/api/exams/ai-generate-questions` | POST | Generate exam questions from a course's slide content using the |
@@ -842,7 +848,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **261** registered API endpoints._
+_Total: **264** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
