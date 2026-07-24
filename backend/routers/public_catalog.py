@@ -22,16 +22,33 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user
 from core.database import get_db
 from models import Certificate, Course, CourseStatus, Organization, User
 from services import rate_limit_service
+from services.cache import cached_view, degrade_on_db_error
 
 
 router = APIRouter(prefix="/api/public", tags=["Public catalog"])
+
+
+def _catalog_cache_key(
+    response: Response = None,
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    db: Session = None,
+    current: CurrentUser = None,
+    **_: object,
+) -> str:
+    """Key: caller's org + normalized query params. TTL-scoped, no PII."""
+    org_id = getattr(current, "organization_id", "anon")
+    q_norm = (q or "").strip().lower()
+    cat_norm = (category or "").strip().lower()
+    return f"public_catalog:{org_id}:{q_norm}:{cat_norm}:{limit}"
 
 # Anonymous /verify — 30 hits per IP per minute (shared across replicas
 # via Redis when available; per-process fallback otherwise).
@@ -122,7 +139,10 @@ def _require_catalog_access(
 
 
 @router.get("/catalog")
+@cached_view(_catalog_cache_key, ttl_seconds=30.0)
+@degrade_on_db_error(_catalog_cache_key)
 def public_catalog(
+    response: Response,
     q: Optional[str] = Query(default=None, max_length=100),
     category: Optional[str] = Query(default=None, max_length=100),
     limit: int = Query(default=50, ge=1, le=200),

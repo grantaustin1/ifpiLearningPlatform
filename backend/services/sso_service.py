@@ -86,7 +86,64 @@ class SSOService:
         self.db = db
 
     def is_enabled(self) -> bool:
-        return settings.sso_enabled and bool(settings.erp360_sso_shared_secret)
+        """Global signature-verification prerequisite. SSO is signature-
+        verifiable if a shared secret is configured. Per-org enablement
+        is enforced separately in `jit_provision` after we resolve the
+        target org from the token's `org_slug` claim (§7.4).
+
+        NOTE: `settings.sso_enabled` (the global `SSO_ENABLED` env flag)
+        is retained ONLY for the sso-status public probe fallback in
+        single-tenant preview setups. Per §7.4 it is NO LONGER checked
+        on the exchange path — the per-org `erp360_sso_enabled` flag on
+        `Organization.integrations.erp360` is the source of truth once
+        we know which org the claim targets.
+        """
+        return bool(settings.erp360_sso_shared_secret)
+
+    def any_org_has_sso_enabled(self) -> bool:
+        """True if ANY organization in this deployment has ERP360 SSO
+        enabled — powers the public `/sso-status` probe on the login
+        page. Falls back to the legacy global `SSO_ENABLED` flag for
+        preview environments that haven't populated per-org settings
+        yet."""
+        # Per-org signal takes precedence — if operators have set at least
+        # one org's `integrations.erp360.sso_enabled=true`, that's the
+        # authoritative "SSO is live somewhere in this deployment" flag.
+        for candidate in self.db.query(Organization).all():
+            if candidate.erp360_sso_enabled:
+                return True
+        # Preview / single-tenant fallback: honor the legacy env flag.
+        return bool(settings.sso_enabled)
+
+    def _resolve_org_for_sso(self, claim_org_slug: Optional[str]) -> Organization:
+        """§7.4 — resolve the target organization from the SSO claim's
+        `org_slug`. Matches against `Organization.integrations.erp360.org_slug`
+        first (explicit ERP360-side mapping), then falls back to native
+        `Organization.slug`, then to the default (first) org for
+        preview compatibility. Fails closed only if the claim explicitly
+        names an org and nothing matches.
+        """
+        if claim_org_slug:
+            # Explicit mapping via integrations.erp360.org_slug
+            for candidate in self.db.query(Organization).all():
+                if (candidate.erp360_settings.get("org_slug") == claim_org_slug
+                        and candidate.is_erp360_connected):
+                    return candidate
+            # Fallback: match by native slug
+            org = self.db.query(Organization).filter(
+                Organization.slug == claim_org_slug
+            ).first()
+            if org is not None:
+                return org
+            raise HTTPException(
+                status_code=404,
+                detail=f"No IFPI academy connected to ERP360 org_slug={claim_org_slug!r}",
+            )
+        # Pre-§7.4 tokens or single-tenant preview — use the default org.
+        org = self.db.query(Organization).order_by(Organization.id.asc()).first()
+        if not org:
+            raise HTTPException(status_code=500, detail="No academy configured")
+        return org
 
     def verify_inbound_token(self, token: str) -> dict:
         if not self.is_enabled():
@@ -119,15 +176,55 @@ class SSOService:
 
         Returns (user, created) — `created` is True when this is the first
         time IFPI has seen this user (i.e. JIT just provisioned them).
+
+        §7.4 — Scoped to the org identified by claims.org_slug. Falls
+        back to the default org for single-tenant preview compatibility.
+        §7.2 — Native-user linking on first SSO requires a
+        verified-email match (`email_verified_at IS NOT NULL`). If the
+        native account is unverified, we refuse the link with 409 and
+        require operator intervention rather than silently seizing it.
         """
         erp_user_id = claims.get("sub")
         email = (claims.get("email") or "").lower().strip()
         if not email:
             raise HTTPException(status_code=400, detail="SSO token missing email")
 
-        org = self.db.query(Organization).order_by(Organization.id.asc()).first()
-        if not org:
-            raise HTTPException(status_code=500, detail="No academy configured")
+        # §7.4 — resolve target org from the claim, not "first org wins".
+        claim_org_slug = (claims.get("org_slug") or "").strip() or None
+        org = self._resolve_org_for_sso(claim_org_slug)
+
+        # §7.4 — per-org enablement gate. Prefer the per-org
+        # `integrations.erp360.sso_enabled=true` opt-in. During the
+        # migration window we fall back to the legacy global
+        # `SSO_ENABLED=true` env flag so preview + existing deployments
+        # keep working. Once every prod org has an explicit per-org
+        # setting, `SSO_ENABLED` can be dropped from the environment.
+        per_org_enabled = org.erp360_sso_enabled
+        legacy_env_enabled = bool(settings.sso_enabled)
+        if not per_org_enabled and not legacy_env_enabled:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"SSO is not enabled for organization {org.slug!r}. "
+                    f"An admin must set "
+                    f"`integrations.erp360.sso_enabled=true` on the "
+                    f"organization record to enable it."
+                ),
+            )
+        if not per_org_enabled and legacy_env_enabled:
+            logger.warning(
+                "sso.jit_provision: falling back to legacy SSO_ENABLED "
+                "env flag for org_id=%s slug=%s — set "
+                "integrations.erp360.sso_enabled=true to migrate.",
+                org.id, org.slug,
+            )
+
+        # Iter 37 — Advisory lock on (org_id, sub) so concurrent SSO
+        # logins for the SAME user serialize outside the transaction.
+        # Removes the login-stampede deadlock risk during a launch or
+        # after a full-org secret rotation. No-op on SQLite.
+        from services.db_locks import advisory_lock
+        advisory_lock(self.db, org.id, erp_user_id or email)
 
         user: Optional[User] = None
         if erp_user_id:
@@ -136,12 +233,60 @@ class SSOService:
             except (TypeError, ValueError):
                 _erp_id = None
             if _erp_id is not None:
-                user = self.db.query(User).filter(User.erp360_user_id == _erp_id).first()
+                user = (
+                    self.db.query(User)
+                    .filter(User.erp360_user_id == _erp_id,
+                            User.organization_id == org.id)
+                    .first()
+                )
         else:
             _erp_id = None
 
         if not user:
-            user = self.db.query(User).filter(User.email == email).first()
+            # §7.2 — first-time link path. Look for a native account with
+            # matching email. Both sides must attest email verification
+            # before we link:
+            #   1. Native account's `email_verified_at` must be set
+            #      (proves the native signup completed email confirmation).
+            #   2. ERP360 claim MUST assert `email_verified: true`
+            #      (proves ERP360 also considers the email verified —
+            #      defense-in-depth against a compromised ERP360 SSO
+            #      claiming an unverified email).
+            # Either side unverified → refuse the auto-link and require
+            # operator intervention rather than silently seizing the
+            # native account.
+            candidate = (
+                self.db.query(User)
+                .filter(User.email == email,
+                        User.organization_id == org.id)
+                .first()
+            )
+            if candidate is not None:
+                claim_email_verified = claims.get("email_verified") is True
+                if candidate.email_verified_at is None:
+                    # Unverified native signup exists — potential
+                    # takeover if we auto-link. Refuse and require ops.
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "A native account with this email exists but the "
+                            "email is not verified. Contact IFPI support to "
+                            "resolve — SSO cannot safely link an unverified "
+                            "native account."
+                        ),
+                    )
+                if not claim_email_verified:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "SSO cannot link a native account unless ERP360 "
+                            "asserts `email_verified: true` in the token "
+                            "claim. Contact IFPI support to resolve."
+                        ),
+                    )
+                # Both sides verified — one-time link. `sub` becomes
+                # authoritative from here.
+                user = candidate
 
         created = user is None
         if created:
@@ -198,10 +343,21 @@ class SSOService:
         if not ifpi_roles:
             ifpi_roles = {"LEARNER"}
 
-        # Replace role rows
-        self.db.query(UserRole).filter(UserRole.user_id == user.id).delete()
+        # §7.3 — Replace ONLY the ERP360-managed subset. IFPI-native
+        # grants (INSTRUCTOR, cohort assignments, native admin) survive.
+        # If a role landing from ERP360 is already held natively, we
+        # skip inserting a duplicate erp360-sourced row so the unique
+        # `(user_id, role)` constraint isn't violated — the user keeps
+        # the role regardless of ERP360 state changes.
+        self.db.query(UserRole).filter(
+            UserRole.user_id == user.id,
+            UserRole.source == "erp360",
+        ).delete()
+        native_roles = {ur.role for ur in user.user_roles if ur.source != "erp360"}
         for r in ifpi_roles:
-            self.db.add(UserRole(user_id=user.id, role=r))
+            if r in native_roles:
+                continue
+            self.db.add(UserRole(user_id=user.id, role=r, source="erp360"))
 
         self.db.commit()
         self.db.refresh(user)

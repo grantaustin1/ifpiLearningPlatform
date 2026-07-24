@@ -27,6 +27,36 @@ class UserOut(BaseModel):
     organization_id: int
     roles: List[str] = []
     points: int = 0
+    # Iter 32 — forces the frontend to redirect to /change-password on
+    # first login when the seeded admin lands. Cleared once they pick a
+    # new password via /api/auth/change-password.
+    must_change_password: bool = False
+    # Iter 33 — GDPR. True when the user has clicked their verification
+    # link. Frontend uses this to show a persistent banner nudging
+    # unverified users to check their inbox.
+    email_verified: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class AccountDeletionConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
 
 
 class LoginResponse(BaseModel):

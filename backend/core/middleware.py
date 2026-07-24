@@ -52,6 +52,14 @@ def get_correlation_id() -> Optional[str]:
     return _correlation_id_var.get()
 
 
+# Iter 38 — request-summary logger + n+1 threshold. Threshold is
+# generous (real n+1s bloat to hundreds of queries — 25 is a signal,
+# not a hard cap). Adjust via env `N_PLUS_ONE_THRESHOLD`.
+import os as _os_iter38
+_req_logger = logging.getLogger("ifpi.request")
+_N_PLUS_ONE_THRESHOLD = int(_os_iter38.environ.get("N_PLUS_ONE_THRESHOLD", "25"))
+
+
 # ─────────────────────────────────────────────────────────────────────
 # 1. Correlation-ID middleware
 # ─────────────────────────────────────────────────────────────────────
@@ -70,11 +78,75 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get(self.HEADER, "")
         cid = raw.strip()[:self.MAX_LEN] or uuid.uuid4().hex
         token = _correlation_id_var.set(cid)
+        # Iter 38 — Reset the per-request query counter at request start.
+        # Reads at request end feed the [req] log line + optional
+        # X-Query-Count response header for n+1 hunting.
+        try:
+            from core.query_counter import reset_query_count
+            reset_query_count()
+        except Exception:  # noqa: BLE001
+            pass
+        # Iter 32b — Propagate correlation ID into Sentry's per-request
+        # scope. sentry-sdk 2.x isolates scopes per FastAPI request via
+        # FastApiIntegration, so `set_tag()` here attaches to any
+        # exception/breadcrumb captured during THIS request only.
+        # No-op when SENTRY_DSN is unset (client is Noop).
+        try:
+            import sentry_sdk
+            if sentry_sdk.get_client().dsn:
+                sentry_sdk.set_tag("correlation_id", cid)
+                sentry_sdk.set_context("request", {
+                    "correlation_id": cid,
+                    "path": request.url.path,
+                    "method": request.method,
+                })
+        except Exception:  # noqa: BLE001 - never let observability break the request
+            pass
+        start = time.perf_counter()
         try:
             response = await call_next(request)
             response.headers[self.HEADER] = cid
+            # Iter 38 — dev/staging aid for n+1 hunting; production
+            # ships with EXPOSE_QUERY_COUNT_HEADER unset (default).
+            import os
+            if os.environ.get("EXPOSE_QUERY_COUNT_HEADER") == "true":
+                try:
+                    from core.query_counter import get_query_count
+                    response.headers["X-Query-Count"] = str(get_query_count())
+                except Exception:  # noqa: BLE001
+                    pass
+            # Iter 38 — structured request summary line. One line per
+            # request, greppable via `[req]` prefix, exportable to
+            # Grafana/Loki/Datadog without further transformation.
+            try:
+                from core.query_counter import get_query_count
+                elapsed_ms = int((time.perf_counter() - start) * 1000)
+                qcount = get_query_count()
+                path = request.url.path
+                # Skip noise: static assets, health probes, docs UI
+                if not (path.startswith("/static") or path in ("/health", "/docs", "/openapi.json", "/redoc")):
+                    _req_logger.info(
+                        "[req] method=%s path=%s status=%d duration_ms=%d queries=%d cid=%s",
+                        request.method, path, response.status_code,
+                        elapsed_ms, qcount, cid,
+                    )
+                    # Flag likely n+1 offenders in real time.
+                    if qcount >= _N_PLUS_ONE_THRESHOLD:
+                        _req_logger.warning(
+                            "[n+1?] path=%s method=%s queries=%d duration_ms=%d cid=%s "
+                            "— audit selectinload/joinedload",
+                            path, request.method, qcount, elapsed_ms, cid,
+                        )
+            except Exception:  # noqa: BLE001
+                pass
             return response
         finally:
+            # Iter 38 — release the query counter slot for this request
+            try:
+                from core.query_counter import drop_query_count
+                drop_query_count()
+            except Exception:  # noqa: BLE001
+                pass
             _correlation_id_var.reset(token)
 
 
@@ -362,6 +434,85 @@ class CSRFProtectMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Iter 32 · Security headers
+# ─────────────────────────────────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds defense-in-depth response headers on every request.
+
+    Rationale (per OWASP secure-headers project):
+      - `Strict-Transport-Security` — pins browsers to HTTPS for 1 year
+        after first visit. Prevents ssl-strip MITM downgrades.
+      - `X-Content-Type-Options: nosniff` — kills MIME sniffing which
+        can turn a text/plain upload into executable JS.
+      - `X-Frame-Options: DENY` — blocks the app from being iframed,
+        defeats clickjacking.
+      - `Referrer-Policy: strict-origin-when-cross-origin` — leaks the
+        path portion of the URL only to same-origin navigations.
+      - `Permissions-Policy` — disables geolocation, camera, mic APIs
+        by default (we don't use them; opt-in individual endpoints if
+        we ever need to).
+      - `Content-Security-Policy` — restricts what the browser will
+        execute. Report-Only in non-prod so devs still get warnings
+        without breakage. Enforced in prod.
+
+    HSTS is intentionally NOT set when serving over HTTP (dev/preview
+    without HTTPS) — that would prevent the browser from ever
+    reaching the site via HTTP again, breaking local dev.
+    """
+
+    # A permissive-but-safer-than-nothing CSP. Frontend inlines some
+    # styles and uses Google Fonts + our own CDN. Adjust once we've
+    # scoped every legitimate origin.
+    CSP = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # CRA/React inline runtime chunks
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob: https:; "
+        "media-src 'self' data: blob: https:; "
+        "connect-src 'self' https: wss:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'"
+    )
+    PERMISSIONS_POLICY = (
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=(), "
+        "magnetometer=(), gyroscope=(), accelerometer=()"
+    )
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # OpenAPI/Swagger docs need looser inline-script rules — skip
+        # CSP there or the docs page white-screens.
+        is_docs = request.url.path.startswith(("/api/docs", "/api/redoc",
+                                                "/api/openapi.json"))
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        headers.setdefault("Permissions-Policy", self.PERMISSIONS_POLICY)
+        # Only set HSTS when we know the request came in over HTTPS
+        # (either directly or via an X-Forwarded-Proto=https from the
+        # ingress). Setting HSTS on plain HTTP would brick localhost.
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+        is_https = request.url.scheme == "https" or forwarded_proto == "https"
+        if is_https:
+            headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        if not is_docs:
+            # In non-prod deployments we emit Report-Only so devs see
+            # violations in the console without breaking pages.
+            from core.config import settings as _s
+            csp_header = ("Content-Security-Policy" if _s.environment == "production"
+                          else "Content-Security-Policy-Report-Only")
+            headers.setdefault(csp_header, self.CSP)
+        return response
+
+
 def _consteq(a: str, b: str) -> bool:
     """Constant-time string compare — resists timing oracle attacks."""
     import hmac
@@ -387,4 +538,5 @@ def install_middleware(app: FastAPI) -> None:
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(LoginBruteForceMiddleware)
     app.add_middleware(CSRFProtectMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     install_exception_handlers(app)

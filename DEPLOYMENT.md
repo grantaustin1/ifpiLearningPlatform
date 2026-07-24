@@ -259,11 +259,58 @@ If a deployment misbehaves:
    you enable versioning; restore individual objects from the console.
    Enable versioning on your bucket if not already.
 
+### 6.1 Neon Point-in-Time Restore (recommended for accidental data loss)
+
+Neon retains 7 days of WAL history on the free tier (30 on Pro), which
+means you can restore the **entire database** to any second in that
+window without a manual backup schedule.
+
+1. **console.neon.tech** → your project → **Branches** → **Create branch**.
+2. In the branch dialog:
+   - Source: your primary branch (`main`).
+   - **"Include data up to"** → pick the exact timestamp *before* the bad
+     write / migration.
+3. Copy the new branch's connection string.
+4. Repoint `DATABASE_URL` in the Emergent Deploy tab to the new
+   branch's URL, redeploy.
+5. Verify the app is healthy against the restored data.
+6. **Promote** the restored branch to primary in Neon
+   (Branches → ⋯ → Set as default). Delete the old branch after you're
+   confident the restore is good.
+
+**Caveat:** Neon PITR restores the *database*, not object storage. If the
+same incident deleted R2/S3 objects too, use R2 versioning restore
+(step 3 above) alongside the DB rollback.
+
+**Cost:** Restore branches count toward your Neon storage quota until
+deleted. Delete the pre-incident primary once promotion is confirmed.
+
+### 6.2 Admin lockout recovery (Iter 33b)
+
+If the admin has lost their password AND the reset email is bouncing
+(e.g. their SMTP relay is misconfigured or the domain was decommissioned):
+
+```bash
+# From the deploy container's shell:
+ADMIN_RESCUE_SECRET="a-long-secret-only-you-know-at-least-16-chars" \
+  python -m scripts.reset_admin_password
+```
+
+The script:
+- Prompts twice for the new password (or reads it from `NEW_ADMIN_PASSWORD`
+  env with `--from-env`).
+- Sets `must_change_password=True` so the emergency password can't
+  survive past first login.
+- Revokes every active refresh token for the admin.
+- Never logs the password value — only its length and source.
+
+Communicate the new password to the admin via a **secure out-of-band
+channel** (Signal, encrypted email, in person), then rotate
+`ADMIN_RESCUE_SECRET` so the same value can't be used twice.
+
 ---
 
-## 7. Known deploy-time gotchas
-
-| Symptom | Cause | Fix |
+## 7. Known deploy-time gotchas| Symptom | Cause | Fix |
 | --- | --- | --- |
 | `sqlalchemy.exc.OperationalError: could not translate host name "None"` | `DATABASE_URL` not set | Set it (§2) |
 | Login succeeds but subsequent requests 401 | `AUTH_COOKIE_SECURE=true` on HTTP-only preview URL | Either use HTTPS or flip to `false` for the preview host |

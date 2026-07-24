@@ -227,6 +227,23 @@ def _test_debris_cleanup_tick():
     except Exception as e:
         logger.exception("nightly test-debris cleanup failed: %s", e)
 
+def _progress_outbox_tick() -> None:
+    """Iter 38 Phase B — drain the progress_outbox. Small batches,
+    tight interval so learners see their views land quickly."""
+    from core.database import SessionLocal
+    from services.progress_outbox import process_batch
+    db = SessionLocal()
+    try:
+        ok, failed = process_batch(db, batch_size=100)
+        if ok or failed:
+            logger.debug("progress_outbox: ok=%s failed=%s", ok, failed)
+    except Exception:
+        logger.exception("progress_outbox_tick error")
+    finally:
+        db.close()
+
+
+
 
 def start_scheduler() -> None:
     global _scheduler
@@ -261,6 +278,14 @@ def start_scheduler() -> None:
         _live_session_reminder_tick, "interval", seconds=60,
         id="live_session_reminders", max_instances=1, coalesce=True,
         misfire_grace_time=120,
+    )
+    # Iter 38 Phase B — Progress outbox drainer. Runs every 2s so hot
+    # write paths (slide view enqueues) surface into the actual
+    # SlideView table with negligible lag.
+    sched.add_job(
+        _progress_outbox_tick, "interval", seconds=2,
+        id="progress_outbox_drain", max_instances=1, coalesce=True,
+        misfire_grace_time=30,
     )
     sched.add_job(
         _test_debris_cleanup_tick, "cron", hour=3, minute=0,
