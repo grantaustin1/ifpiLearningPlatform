@@ -3,8 +3,8 @@ import { api } from 'lib/api'
 import { Link } from 'react-router-dom'
 import { BookOpen, ClipboardList, Users, Award, ArrowRight, Plus, Sparkles, TrendingUp } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
-import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
-import { OnboardingBoard } from './OnboardingBoard'
+import MembersNeedingActionWidget from './MembersNeedingActionWidget'
+import OnboardingBoard from './OnboardingBoard'
 import { DocsEngagementTile } from './DocsEngagementTile'
 
 export default function DashboardPage() {
