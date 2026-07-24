@@ -1,9 +1,8 @@
-"""Course routes: CRUD + slide management. Role-gated at the API layer."""
 from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -19,7 +18,7 @@ from schemas import (
     CourseCreate, CourseDetail, CourseSummary, CourseUpdate, SlideIn, SlideOut,
 )
 
-router = APIRouter(prefix="/api/courses", tags=["Courses"])
+from . import router
 
 
 def _can_manage(user: CurrentUser) -> bool:
@@ -388,23 +387,6 @@ def restore_slide_version(course_id: int, slide_id: int, version_number: int,
         "slide": {"id": s.id, "title": s.title, "media_url": s.media_url,
                   "slide_type": s.slide_type.value if s.slide_type else None},
     }
-
-
-# ── Iter 19: Rich-text editor helper (separate prefix to avoid colliding
-# with `/api/courses/{course_id}` paths) ──────────────────────────────
-richtext_router = APIRouter(prefix="/api/rich-text", tags=["Rich Text"])
-
-
-@richtext_router.post("/sanitize")
-def sanitize_html_payload(body: dict,
-                          _current: CurrentUser = Depends(requires_roles(
-                              "INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
-    """Server-side HTML sanitizer for the rich-text editor preview.
-    Strips dangerous tags/attrs while preserving formatting + media tags.
-    """
-    from core.sanitizer import sanitize_course_html
-    raw = body.get("html") or ""
-    return {"sanitized": sanitize_course_html(raw), "input_length": len(raw)}
 
 
 @router.delete("/{course_id}/slides/{slide_id}")

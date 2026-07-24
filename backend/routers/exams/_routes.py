@@ -1,9 +1,9 @@
-"""Exam routes: CRUD + question management + take + attempt submission."""
 from __future__ import annotations
 
 from typing import List, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
@@ -17,7 +17,7 @@ from schemas import (
 from services.exam_service import ExamService
 from services import ai_quiz_service
 
-router = APIRouter(prefix="/api/exams", tags=["Exams"])
+from . import router
 
 
 def _summary(e: Exam) -> ExamSummary:
@@ -170,11 +170,7 @@ def submit_attempt(exam_id: int, body: AttemptSubmit, db: Session = Depends(get_
     return AttemptResult(**result)
 
 
-
 # ── AI quiz generator ────────────────────────────────────────────────
-from pydantic import BaseModel, Field
-
-
 class AIQuizRequest(BaseModel):
     course_id: int
     num_questions: int = Field(default=5, ge=1, le=20)

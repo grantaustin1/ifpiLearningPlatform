@@ -1,41 +1,19 @@
-"""Admin invitations: create/list/revoke + public token endpoints (lookup, accept)."""
 from __future__ import annotations
 
+from . import admin_router
+from ._schemas import BulkInviteBody, InvitationCreate, InvitationOut
+
 from datetime import datetime, timezone
+
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, EmailStr
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from auth.cookies import set_auth_cookie, set_refresh_cookie, should_include_token_in_body
-from auth.dependencies import CurrentUser, get_current_user, requires_roles
-from core.config import settings
+from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import Invitation
-from schemas import LoginResponse, UserOut
-from services.auth_service import AuthService
-from services.invitation_service import ALLOWED_INVITE_ROLES, InvitationService
-
-
-class InvitationCreate(BaseModel):
-    email: EmailStr
-    name: Optional[str] = None
-    role: str = "INSTRUCTOR"
-
-
-class InvitationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    email: str
-    name: Optional[str]
-    role: str
-    invited_by_id: Optional[int]
-    accepted_at: Optional[datetime]
-    revoked_at: Optional[datetime]
-    expires_at: datetime
-    created_at: datetime
-    status: str
+from services.invitation_service import InvitationService
 
 
 def _status_of(inv: Invitation) -> str:
@@ -50,9 +28,6 @@ def _status_of(inv: Invitation) -> str:
     if exp < datetime.now(timezone.utc):
         return "expired"
     return "pending"
-
-
-admin_router = APIRouter(prefix="/api/admin/invitations", tags=["Invitations"])
 
 
 @admin_router.post("", response_model=InvitationOut)
@@ -108,17 +83,6 @@ def revoke_invitation(invitation_id: int, db: Session = Depends(get_db),
     return {"ok": True}
 
 
-class BulkInviteRow(BaseModel):
-    email: str
-    name: Optional[str] = None
-    role: str = "LEARNER"
-
-
-class BulkInviteBody(BaseModel):
-    invitations: List[BulkInviteRow]
-    cohort: Optional[str] = None
-
-
 @admin_router.post("/bulk")
 def bulk_invite(body: BulkInviteBody, request: Request,
                 db: Session = Depends(get_db),
@@ -157,50 +121,3 @@ def bulk_invite(body: BulkInviteBody, request: Request,
     )
     db.commit()
     return {"queued": queued, "total": len(rows), "results": results}
-
-
-# ── Public endpoints (no auth — keyed by opaque token) ───────────────
-public_router = APIRouter(prefix="/api/invitations", tags=["Invitations"])
-
-
-class InvitationAccept(BaseModel):
-    password: str
-    name: Optional[str] = None
-
-
-class InvitationLookup(BaseModel):
-    email: str
-    name: Optional[str]
-    role: str
-    organization_name: str
-
-
-@public_router.get("/{token}", response_model=InvitationLookup)
-def lookup_invitation(token: str, db: Session = Depends(get_db)):
-    inv = InvitationService(db).lookup(token)
-    from models import Organization
-    org = db.query(Organization).filter(Organization.id == inv.organization_id).first()
-    return InvitationLookup(
-        email=inv.email, name=inv.name, role=inv.role,
-        organization_name=org.name if org else "IFPI Learning",
-    )
-
-
-@public_router.post("/{token}/accept", response_model=LoginResponse)
-def accept_invitation(token: str, body: InvitationAccept, response: Response,
-                      db: Session = Depends(get_db)):
-    svc = InvitationService(db)
-    user = svc.accept(token, password=body.password, name=body.name)
-    access, refresh = AuthService(db).issue_tokens(user)
-    set_auth_cookie(response, access)
-    set_refresh_cookie(response, refresh)
-    from core.role_registry import normalize_role_names
-    roles = normalize_role_names([ur.role for ur in user.user_roles]) or ["LEARNER"]
-    return LoginResponse(
-        access_token=access if should_include_token_in_body() else None,
-        expires_in=settings.jwt_expiration_minutes * 60,
-        user=UserOut(
-            id=user.id, email=user.email, name=user.name,
-            organization_id=user.organization_id, roles=roles, points=user.points or 0,
-        ),
-    )
