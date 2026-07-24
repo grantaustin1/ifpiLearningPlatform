@@ -30,7 +30,7 @@ export default function Erp360IntegrationsPage() {
     queryFn: async () =>
       (await api.get(`/admin/organizations/${orgId}/integrations/erp360`)).data,
     // Snapshot into local draft on first load
-    onSuccess: (r) => { if (!draft) setDraft(r) },
+    onSuccess: (r: Integration) => { if (!draft) setDraft(r) },
   } as any)
 
   const saveMut = useMutation({
