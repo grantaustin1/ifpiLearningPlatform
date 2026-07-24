@@ -6,6 +6,23 @@ Both accounts live in the default "IFPI Main Academy" tenant (`organization_id=1
 - Email: `admin@ifpi.org`
 - Password: `admin123`
 - Role: `ADMIN`
+- **Iter 32 — `must_change_password=True`**: On first login the app
+  redirects to `/change-password?forced=1`. If your test needs the
+  admin to reach the dashboard without triggering this gate, either:
+  1. Clear the flag manually: `UPDATE users SET must_change_password=0
+     WHERE email='admin@ifpi.org'`, or
+  2. Complete the change-password form once (backend/frontend both
+     honour the flag).
+- 2FA (TOTP): **DISABLED** by default. Test files (`test_iteration30i_totp.py`) enable it,
+  run the flow, and re-disable at teardown. If a test aborts mid-flow, run the following
+  to recover:
+  ```
+  cd /app/backend && python -c "
+  from core.database import SessionLocal; from models import User
+  db=SessionLocal(); u=db.query(User).filter_by(email='admin@ifpi.org').first()
+  u.totp_secret_enc=None; u.totp_enabled_at=None; u.totp_recovery_codes=[]
+  db.commit(); print('2FA cleared')"
+  ```
 - Capabilities: full course/exam CRUD, AI builder, analytics, user list, billing console.
 
 ## Learner

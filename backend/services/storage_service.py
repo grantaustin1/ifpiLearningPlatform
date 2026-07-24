@@ -114,10 +114,14 @@ class S3Storage(StorageBackend):
                 import boto3  # type: ignore
             except ImportError as e:
                 raise StorageError("boto3 not installed. pip install boto3") from e
+            # Optional endpoint override for S3-compatible services
+            # (Cloudflare R2, MinIO, etc.). AWS-native ignored when unset.
+            endpoint_url = os.environ.get("AWS_S3_ENDPOINT_URL") or None
             self._client = boto3.client(
                 "s3", region_name=self.region,
                 aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
                 aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                endpoint_url=endpoint_url,
             )
         return self._client
 

@@ -16,6 +16,10 @@ def register_all(app: FastAPI) -> None:
     from routers import auth
     app.include_router(auth.router)
 
+    # Iter 34b — ERP360 inbound integration surface
+    from routers import erp360_sync
+    app.include_router(erp360_sync.router)
+
     # ── Core LMS: courses, exams, learning paths ─────────────────────
     from routers import courses, exams, learning_paths
     app.include_router(courses.router)
@@ -152,6 +156,20 @@ def register_all(app: FastAPI) -> None:
     # ── Iter 22: Live Sessions (cohort meetings + attendance) ────────
     from routers import live_sessions
     app.include_router(live_sessions.router)
+
+    # ── Iter 39: Admin entitlement inspection (support-tool for
+    #     "why can/can't user X access course Y?") ──────────────────
+    from routers import admin_entitlements
+    app.include_router(admin_entitlements.router)
+
+    # ── Iter 39: Admin per-org ERP360 integration configuration ────
+    from routers import admin_organizations
+    app.include_router(admin_organizations.router)
+
+    # ── Iter 39: Stripe payments (checkout session + webhook) ──────
+    from routers import stripe_payments
+    app.include_router(stripe_payments.router)
+    app.include_router(stripe_payments.webhook_router)
 
     # ── Iter 24: Marketplace funnel analytics ────────────────────────
     from routers import marketplace_analytics

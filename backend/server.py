@@ -6,17 +6,90 @@ This file owns: app construction, CORS, lifecycle hooks, root + health.
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# ── Iter 32 · Sentry error tracking ─────────────────────────────────
+# Initialised BEFORE any FastAPI app / router import so exceptions
+# raised during startup are captured. No-op when SENTRY_DSN is unset,
+# which is the case in dev / preview — Sentry never sees test noise.
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    def _sentry_before_send(event, hint):  # type: ignore[no-untyped-def]
+        # Iter 32b — Attach the current correlation ID to every event.
+        # `set_tag()` in CorrelationIdMiddleware handles the request-
+        # scoped case, but background workers (APScheduler ticks,
+        # outbox drainers) also get instrumented — this hook makes
+        # sure they inherit whatever context var is set.
+        try:
+            from core.middleware import get_correlation_id
+            cid = get_correlation_id()
+            if cid:
+                event.setdefault("tags", {}).setdefault("correlation_id", cid)
+        except Exception:  # noqa: BLE001
+            pass
+        return event
+
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        environment=os.environ.get("ENVIRONMENT", "unknown"),
+        release=os.environ.get("APP_RELEASE") or None,
+        # Sample rate is intentionally conservative — 10% of transactions
+        # for tracing. Errors are always captured at 100%.
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,  # never send PII/email/ip without consent
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            SqlalchemyIntegration(),
+            # LoggingIntegration turns every `logger.info/warning/...`
+            # into a Sentry BREADCRUMB (default level=INFO), and every
+            # `logger.error/exception` into a captured EVENT. Combined
+            # with our correlation-id log format below, a single Sentry
+            # error will show the full server-side trail of that same
+            # request's log lines.
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        ],
+        ignore_errors=[KeyboardInterrupt],
+        before_send=_sentry_before_send,
+    )
 
 from core.config import settings
 from core.database import Base, engine
 from routers import register_all
 
+# Structured log format — Iter 32b prepends the correlation ID (or a
+# "-" placeholder when there isn't one, e.g. background workers). The
+# Sentry LoggingIntegration turns each INFO+ line into a breadcrumb, so
+# an error captured at request X now ships the FULL trail of log lines
+# tagged with the same correlation-id.
+#
+# We inject `cid` via a LogRecordFactory (rather than a Filter) so it's
+# populated on EVERY LogRecord — including ones emitted by third-party
+# libraries (uvicorn, apscheduler, sqlalchemy) whose loggers may have
+# their own handlers that bypass filter propagation.
+_original_log_factory = logging.getLogRecordFactory()
+
+def _record_factory(*args, **kwargs):
+    record = _original_log_factory(*args, **kwargs)
+    try:
+        from core.middleware import get_correlation_id
+        record.cid = get_correlation_id() or "-"
+    except Exception:  # noqa: BLE001 — during import ordering
+        record.cid = "-"
+    return record
+
+logging.setLogRecordFactory(_record_factory)
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s [%(levelname)s] [cid=%(cid)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("ifpi")
 
@@ -104,13 +177,25 @@ async def _api_token_call_logger(request, call_next):
 register_all(app)
 
 
+# ── Iter 39 · `/api/v1/*` versioned namespace alias ─────────────────
+# Added LAST so it wraps as the OUTERMOST middleware — path rewriting
+# happens before any routing/auth/logging so downstream layers see the
+# canonical `/api/...` path.
+from core.api_versioning import ApiV1AliasMiddleware
+app.add_middleware(ApiV1AliasMiddleware)
+
+
 @app.get("/api")
 def root():
     return {
         "name": "IFPI Learning Platform",
         "status": "ok",
         "environment": settings.environment,
-        "sso_enabled": settings.sso_enabled,
+        # Informational only. Per §7.4 the effective SSO enablement is
+        # decided per-org via `Organization.integrations.erp360.sso_enabled`;
+        # this field is retained as a preview-mode fallback indicator.
+        "sso_signing_secret_configured": bool(settings.erp360_sso_shared_secret),
+        "sso_enabled": settings.sso_enabled,  # legacy preview flag
         "billing_live_mode": settings.billing_live_mode,
     }
 

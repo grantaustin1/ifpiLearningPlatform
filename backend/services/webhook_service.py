@@ -35,6 +35,16 @@ MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = [30, 300, 1800]
 REQUEST_TIMEOUT = 8
 
+# Sentinel URL scheme: any subscription pointing at `dry-run://…` will
+# be signed + persisted normally but the HTTP POST is skipped. Delivery
+# rows are stamped `status='DELIVERED', status_code=204, error='dry-run'`
+# so the admin UI + audit trail show a full sign-off without touching
+# an external endpoint. Useful for:
+#   • Bootstrapping the ERP360 → IFPI direction before ERP360 exposes
+#     their inbound URL (flip `target_url` to real value → live)
+#   • Staging environments that must not spam prod webhook targets
+DRY_RUN_URL_PREFIX = "dry-run://"
+
 
 def sign(secret: str, raw_body: bytes) -> str:
     """HMAC-SHA256 hex digest. Used to sign outgoing requests and to verify
@@ -67,6 +77,24 @@ def _attempt(db: Session, delivery: WebhookDelivery, sub: WebhookSubscription) -
         "X-IFPI-Signature-Algorithm": "HMAC-SHA256",
     }
     now = datetime.now(timezone.utc)
+
+    # Dry-run short-circuit — persists as delivered without POST.
+    if (sub.target_url or "").startswith(DRY_RUN_URL_PREFIX):
+        delivery.status = "DELIVERED"
+        delivery.status_code = 204
+        delivery.error = "dry-run: no HTTP request sent"
+        delivery.delivered_at = now
+        delivery.next_attempt_at = None
+        sub.last_success_at = now
+        logger.info(
+            "webhooks.dry_run: event=%s event_id=%s sub_id=%s "
+            "target=%s sig=%s bytes=%d",
+            delivery.event_type, delivery.event_id, sub.id,
+            sub.target_url, delivery.signature[:12] + "…",
+            len(delivery.payload or ""),
+        )
+        return
+
     try:
         resp = requests.post(sub.target_url, data=delivery.payload, headers=headers,
                              timeout=REQUEST_TIMEOUT)

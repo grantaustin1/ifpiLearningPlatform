@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -29,7 +30,12 @@ class Settings(BaseSettings):
     # mutating request that authenticates via cookie. Bearer-header
     # requests (API tokens, mobile) are exempt.
     csrf_enabled: bool = False
-    allowed_origins: str = "*"
+    # Origins allowed to make credentialed browser requests.
+    # Env: CORS_ORIGINS is the deployment-surface name (per Emergent
+    # deploy support). ALLOWED_ORIGINS is kept as a legacy alias so
+    # preview .env files don't have to be renamed. Deploy secret wins.
+    cors_origins_env: str = Field(default="", validation_alias="CORS_ORIGINS")
+    allowed_origins: str = "*"      # legacy ALLOWED_ORIGINS
 
     emergent_llm_key: str = ""
     ai_builder_model: str = "gpt-4o-mini"
@@ -74,9 +80,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        if not self.allowed_origins or self.allowed_origins == "*":
+        # Deployment secret CORS_ORIGINS wins if set (per Emergent deploy
+        # support). Falls back to legacy ALLOWED_ORIGINS for preview.
+        raw = (self.cors_origins_env or self.allowed_origins or "").strip()
+        if not raw or raw == "*":
             return ["*"]
-        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
 
 @lru_cache

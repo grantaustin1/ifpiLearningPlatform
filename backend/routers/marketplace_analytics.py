@@ -351,16 +351,22 @@ def track_slide_view(
     if not slide:
         return {"tracked": False, "reason": "unknown_slide"}
     today = date.today().isoformat()
-    view = SlideView(
-        course_id=course_id, slide_id=slide_id,
-        user_id=current.id, viewed_on_date=today,
-    )
-    try:
-        db.add(view); db.commit()
-        return {"tracked": True}
-    except IntegrityError:
-        db.rollback()
-        return {"tracked": False, "reason": "already_counted_today"}
+    # Iter 38 Phase B — enqueue into progress_outbox instead of inserting
+    # SlideView synchronously. Under 10× traffic the direct insert path
+    # was ~20% of all request time; the outbox drops it to a tiny
+    # single-row INSERT that returns immediately. Background worker
+    # (services.outbox_worker._progress_outbox_tick, every 2s) does the
+    # actual SlideView insert. SlideView's unique constraint on
+    # (slide, user, day) makes the handler safely idempotent.
+    from services.progress_outbox import enqueue
+    enqueue(db, "slide_view", {
+        "course_id": course_id,
+        "slide_id": slide_id,
+        "user_id": current.id,
+        "viewed_on_date": today,
+    })
+    db.commit()
+    return {"tracked": True, "queued": True}
 
 
 @admin_router.get("/course-dropoff/{course_id}")

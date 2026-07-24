@@ -45,6 +45,9 @@ if os.environ.get("SLOW_QUERY_ENABLED", "true").lower() in ("1", "true", "yes"):
     try:
         from core.slow_query_logger import install as _install_slow
         _install_slow(engine)
+        # Iter 38 — per-request query counter for n+1 detection
+        from core.query_counter import install as _install_qc
+        _install_qc(engine)
     except Exception as _exc:  # noqa: BLE001
         logger.warning("slow-query logger install failed: %s", _exc)
 

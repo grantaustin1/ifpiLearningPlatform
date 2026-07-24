@@ -23,6 +23,7 @@ KNOWN_EVENT_TYPES = [
     "course.completed",
     "certificate.issued",
     "cohort.milestone_reached",
+    "learner.invited",
     "user.provisioned",
 ]
 
@@ -176,6 +177,55 @@ def test_subscription(sub_id: int, db: Session = Depends(get_db),
     return {
         "status": delivery.status, "status_code": delivery.status_code,
         "error": delivery.error,
+    }
+
+
+@router.get("/deliveries")
+def list_all_deliveries(
+    status: Optional[str] = None,
+    event_type: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Recent WebhookDelivery rows across ALL subscriptions in the
+    caller's org. Read-only — for ops visibility of the outbound
+    stream (especially the ERP360-managed dry-run subscription).
+
+    Filters: `status` (QUEUED, DELIVERED, FAILED, DEAD_LETTER),
+             `event_type` (learner.invited, certificate.issued, …).
+    Returns joined subscription metadata so ops can tell dry-run
+    apart from live at a glance.
+    """
+    limit = max(1, min(limit, 200))
+    q = (
+        db.query(WebhookDelivery, WebhookSubscription)
+        .join(WebhookSubscription,
+              WebhookSubscription.id == WebhookDelivery.subscription_id)
+        .filter(WebhookDelivery.organization_id == current.organization_id)
+    )
+    if status:
+        q = q.filter(WebhookDelivery.status == status.upper())
+    if event_type:
+        q = q.filter(WebhookDelivery.event_type == event_type)
+    rows = q.order_by(WebhookDelivery.id.desc()).limit(limit).all()
+
+    return {
+        "items": [{
+            "id": d.id,
+            "subscription_id": s.id,
+            "subscription_description": s.description,
+            "target_url": s.target_url,
+            "is_dry_run": (s.target_url or "").startswith("dry-run://"),
+            "event_type": d.event_type,
+            "event_id": d.event_id,
+            "status": d.status,
+            "status_code": d.status_code,
+            "attempt_count": d.attempt_count,
+            "error": d.error,
+            "created_at": d.created_at,
+            "delivered_at": d.delivered_at,
+        } for d, s in rows],
     }
 
 

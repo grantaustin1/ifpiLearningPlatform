@@ -3,6 +3,9 @@ import { api } from 'lib/api'
 import { Link } from 'react-router-dom'
 import { BookOpen, ClipboardList, Users, Award, ArrowRight, Plus, Sparkles, TrendingUp } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
+import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
+import { OnboardingBoard } from './OnboardingBoard'
+import { DocsEngagementTile } from './DocsEngagementTile'
 
 export default function DashboardPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -55,6 +58,17 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-500 mt-0.5 font-medium">{s.label}</p>
           </Link>
         ))}
+      </div>
+
+      <OnboardingBoard />
+
+      <div className="grid xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-2">
+          <MembersNeedingActionWidget />
+        </div>
+        <div className="space-y-5">
+          <DocsEngagementTile />
+        </div>
       </div>
 
       <div className="grid xl:grid-cols-3 gap-5">

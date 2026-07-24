@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,24 @@ _DEFAULT_BADGE_TIERS = [
 ]
 
 
+def _seed_admin_password() -> str:
+    """Iter 33 — Never commit a literal admin password. Prefer the
+    SEED_ADMIN_PASSWORD env var; hard-fail in prod, warn in dev."""
+    val = (os.environ.get("SEED_ADMIN_PASSWORD") or "").strip()
+    if val:
+        return val
+    if os.environ.get("ENVIRONMENT", "").lower() == "production":
+        raise RuntimeError(
+            "SEED_ADMIN_PASSWORD is unset in production. Refusing to seed "
+            "with a well-known default. Set the env var and redeploy."
+        )
+    logger.warning(
+        "SEED_ADMIN_PASSWORD not set — falling back to 'admin123' for dev "
+        "seed. UNSAFE in production; deploy_precheck.py will block this."
+    )
+    return "admin123"
+
+
 def seed(db: Session) -> None:
     # 1. Default academy
     org = db.query(Organization).filter(Organization.slug == "ifpi-main").first()
@@ -40,22 +59,14 @@ def seed(db: Session) -> None:
         logger.info("Seeded academy: %s", org.name)
 
     # 2. Admin user
+    # 2. Admin user — idempotent by email. If a row with this email
+    #    already exists (whether the operator rotated the password
+    #    already or not), we DO NOT touch it. This is critical: every
+    #    subsequent redeploy must leave rotated credentials alone.
     admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
-    if not admin:
-        admin = User(
-            email="admin@ifpi.org", name="IFPI Admin",
-            password_hash=get_password_hash("admin123"),
-            organization_id=org.id, is_active=True,
-        )
-        db.add(admin)
-        db.flush()
-        db.add(UserRole(user_id=admin.id, role="ADMIN"))
-        db.add(UserRole(user_id=admin.id, role="SUPER_ADMIN"))
-        db.add(Person(user_id=admin.id, organization_id=org.id,
-                      email=admin.email, name=admin.name,
-                      lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
-        logger.info("Seeded admin: %s / admin123", admin.email)
-    else:
+    if admin is not None:
+        logger.info("Seed: admin@ifpi.org already exists (id=%s) — "
+                    "leaving password untouched.", admin.id)
         # Ensure SUPER_ADMIN role exists for existing admin (idempotent)
         has_super = db.query(UserRole).filter(
             UserRole.user_id == admin.id, UserRole.role == "SUPER_ADMIN"
@@ -64,22 +75,57 @@ def seed(db: Session) -> None:
             db.add(UserRole(user_id=admin.id, role="SUPER_ADMIN"))
             db.flush()
             logger.info("Added SUPER_ADMIN role to existing admin")
-
-    # 3. Learner user
-    learner = db.query(User).filter(User.email == "learner@ifpi.org").first()
-    if not learner:
-        learner = User(
-            email="learner@ifpi.org", name="Test Learner",
-            password_hash=get_password_hash("learner123"),
+    else:
+        seed_pw = _seed_admin_password()
+        admin = User(
+            email="admin@ifpi.org", name="IFPI Admin",
+            password_hash=get_password_hash(seed_pw),
             organization_id=org.id, is_active=True,
+            # Iter 32 — force password rotation on first login so
+            # nobody ships prod with the seeded password still active.
+            must_change_password=True,
         )
-        db.add(learner)
+        db.add(admin)
         db.flush()
-        db.add(UserRole(user_id=learner.id, role="LEARNER"))
-        db.add(Person(user_id=learner.id, organization_id=org.id,
-                      email=learner.email, name=learner.name,
+        db.add(UserRole(user_id=admin.id, role="ADMIN"))
+        db.add(UserRole(user_id=admin.id, role="SUPER_ADMIN"))
+        db.add(Person(user_id=admin.id, organization_id=org.id,
+                      email=admin.email, name=admin.name,
                       lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
-        logger.info("Seeded learner: %s / learner123", learner.email)
+        # NEVER log the actual password (it may be a real prod secret).
+        # Log only the fact and length so the operator can verify from
+        # deploy env vs stdout without exposing the value.
+        logger.info("Seeded admin: %s (password from %s, %d chars, "
+                    "must_change_password=True)",
+                    admin.email,
+                    "SEED_ADMIN_PASSWORD env" if os.environ.get("SEED_ADMIN_PASSWORD")
+                    else "dev fallback",
+                    len(seed_pw))
+
+    # 3. Learner user — same idempotency contract as the admin row.
+    learner = db.query(User).filter(User.email == "learner@ifpi.org").first()
+    if learner is not None:
+        logger.info("Seed: learner@ifpi.org already exists (id=%s) — "
+                    "leaving password untouched.", learner.id)
+    else:
+        # Learner is a demo account, only seeded in non-prod. In prod
+        # we don't seed a test learner at all — real learners
+        # self-register.
+        if os.environ.get("ENVIRONMENT", "").lower() == "production":
+            logger.info("Seed: skipping learner@ifpi.org creation in prod.")
+        else:
+            learner = User(
+                email="learner@ifpi.org", name="Test Learner",
+                password_hash=get_password_hash("learner123"),
+                organization_id=org.id, is_active=True,
+            )
+            db.add(learner)
+            db.flush()
+            db.add(UserRole(user_id=learner.id, role="LEARNER"))
+            db.add(Person(user_id=learner.id, organization_id=org.id,
+                          email=learner.email, name=learner.name,
+                          lifecycle_stage=LifecycleStage.LEARNER, source="seed"))
+            logger.info("Seeded learner: %s (dev-only)", learner.email)
 
     # 3b. AGENT008 cohort learner (required for leaderboard cohort-filter tests)
     agent_learner = db.query(User).filter(User.email == "agent008@ifpi.org").first()

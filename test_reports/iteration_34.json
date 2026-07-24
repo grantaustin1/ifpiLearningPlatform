@@ -1,0 +1,39 @@
+{
+  "summary": "Iter 33c full sweep — Backend: 14/14 new comprehensive docs-library+engagement tests PASS plus the 3 existing test_iteration33c_docs_engagement.py tests PASS (17/17 total). Frontend E2E on preview URL: (a) admin login with must_change_password=True correctly forces redirect to /change-password?forced=1 with 'Password change required' banner; (b) after clearing the flag, Owner Dashboard renders with data-testid='docs-engagement-tile' showing 3 stat boxes (Total opens=360, Unique docs=4, Unique admins=1) plus a top-list with 4 items (Setup Manual 168, User Manual 100, Assessment 61, Integration Matrix 31), each with correct data-testid='docs-engagement-doc-<slug>'; (c) 'Open library' link routes to /settings; (d) Documents tab renders 4 rows setup-manual (23.1 KB / 512 lines), user-manual (42.0 KB / 858 lines), integration-matrix (163 lines / 6.3 KB), assessment (303 lines / 17.2 KB) each with Preview / Download PDF / Markdown buttons; (e) Clicking Preview on setup-manual loads a blob:// PDF into data-testid='doc-preview-iframe' successfully; (f) Learner login redirects to /courses, does NOT render docs-engagement-tile, and manual navigation to /settings kicks them back to /courses. Deploy precheck with backend/.env ENVIRONMENT=development exits 0 as required (soft-advisor mode, blockers downgraded to warnings). Admin must_change_password restored to True at end of run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration33c_docs_library_full.py",
+    "/app/backend/tests/test_iteration33c_docs_engagement.py",
+    "/app/test_reports/pytest/iter33c_full.xml",
+    "/app/test_reports/pytest/iter33c.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/owner_dashboard.py::docs_engagement — Clean SQL rollup with func.count/distinct/max on AuditLog. Uses base_q.with_entities to avoid re-running the filter block. `latest_at` correctly ISO-formats a naive UTC into an aware ISO string. CATALOG.get(slug, {}).get('title') falls back to raw slug — safe against catalog drift. All good.",
+    "routers/docs_library.py — Every /pdf and /raw route calls audit_service.record + db.commit before returning the payload, guaranteeing the audit row is durable even if the client bails on the download. Content-Disposition inline/attachment toggle via `preview` bool is correct. Path traversal is nipped in `docs_library_service.CATALOG` (whitelist only).",
+    "services/docs_library_service.py::_md_to_pdf — xhtml2pdf is called synchronously; PDF is cached on disk keyed by mtime_ns so edits invalidate. Rendered PDFs are 60-100 KB for 500+ line manuals — well under the 20 KB floor asserted by tests.",
+    "frontend/DocsEngagementTile.tsx — Uses useQuery with 5 min staleTime — good caching. Empty state (data-testid=docs-engagement-empty) branches on total===0. Non-negotiable data-testid coverage for all 3 stat boxes + top-list items. Loading state also has a testid. Solid.",
+    "frontend/OrganizationDocumentsTab.tsx — Blob-URL approach for iframe preview is the correct pattern to work around JWT-gated PDF endpoints (the browser cannot attach Authorization to an iframe src). Blob URLs are revoked on unmount (useEffect cleanup) + on preview close — no memory leak. Preview iframe has data-testid='doc-preview-iframe' as required."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration33c_docs_library_full.py (NEW — 14 comprehensive regression tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (17/17 iter33c docs library + engagement tests)",
+    "frontend": "100% (all review checklist items verified)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123 (must_change_password=True per seed, restored at end of run), learner@ifpi.org / learner123",
+  "seed_data_creation": "No new seed data created. During TestAudit.test_preview_then_download_writes_audit_rows, 4 audit rows (2 DOC_PREVIEWED + 2 DOC_DOWNLOADED) were written by the admin account — these are cumulative with the ~360 events shown on the tile.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter 33c ships GREEN. New backend test file at /app/backend/tests/test_iteration33c_docs_library_full.py adds 14 asserts covering manifest shape (4 docs, correct sizes/line counts), PDF payload validity (%PDF- header, >20KB, inline vs attachment Content-Disposition), raw markdown route + 404 on bogus slugs, learner 403 on every endpoint, audit-row emission delta (verified via docs-engagement rollup), and top_docs sort order + human titles. UI verified end-to-end on preview URL — DocsEngagementTile renders 360/4/1 with 4-item top-list; Documents tab renders all 4 rows with correct byte/line metadata; preview iframe loads blob PDF; learner cannot see tile or reach /settings. Forced-password-change gate works (admin@ifpi.org has must_change_password=True; redirects to /change-password?forced=1). No follow-up needed.",
+  "rca of the issue": "No issues found."
+}

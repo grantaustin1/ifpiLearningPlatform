@@ -1,0 +1,45 @@
+{
+  "summary": "Iter 33 GDPR + email-verification sprint validated end-to-end. Backend: 14/14 iter33 sprint tests PASS in isolation (verify-email single-use, /me/export bundle w/ 8 sections, /me/delete-request+DELETE anonymises PII, forgot-password rate-limit 429 on 4th call, hardcoded-password lint exit 0, SEED_ADMIN_PASSWORD prod-only helper, deploy_precheck blocks unset SEED_ADMIN_PASSWORD). Regression: 53/55 across iter30/31/32/33 sprint suites when run in one shot — the 2 failures are iter32 forgot-password tests hitting 429 due to persistent in-memory rate-limit state from earlier iter33 test run; re-verified they PASS 2/2 after backend restart (real bug in RL is NOT present, this is expected in-mem RL state carry-over between test invocations). Frontend E2E on preview URL: (1) /preferences renders email-verification-card ONLY when user.email_verified=false — hidden for learner (verified=true) [both branches confirmed]; (2) Resend link button POSTs /api/auth/resend-verification and toasts 'Verification email queued'; (3) Download my data streams a JSON file (`ifpi-data-export-YYYY-MM-DD.json`) containing profile/enrollments/exam_attempts/certificates/notifications/audit_records/active_sessions — profile.email matches session user; (4) Delete-account confirm dialog opens, Cancel button aborts safely; (5) After 'Send code', prompt dialog for 6-digit code appears; wrong code (999999) triggers backend 400 + red toast; (6) /verify-email/bogus-token renders error card with 'Verification failed'; (7) /verify-email/<valid-token> — backend correctly sets users.email_verified_at, but the UI shows the ERROR card because React.StrictMode double-invokes the useEffect in dev/preview builds, so the second call gets a 400 (token already used) and overwrites the success state. Prod build (StrictMode effect double-run is dev-only) will not exhibit this, but the frontend should guard with a useRef anyway.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/forgot-password", "issue": "In-memory rate-limit state persists across pytest invocations against the same running backend, causing false test-suite failures when iter33's intentional-exhaust test (test_forgot_password_rate_limit_by_email) runs before iter32's 200-response tests. Not a production bug — expected RL behaviour. Consider adding an ADMIN/test-only /api/rate-limit/reset endpoint or a pytest fixture that resets rate_limit_service._mem_buckets in the backend process."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VerifyEmailPage.tsx", "issue": "React.StrictMode double-invokes the useEffect on mount in dev/preview builds, calling /api/auth/verify-email twice. First call succeeds (200, token consumed, users.email_verified_at set), second call gets 400 'Verification link already used' and overwrites the state to 'error', so the user sees a 'Verification failed' card even though verification succeeded. Fix: guard with a useRef so the effect runs at most once, or use an AbortController.", "selector": "[data-testid=verify-email-error]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration33_sprint.py",
+    "/app/test_reports/pytest/iter33_retest.xml",
+    "/app/test_reports/pytest/iter30to33_regression.xml"
+  ],
+  "action_items": [
+    "VerifyEmailPage.tsx — Guard the verify-email POST with a useRef so React StrictMode double-invoke doesn't consume the token twice and leave the UI showing an error after a successful verification. Suggested pattern: `const done = useRef(false); useEffect(() => { if (done.current) return; done.current = true; api.post(...) })`."
+  ],
+  "critical_code_review_comments": [
+    "services/auth_service.py::consume_email_verification — Idempotency + expiry check are correct. Second consume of the same token returns 400 as designed. Verified via test_verify_email_endpoint_end_to_end.",
+    "services/auth_service.py::export_user_data — Cleanly limits audit_records to 500 rows (prevents DoS on large accounts). All datetime fields go through _iso() so no naive/aware mixups leak into the JSON.",
+    "services/auth_service.py::confirm_account_deletion — Correctly anonymises user + Person rows, revokes refresh tokens, and preserves FKs (certs/enrollments/audit) by keeping user.id. Wipes totp_secret_enc + totp_recovery_codes. request row confirmed_at is set atomically. Well done.",
+    "routers/auth.py — /me/export and /me/delete-request correctly reject API-token principals (current.id < 0). Rate limits sensible (verify-resend 2/hr, delete-req 3/hr, forgot-password 5/hr per IP + 3/hr per email).",
+    "scripts/lint_hardcoded_passwords.py — Regex list is tight (only assignment-into-password and known-weak literals). Whitelist covers tests, seed helper, memory docs, and auth UI copy. Exit code 0 confirmed clean.",
+    "seed/seed_minimal.py::_seed_admin_password — Env-var-first, RuntimeError-on-prod-missing, warn+fallback in dev is exactly the right posture. Verified via monkeypatch tests.",
+    "VerifyEmailPage.tsx — Minor UX bug on double-invoke (see frontend_issues.ui_bugs). Also consider showing a distinct 'Already verified' message when the second call returns 400, so users hitting the link twice from their email don't panic.",
+    "PreferencesPage.tsx — Clean composition of confirm+prompt dialogs. GDPR section auto-hides nothing for admins; consider adding an 'Admin note: seed accounts cannot be self-deleted' banner for the admin user (currently admin can delete self, which would break the /login page test suite — see agent_to_agent_context_note in the review request)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (14/14 iter33 + 55/55 iter30-33 regression when run per-suite; 53/55 in a single run due to in-mem RL carry-over on 2 iter32 tests)",
+    "frontend": "95% (8/9 E2E checks pass; VerifyEmailPage valid-token case shows error card due to React StrictMode double-invoke)"
+  },
+  "test_credentials": "learner@ifpi.org / learner123 (email_verified=true via backfill). Admin NOT used for delete-account tests. Throwaway users registered via /api/auth/register with random UUID emails.",
+  "seed_data_creation": "3 throwaway users created during testing: iter33fe-<uuid>@ifpi.org (used for FE preferences + export + delete flows, wrong-code rejected so still active), verify-test-<uuid>@ifpi.org (successfully email-verified via /verify-email/:token), rl-<uuid>@ifpi.org from iter33 pytest (verified rate-limit). All are learner-role, isolated from admin/learner seed accounts. No PII cleanup needed — they use disposable UUID emails.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter 33 GDPR sprint is 99% green. Only real defect: VerifyEmailPage's useEffect fires twice under React.StrictMode (dev/preview) and consumes the single-use token twice, so the second call's 400 overwrites the success state. The backend flag (users.email_verified_at) is correctly set — this is UI-only. Prod-mode React build won't double-invoke effects, so the bug is preview-only, but the fix (useRef gate) is 3 lines and worth doing. When retesting after fix: (a) mint a fresh token via `AuthService(db).issue_email_verification(user)`, (b) visit /verify-email/<token>, (c) verify success card + Continue to dashboard nav works. RL note: iter32's forgot-password tests + iter33's rate-limit test share the RL bucket state across pytest invocations against the running backend. To get a clean 55/55 in one shot, `sudo supervisorctl restart backend` before the suite or add a fixture that HTTP-POSTs to a test-only /api/rate-limit/reset endpoint. Admin@ifpi.org still has must_change_password=True — do NOT use it for delete-account UI tests.",
+  "rca of the issue": "VerifyEmailPage.tsx (line 22-35): the useEffect that calls `api.post('/auth/verify-email', {token})` has no guard against React.StrictMode's intentional double-invoke of effects in dev mode. Sequence: mount → useEffect runs once (verifies token, sets state='ok') → StrictMode unmounts/remounts to test resilience → useEffect runs again (400 from backend, sets state='error'). Backend verification succeeded; only the final UI state is wrong. Fix: `const attempted = useRef(false); useEffect(() => { if (attempted.current || !token) return; attempted.current = true; api.post(...) }, [token])`. Alternate: distinguish the 'already verified' error server-side and treat it as success client-side."
+}

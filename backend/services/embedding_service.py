@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 import uuid
 from typing import List, Optional
@@ -178,6 +179,20 @@ async def ingest_document(
     return doc
 
 
+def _use_pgvector() -> bool:
+    """True when the operator has flipped USE_PGVECTOR=true AND the
+    `pgvector` package is installed. Read at each call so tests can
+    monkey-patch os.environ.
+    """
+    if os.environ.get("USE_PGVECTOR", "").lower() not in ("1", "true", "yes"):
+        return False
+    try:
+        import pgvector  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 async def semantic_search(
     db: Session, *,
     organization_id: int,
@@ -189,6 +204,12 @@ async def semantic_search(
 
     Result: list of `{chunk_id, document_id, document_title, chunk_index,
     text, score}` sorted by score desc.
+
+    **Iter 34 (P2 option a):** When `USE_PGVECTOR=true` we push the ANN
+    search down into Postgres via the `<=>` cosine-distance operator,
+    which uses an HNSW index (see Alembic `20260206_add_pgvector.py`).
+    Otherwise we fall back to fetching all chunks + a Python-side
+    cosine loop — fine at MVP scale (<5000 chunks/org).
     """
     if not query.strip():
         return []
@@ -197,8 +218,37 @@ async def semantic_search(
         return []
     q_vec = q_vec_list[0]
 
-    # Naive: fetch all chunks for org + rank in Python. Fine at MVP scale
-    # (<10k chunks). Swap for pgvector when we hit that ceiling.
+    # ── Fast path: pgvector `<=>` cosine distance ──────────────────────
+    if _use_pgvector():
+        try:
+            from sqlalchemy import text as _sqltext  # local — avoid top-level dep
+            # Cast to a Postgres array literal via SQLAlchemy bindparam.
+            # Cosine DISTANCE = 1 - cosine SIMILARITY, so score = 1 - dist.
+            course_clause = "AND sd.course_id = :cid" if course_id is not None else ""
+            sql = f"""
+                SELECT sc.id, sc.document_id, sd.title, sc.chunk_index,
+                       sc.text, 1 - (sc.embedding <=> :qvec) AS score
+                  FROM source_chunks sc
+                  JOIN source_documents sd ON sc.document_id = sd.id
+                 WHERE sd.organization_id = :org
+                   {course_clause}
+              ORDER BY sc.embedding <=> :qvec
+                 LIMIT :k
+            """
+            params = {"qvec": q_vec, "org": organization_id, "k": top_k}
+            if course_id is not None:
+                params["cid"] = course_id
+            rows = db.execute(_sqltext(sql), params).all()
+            return [
+                {"chunk_id": r[0], "document_id": r[1],
+                 "document_title": r[2], "chunk_index": r[3],
+                 "text": r[4], "score": round(float(r[5]), 4)}
+                for r in rows if r[5] > 0.05
+            ]
+        except Exception:  # noqa: BLE001 — degrade to Python path on any drift
+            pass
+
+    # ── Fallback: Python-side cosine over org corpus ───────────────────
     q = db.query(SourceChunk, SourceDocument).join(
         SourceDocument, SourceChunk.document_id == SourceDocument.id,
     ).filter(SourceDocument.organization_id == organization_id)

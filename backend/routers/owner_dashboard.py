@@ -18,11 +18,12 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin
 from core.database import get_db
-from models import Course, Enrollment, EnrollmentStatus, User
+from models import AuditLog, Course, Enrollment, EnrollmentStatus, User
 
 router = APIRouter(prefix="/api/admin/dashboard", tags=["Owner Dashboard"])
 
@@ -146,3 +147,80 @@ def members_needing_action(
         "generated_at": now_iso,
         "items": items[:limit],
     }
+
+
+@router.get("/docs-engagement")
+def docs_engagement(
+    days: int = Query(7, ge=1, le=90),
+    current: CurrentUser = Depends(requires_admin()),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Iter 33c — Docs engagement tile for the Owner dashboard.
+
+    Reads `DOC_PREVIEWED` + `DOC_DOWNLOADED` events from the audit log
+    (written by `routers/docs_library.py`) and rolls them up so owners
+    can tell whether new admins are actually reading the manuals before
+    they call for help.
+
+    Returns:
+      - `window_days` — the rolling window (default 7)
+      - `total_events` — combined preview + download count
+      - `unique_docs` — distinct docs opened
+      - `unique_readers` — distinct admin users who opened at least one
+      - `top_docs` — up to 5 rows: `{slug, title, count}` sorted desc
+      - `latest_at` — ISO timestamp of the most recent open (nullable)
+    """
+    # Doc catalog for pretty titles — kept in sync via docs_library_service
+    from services.docs_library_service import CATALOG
+
+    now = datetime.utcnow()
+    cutoff = now - timedelta(days=days)
+
+    base_q = db.query(AuditLog).filter(
+        AuditLog.organization_id == current.organization_id,
+        AuditLog.action.in_(["DOC_PREVIEWED", "DOC_DOWNLOADED"]),
+        AuditLog.created_at >= cutoff,
+    )
+
+    total_events = base_q.count()
+    unique_readers = (
+        base_q.with_entities(func.count(func.distinct(AuditLog.actor_user_id)))
+        .scalar() or 0
+    )
+    unique_docs = (
+        base_q.with_entities(func.count(func.distinct(AuditLog.target_id)))
+        .scalar() or 0
+    )
+    latest_at = (
+        base_q.with_entities(func.max(AuditLog.created_at)).scalar()
+    )
+
+    top_rows = (
+        base_q.with_entities(
+            AuditLog.target_id,
+            func.count(AuditLog.id).label("cnt"),
+        )
+        .group_by(AuditLog.target_id)
+        .order_by(func.count(AuditLog.id).desc())
+        .limit(5)
+        .all()
+    )
+    top_docs = [
+        {
+            "slug": slug,
+            "title": (CATALOG.get(slug, {}).get("title") or slug),
+            "count": int(cnt),
+        }
+        for slug, cnt in top_rows
+        if slug  # skip malformed rows
+    ]
+
+    return {
+        "window_days": days,
+        "total_events": int(total_events),
+        "unique_docs": int(unique_docs),
+        "unique_readers": int(unique_readers),
+        "top_docs": top_docs,
+        "latest_at": _iso(latest_at.replace(tzinfo=timezone.utc)) if latest_at else None,
+    }
+

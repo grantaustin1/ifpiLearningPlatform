@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -14,15 +14,25 @@ const ADMIN_NAV = [
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
   { href: '/exams',         label: 'Exams',        icon: ClipboardList },
   { href: '/certificates',  label: 'Certificates', icon: Award },
+  { href: '/admin/certificates', label: 'Cert. audit', icon: Shield },
   { href: '/leaderboard',   label: 'Leaderboard',  icon: Trophy },
   { href: '/badge-tiers',   label: 'Badge tiers',  icon: Award },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
+  { href: '/marketplace-analytics', label: 'Marketplace analytics', icon: TrendingUp },
+  { href: '/scheduled-reports', label: 'Scheduled reports', icon: Send },
+  { href: '/live-sessions', label: 'Live sessions', icon: Video },
+  { href: '/email-diagnostics', label: 'Email diagnostics', icon: Mail },
+  { href: '/affiliate',     label: 'Affiliate',    icon: Users },
+  { href: '/query-builder', label: 'Query builder', icon: Database },
   { href: '/users',         label: 'Users',        icon: Users },
   { href: '/outbox',        label: 'Email Outbox', icon: Mail },
   { href: '/billing',       label: 'Billing',      icon: CreditCard },
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
   { href: '/webhooks',      label: 'Webhooks',     icon: Webhook },
+  { href: '/webhooks/deliveries', label: 'Deliveries', icon: Send },
+  { href: '/integrations/erp360', label: 'ERP360',  icon: Link2 },
+  { href: '/entitlements',  label: 'Entitlements', icon: Search },
   { href: '/imports',       label: 'Content imports', icon: FolderInput },
   { href: '/research',      label: 'Deep research', icon: Sparkles },
   { href: '/tokens',        label: 'API tokens',   icon: KeyRound },
@@ -34,8 +44,10 @@ const LEARNER_NAV = [
   { href: '/courses',       label: 'My Courses',     icon: BookOpen },
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
   { href: '/certificates',  label: 'My Certificates',icon: Award },
+  { href: '/live-sessions', label: 'Live sessions',  icon: Video },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: Trophy },
   { href: '/billing',       label: 'Subscriptions',  icon: CreditCard },
+  { href: '/preferences',   label: 'Preferences',    icon: SlidersHorizontal },
 ]
 
 export default function DashboardLayout() {
