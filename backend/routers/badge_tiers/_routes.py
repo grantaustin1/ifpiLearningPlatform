@@ -1,34 +1,14 @@
-"""Badge tiers — per-organisation badge ladder CRUD + drag-reorder."""
 from __future__ import annotations
 
-from typing import Optional
+from . import router
+from ._schemas import BadgeTierIn, BadgeTierUpdate
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import BadgeTier
-
-router = APIRouter(prefix="/api/badge-tiers", tags=["Badge Tiers"])
-
-
-class BadgeTierIn(BaseModel):
-    slug: str = Field(min_length=1, max_length=50)
-    label: str = Field(min_length=1, max_length=100)
-    emoji: str = Field(default="🏅", max_length=8)
-    description: Optional[str] = None
-    threshold_xp: int = 0
-    is_active: bool = True
-
-
-class BadgeTierUpdate(BaseModel):
-    label: Optional[str] = None
-    emoji: Optional[str] = None
-    description: Optional[str] = None
-    threshold_xp: Optional[int] = None
-    is_active: Optional[bool] = None
 
 
 def _to_dict(t: BadgeTier) -> dict:

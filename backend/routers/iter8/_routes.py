@@ -1,19 +1,13 @@
-"""Audit log read API + cohorts list + learner PDF transcript.
-
-Iteration 8 additions:
-- GET /api/admin/audit-log — paginated list with filters (admin only, own org)
-- GET /api/admin/cohorts — distinct cohort labels in the caller's org
-- GET /api/admin/reports/cohort-stats?cohort=X — completion/score stats
-- GET /api/certificates/transcript — branded PDF transcript for the calling user
-"""
 from __future__ import annotations
+
+from . import router
 
 import csv
 import io
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
@@ -25,7 +19,6 @@ from models import (
     ExamAttempt, Organization, User, UserBadge,
 )
 
-router = APIRouter(tags=["Audit & Reports"])
 
 # ── Audit log ────────────────────────────────────────────────────────
 @router.get("/api/admin/audit-log")

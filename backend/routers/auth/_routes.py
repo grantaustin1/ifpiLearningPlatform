@@ -1,7 +1,8 @@
-"""Auth routes: register, login, refresh, logout, /me, and the SSO bridge."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from . import router
+
+from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from auth.cookies import (
@@ -19,8 +20,6 @@ from schemas import (
 )
 from services.auth_service import AuthService
 from services.sso_service import SSOService
-
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _to_user_out(user) -> UserOut:

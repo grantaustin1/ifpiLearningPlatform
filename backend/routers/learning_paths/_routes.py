@@ -1,90 +1,21 @@
-"""Learning Paths router — group ordered courses with prerequisites.
-
-Public endpoints (any authenticated user):
-  GET    /api/learning-paths             list (LEARNERs see only PUBLISHED)
-  GET    /api/learning-paths/{id}        detail with items
-  POST   /api/learning-paths/{id}/enroll enrol in path
-
-Admin endpoints (INSTRUCTOR/ADMIN):
-  POST   /api/learning-paths              create
-  PATCH  /api/learning-paths/{id}         update
-  DELETE /api/learning-paths/{id}         delete
-  POST   /api/learning-paths/{id}/items   add course to path
-  DELETE /api/learning-paths/{id}/items/{course_id} remove
-"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import INSTRUCTOR_ROLES
 from models import (
-    Course, Enrollment, EnrollmentStatus, LearningPath, LearningPathEnrollment,
+    Course, Enrollment, LearningPath, LearningPathEnrollment,
     LearningPathItem, LearningPathStatus,
 )
 
-router = APIRouter(prefix="/api/learning-paths", tags=["Learning Paths"])
-
-
-# ── Schemas ──────────────────────────────────────────────────────────
-class PathCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    cover_color: str = "bg-violet-500"
-    estimated_hours: Optional[int] = None
-    price_cents: int = 0
-    currency: str = "ZAR"
-
-
-class PathUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    cover_color: Optional[str] = None
-    estimated_hours: Optional[int] = None
-    price_cents: Optional[int] = None
-    status: Optional[str] = None
-
-
-class PathItemIn(BaseModel):
-    course_id: int
-    order_index: Optional[int] = None
-    is_required: bool = True
-
-
-class PathItemOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    course_id: int
-    course_title: str
-    course_status: str
-    order_index: int
-    is_required: bool
-
-
-class PathSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    title: str
-    description: Optional[str]
-    cover_color: str
-    status: str
-    estimated_hours: Optional[int]
-    price_cents: int
-    currency: str
-    course_count: int
-    enrollment_count: int
-
-
-class PathDetail(PathSummary):
-    items: List[PathItemOut]
-    user_progress: float = 0.0
-    user_status: Optional[str] = None
+from . import router
+from ._schemas import PathCreate, PathDetail, PathItemIn, PathItemOut, PathSummary, PathUpdate
 
 
 def _can_manage(user: CurrentUser) -> bool:
@@ -117,7 +48,6 @@ def _detail(p: LearningPath, user_id: int) -> PathDetail:
     )
 
 
-# ── Routes ───────────────────────────────────────────────────────────
 @router.get("", response_model=List[PathSummary])
 def list_paths(db: Session = Depends(get_db),
                current: CurrentUser = Depends(get_current_user)):
@@ -267,7 +197,6 @@ def enroll_in_path(path_id: int, db: Session = Depends(get_db),
     return {"ok": True, "already": False, "courses_enrolled": len(p.items)}
 
 
-# ── Publish workflow (validates the path has at least one course) ─────
 @router.post("/{path_id}/publish")
 def publish_path(path_id: int, db: Session = Depends(get_db),
                  current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
