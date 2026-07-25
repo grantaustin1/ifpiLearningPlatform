@@ -77,23 +77,6 @@ export default function DashboardLayout() {
     : null
 
   const handleLogout = async () => { await logout(); nav('/login') }
-  const backend = process.env.REACT_APP_BACKEND_URL || ''
-  const resolvedLogo = org.logo_url
-    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
-    : null
-
-  const handleLogout = async () => { await logout(); nav('/login') }
-  const resolvedLogo = org.logo_url
-    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
-    : null
-  const resolvedLogo = org.logo_url
-    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
-    || ''
-  const resolvedLogo = org.logo_url
-    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
-    : null
-
-  const handleLogout = async () => { await logout(); nav('/login') }
 
   return (
     <div className="flex h-screen overflow-hidden">
