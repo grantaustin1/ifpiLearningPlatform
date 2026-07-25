@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 
 interface PromptOptions {
   title: string;
@@ -10,8 +10,6 @@ interface PromptOptions {
 }
 
 export function usePrompt() {
-  const [value, setValue] = useState('');
-
   const prompt = useCallback((opts: PromptOptions): Promise<string | null> => {
     return new Promise((resolve) => {
       const result = window.prompt(`${opts.title}\n${opts.description}\n${opts.placeholder || ''}`);
