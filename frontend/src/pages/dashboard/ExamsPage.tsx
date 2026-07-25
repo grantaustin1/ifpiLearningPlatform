@@ -190,7 +190,7 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5">Question type</label>
-                <select value={qType} onChange={e => setQType(e.target.value as any)} data-testid="ai-type"
+                <select value={qType} onChange={e => setQType(e.target.value as typeof qType)} data-testid="ai-type""ai-type"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
                   <option value="MULTIPLE_CHOICE">Multiple choice (4 options)</option>
                   <option value="TRUE_FALSE">True / False</option>
