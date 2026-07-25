@@ -22,7 +22,8 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (accessTokenMem) {
-    const h = AxiosHeaders.from(config.headers || {})
+    const h = new AxiosHeaders()
+    if (config.headers) Object.assign(h, config.headers)
     h.set('Authorization', `Bearer ${accessTokenMem}`)
     config.headers = h
   }
@@ -52,7 +53,8 @@ api.interceptors.response.use(
       const newTok = await refreshing
       refreshing = null
       if (newTok) {
-        const h = AxiosHeaders.from(original.headers || {})
+        const h = new AxiosHeaders()
+        if (original.headers) Object.assign(h, original.headers)
         h.set('Authorization', `Bearer ${newTok}`)
         original.headers = h
         return api.request(original)
