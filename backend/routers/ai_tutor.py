@@ -175,7 +175,7 @@ async def _call_llm(question: str, citations: list[dict]) -> tuple[str, dict]:
 @router.post("/ask", response_model=AskOut)
 async def ask(body: AskIn, request: Request,
               current: CurrentUser = Depends(get_current_user),
-              db: Session = Depends(get_db)):
+              db: Session = Depends(get_db)) -> AskOut:
     # Course scoping: if provided, verify it's in the user's org
     if body.course_id is not None:
         course = db.query(Course).filter(
@@ -256,7 +256,7 @@ async def ask(body: AskIn, request: Request,
 
 @router.get("/sessions")
 def list_sessions(current: CurrentUser = Depends(get_current_user),
-                  db: Session = Depends(get_db)):
+                  db: Session = Depends(get_db)) -> dict:
     rows = (db.query(AITutorSession)
             .filter(AITutorSession.user_id == current.id,
                     AITutorSession.organization_id == current.organization_id,
@@ -272,7 +272,7 @@ def list_sessions(current: CurrentUser = Depends(get_current_user),
 @router.get("/sessions/{session_id}")
 def get_session(session_id: int,
                 current: CurrentUser = Depends(get_current_user),
-                db: Session = Depends(get_db)):
+                db: Session = Depends(get_db)) -> dict:
     session = db.query(AITutorSession).filter(
         AITutorSession.id == session_id,
         AITutorSession.user_id == current.id,
@@ -297,7 +297,7 @@ def get_session(session_id: int,
 @router.post("/sessions/{session_id}/archive")
 def archive_session(session_id: int,
                     current: CurrentUser = Depends(get_current_user),
-                    db: Session = Depends(get_db)):
+                    db: Session = Depends(get_db)) -> dict:
     session = db.query(AITutorSession).filter(
         AITutorSession.id == session_id,
         AITutorSession.user_id == current.id).first()
@@ -325,7 +325,7 @@ class SaveAsFlashcardIn(BaseModel):
 @router.post("/save-as-flashcard")
 def save_as_flashcard(body: SaveAsFlashcardIn, request: Request,
                       current: CurrentUser = Depends(get_current_user),
-                      db: Session = Depends(get_db)):
+                      db: Session = Depends(get_db)) -> dict:
     from models import Course, Flashcard
 
     # Confirm the assistant message belongs to a session owned by the

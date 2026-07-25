@@ -82,7 +82,7 @@ def _serialize_code(c: AffiliateCode) -> dict:
 @router.post("/api/admin/affiliate/codes")
 def create_code(body: CodeCreateIn, request: Request,
                 current: CurrentUser = Depends(requires_admin()),
-                db: Session = Depends(get_db)):
+                db: Session = Depends(get_db)) -> dict:
     code = (body.code or _generate_code(db)).upper()
     # Uniqueness check
     if db.query(AffiliateCode).filter(AffiliateCode.code == code).first():
@@ -106,7 +106,7 @@ def create_code(body: CodeCreateIn, request: Request,
 
 @router.get("/api/admin/affiliate/codes")
 def list_codes(current: CurrentUser = Depends(requires_admin()),
-               db: Session = Depends(get_db)):
+               db: Session = Depends(get_db)) -> dict:
     rows = (db.query(AffiliateCode)
             .filter(AffiliateCode.organization_id == current.organization_id)
             .order_by(AffiliateCode.created_at.desc()).all())
@@ -116,7 +116,7 @@ def list_codes(current: CurrentUser = Depends(requires_admin()),
 @router.patch("/api/admin/affiliate/codes/{code_id}")
 def update_code(code_id: int, body: CodePatchIn, request: Request,
                 current: CurrentUser = Depends(requires_admin()),
-                db: Session = Depends(get_db)):
+                db: Session = Depends(get_db)) -> dict:
     row = db.query(AffiliateCode).filter(
         AffiliateCode.id == code_id,
         AffiliateCode.organization_id == current.organization_id).first()
@@ -140,7 +140,7 @@ def update_code(code_id: int, body: CodePatchIn, request: Request,
 
 @router.get("/api/admin/affiliate/referrals")
 def list_referrals(current: CurrentUser = Depends(requires_admin()),
-                   db: Session = Depends(get_db)):
+                   db: Session = Depends(get_db)) -> dict:
     """Referrals attributed to codes I own."""
     q = (db.query(AffiliateReferral, AffiliateCode, Organization)
          .join(AffiliateCode, AffiliateCode.id == AffiliateReferral.code_id)
@@ -161,7 +161,7 @@ def list_referrals(current: CurrentUser = Depends(requires_admin()),
 
 @router.get("/api/admin/affiliate/earnings")
 def earnings(current: CurrentUser = Depends(requires_admin()),
-             db: Session = Depends(get_db)):
+             db: Session = Depends(get_db)) -> dict:
     """Aggregate earnings by status. Cents-based to avoid float drift."""
     q = (db.query(AffiliateReferral.status,
                   func.count(AffiliateReferral.id).label("count"),
@@ -184,7 +184,7 @@ def earnings(current: CurrentUser = Depends(requires_admin()),
 
 
 @router.get("/api/affiliate/lookup/{code}")
-def lookup(code: str, db: Session = Depends(get_db)):
+def lookup(code: str, db: Session = Depends(get_db)) -> dict:
     """Public — thin preview so signup forms can show
     'You're being referred by ACME Corp'. Does NOT return internal ids."""
     row = (db.query(AffiliateCode, Organization)
@@ -210,7 +210,7 @@ class MarkCreditedIn(BaseModel):
 @router.post("/api/admin/affiliate/referrals/{referral_id}/mark-credited")
 def mark_credited(referral_id: int, body: MarkCreditedIn, request: Request,
                   current: CurrentUser = Depends(requires_roles("SUPER_ADMIN")),
-                  db: Session = Depends(get_db)):
+                  db: Session = Depends(get_db)) -> dict:
     ref = db.query(AffiliateReferral).filter(
         AffiliateReferral.id == referral_id).first()
     if not ref:
