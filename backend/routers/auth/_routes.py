@@ -60,7 +60,7 @@ def _login_response(response: Response, user, access: str, refresh: str,
 
 @router.post("/register", response_model=LoginResponse)
 def register(body: RegisterRequest, request: Request, response: Response,
-             db: Session = Depends(get_db)):
+             db: Session = Depends(get_db)) -> LoginResponse:
     svc = AuthService(db)
     user = svc.register(body.email, body.password, body.name)
     # Iter 33 — issue + email the verification token. Failures here are
@@ -101,7 +101,7 @@ def _send_verification_email(db: Session, svc: AuthService, user) -> None:
 
 @router.post("/login")
 def login(body: LoginRequest, request: Request, response: Response,
-          db: Session = Depends(get_db)):
+          db: Session = Depends(get_db)) -> LoginResponse | dict:
     svc = AuthService(db)
     user = svc.login(body.email, body.password)
     # Iter 30i — if 2FA is enabled, don't issue tokens yet. Return an
@@ -117,7 +117,7 @@ def login(body: LoginRequest, request: Request, response: Response,
 
 
 @router.post("/refresh", response_model=LoginResponse)
-def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+def refresh(request: Request, response: Response, db: Session = Depends(get_db)) -> LoginResponse:
     token = request.cookies.get(REFRESH_COOKIE)
     if not token:
         # Allow Bearer fallback
@@ -132,14 +132,14 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
 
 @router.post("/logout")
 def logout(response: Response, current: CurrentUser = Depends(get_current_user),
-           db: Session = Depends(get_db)):
+           db: Session = Depends(get_db)) -> dict:
     AuthService(db).revoke_all(current.id)
     clear_auth_cookies(response)
     return {"ok": True}
 
 
 @router.get("/me", response_model=UserOut)
-def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
     from models import User
     # API tokens (Iter 21) carry a negative `id` and don't have a User row —
     # return the synthetic principal data directly.
@@ -155,7 +155,7 @@ def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(g
 
 # ── SSO bridge (stubbed until ERP360 is wired) ───────────────────────
 @router.get("/sso-status")
-def sso_status(db: Session = Depends(get_db)):
+def sso_status(db: Session = Depends(get_db)) -> dict:
     """Public endpoint — the login page calls this on mount to decide whether
     to render the "Continue with ERP360" button. Returns the redirect URL
     where ERP360 will mint the token and bounce back to IFPI.
@@ -175,9 +175,9 @@ def sso_status(db: Session = Depends(get_db)):
     return {"enabled": enabled, "initiate_url": initiate_url}
 
 
-@router.post("/sso-exchange")
+@router.post("/sso-exchange", response_model=None)
 async def sso_exchange(request: Request, response: Response,
-                       db: Session = Depends(get_db)):
+                       db: Session = Depends(get_db)) -> LoginResponse | Response:
     """Inbound SSO from ERP360. Supports two response modes:
 
     - **JSON binding** (Content-Type: application/json) — legacy path
@@ -290,7 +290,7 @@ async def sso_exchange(request: Request, response: Response,
 @router.post("/change-password")
 def change_password(body: ChangePasswordRequest,
                     current: CurrentUser = Depends(get_current_user),
-                    db: Session = Depends(get_db)):
+                    db: Session = Depends(get_db)) -> dict:
     """Self-service password change. Verifies the old password, sets the
     new one, clears the `must_change_password` flag, and revokes all
     active refresh tokens so other devices are logged out.
@@ -308,7 +308,7 @@ def change_password(body: ChangePasswordRequest,
 
 @router.post("/forgot-password")
 def forgot_password(body: ForgotPasswordRequest, request: Request,
-                    db: Session = Depends(get_db)):
+                    db: Session = Depends(get_db)) -> dict:
     """Emails a single-use reset link if the address matches an active
     user. Always returns 200 (enumeration guard) — the response is
     identical whether the email was found or not.
@@ -358,7 +358,7 @@ def forgot_password(body: ForgotPasswordRequest, request: Request,
 
 @router.post("/reset-password")
 def reset_password(body: ResetPasswordRequest, request: Request,
-                   response: Response, db: Session = Depends(get_db)):
+                   response: Response, db: Session = Depends(get_db)) -> LoginResponse:
     """Consume a reset token + set a new password. On success, logs the
     user in immediately (cookies set) so they don't have to re-enter
     the credential they just picked.
@@ -370,7 +370,7 @@ def reset_password(body: ResetPasswordRequest, request: Request,
 
 # ── Iter 33 · Email verification (GDPR-aligned) ─────────────────────
 @router.post("/verify-email")
-def verify_email(body: VerifyEmailRequest, db: Session = Depends(get_db)):
+def verify_email(body: VerifyEmailRequest, db: Session = Depends(get_db)) -> dict:
     """Consume an email-verification token. Called by the /verify-email/:token
     frontend page. Idempotent — a stale link returns 400."""
     user = AuthService(db).consume_email_verification(body.token)
@@ -381,7 +381,7 @@ def verify_email(body: VerifyEmailRequest, db: Session = Depends(get_db)):
 @router.post("/resend-verification")
 def resend_verification(request: Request,
                         current: CurrentUser = Depends(get_current_user),
-                        db: Session = Depends(get_db)):
+                        db: Session = Depends(get_db)) -> dict:
     """Re-issue + email a verification link. Rate-limited (2/hr per
     user) so a compromised session can't spam its own inbox."""
     from services import rate_limit_service
@@ -400,7 +400,7 @@ def resend_verification(request: Request,
 # ── Iter 33 · GDPR: data export + account deletion ──────────────────
 @router.get("/me/export")
 def export_my_data(current: CurrentUser = Depends(get_current_user),
-                   db: Session = Depends(get_db)):
+                   db: Session = Depends(get_db)) -> dict:
     """GDPR Right to Data Portability. Returns a JSON bundle of every
     piece of PII we hold about the requester. Frontend saves the
     response body as a file. API tokens cannot invoke this — must be
@@ -414,7 +414,7 @@ def export_my_data(current: CurrentUser = Depends(get_current_user),
 @router.post("/me/delete-request")
 def request_account_deletion(request: Request,
                              current: CurrentUser = Depends(get_current_user),
-                             db: Session = Depends(get_db)):
+                             db: Session = Depends(get_db)) -> dict:
     """Step 1 of self-deletion. Emails a 6-digit confirmation code that
     must be POSTed back within 30 minutes to complete the erasure."""
     if current.id < 0:
@@ -457,7 +457,7 @@ def request_account_deletion(request: Request,
 def confirm_account_deletion(body: AccountDeletionConfirmRequest,
                              response: Response,
                              current: CurrentUser = Depends(get_current_user),
-                             db: Session = Depends(get_db)):
+                             db: Session = Depends(get_db)) -> dict:
     """Step 2 of self-deletion. Consumes the emailed code + anonymises
     the account. Not a hard delete — the row stays for FK integrity
     (certs, audit records) but every PII field is scrubbed.
@@ -477,7 +477,7 @@ def confirm_account_deletion(body: AccountDeletionConfirmRequest,
 # suite clear the in-memory rate-limit buckets between runs so parallel
 # tests aren't affected by earlier tests' 429-generating requests.
 @router.post("/_test/reset-rate-limit")
-def test_reset_rate_limit():
+def test_reset_rate_limit() -> dict:
     import os as _os
     if _os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() != "true":
         raise HTTPException(status_code=404, detail="Not found")
