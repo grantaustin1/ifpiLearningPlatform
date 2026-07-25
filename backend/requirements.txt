@@ -174,7 +174,7 @@ tzlocal==5.3.1
 uritemplate==4.2.0
 uritools==6.1.2
 urllib3==2.7.0
-uvicorn==0.32.1
+uvicorn==0.51.0
 uvloop==0.22.1
 watchfiles==1.2.0
 webencodings==0.5.1
