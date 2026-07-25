@@ -166,7 +166,7 @@ export default function CourseEditPage() {
               <Sparkles className="h-3.5 w-3.5" /> Mind map
             </button>
             <a
-              href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+              href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
               onClick={(e) => {
                 // Attach auth token as query fallback isn't safe; fetch + blob download instead.
                 e.preventDefault()
@@ -442,7 +442,12 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
           data-testid="narration-voice-select">
           {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={model} onChange={e => setModel(e.target.value as any)}
+        <select value={model} onChange={e => setModel(e.target.value as 'tts-1' | 'tts-1-hd')})}
+          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+          data-testid="narration-voice-select">
+          {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <select value={model} onChange={e => setModel(e.target.value as 'tts-1' | 'tts-1-hd')}
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="narration-model-select">
           <option value="tts-1">tts-1 (fast)</option>
@@ -576,13 +581,13 @@ function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }
         className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-400"
         data-testid="video-prompt-input" />
       <div className="flex flex-wrap items-center gap-2">
-        <select value={model} onChange={e => setModel(e.target.value as any)}
+        <select value={model} onChange={e => setModel(e.target.value as 'sora-2' | 'sora-2-pro')}
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="video-model-select">
           <option value="sora-2">sora-2</option>
           <option value="sora-2-pro">sora-2-pro (higher quality)</option>
         </select>
-        <select value={duration} onChange={e => setDuration(Number(e.target.value) as any)}
+        <select value={duration} onChange={e => setDuration(Number(e.target.value) as 4 | 8 | 12)}
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="video-duration-select">
           <option value={4}>4s</option>
