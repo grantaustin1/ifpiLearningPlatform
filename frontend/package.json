@@ -71,6 +71,9 @@
     "form-data": "^4.0.2",
     "js-yaml": "^4.2.0",
     "shell-quote": "^1.8.5",
-    "underscore": "^1.13.8"
+    "underscore": "^1.13.8",
+    "svgo": "^3.0.2",
+    "webpack-dev-server": "^5.2.6",
+    "@tootallnate/once": "^2.0.1"
   }
 }
