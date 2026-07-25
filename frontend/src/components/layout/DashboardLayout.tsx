@@ -71,7 +71,16 @@ export default function DashboardLayout() {
     return () => window.clearInterval(id)
   }, [])
   const brandName = org.name || 'IFPI Learning'
-  const backend = (import.meta as any).env?.VITE_API_URL
+  const backend = process.env.REACT_APP_BACKEND_URL || ''
+  const resolvedLogo = org.logo_url
+    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
+    : null
+
+  const handleLogout = async () => { await logout(); nav('/login') }
+  const resolvedLogo = org.logo_url
+    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
+    : null
+  const resolvedLogo = org.logo_url
     || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
     || ''
   const resolvedLogo = org.logo_url

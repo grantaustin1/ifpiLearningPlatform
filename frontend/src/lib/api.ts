@@ -5,7 +5,7 @@
  * - Bearer token added if present in memory (dual-mode auth).
  * - 401 → tries one silent refresh; on failure redirects to /login.
  */
-import axios, { AxiosError, AxiosRequestConfig } from 'axios'
+import axios, { AxiosError, AxiosRequestConfig, AxiosHeaders } from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || ''
 export const API_BASE = `${BACKEND_URL}/api`
@@ -22,8 +22,9 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (accessTokenMem) {
-    (config.headers as any) = config.headers || {}
-    ;(config.headers as any).Authorization = `Bearer ${accessTokenMem}`
+    const h = AxiosHeaders.from(config.headers || {})
+    h.set('Authorization', `Bearer ${accessTokenMem}`)
+    config.headers = h
   }
   return config
 })
@@ -51,8 +52,9 @@ api.interceptors.response.use(
       const newTok = await refreshing
       refreshing = null
       if (newTok) {
-        (original.headers as any) = original.headers || {}
-        ;(original.headers as any).Authorization = `Bearer ${newTok}`
+        const h = AxiosHeaders.from(original.headers || {})
+        h.set('Authorization', `Bearer ${newTok}`)
+        original.headers = h
         return api.request(original)
       }
       // Hard fail — clear token, redirect. Iter 33d: don't bounce the

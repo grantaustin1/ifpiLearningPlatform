@@ -26,7 +26,16 @@ export default function RegisterPage() {
       .catch(() => {})
   }, [])
 
-  const backend = (import.meta as any).env?.VITE_API_URL
+  const backend = process.env.REACT_APP_BACKEND_URL || ''
+  const resolvedLogo = brand.logo_url
+    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
+    : null
+
+  const onSubmit = async (e: React.FormEvent) => {
+  const resolvedLogo = brand.logo_url
+    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
+    : null
+  const resolvedLogo = brand.logo_url
     || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL) || ''
   const resolvedLogo = brand.logo_url
     ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
