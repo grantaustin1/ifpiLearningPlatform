@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Award, Download, FileText, Linkedin, Link2, ShieldCheck } from 'lucide-react'
+import { Award, Download, ExternalLink, FileText, Link2, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function CertificatesPage() {
@@ -108,7 +108,7 @@ export default function CertificatesPage() {
                 </button>
                 <button onClick={() => shareLinkedIn(c)} data-testid={`cert-linkedin-${c.id}`}
                   className="inline-flex items-center justify-center gap-1.5 text-xs bg-[#0A66C2] hover:bg-[#004182] text-white px-3 py-2 rounded-lg font-semibold">
-                  <Linkedin className="h-3.5 w-3.5" /> Add to LinkedIn
+                  <ExternalLink className="h-3.5 w-3.5" /> Add to LinkedIn
                 </button>
                 <a href={verifyUrl(c.code)} target="_blank" rel="noreferrer"
                   data-testid={`cert-verify-${c.id}`}
