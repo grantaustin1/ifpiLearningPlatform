@@ -12,8 +12,18 @@ export default function CommentsPanel({ slideId }: { slideId: number }) {
   const [posting, setPosting] = useState(false)
   const isMod = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
 
-  const load = () => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data))
-  useEffect(() => { load() }, [slideId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const ctrl = new AbortController()
+    api.get(`/slides/${slideId}/comments`, { signal: ctrl.signal }).then(r => setComments(r.data)).catch(() => {})
+    return () => ctrl.abort()
+  }, [slideId])
+  useEffect(() => {
+    const ctrl = new AbortController()
+    api.get(`/slides/${slideId}/comments`, { signal: ctrl.signal }).then(r => setComments(r.data)).catch(() => {})
+    return () => ctrl.abort()
+  }, [slideId])
+
+  const refresh = () => api.get(`/slides/${slideId}/comments`).then(r => setComments(r.data)).catch(() => {})
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,6 +37,9 @@ export default function CommentsPanel({ slideId }: { slideId: number }) {
   }
 
   const del = async (id: number) => {
+    await api.delete(`/slides/${slideId}/comments/${id}`)
+    refresh()
+  }
     await api.delete(`/slides/${slideId}/comments/${id}`)
     load()
   }
