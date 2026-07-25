@@ -442,13 +442,7 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
           data-testid="narration-voice-select">
           {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={model} onChange={e => setModel(e.target.value as 'tts-1' | 'tts-1-hd')})}
-          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
-          data-testid="narration-voice-select">
-          {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
         <select value={model} onChange={e => setModel(e.target.value as 'tts-1' | 'tts-1-hd')}
-          className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="narration-model-select">
           <option value="tts-1">tts-1 (fast)</option>
           <option value="tts-1-hd">tts-1-hd (higher quality)</option>

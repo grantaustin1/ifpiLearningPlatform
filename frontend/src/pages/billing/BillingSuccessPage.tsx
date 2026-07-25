@@ -91,51 +91,6 @@ export default function BillingSuccessPage() {
       cancelled = true
       if (timeoutId) clearTimeout(timeoutId)
     }
-
-    const poll = async (n: number) => {
-      if (cancelled) return
-      setAttempt(n)
-      try {
-        const r = await api.get(`/payments/v1/checkout/status/${sessionId}`)
-        const data = r.data as StatusResp
-        setDetails(data)
-
-        if (data.entitled && data.payment_status === 'paid') {
-          setStatus('paid')
-          // Auto-enroll once (server-side is idempotent, but avoid
-          // spamming the endpoint on re-renders).
-          if (!enrolledRef.current) {
-            enrolledRef.current = true
-            try {
-              await api.post(`/courses/${data.course_id}/enroll`)
-            } catch {/* enrollment may 409 if already enrolled — fine */}
-          }
-          // Navigate to the course after a short beat so the user
-          // sees the success state.
-          setTimeout(() => nav(`/learn/${data.course_id}`), 1500)
-          return
-        }
-
-        if (data.status === 'expired') {
-          setStatus('expired'); return
-        }
-
-        // Not paid yet — try again if we have attempts left
-        if (n + 1 >= MAX_ATTEMPTS) {
-          setStatus('failed')
-          return
-        }
-        setTimeout(() => poll(n + 1), POLL_INTERVAL_MS)
-      } catch (e: any) {
-        setStatus('error')
-        setErrorMsg(e?.response?.data?.detail
-          || e?.response?.data?.error?.message
-          || 'Payment status check failed')
-      }
-    }
-
-    poll(0)
-    return () => { cancelled = true }
   }, [sessionId, nav])
 
 
