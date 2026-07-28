@@ -95,7 +95,29 @@ routers/live_sessions/
 
 **Lesson**: Always check `mergeable_state` via GitHub API. "clean" means safe to squash-merge even if the PR branch is old.
 
-### 3.2 Conflict Resolution
+### 3.3 Critical Finding: npm "overrides" vs Yarn "resolutions"
+
+**The IFPI repo uses Yarn 1.22.22 but had `"overrides"` in `package.json` (an npm 8.3+ feature). Yarn 1.x only supports `"resolutions"`.**
+
+This meant **all transitive dependency security overrides were silently ignored** for months. Vulnerable versions like `nth-check@1.0.2`, `serialize-javascript@4.0.0`, and `postcss@7.0.39` remained in the lockfile despite override entries.
+
+**Fix**: Rename `"overrides"` → `"resolutions"`, delete `node_modules` + `yarn.lock`, regenerate from scratch.
+
+**Result**: GitHub alerts dropped from 21 → 3 HIGH.
+
+| Package | Before | After | Severity |
+|---------|--------|-------|----------|
+| nth-check | 1.0.2 | 2.1.1 | HIGH |
+| serialize-javascript | 4.0.0 | 7.0.7 | HIGH |
+| postcss | 7.0.39 | 8.5.23 | HIGH |
+
+### 3.4 Accepted Risk: Remaining 3 HIGH Vulnerabilities
+
+| Package | Advisory | Status | Reason |
+|---------|----------|--------|--------|
+| react-router@7.18.1 | GHSA-qwww-vcr4-c8h2 (RSC CSRF) | **Accepted** | Only affects React Server Components; IFPI uses standard CSR. No stable 8.x release exists yet. |
+| path-to-regexp@0.2.5 | CVE-2024-45296 | **Accepted** | Only in `webpack-dev-server>express` (dev-only). Zero production impact. Express 4.x requires 0.x branch. |
+| (Unknown) | TBD | **Monitoring** | Likely stale/false positive. All major backend packages verified at patched versions. |
 
 When a dependabot PR has merge conflicts (e.g., #147 `@radix-ui/react-progress`):
 - **Preferred**: Close the PR with a comment — dependabot will recreate it fresh within 24 hours
@@ -270,7 +292,35 @@ Based on actual time spent:
 
 ---
 
+### IFPI Changes (2026-07-28 Session)
+
+**Commits:**
+1. `ce20a15f` — fix(frontend): convert npm `"overrides"` to Yarn `"resolutions"` for transitive dep security fixes
+2. `bbf2f5b8` — docs: regenerate auto-blocks to fix docs drift
+3. `84c0188d` — chore(backend): remove unused imports across 44 routers/services
+4. `bc9cdd47` — types(backend): add return type annotations (api_tokens, admin_entitlements, admin_organizations)
+5. `7fc5a753` — docs: regenerate auto-blocks after type hint additions
+6. `2c0f6ff6` — types(backend): add return type annotations to 70 functions across 8 routers
+
+**Key fixes:**
+- Resolved 18 frontend dependency vulnerabilities by fixing `overrides` → `resolutions`
+- Added return type annotations to 70+ backend functions
+- Removed 80 lines of unused imports across 44 backend files
+- Backend tests: 4 passed, 7 skipped (all pre-existing)
+- TypeScript build: zero errors
+
+---
+
 ## 10. Recommended Next Steps for IFPI
+
+1. **Monitor the 3 remaining HIGH alerts** — likely stale/false positive; trigger a Dependabot re-scan from GitHub UI
+2. **Major dependabot bumps** (defer until ready):
+   - `#152` tailwindcss 3→4 (highest risk — test locally first)
+   - `#156` typescript 6→7 (may break build — test first)
+3. **CI/CD guardrails**:
+   - Add `tsc --noEmit` to CI pipeline
+   - Add `python -m py_compile` for backend syntax checking
+   - Add `yarn audit` or `npm audit` step to catch frontend vulns pre-merge
 
 1. **Address remaining major dependabot bumps**:
    - `#152` tailwindcss 3→4 (highest risk — test locally first)
@@ -290,6 +340,8 @@ Based on actual time spent:
 
 ---
 
-*Document version: 1.0*
+*Document version: 1.1*
+*Updated: 2026-07-28*
+*Applies to: ThreeSixtyERP, ifpiLearningPlatform, and future sibling repos*
 *Created: 2026-07-25*
 *Applies to: ThreeSixtyERP, ifpiLearningPlatform, and future sibling repos*
