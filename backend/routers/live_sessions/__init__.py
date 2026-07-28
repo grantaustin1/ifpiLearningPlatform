@@ -20,4 +20,3 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/live-sessions", tags=["Live Sessions"])
 
-from . import _routes, _attendance_routes, _ics_routes

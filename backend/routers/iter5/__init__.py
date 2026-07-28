@@ -27,4 +27,3 @@ def sign_outgoing_payload(body: bytes) -> dict:
     return {"X-Signature": sig, "X-Timestamp": ts, "X-Service-Token": secret}
 
 
-from . import _preview_routes, _uploads_routes, _comments_routes, _academies_routes, _portal_routes

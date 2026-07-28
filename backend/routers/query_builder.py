@@ -25,7 +25,6 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field

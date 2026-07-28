@@ -11,7 +11,6 @@ from __future__ import annotations
 import base64
 import logging
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException
 

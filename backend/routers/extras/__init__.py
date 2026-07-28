@@ -9,10 +9,3 @@ public_branding_router = APIRouter(prefix="/api/branding", tags=["Public Brandin
 outbox_router = APIRouter(prefix="/api/admin/outbox", tags=["Outbox"])
 paths_extra_router = APIRouter(prefix="/api/learning-paths", tags=["Learning Paths"])
 
-from . import (
-    _leads_routes,
-    _org_routes,
-    _public_branding_routes,
-    _outbox_routes,
-    _paths_extra_routes,
-)

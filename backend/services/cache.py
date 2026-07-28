@@ -30,7 +30,7 @@ from collections import OrderedDict
 from threading import Lock
 from typing import Any, Callable, Optional
 
-from fastapi import Request, Response
+from fastapi import Response
 from sqlalchemy.exc import OperationalError
 
 logger = logging.getLogger(__name__)

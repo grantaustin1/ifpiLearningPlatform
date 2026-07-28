@@ -5,7 +5,7 @@ from ._schemas import BulkInviteBody, InvitationCreate, InvitationOut
 
 from datetime import datetime, timezone
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session

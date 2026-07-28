@@ -6,12 +6,11 @@ import hmac
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
-from typing import List
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from models import Certificate, LiveSession, LiveSessionRsvp, Organization, User
+from models import Certificate, LiveSession, Organization, User
 
 logger = logging.getLogger(__name__)
 

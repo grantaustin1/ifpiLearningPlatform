@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Response
+from fastapi import Depends, Response
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_roles
