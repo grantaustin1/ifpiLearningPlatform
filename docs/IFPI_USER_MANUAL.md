@@ -473,32 +473,21 @@ Core entities (see `backend/models/` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 487 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
-| `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 655 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
-| `routers/exams.py` | 212 |
-| `routers/extras.py` | 545 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
-| `routers/invitations.py` | 206 |
-| `routers/iter5.py` | 337 |
-| `routers/iter8.py` | 305 |
-| `routers/learning_paths.py` | 285 |
-| `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1210 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
 | `routers/public_catalog.py` | 173 |
-| `routers/query_builder.py` | 250 |
+| `routers/query_builder.py` | 258 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 512 |
 | `routers/seo.py` | 257 |
@@ -506,7 +495,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12772** |
+| **Total** | **7554** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -762,7 +751,6 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
 | `/api/courses/{course_id}/unpublish` | POST |  |
-| `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
 | `/api/erp360/sync/status` | GET | Public probe. Returns whether IFPI is ready to receive ERP360 |
 | `/api/erp360/sync/test-ping` | POST | Round-trip verification. Currently a stub — synthetic outbound |
@@ -805,7 +793,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/learning-paths/{path_id}/publish` | POST |  |
 | `/api/live-sessions` | GET |  |
 | `/api/live-sessions` | POST |  |
-| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
+| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. |
 | `/api/live-sessions/subscribe-url/qr` | GET | Iter 25 — Return an SVG QR code encoding the current user's |
 | `/api/live-sessions/subscribe-url/rotate` | POST | Iter 25 — Bump the org's subscription_secret_version. Every |
 | `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
@@ -820,7 +808,6 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/live-sessions/{session_id}/uncancel` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
-| `/api/openapi.json` | GET |  |
 | `/api/organization` | GET |  |
 | `/api/organization` | PATCH |  |
 | `/api/organization/apply-theme/{slug}` | POST | Copy a preset's branding values onto the caller's organization. |
@@ -861,7 +848,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **273** registered API endpoints._
+_Total: **271** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
