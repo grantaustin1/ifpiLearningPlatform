@@ -88,7 +88,7 @@ def list_user_entitlements(
     include_free: bool = False,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_admin()),
-):
+) -> UserEntitlementsResponse:
     """List every paid course in the caller's org + whether the target
     user can access it and why.
 
@@ -145,7 +145,7 @@ def get_single_entitlement(
     course_id: int,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_admin()),
-):
+) -> SingleEntitlementResponse:
     """One user, one course — the "why can't they enroll?" answer."""
     user = _load_target_user(db, current, user_id)
     course = db.query(Course).filter(
