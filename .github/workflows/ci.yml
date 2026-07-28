@@ -154,6 +154,19 @@ jobs:
 
   # ─── Frontend lint + typecheck ─────────────────────────────────
   frontend:
+    name: Frontend Typecheck + Build
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: 'yarn', cache-dependency-path: frontend/yarn.lock }
+      - working-directory: frontend
+        run: |
+          yarn install --frozen-lockfile
+          yarn typecheck
+          CI=true yarn build
+  frontend:
     name: Frontend Lint + Build
     runs-on: ubuntu-latest
     needs: secret-scan
