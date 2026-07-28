@@ -42,8 +42,10 @@ def _to_dict(t: ApiToken) -> dict:
 
 
 @router.get("")
-def list_tokens(db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+def list_tokens(
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+) -> dict:
     rows = db.query(ApiToken).filter(
         ApiToken.organization_id == current.organization_id,
     ).order_by(ApiToken.id.desc()).all()
@@ -51,8 +53,11 @@ def list_tokens(db: Session = Depends(get_db),
 
 
 @router.post("", status_code=201)
-def create_token(body: ApiTokenCreate, db: Session = Depends(get_db),
-                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+def create_token(
+    body: ApiTokenCreate,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+) -> dict:
     # Preserve scope tokens (contain `:`) verbatim; normalize role tokens.
     raw = body.scopes or []
     scope_tokens = [s for s in raw if isinstance(s, str) and ":" in s]
@@ -93,8 +98,11 @@ def create_token(body: ApiTokenCreate, db: Session = Depends(get_db),
 
 
 @router.post("/{token_id}/revoke")
-def revoke_token(token_id: int, db: Session = Depends(get_db),
-                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+def revoke_token(
+    token_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+) -> dict:
     row = db.query(ApiToken).filter(
         ApiToken.id == token_id,
         ApiToken.organization_id == current.organization_id,
@@ -117,8 +125,11 @@ def revoke_token(token_id: int, db: Session = Depends(get_db),
 
 
 @router.delete("/{token_id}")
-def delete_token(token_id: int, db: Session = Depends(get_db),
-                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+def delete_token(
+    token_id: int,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+) -> dict:
     row = db.query(ApiToken).filter(
         ApiToken.id == token_id,
         ApiToken.organization_id == current.organization_id,
@@ -136,7 +147,7 @@ def token_usage_analytics(
     days: int = 30,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
-):
+) -> dict:
     """Return per-day request counts for the org over the last `days` days,
     plus a breakdown by-token. Used by the /tokens page chart.
 
@@ -220,7 +231,7 @@ def ai_spend_analytics(
     days: int = 30,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
-):
+) -> dict:
     """Per-day $ spend across all AI providers for the last `days` days.
     Sources: `ai_usage_ledger`. Grouped by provider for a stacked chart."""
     from datetime import datetime, timedelta, timezone
