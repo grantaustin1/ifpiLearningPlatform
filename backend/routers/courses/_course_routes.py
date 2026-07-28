@@ -39,7 +39,7 @@ def list_courses(
     category: str | None = Query(None),
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-):
+) -> list:
     query = db.query(Course).filter(Course.organization_id == current.organization_id)
     if not _can_manage(current):
         query = query.filter(Course.status == CourseStatus.PUBLISHED)
@@ -55,7 +55,7 @@ def list_courses(
 def reorder_catalog(
     body: dict, db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
-):
+) -> dict:
     """Body: {"course_ids": [id1, id2, ...]} — sets display_order to the
     list index. Only courses in the caller's org are updated."""
     ids = body.get("course_ids") or []
@@ -75,7 +75,7 @@ def reorder_catalog(
 def create_course(
     body: CourseCreate, db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN")),
-):
+) -> CourseDetail:
     # Pre-flight duplicate check so we return 409 instead of a 500 from the
     # DB unique constraint (uq_courses_org_title, Iter 25b).
     dup = db.query(Course).filter(
@@ -101,7 +101,7 @@ def create_course(
 
 @router.get("/{course_id}", response_model=CourseDetail)
 def get_course(course_id: int, db: Session = Depends(get_db),
-               current: CurrentUser = Depends(get_current_user)):
+               current: CurrentUser = Depends(get_current_user)) -> CourseDetail:
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
     ).first()
@@ -114,7 +114,7 @@ def get_course(course_id: int, db: Session = Depends(get_db),
 
 @router.patch("/{course_id}", response_model=CourseDetail)
 def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_db),
-                  current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                  current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> CourseDetail:
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
     ).first()
@@ -132,7 +132,7 @@ def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_
 
 @router.delete("/{course_id}")
 def delete_course(course_id: int, db: Session = Depends(get_db),
-                  current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                  current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
     ).first()
@@ -145,7 +145,7 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
 
 @router.post("/{course_id}/publish")
 def publish_course(course_id: int, db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                   current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> dict:
     """Explicit publish action with validation. Course must have at least
     one slide before it can be published."""
     c = db.query(Course).filter(
@@ -162,7 +162,7 @@ def publish_course(course_id: int, db: Session = Depends(get_db),
 
 @router.post("/{course_id}/unpublish")
 def unpublish_course(course_id: int, db: Session = Depends(get_db),
-                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> dict:
     c = db.query(Course).filter(
         Course.id == course_id, Course.organization_id == current.organization_id,
     ).first()
@@ -175,7 +175,7 @@ def unpublish_course(course_id: int, db: Session = Depends(get_db),
 
 @router.post("/{course_id}/duplicate")
 def duplicate_course(course_id: int, db: Session = Depends(get_db),
-                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                     current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> dict:
     """Deep-clone a course (with all slides) as a new DRAFT. Optional template path:
     instructors can keep a master "template" course and duplicate it as a base
     for each new cohort."""

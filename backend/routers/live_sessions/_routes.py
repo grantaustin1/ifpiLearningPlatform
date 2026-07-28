@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ── Admin routes ─────────────────────────────────────────────────────
 @router.post("", status_code=201)
 def create_session(body: LiveSessionIn, db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     # Normalise timezone: coerce naive → UTC
     start = body.start_at
     if start.tzinfo is None:
@@ -75,7 +75,7 @@ def list_sessions(
     cohort: Optional[str] = None,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-):
+) -> dict:
     # Iter 38 — was 86 queries via `s.rsvps` lazy-load per session
     # (twice — for rsvp_count and attendance_count). `selectinload`
     # collapses to 2 queries total.
@@ -94,7 +94,7 @@ def list_sessions(
 def list_upcoming_for_learner(
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-):
+) -> dict:
     """List sessions the current user can RSVP to: their cohort (or
     sessions with no cohort restriction)."""
     user = db.query(User).filter(User.id == current.id).first()
@@ -129,7 +129,7 @@ def list_upcoming_for_learner(
 
 @router.get("/{session_id}")
 def get_session(session_id: int, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(get_current_user)):
+                current: CurrentUser = Depends(get_current_user)) -> dict:
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
         LiveSession.organization_id == current.organization_id,
@@ -142,7 +142,7 @@ def get_session(session_id: int, db: Session = Depends(get_db),
 @router.patch("/{session_id}")
 def update_session(session_id: int, body: LiveSessionPatch,
                    db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
         LiveSession.organization_id == current.organization_id,
@@ -164,7 +164,7 @@ def update_session(session_id: int, body: LiveSessionPatch,
 @router.delete("/{session_id}", status_code=204)
 def delete_session(session_id: int, cascade_series: bool = False,
                    db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> None:
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
         LiveSession.organization_id == current.organization_id,
@@ -184,7 +184,7 @@ def delete_session(session_id: int, cascade_series: bool = False,
 
 @router.post("/{session_id}/cancel")
 def cancel_occurrence(session_id: int, db: Session = Depends(get_db),
-                      current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                      current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics).
     The row is soft-cancelled (stamped `cancelled_at`) rather than hard-
     deleted so RSVP + attendance history is preserved for audit."""
@@ -202,7 +202,7 @@ def cancel_occurrence(session_id: int, db: Session = Depends(get_db),
 
 @router.post("/{session_id}/uncancel")
 def uncancel_occurrence(session_id: int, db: Session = Depends(get_db),
-                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     s = db.query(LiveSession).filter(
         LiveSession.id == session_id,
         LiveSession.organization_id == current.organization_id,
@@ -219,7 +219,7 @@ def uncancel_occurrence(session_id: int, db: Session = Depends(get_db),
 @router.post("/{session_id}/rsvp")
 def toggle_rsvp(session_id: int, series: bool = False,
                 db: Session = Depends(get_db),
-                current: CurrentUser = Depends(get_current_user)):
+                current: CurrentUser = Depends(get_current_user)) -> dict:
     """RSVP to a single session (default) OR the whole series when
     `?series=true` is passed against a series-head id (Iter 24 Cohort
     Enrollment)."""

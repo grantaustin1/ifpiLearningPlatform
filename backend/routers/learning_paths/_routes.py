@@ -50,7 +50,7 @@ def _detail(p: LearningPath, user_id: int) -> PathDetail:
 
 @router.get("", response_model=List[PathSummary])
 def list_paths(db: Session = Depends(get_db),
-               current: CurrentUser = Depends(get_current_user)):
+               current: CurrentUser = Depends(get_current_user)) -> list:
     q = db.query(LearningPath).filter(LearningPath.organization_id == current.organization_id)
     if not _can_manage(current):
         q = q.filter(LearningPath.status == LearningPathStatus.PUBLISHED)
@@ -59,7 +59,7 @@ def list_paths(db: Session = Depends(get_db),
 
 @router.post("", response_model=PathDetail)
 def create_path(body: PathCreate, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> PathDetail:
     p = LearningPath(
         organization_id=current.organization_id, title=body.title,
         description=body.description, cover_color=body.cover_color,
@@ -74,7 +74,7 @@ def create_path(body: PathCreate, db: Session = Depends(get_db),
 
 @router.get("/{path_id}", response_model=PathDetail)
 def get_path(path_id: int, db: Session = Depends(get_db),
-             current: CurrentUser = Depends(get_current_user)):
+             current: CurrentUser = Depends(get_current_user)) -> PathDetail:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
@@ -88,7 +88,7 @@ def get_path(path_id: int, db: Session = Depends(get_db),
 
 @router.patch("/{path_id}", response_model=PathDetail)
 def update_path(path_id: int, body: PathUpdate, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> PathDetail:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
@@ -107,7 +107,7 @@ def update_path(path_id: int, body: PathUpdate, db: Session = Depends(get_db),
 
 @router.delete("/{path_id}")
 def delete_path(path_id: int, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
@@ -121,7 +121,7 @@ def delete_path(path_id: int, db: Session = Depends(get_db),
 
 @router.post("/{path_id}/items", response_model=PathItemOut)
 def add_item(path_id: int, body: PathItemIn, db: Session = Depends(get_db),
-             current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+             current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> PathItemOut:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
@@ -156,7 +156,7 @@ def add_item(path_id: int, body: PathItemIn, db: Session = Depends(get_db),
 
 @router.delete("/{path_id}/items/{course_id}")
 def remove_item(path_id: int, course_id: int, db: Session = Depends(get_db),
-                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> dict:
     item = db.query(LearningPathItem).join(LearningPath).filter(
         LearningPathItem.path_id == path_id,
         LearningPathItem.course_id == course_id,
@@ -171,7 +171,7 @@ def remove_item(path_id: int, course_id: int, db: Session = Depends(get_db),
 
 @router.post("/{path_id}/enroll")
 def enroll_in_path(path_id: int, db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(get_current_user)):
+                   current: CurrentUser = Depends(get_current_user)) -> dict:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
@@ -199,7 +199,7 @@ def enroll_in_path(path_id: int, db: Session = Depends(get_db),
 
 @router.post("/{path_id}/publish")
 def publish_path(path_id: int, db: Session = Depends(get_db),
-                 current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+                 current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))) -> dict:
     p = db.query(LearningPath).filter(
         LearningPath.id == path_id,
         LearningPath.organization_id == current.organization_id,
