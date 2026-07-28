@@ -1,0 +1,48 @@
+# Pre-commit configuration for IFPI Learning Platform
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # ─── Local hooks (project-specific) ─────────────────────────────
+  - repo: local
+    hooks:
+      # TypeScript typecheck — blocks commits that break tsc --noEmit
+      - id: tsc-typecheck
+        name: TypeScript typecheck
+        description: Ensure frontend TypeScript compiles without errors
+        entry: bash -c 'cd frontend && yarn typecheck'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+        stages: [commit]
+
+      # Python syntax check — blocks commits with syntax errors
+      - id: python-syntax
+        name: Python syntax check
+        description: Verify Python files compile cleanly
+        entry: python -m py_compile
+        language: system
+        files: ^backend/.*\.py$
+        stages: [commit]
+
+      # Raw URL guard — warns about raw localhost URLs in source
+      - id: raw-url-guard
+        name: Raw URL guard
+        description: Prevent hardcoded localhost/preview URLs in source files
+        entry: bash scripts/guard_no_raw_urls.sh
+        language: system
+        files: ^(frontend|backend)/.*\.(py|ts|tsx|js|jsx)$
+        pass_filenames: true
+        stages: [commit]
+
+  # ─── Standard hooks ─────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
