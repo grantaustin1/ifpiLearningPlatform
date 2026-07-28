@@ -26,6 +26,7 @@ import os
 import secrets
 from typing import Optional
 
+from core.config import settings
 from sqlalchemy.orm import Session
 
 from models import Organization, WebhookSubscription
@@ -63,7 +64,7 @@ def _default_secret() -> str:
     `IFPI_WEBHOOK_OUTBOUND_SECRET` env; fall back to a locally-generated
     random secret so the subscription still works in single-tenant
     preview (with a warning log)."""
-    secret = (os.environ.get("IFPI_WEBHOOK_OUTBOUND_SECRET") or "").strip()
+    secret = (settings.webhook_outbound_secret or "").strip()
     if secret:
         return secret
     logger.warning(
