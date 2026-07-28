@@ -68,7 +68,7 @@ class TermsAcceptIn(BaseModel):
 
 @router.get("/api/terms/current")
 def get_current_terms(current: CurrentUser = Depends(get_current_user),
-                      db: Session = Depends(get_db)):
+                      db: Session = Depends(get_db)) -> dict:
     tv = (db.query(TermsVersion)
           .filter(TermsVersion.organization_id == current.organization_id,
                   TermsVersion.is_current.is_(True))
@@ -95,7 +95,7 @@ def get_current_terms(current: CurrentUser = Depends(get_current_user),
 @router.post("/api/terms/accept")
 def accept_terms(body: TermsAcceptIn, request: Request,
                  current: CurrentUser = Depends(get_current_user),
-                 db: Session = Depends(get_db)):
+                 db: Session = Depends(get_db)) -> dict:
     tv = db.query(TermsVersion).filter(
         TermsVersion.id == body.terms_version_id,
         TermsVersion.organization_id == current.organization_id,
@@ -126,7 +126,7 @@ def accept_terms(body: TermsAcceptIn, request: Request,
 
 @router.get("/api/admin/terms")
 def list_terms(current: CurrentUser = Depends(requires_admin()),
-               db: Session = Depends(get_db)):
+               db: Session = Depends(get_db)) -> dict:
     rows = (db.query(TermsVersion)
             .filter(TermsVersion.organization_id == current.organization_id)
             .order_by(TermsVersion.published_at.desc())
@@ -141,7 +141,7 @@ def list_terms(current: CurrentUser = Depends(requires_admin()),
 @router.post("/api/admin/terms")
 def publish_terms(body: TermsPublishIn, request: Request,
                   current: CurrentUser = Depends(requires_admin()),
-                  db: Session = Depends(get_db)):
+                  db: Session = Depends(get_db)) -> dict:
     # Version string must be unique within org
     existing = db.query(TermsVersion).filter(
         TermsVersion.organization_id == current.organization_id,
@@ -173,7 +173,7 @@ def publish_terms(body: TermsPublishIn, request: Request,
 @router.get("/api/admin/terms/acceptances")
 def list_acceptances(limit: int = 200,
                      current: CurrentUser = Depends(requires_admin()),
-                     db: Session = Depends(get_db)):
+                     db: Session = Depends(get_db)) -> dict:
     q = (db.query(TermsAcceptance, User, TermsVersion)
          .join(User, User.id == TermsAcceptance.user_id)
          .join(TermsVersion, TermsVersion.id == TermsAcceptance.terms_version_id)
@@ -207,7 +207,7 @@ def _get_or_create_kiosk(db: Session, org_id: int) -> KioskSettings:
 
 @router.get("/api/kiosk/settings")
 def get_kiosk_settings(current: CurrentUser = Depends(get_current_user),
-                       db: Session = Depends(get_db)):
+                       db: Session = Depends(get_db)) -> dict:
     row = db.query(KioskSettings).filter(
         KioskSettings.organization_id == current.organization_id).first()
     if not row:
@@ -221,7 +221,7 @@ def get_kiosk_settings(current: CurrentUser = Depends(get_current_user),
 @router.put("/api/admin/kiosk/settings")
 def update_kiosk_settings(body: KioskSettingsIn, request: Request,
                           current: CurrentUser = Depends(requires_admin()),
-                          db: Session = Depends(get_db)):
+                          db: Session = Depends(get_db)) -> dict:
     row = _get_or_create_kiosk(db, current.organization_id)
     row.enabled = body.enabled
     row.idle_timeout_seconds = body.idle_timeout_seconds
@@ -246,7 +246,7 @@ class KioskUnlockIn(BaseModel):
 @router.post("/api/kiosk/unlock")
 def kiosk_unlock(body: KioskUnlockIn,
                  current: CurrentUser = Depends(get_current_user),
-                 db: Session = Depends(get_db)):
+                 db: Session = Depends(get_db)) -> dict:
     if body.method == "pin":
         row = db.query(KioskSettings).filter(
             KioskSettings.organization_id == current.organization_id).first()
@@ -295,7 +295,7 @@ KNOWN_FLAGS: dict[str, tuple[bool, str]] = {
 @degrade_on_db_error(_feature_flags_cache_key)
 def get_feature_flags(response: Response,
                       current: CurrentUser = Depends(get_current_user),
-                      db: Session = Depends(get_db)):
+                      db: Session = Depends(get_db)) -> dict:
     rows = db.query(FeatureFlag).filter(
         FeatureFlag.organization_id == current.organization_id).all()
     overrides = {r.flag_key: r.enabled for r in rows}
@@ -314,7 +314,7 @@ def get_feature_flags(response: Response,
 @router.put("/api/admin/feature-flags/{flag_key}")
 def set_feature_flag(flag_key: str, body: FeatureFlagIn, request: Request,
                      current: CurrentUser = Depends(requires_admin()),
-                     db: Session = Depends(get_db)):
+                     db: Session = Depends(get_db)) -> dict:
     if flag_key not in KNOWN_FLAGS:
         raise HTTPException(status_code=400,
                             detail=f"Unknown flag_key '{flag_key}'. See /api/feature-flags for the registry.")

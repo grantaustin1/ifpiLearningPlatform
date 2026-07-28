@@ -15,7 +15,7 @@ from ._schemas import CohortSettingsIn, OrgUpdate, SmtpConfigIn, WebhookTestIn
 
 @org_router.get("")
 def get_org(db: Session = Depends(get_db),
-            current: CurrentUser = Depends(get_current_user)):
+            current: CurrentUser = Depends(get_current_user)) -> dict:
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Organisation not found")
@@ -38,7 +38,7 @@ def get_org(db: Session = Depends(get_db),
 
 @org_router.put("/cohort-settings")
 def update_cohort_settings(body: CohortSettingsIn, db: Session = Depends(get_db),
-                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Organisation not found")
@@ -67,7 +67,7 @@ def _detect_provider(url: str) -> str:
 
 @org_router.post("/cohort-settings/test-webhook")
 def test_cohort_webhook(body: WebhookTestIn, db: Session = Depends(get_db),
-                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Send a sample celebration message to verify the configured webhook.
 
     Returns the upstream HTTP status so the admin sees whether Discord/Slack
@@ -114,7 +114,7 @@ def test_cohort_webhook(body: WebhookTestIn, db: Session = Depends(get_db),
 
 @org_router.post("/cohort-digest/send-now")
 def send_cohort_digest_now(db: Session = Depends(get_db),
-                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                           current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Manual trigger — queues the weekly cohort digest immediately for this
     org. Unlike the scheduled job this ignores the 6-day dedupe window so an
     admin can preview the email on demand.
@@ -136,7 +136,7 @@ def send_cohort_digest_now(db: Session = Depends(get_db),
 
 
 @org_router.get("/themes")
-def list_theme_presets(current: CurrentUser = Depends(get_current_user)):
+def list_theme_presets(current: CurrentUser = Depends(get_current_user)) -> list:
     """Read-only list of curated theme presets an ADMIN can apply in one click."""
     from services.theme_presets import PRESETS
     return PRESETS
@@ -144,7 +144,7 @@ def list_theme_presets(current: CurrentUser = Depends(get_current_user)):
 
 @org_router.post("/apply-theme/{slug}")
 def apply_theme_preset(slug: str, db: Session = Depends(get_db),
-                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Copy a preset's branding values onto the caller's organization."""
     from services.theme_presets import get_preset
     preset = get_preset(slug)
@@ -172,7 +172,7 @@ def apply_theme_preset(slug: str, db: Session = Depends(get_db),
 
 @org_router.get("/smtp")
 def get_smtp_config(db: Session = Depends(get_db),
-                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Returns the SMTP config minus the password. Password is write-only."""
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
@@ -188,7 +188,7 @@ def get_smtp_config(db: Session = Depends(get_db),
 
 @org_router.put("/smtp")
 def update_smtp_config(body: SmtpConfigIn, db: Session = Depends(get_db),
-                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     from services.smtp_service import encrypt_password
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
@@ -215,7 +215,7 @@ def update_smtp_config(body: SmtpConfigIn, db: Session = Depends(get_db),
 
 @org_router.post("/smtp/test")
 def test_smtp_send(body: dict, db: Session = Depends(get_db),
-                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     """Send a test email immediately (synchronous, NOT via the outbox)."""
     from services.smtp_service import send_via_org_smtp
     to = (body.get("to") or "").strip()
@@ -241,7 +241,7 @@ def test_smtp_send(body: dict, db: Session = Depends(get_db),
 
 @org_router.patch("")
 def update_org(body: OrgUpdate, db: Session = Depends(get_db),
-               current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+               current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Organisation not found")
