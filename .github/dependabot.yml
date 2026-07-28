@@ -1,4 +1,6 @@
 version: 2
+# Dependabot config - triggers re-scan on edit
+updates:
 updates:
   - package-ecosystem: "pip"
     directory: "/backend"
