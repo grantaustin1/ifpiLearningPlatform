@@ -21,7 +21,7 @@ def bulk_email_certificates(
     """Iter 31 — Bulk re-email certificate download links to owners.
     Useful for resending after infra issues or re-notifying learners
     of a re-issued cert. Uses standard outbox pipeline."""
-    from models import User as UserModel, LiveSession, Organization
+    from models import LiveSession, Organization
     from services.mail_service import MailService
     mail = MailService(db)
     org = db.query(Organization).filter(

@@ -3,4 +3,3 @@ from fastapi import APIRouter
 
 router = APIRouter(tags=["Audit & Reports"])
 
-from . import _routes

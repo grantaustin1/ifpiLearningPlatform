@@ -14,7 +14,6 @@ from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import Organization, WebhookDelivery, WebhookSubscription
 from services import audit_service
-from services.webhook_service import emit_event
 
 router = APIRouter(prefix="/api/admin/webhooks", tags=["Webhooks"])
 

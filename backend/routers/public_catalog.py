@@ -19,10 +19,9 @@ limiting lives in the ingress / CDN layer.
 """
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user

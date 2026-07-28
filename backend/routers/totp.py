@@ -26,7 +26,6 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
-from core.config import settings as _settings
 from core.security import verify_password
 from models import User
 from schemas import (

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth.dependencies import CurrentUser, get_current_user
 from core.database import get_db
-from models import EnrollmentStatus, User, UserBadge
+from models import EnrollmentStatus, User
 from schemas import LeaderboardEntry
 from services.gamification_service import BADGE_META
 

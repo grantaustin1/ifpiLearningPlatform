@@ -1,4 +1,3 @@
-from models import LiveSession
 
 
 def resolve_certificate_title(c, sessions: dict) -> str:

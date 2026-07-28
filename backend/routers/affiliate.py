@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from auth.dependencies import CurrentUser, get_current_user, requires_admin, requires_roles
+from auth.dependencies import CurrentUser, requires_admin, requires_roles
 from core.database import get_db
 from models import AffiliateCode, AffiliateReferral, Organization
 from services import audit_service

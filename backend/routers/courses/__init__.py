@@ -6,4 +6,3 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
 richtext_router = APIRouter(prefix="/api/rich-text", tags=["Rich Text"])
 
-from . import _course_routes, _slide_routes, _enrollment_routes, _prerequisite_routes, _richtext_routes

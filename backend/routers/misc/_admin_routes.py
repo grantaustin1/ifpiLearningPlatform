@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections import OrderedDict
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, Response
+from fastapi import Depends, Response
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session, selectinload
 
-from auth.dependencies import CurrentUser, get_current_user, requires_roles
+from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import Certificate, Course, Enrollment, EnrollmentStatus, Exam, ExamAttempt, User
 from schemas import AnalyticsOverview

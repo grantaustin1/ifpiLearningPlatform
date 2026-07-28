@@ -8,16 +8,16 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from core.sanitizer import sanitize_plain_text
 from models import (
-    Course, CourseSlide, CourseStatus, Organization, ScormPackage, SlideType,
-    User, XApiStatement,
+    Course, CourseSlide, CourseStatus, ScormPackage, SlideType, User,
+    XApiStatement,
 )
 from services.scorm_service import ParsedScorm, ScormParseError, extract_and_parse
 

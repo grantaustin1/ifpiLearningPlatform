@@ -15,18 +15,16 @@ Endpoints (all staff-only via `requires_staff()`):
 from __future__ import annotations
 
 import logging
-import os
-import uuid
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth.dependencies import CurrentUser, requires_admin, requires_staff
+from auth.dependencies import CurrentUser, requires_staff
 from core.config import settings
 from core.database import SessionLocal, get_db
 from core.sanitizer import sanitize_plain_text

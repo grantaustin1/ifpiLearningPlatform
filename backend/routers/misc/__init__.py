@@ -12,16 +12,3 @@ admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 billing_router = APIRouter(prefix="/api/billing", tags=["Billing"])
 catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 
-from . import (
-    _ai_builder_routes,
-    _enrollment_routes,
-    _cert_lifecycle_routes,
-    _cert_admin_routes,
-    _cert_verify_routes,
-    _cert_export_routes,
-    _notification_routes,
-    _gamification_routes,
-    _admin_routes,
-    _billing_routes,
-    _catalog_routes,
-)

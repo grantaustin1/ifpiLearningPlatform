@@ -3,7 +3,7 @@ from __future__ import annotations
 from . import public_router
 from ._schemas import InvitationAccept, InvitationLookup
 
-from fastapi import Depends, HTTPException, Response
+from fastapi import Depends, Response
 from sqlalchemy.orm import Session
 
 from auth.cookies import set_auth_cookie, set_refresh_cookie, should_include_token_in_body

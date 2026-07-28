@@ -3,4 +3,3 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/exams", tags=["Exams"])
 
-from . import _routes

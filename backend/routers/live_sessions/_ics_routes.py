@@ -12,7 +12,7 @@ from core.database import get_db
 from models import LiveSession, LiveSessionRsvp, Organization, User
 
 from . import router
-from ._helpers import _ics_escape, _serialize, _sign_subscription_token, _verify_subscription_token
+from ._helpers import _ics_escape, _sign_subscription_token, _verify_subscription_token
 
 
 @router.get("/{session_id}/ics")

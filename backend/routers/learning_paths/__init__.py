@@ -16,4 +16,3 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/learning-paths", tags=["Learning Paths"])
 
-from . import _routes

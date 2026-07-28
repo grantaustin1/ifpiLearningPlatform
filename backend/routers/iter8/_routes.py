@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import distinct, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles

@@ -5,10 +5,8 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from models import LifecycleStage, Organization, Person
 

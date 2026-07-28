@@ -30,8 +30,8 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user, requires_staff
 from core.database import get_db
 from models import (
-    Course, CourseSlide, Enrollment, Flashcard, FlashcardReview,
-    SourceChunk, SourceDocument,
+    Course, CourseSlide, Flashcard, FlashcardReview, SourceChunk,
+    SourceDocument,
 )
 from services import ai_budget_service, flashcard_service
 

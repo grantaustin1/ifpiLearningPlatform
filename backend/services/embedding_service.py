@@ -17,7 +17,6 @@ import logging
 import math
 import os
 import re
-import uuid
 from typing import List, Optional
 
 from sqlalchemy.orm import Session

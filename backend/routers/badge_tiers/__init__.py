@@ -3,4 +3,3 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/badge-tiers", tags=["Badge Tiers"])
 
-from . import _routes
