@@ -1,6 +1,33 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 · Lint extended with decorator-pass (2026-02-13)
+
+Extends the ForwardRef preflight lint to catch the bug at DEFINITION time, not just after decorators have been attached to endpoints.
+
+### New `--check-decorators` mode
+
+AST-scan of every module under `services/` and `core/`:
+- If the module uses `functools.wraps` (heuristic: "defines a decorator")
+- AND its top-level imports omit any of `{Request, Response, BackgroundTasks}`
+- THEN print an ADVISORY WARNING (not build-failing) pointing at the exact file + missing imports.
+
+Rationale: not every decorator wraps a FastAPI endpoint. Making this fatal would false-positive on pure worker/utility decorators. But every warning IS worth reading before you attach that decorator to a route.
+
+### Preemptive fix
+Applied the recommendation to both existing decorator modules:
+- `services/db_locks.py` — now re-exports `Request, Response, BackgroundTasks`
+- `services/cache.py` — now re-exports `BackgroundTasks` (Request/Response already present)
+
+Both modules now pass the advisory pass cleanly.
+
+### CI + tests
+- `.github/workflows/ci.yml` — `endpoint-signatures` job now runs with `--check-decorators`
+- New test `test_lint_with_decorator_pass_passes` locks in the current clean state
+
+**Total: still 91/91 tests passing (Stripe API flakiness in full-suite runs is external, isolated runs are clean).**
+
+
 ## Iter 39 · Endpoint signature preflight lint (2026-02-13)
 
 Guards against the class of bug that took down CI's agent 008 (Iter 39 fix earlier today). Runs on every push before the pytest suite.
