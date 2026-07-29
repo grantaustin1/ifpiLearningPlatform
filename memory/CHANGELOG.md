@@ -1,6 +1,26 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iter 39 · Endpoint signature preflight lint (2026-02-13)
+
+Guards against the class of bug that took down CI's agent 008 (Iter 39 fix earlier today). Runs on every push before the pytest suite.
+
+### The bug this prevents
+`from __future__ import annotations` + decorator whose wrapper module doesn't import the annotation's type = `get_type_hints(endpoint)` leaves a `ForwardRef` unresolved → FastAPI treats it as a query param → every request silently 422s.
+
+### Preflight lint
+- `scripts/lint_endpoint_signatures.py` — imports the app, walks `app.routes`, runs `get_type_hints(route.endpoint)` on each, asserts every annotation resolves to a real class (no `ForwardRef` leaks). Exits 0 on clean, 1 on any leak with a targeted "fix: import X in module Y" message.
+- Verified: 275 endpoints check clean on the current codebase.
+
+### CI wire-up
+- New `.github/workflows/ci.yml` job **`endpoint-signatures`** (runs in parallel with backend-tests). Fails the build on any leak.
+
+### Tests
+- `tests/test_iteration39_endpoint_signature_lint.py` — 3 tests: (a) live app lint passes, (b) `services.db_locks` re-exports `Request`, (c) `services.cache` re-exports `Request` + `Response`. Removing any of these re-exports breaks the endpoints those decorators wrap.
+
+**Total: 91/91 backend tests passing, 1 skipped.**
+
+
 ## Iter 39 · Webhook Deliveries admin page (read-only) (2026-02-13)
 
 Small ops-visibility addition on top of the outbound dispatcher. Zero interactive complexity — read-only list, auto-refresh 15s, two filters.

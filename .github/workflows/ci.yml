@@ -101,6 +101,29 @@ jobs:
             printf "$VIOL"
           fi
 
+  # ─── Endpoint signature lint ────────────────────────────────────
+  # Catches ForwardRef leaks caused by decorators whose wrapper module
+  # doesn't import the annotation's type. Introduced after CI Iter 39
+  # regression: POST /api/courses/{id}/complete silently 422'd because
+  # `@retry_on_deadlock` + `from __future__ import annotations` +
+  # `request: Request` = FastAPI couldn't resolve the type.
+  endpoint-signatures:
+    name: Endpoint Signature Lint
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r backend/requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
+      - name: Bootstrap DB (for import-time side effects)
+        working-directory: backend
+        run: python -c "from server import app; print('imported', len(app.routes), 'routes')"
+      - name: Lint endpoint annotations resolve
+        working-directory: backend
+        run: python scripts/lint_endpoint_signatures.py
+
   # ─── QA Agents: governance + infra (allow E2E to be optional) ──
   qa-agents:
     name: QA Agents (007 invariants + 010 infra)
