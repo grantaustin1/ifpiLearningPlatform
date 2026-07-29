@@ -49,6 +49,7 @@ def _api_url() -> str:
 
 API = _api_url()
 LOG: list[dict] = []
+MAX_ERROR_BODY_LENGTH = 200
 
 
 def step(name: str, ok: bool, detail: str = "") -> None:
@@ -63,7 +64,7 @@ def step(name: str, ok: bool, detail: str = "") -> None:
 def _is_completion_status_ok(status_code: int, is_already_completed: bool) -> bool:
     """Accept normal success codes, plus 422 only when completion state is
     already persisted (idempotent outcome)."""
-    return status_code in (200, 201) or is_already_completed
+    return status_code in (200, 201) or (status_code == 422 and is_already_completed)
 
 
 def _report_path(name: str) -> Path:
@@ -171,22 +172,28 @@ def main() -> int:
     completed_despite_422 = False
     if r.status_code == 422:
         with SessionLocal() as db:
-            learner = db.query(User).filter(User.email == learner_email).first()
-            if learner:
-                en = db.query(Enrollment).filter(
-                    Enrollment.user_id == learner.id, Enrollment.course_id == course.id,
-                ).first()
-                cert = db.query(Certificate).filter(
-                    Certificate.user_id == learner.id, Certificate.course_id == course.id,
-                ).first()
-                completed_despite_422 = en and en.status == EnrollmentStatus.COMPLETED and cert
+            from sqlalchemy import and_
+
+            completed_despite_422 = db.query(Enrollment.id).join(
+                User, User.id == Enrollment.user_id,
+            ).join(
+                Certificate,
+                and_(
+                    Certificate.user_id == Enrollment.user_id,
+                    Certificate.course_id == Enrollment.course_id,
+                ),
+            ).filter(
+                User.email == learner_email,
+                Enrollment.course_id == course.id,
+                Enrollment.status == EnrollmentStatus.COMPLETED,
+            ).first() is not None
     step(
         "course marked complete",
         _is_completion_status_ok(r.status_code, completed_despite_422),
         (
             f"status={r.status_code} (already completed + cert issued)"
             if completed_despite_422
-            else f"status={r.status_code} body={r.text[:200]}"
+            else f"status={r.status_code} body={r.text[:MAX_ERROR_BODY_LENGTH]}"
         ),
     )
 
