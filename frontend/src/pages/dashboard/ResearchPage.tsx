@@ -46,7 +46,12 @@ export default function ResearchPage() {
         const r = await api.get(`/authoring/research/${id}`)
         setJobs(js => js.map(j => (j.id === id ? { ...j, ...r.data } : j)))
         if (r.data.status === 'COMPLETED' || r.data.status === 'FAILED') break
-      } catch {  }
+      } catch (e) {
+        // Poll may fail transiently (network flap, backend restart) —
+        // continue the loop so we retry on the next tick. Log for
+        // debugging without spamming the user.
+        console.debug('research poll failed, will retry', id, e)
+      }
     }
     setActivePolls(p => ({ ...p, [id]: false }))
   }
