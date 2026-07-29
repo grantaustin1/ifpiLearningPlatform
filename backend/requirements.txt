@@ -9,7 +9,7 @@ anyio==4.13.0
 APScheduler==3.11.3
 arabic-reshaper==3.0.1
 asn1crypto==1.5.1
-ast_serialize==0.5.0
+ast_serialize==0.6.0
 attrs==26.1.0
 bcrypt==4.2.1
 bidict==0.23.1
@@ -88,7 +88,7 @@ mccabe==0.7.0
 mdurl==0.1.2
 msgpack==1.2.1
 multidict==6.7.1
-mypy==2.1.0
+mypy==2.3.0
 mypy_extensions==1.1.0
 numpy==2.4.6
 oauthlib==3.3.1
