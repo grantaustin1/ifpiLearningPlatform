@@ -60,8 +60,10 @@ def step(name: str, ok: bool, detail: str = "") -> None:
         raise SystemExit(1)
 
 
-def _is_completion_status_ok(status_code: int, completed_despite_422: bool) -> bool:
-    return status_code in (200, 201) or completed_despite_422
+def _is_completion_status_ok(status_code: int, is_already_completed: bool) -> bool:
+    """Accept normal success codes, plus 422 only when completion state is
+    already persisted (idempotent outcome)."""
+    return status_code in (200, 201) or is_already_completed
 
 
 def _report_path(name: str) -> Path:
@@ -177,9 +179,7 @@ def main() -> int:
                 cert = db.query(Certificate).filter(
                     Certificate.user_id == learner.id, Certificate.course_id == course.id,
                 ).first()
-                completed_despite_422 = bool(
-                    en and en.status == EnrollmentStatus.COMPLETED and cert,
-                )
+                completed_despite_422 = en and en.status == EnrollmentStatus.COMPLETED and cert
     step(
         "course marked complete",
         _is_completion_status_ok(r.status_code, completed_despite_422),
