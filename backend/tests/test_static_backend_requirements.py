@@ -2,6 +2,9 @@ from pathlib import Path
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+# Mirrors google-genai==1.2.0 declared websockets requirement.
+GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC = ">=13.0,<15.0dev"
+
 
 def test_emergentintegrations_not_pinned_in_requirements():
     requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
@@ -25,4 +28,4 @@ def test_google_genai_websockets_pin_compatibility():
 
     assert "google-genai" in pins
     assert "websockets" in pins
-    assert Version(pins["websockets"]) in SpecifierSet(">=13.0,<15.0dev")
+    assert Version(pins["websockets"]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
