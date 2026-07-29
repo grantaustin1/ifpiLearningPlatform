@@ -33,6 +33,22 @@ def test_lint_endpoint_signatures_passes():
     assert "All endpoint annotations resolve cleanly" in r.stdout
 
 
+def test_lint_with_decorator_pass_passes():
+    """The `--check-decorators` advisory pass must also be clean —
+    every module that defines a functools.wraps decorator imports
+    the expected FastAPI ASGI types at module scope."""
+    r = subprocess.run(
+        ["python", "/app/backend/scripts/lint_endpoint_signatures.py",
+         "--check-decorators"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "No decorator modules missing expected annotation imports" in r.stdout, (
+        f"decorator-pass warned — fix by adding the missing imports "
+        f"to the flagged module(s):\n{r.stdout}"
+    )
+
+
 def test_db_locks_module_re_exports_request():
     """`services.db_locks` wraps endpoints with `request: Request`.
     Its `__globals__` MUST contain `Request` so FastAPI's

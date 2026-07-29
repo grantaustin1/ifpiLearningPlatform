@@ -122,7 +122,7 @@ jobs:
         run: python -c "from server import app; print('imported', len(app.routes), 'routes')"
       - name: Lint endpoint annotations resolve
         working-directory: backend
-        run: python scripts/lint_endpoint_signatures.py
+        run: python scripts/lint_endpoint_signatures.py --check-decorators
 
   # ─── QA Agents: governance + infra (allow E2E to be optional) ──
   qa-agents:
