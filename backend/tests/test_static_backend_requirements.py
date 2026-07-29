@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 
 def test_emergentintegrations_not_pinned_in_requirements():
@@ -7,11 +6,11 @@ def test_emergentintegrations_not_pinned_in_requirements():
         encoding="utf-8"
     )
 
-    # Prevent reinstall-time failures by disallowing emergentintegrations as a pinned requirement.
-    match = re.search(
-        r"(?im)^\s*emergentintegrations(\[.*\])?\s*(==|>=|<=|~=|!=|>|<)",
-        requirements,
-    )
-    assert not match, (
-        f"emergentintegrations should not be pinned in requirements.txt, found: {match.group(0)!r}"
-    )
+    # Prevent reinstall-time failures by disallowing emergentintegrations in requirements.
+    for line in requirements.splitlines():
+        requirement = line.split("#", 1)[0].strip()
+        if requirement.lower().startswith("emergentintegrations"):
+            assert False, (
+                "emergentintegrations should not be listed in requirements.txt, "
+                f"found: {line!r}"
+            )
