@@ -17,10 +17,15 @@ def test_numpy_pin_is_python311_compatible():
         encoding="utf-8"
     )
 
-    match = re.search(r"^numpy==(\d+)\.(\d+)\.(\d+)", requirements, flags=re.MULTILINE)
-    assert match, "requirements.txt must include a pinned numpy version"
+    numpy_line = next(
+        (line.strip() for line in requirements.splitlines() if line.strip().startswith("numpy==")),
+        "",
+    )
+    assert numpy_line, "requirements.txt must include a pinned numpy version"
 
-    major, minor, *_ = (int(part) for part in match.groups())
+    version_match = re.match(r"numpy==(\d+)\.(\d+)", numpy_line)
+    assert version_match, "numpy must be pinned to a parseable major.minor version"
+    major, minor = (int(part) for part in version_match.groups())
     assert (major, minor) < MIN_NUMPY_REQUIRING_PYTHON_312, (
         "numpy pin must remain Python 3.11 compatible"
     )
