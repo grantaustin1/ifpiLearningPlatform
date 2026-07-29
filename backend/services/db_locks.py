@@ -89,5 +89,25 @@ def retry_on_deadlock(max_retries: int = 1,
                         sqlstate, fn.__name__, attempts, max_retries, delay * 1000,
                     )
                     time.sleep(delay)
+
+        # FastAPI compatibility: when the decorated function's module uses
+        # `from __future__ import annotations`, all annotations are stored as
+        # strings.  FastAPI's `get_typed_signature` resolves those strings
+        # against `_wrapped.__globals__` — which points to *this* module
+        # (db_locks.py), not the original function's module.  Any type name
+        # not imported here (e.g. `Request`, `CurrentUser`) is left as an
+        # unresolved `ForwardRef`, which FastAPI then treats as a required
+        # body/query parameter, causing a 422 on requests that don't supply
+        # that parameter.
+        #
+        # Fix: for each string annotation in `fn`, if the name resolves in
+        # `fn`'s own globals, inject it into `_wrapped.__globals__` so
+        # FastAPI can find it.  We use `setdefault` to avoid clobbering
+        # anything already defined in this module's namespace.
+        fn_globals = getattr(fn, "__globals__", {})
+        for _annotation in getattr(fn, "__annotations__", {}).values():
+            if isinstance(_annotation, str) and _annotation in fn_globals:
+                _wrapped.__globals__.setdefault(_annotation, fn_globals[_annotation])
+
         return _wrapped
     return _decorator
