@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { X, Check, RotateCcw } from 'lucide-react'
 import { api } from 'lib/api'
+import { safeSvg } from 'lib/sanitize'
 
 /**
  * SubscriptionModal — Renders the calendar-subscription URL, QR SVG,
@@ -53,7 +54,7 @@ export function SubscriptionModal({ url, kind, isAdmin, onClose, onRotate }: {
         <div className="p-5 space-y-4">
           {qrSvg && (
             <div className="flex justify-center bg-slate-50 rounded-xl p-4" data-testid="subscription-qr">
-              <div className="w-48 h-48" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <div className="w-48 h-48" dangerouslySetInnerHTML={{ __html: safeSvg(qrSvg) }} />
             </div>
           )}
           <div>
