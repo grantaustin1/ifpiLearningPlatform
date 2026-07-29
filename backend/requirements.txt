@@ -88,7 +88,7 @@ mccabe==0.7.0
 mdurl==0.1.2
 msgpack==1.2.1
 multidict==6.7.1
-mypy==2.1.0
+mypy==2.3.0
 mypy_extensions==1.1.0
 numpy==2.4.6
 oauthlib==3.3.1
