@@ -4,6 +4,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 # Mirrors google-genai==1.2.0 declared websockets requirement.
+# If google-genai is upgraded, this spec should be reviewed/updated.
 GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC = ">=13.0,<15.0dev"
 
 
@@ -31,6 +32,9 @@ def test_google_genai_websockets_pin_compatibility():
     assert "websockets" in requirements_by_name
 
     websockets_req = requirements_by_name["websockets"]
-    pinned_version_strings = [spec.version for spec in websockets_req.specifier if spec.operator == "=="]
-    assert pinned_version_strings
-    assert Version(pinned_version_strings[0]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
+    pinned_version = next(
+        (str(spec)[2:] for spec in websockets_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version is not None, "websockets must be pinned with == in requirements.txt"
+    assert Version(pinned_version) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
