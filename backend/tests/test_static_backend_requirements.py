@@ -6,9 +6,9 @@ from packaging.version import Version
 # Mirrors google-genai==1.2.0 declared websockets requirement.
 # If google-genai is upgraded, this spec should be reviewed/updated.
 GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC = ">=13.0,<15.0dev"
-# Mirrors svglib==2.0.2 declared reportlab requirement.
+# Mirrors the currently published svglib==2.0.2 package metadata requirement.
 SVGLIB_2_0_2_REPORTLAB_SPEC = ">=4.4.3"
-# Mirrors xhtml2pdf==0.2.17 declared reportlab requirement.
+# Mirrors the currently published xhtml2pdf==0.2.17 package metadata requirement.
 XHTML2PDF_0_2_17_REPORTLAB_SPEC = ">=4.0.4,<5"
 
 
