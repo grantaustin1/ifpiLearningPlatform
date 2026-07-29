@@ -1,4 +1,5 @@
 from pathlib import Path
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -18,14 +19,18 @@ def test_google_genai_websockets_pin_compatibility():
     requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
         encoding="utf-8"
     )
-    pins = {}
+    requirements_by_name = {}
     for raw_line in requirements.splitlines():
         line = raw_line.strip()
-        if not line or line.startswith("#") or "==" not in line:
+        if not line or line.startswith("#") or line.startswith("-"):
             continue
-        name, version = line.split("==", 1)
-        pins[name.strip().lower()] = version.strip()
+        req = Requirement(line)
+        requirements_by_name[req.name.lower()] = req
 
-    assert "google-genai" in pins
-    assert "websockets" in pins
-    assert Version(pins["websockets"]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
+    assert "google-genai" in requirements_by_name
+    assert "websockets" in requirements_by_name
+
+    websockets_req = requirements_by_name["websockets"]
+    pinned_versions = [spec.version for spec in websockets_req.specifier if spec.operator == "=="]
+    assert pinned_versions
+    assert Version(pinned_versions[0]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
