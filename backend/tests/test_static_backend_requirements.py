@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 
 def test_emergentintegrations_not_pinned_in_requirements():
     requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
@@ -10,7 +12,7 @@ def test_emergentintegrations_not_pinned_in_requirements():
     for line in requirements.splitlines():
         requirement = line.split("#", 1)[0].strip()
         if requirement.lower().startswith("emergentintegrations"):
-            assert False, (
+            pytest.fail(
                 "emergentintegrations should not be listed in requirements.txt, "
                 f"found: {line!r}"
             )
