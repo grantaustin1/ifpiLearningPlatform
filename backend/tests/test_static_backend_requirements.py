@@ -7,4 +7,12 @@ def test_emergentintegrations_not_pinned_in_requirements():
         encoding="utf-8"
     )
 
-    assert not re.search(r"(?im)^\s*emergentintegrations(\[.*\])?\s*(==|>=|<=|~=|!=|>|<)", requirements)
+    # Prevent reinstall-time failures by disallowing emergentintegrations as a pinned requirement.
+    match = re.search(
+        r"(?im)^\s*emergentintegrations(\[.*\])?\s*(==|>=|<=|~=|!=|>|<)",
+        requirements,
+    )
+    assert not match, (
+        f"emergentintegrations should not be pinned in requirements.txt, found: {match.group(0)!r}"
+        if match else ""
+    )
