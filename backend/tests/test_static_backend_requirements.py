@@ -31,6 +31,6 @@ def test_google_genai_websockets_pin_compatibility():
     assert "websockets" in requirements_by_name
 
     websockets_req = requirements_by_name["websockets"]
-    pinned_versions = [spec.version for spec in websockets_req.specifier if spec.operator == "=="]
-    assert pinned_versions
-    assert Version(pinned_versions[0]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
+    pinned_version_strings = [spec.version for spec in websockets_req.specifier if spec.operator == "=="]
+    assert pinned_version_strings
+    assert Version(pinned_version_strings[0]) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
