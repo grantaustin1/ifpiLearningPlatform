@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
+import { safeHtml } from 'lib/sanitize'
 import { ChevronLeft, ChevronRight, CheckCircle, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
@@ -80,7 +81,7 @@ export default function LearnPage() {
               {slide.slide_type === 'AUDIO' && slide.media_url && <audio src={slide.media_url} controls className="w-full mb-6" />}
               {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
               {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
-              {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: slide.content }} />}
+              {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: safeHtml(slide.content) }} />}
               {slide.narration_url && (
                 <div className="mt-6 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3" data-testid="learn-slide-narration">
                   <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
