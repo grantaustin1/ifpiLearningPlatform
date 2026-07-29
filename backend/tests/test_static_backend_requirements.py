@@ -14,5 +14,4 @@ def test_emergentintegrations_not_pinned_in_requirements():
     )
     assert not match, (
         f"emergentintegrations should not be pinned in requirements.txt, found: {match.group(0)!r}"
-        if match else ""
     )
