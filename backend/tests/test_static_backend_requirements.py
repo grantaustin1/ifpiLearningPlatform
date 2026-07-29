@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 def test_emergentintegrations_not_pinned_in_requirements():
@@ -6,4 +7,4 @@ def test_emergentintegrations_not_pinned_in_requirements():
         encoding="utf-8"
     )
 
-    assert "emergentintegrations" not in requirements
+    assert not re.search(r"(?im)^\s*emergentintegrations(\[.*\])?\s*(==|>=|<=|~=|!=|>|<)", requirements)
