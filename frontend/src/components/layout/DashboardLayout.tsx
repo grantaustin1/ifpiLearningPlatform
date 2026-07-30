@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -113,6 +113,15 @@ export default function DashboardLayout() {
               <span className="truncate">{item.label}</span>
             </NavLink>
           ))}
+          <a
+            href={`${backend}/api/public/guides/${isAdmin ? 'IFPI_Admin_User_Guide.pdf' : 'IFPI_Student_User_Guide.pdf'}`}
+            target="_blank" rel="noopener noreferrer"
+            data-testid="sidebar-help-link"
+            title={isAdmin ? 'Open the Administrator User Guide (PDF)' : 'Open the Student User Guide (PDF)'}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all">
+            <HelpCircle className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Help &amp; guides</span>
+          </a>
         </nav>
         <div className="border-t border-white/5 p-3">
           {streak && streak.current_streak > 0 && (
