@@ -1,8 +1,9 @@
 # IFPI Learning Platform — Student User Guide
 
-**Version 2.0 · July 2026 — Complete first-time walkthrough**
+**Version 3.0 · July 2026 — Complete first-time walkthrough**
 
-This is a step-by-step manual for learners. It assumes you have never used
+This is a step-by-step manual for learners on the International Fitness
+Professionals Institute learning platform. It assumes you have never used
 the platform before. Every instruction refers to the exact buttons and menus
 you will see.
 
@@ -11,14 +12,15 @@ you will see.
 ## 1. What You Need
 
 - A modern browser (Chrome, Edge, Firefox or Safari) on computer, tablet or
-  phone — there is nothing to install.
+  phone — nothing to install.
 - Your email address.
 - Either an **invitation email** from your academy, or the platform URL to
   register yourself.
 
 **Your sidebar.** Once logged in you'll see: *Dashboard, My Courses,
 Learning Paths, My Certificates, Live sessions, Leaderboard, Subscriptions,
-Preferences.* This guide covers each one.
+Preferences* — plus a **Help & guides** link at the bottom that opens this
+manual as a PDF whenever you need it.
 
 ---
 
@@ -27,81 +29,64 @@ Preferences.* This guide covers each one.
 ### 2.1 If you received an invitation email
 1. Open the email and click the **join link**.
 2. Your email is pre-filled. Choose a password and confirm it.
-3. Submit — you land directly on your dashboard, already a member of your
-   academy. Done.
+3. Submit — you land directly on your dashboard. Done.
 
-> Didn't get the email? Check spam. Still nothing? Ask your administrator —
-> they can copy your personal invite link and send it another way.
+> Didn't get the email? Check spam, then ask your administrator — they can
+> copy your personal invite link and send it another way.
 
 ### 2.2 If you are registering yourself
-1. Open the platform URL and click **Register** (top-right).
-2. Enter your **name**, **email**, and a **password**. Submit.
-3. You are logged in immediately, and a **verification email** is sent.
-   Click the link in it within 24 hours. (A banner in the app lets you
-   resend the email if needed.)
+1. Open the platform URL and click **Register**.
+2. Enter your **name**, **email** and a **password**. Submit.
+3. You are logged in immediately; click the link in the **verification
+   email** within 24 hours (the in-app banner can resend it).
 
 ### 2.3 Logging in later
-1. Open the platform URL, click **Login**, enter email + password.
-2. If your account has two-factor authentication, also enter the 6-digit
-   code from your authenticator app.
-3. **Forgot your password?** Click **Forgot password** on the login page,
-   enter your email, open the reset link you receive, choose a new password.
+1. Click **Login**, enter email + password (and the 6-digit code if you've
+   enabled two-factor authentication).
+2. **Forgot your password?** Use **Forgot password** on the login page.
 
-> ⚠️ If a full-screen **Terms & Conditions** page appears after login, read
-> and click **Accept** — the platform stays locked until you do. This also
-> happens whenever your academy publishes updated terms.
+> ⚠️ If a full-screen **Terms & Conditions** page appears, read and click
+> **Accept** — the platform stays locked until you do.
 
 ---
 
 ## 3. Your Dashboard
 
-After login you land on **Dashboard**. What you see:
-
 - **Your courses** with progress bars — click any card to continue exactly
   where you left off.
-- **Learning streak** 🔥 — the number of consecutive days you've been
-  active. Any real activity (slides, exams, flashcards) counts.
-- **Points and badges** — you earn points (XP) for activity; badges unlock
-  automatically at point thresholds your academy sets.
+- **Learning streak** 🔥 — consecutive active days. Any real activity
+  (slides, exams, flashcards) counts.
+- **Points and badges** — earned automatically as you learn.
 - **Upcoming live sessions** you've RSVP'd to.
 
 ---
 
 ## 4. Finding a Course
 
-1. Open the **catalog** (from the dashboard or the public catalog page).
-2. Use the **search box** to find a topic, the **category** and **academy**
-   filters to narrow down, and the **sort** menu (newest / popular).
-3. Click a course card to open its **detail page**: full description,
-   estimated duration, price (if any), and the Enrol button.
+1. Open the **catalog**. Courses now show **cover photos**, category tags,
+   duration — and an **amber star rating** (e.g. ★ 4.5 (12)) when other
+   learners have rated them. Ratings come only from people who actually
+   finished the course, so they're worth trusting.
+2. Use the **search box**, **category/academy filters** and **sort** menu.
+   The **Featured** row highlights courses the academy recommends.
+3. Click a card for the detail page and the Enrol button.
 
-**Learning Paths:** if your academy organises courses into paths (e.g.
-Foundation → Intermediate → Advanced), open **Learning Paths** to see the
-sequence and your position. Complete a step to unlock the next one.
+**Learning Paths:** if courses are arranged in a path (Foundation →
+Intermediate → Advanced), finish one step to unlock the next.
 
-**Locked courses:** some courses require a prerequisite course first. The
-detail page tells you which one.
+**Locked courses** require a prerequisite course first — the detail page
+tells you which.
 
 ---
 
 ## 5. Enrolling
 
-### 5.1 Free courses
-Click **Enrol** — that's it. The course opens immediately and appears under
-**My Courses**.
-
-### 5.2 Paid courses
-1. Click **Enrol** on the course detail page.
-2. You are taken to a **secure checkout** — enter your card details and pay.
-3. On success you land on a confirmation page and your access activates
-   immediately. If the payment is still processing, the page updates by
-   itself — if something goes wrong there is a **Retry** button.
-4. Your receipts and active subscriptions live under **Subscriptions** in
-   the sidebar.
+- **Free courses** — click **Enrol**; the course opens immediately.
+- **Paid courses** — click **Enrol** → secure checkout → access activates on
+  payment confirmation. Receipts live under **Subscriptions**.
 
 > 💳 In a test environment your academy may tell you to use the test card
-> number 4242 4242 4242 4242 (any future expiry, any CVC). No real money
-> moves in test mode.
+> 4242 4242 4242 4242 (any future expiry/CVC). No real money moves.
 
 ---
 
@@ -109,157 +94,144 @@ Click **Enrol** — that's it. The course opens immediately and appears under
 
 ### 6.1 The course player
 1. Open the course from **My Courses**.
-2. Content is a sequence of **slides**. Read each one, then click
-   **Next** (or use the → arrow key). **Previous** goes back.
-3. Your progress **saves automatically** after every slide. Close the
-   browser whenever you like — reopening the course puts you back exactly
-   where you stopped.
-4. Some slides have **audio narration** — press the play button to listen.
-5. On the final slide you'll see the **completion card** — congratulations!
-   If the course has an exam, the button to start it is right there.
+2. Read each **slide**, then click **Next** (or the → arrow key). Progress
+   **saves automatically** — leave any time, resume exactly where you were.
+3. Some slides have **audio narration** — press play to listen.
 
-### 6.2 Asking the AI Tutor
-Stuck on a concept? There's a floating **Ask AI Tutor** button inside every
-course.
+### 6.2 Finishing — and rating the course
+On the final slide you reach the **completion card**: 🎉 congratulations,
+any XP you earned, and a **"How was this course?"** star row.
 
-1. Click it — a chat panel slides out.
-2. Type your question and press **Enter** (Shift+Enter makes a new line).
-3. The tutor answers using your academy's own course materials, and shows
-   **citations** for where each fact came from.
-4. Useful answer? Click **Save as flashcard** under the reply — it joins
-   your revision deck automatically.
+- Click 1–5 stars to rate it — your rating helps other learners choose and
+  gives your academy honest feedback. You can rate only after finishing,
+  and clicking again later simply updates your rating.
+- If the course has an exam, the button to start it is right there too.
 
-Your tutor conversations are private to you. Any personal information in
-your questions is automatically removed before AI processing.
+### 6.3 The AI Tutor
+Stuck on a concept? Click **Ask AI Tutor** inside any course, type your
+question, and get an answer built from your academy's own materials with
+**citations**. Save a useful answer as a flashcard with one click.
 
-### 6.3 Flashcards (revision that actually works)
-If your course has flashcards, open them via the **flashcards link** on the
-course page.
+> Privacy: tutor chats are private to you, and any personal information in
+> your questions is automatically removed before AI processing.
 
-1. A card shows a question — think of the answer, then reveal it.
-2. Rate how well you knew it. The scheduler (spaced repetition) shows each
-   card again *just before you'd forget it* — a few minutes a day beats
-   cramming.
+### 6.4 Flashcards
+If your course has flashcards, the review scheduler shows each card just
+before you'd forget it (spaced repetition). A few minutes a day beats
+cramming.
 
 ---
 
 ## 7. Live Sessions
 
-1. Click **Live sessions** to see upcoming events, or find them on the
-   course page.
-2. Click **RSVP** on any session you want to attend. For a repeating
-   series you can RSVP to a single date or the **whole series**.
-   - Bonus: if the session belongs to a course you're not enrolled in yet,
-     RSVPing **enrols you automatically**.
-3. **Get it in your calendar:** click **Subscribe calendar** and add your
-   personal feed URL to Google/Apple/Outlook — every session you RSVP to
-   appears automatically. You can also download a single invite file.
-4. You'll receive an **email reminder** before each session. At the session
-   time, click the **join link** on the session card.
-5. Your instructor marks attendance afterwards — attending can earn you an
-   **attendance certificate**, issued automatically.
+1. Click **Live sessions** (or find them on the course page) and **RSVP**.
+   For a repeating series, RSVP to one date or the whole series. RSVPing to
+   a course you're not enrolled in **enrols you automatically**.
+2. **Subscribe calendar** adds every session you RSVP to into
+   Google/Apple/Outlook via your personal feed URL.
+3. You get an **email reminder** before each session; join via the link on
+   the session card. Attending can earn an **attendance certificate**.
 
 ---
 
 ## 8. Taking an Exam
 
-1. Finish the course slides, then click **Start exam** on the completion
-   card (or via **Exams** on the course page).
-2. Before you start, the screen shows the **time limit**, the **passing
-   score** (e.g. 70%) and **how many attempts** you have. Only start when
-   you're ready — the timer runs continuously once started.
-3. Answer each question (multiple choice or true/false). The timer stays
-   visible.
-4. Click **Submit**. Your score appears immediately.
-5. **Passed?** Your certificate is issued instantly (next section).
-   **Failed?** Don't panic — review the slides and flashcards and use
-   another attempt, up to the limit shown.
+1. Finish the slides, then click **Start exam** on the completion card.
+2. Before starting you see the **time limit**, **passing score** and your
+   **remaining attempts** — the timer runs continuously once started.
+3. Answer the questions and **Submit**; your score appears instantly.
+4. **Passed?** Certificate issued immediately. **Failed?** Review the slides
+   and flashcards and use another attempt.
 
 ---
 
 ## 9. Your Certificates
 
-Click **My Certificates** to see everything you've earned. For each one you
-can:
+From **My Certificates** you can, for each one:
 
-- **Download the PDF** — professionally branded by your academy, with a QR
-  code printed on it.
-- **Verify** — the QR code (and the verify link) opens a public page that
-  confirms your certificate is genuine. Employers can check it without any
-  account.
-- **Share** — click share to get a link with a rich preview card, perfect
-  for LinkedIn. Post it: *"I just completed …"*.
+- **Download the PDF** — branded by your academy, QR code included.
+- **Verify** — the QR/link opens a public page proving it's genuine;
+  employers can check without an account.
+- **Share** — a rich preview card, perfect for LinkedIn: *"I just
+  completed…"*.
 
-> ⚠️ If a certificate page ever shows **REVOKED**, contact your academy
-> administrator — certificates can be withdrawn (e.g. if issued in error).
+> ⚠️ If a certificate ever shows **REVOKED**, contact your academy
+> administrator.
 
 ---
 
 ## 10. Streaks, Points, Badges & the Leaderboard
 
-- **Streak 🔥** — do anything meaningful (a slide, a flashcard review, an
-  exam) each day to keep it going. We'll email you a friendly nudge if your
-  streak is about to break.
-- **Points (XP)** — earned for completing slides, exams and sessions.
-- **Badges** — awarded automatically as your points cross thresholds.
-- **Leaderboard** — click **Leaderboard** to see your rank in your academy.
-  Compete kindly.
+- **Streak 🔥** — one meaningful activity a day keeps it alive; we email a
+  nudge if it's about to break.
+- **Points (XP)** — for slides, exams and sessions.
+- **Badges** — unlock automatically at point thresholds.
+- **Leaderboard** — your rank in your academy. Compete kindly.
 
 ---
 
-## 11. Your Account & Settings
+## 11. Sending Feedback
 
-- **Change password** — from your account/security settings, any time.
-- **Two-factor authentication (optional, recommended)** — enable it in
-  security settings: scan the QR code with an authenticator app (Google
-  Authenticator, Authy…), confirm with a 6-digit code, and **store your
-  recovery codes safely** (each one works once if you lose your phone).
-- **Preferences** — click **Preferences** to opt in/out of digest and
-  reminder emails.
-- **Subscriptions** — your payment history and active subscriptions.
-- **Your data & privacy (GDPR)** — you can request an export of your data
-  or account erasure. Erasure anonymises your personal details while your
-  issued certificates remain verifiable.
+See a bug? Have an idea? Click the round **feedback button** in the
+bottom-right corner of any page:
+
+1. Pick 🐞 **Bug**, 💡 **Idea** or 💬 **Other**.
+2. Describe what happened (and what you expected).
+3. **Send** — the page you were on is attached automatically, and your
+   academy's admins see it in their feedback inbox.
+
+No screenshots or emails needed — this is the fastest way to be heard.
 
 ---
 
-## 12. FAQ & Troubleshooting
+## 12. Your Account & Settings
 
-**The page says my progress wasn't saved.**
-Progress saves per slide, automatically. Check your internet connection and
-reopen the course — you'll be on the last slide you completed.
+- **Change password** anytime in security settings; **two-factor
+  authentication** is optional but recommended (store your recovery codes!).
+- **Preferences** — opt in/out of digest and reminder emails.
+- **Subscriptions** — payment history and active subscriptions.
+- **Your data (GDPR)** — request an export or account erasure; erasure
+  anonymises your details while your certificates remain verifiable.
+
+---
+
+## 13. FAQ & Troubleshooting
+
+**My progress didn't save.**
+Progress saves per slide automatically. Check your connection and reopen the
+course — you'll be on the last slide you completed.
+
+**I can't find the star rating.**
+Ratings unlock on the completion card, after you finish every slide. If you
+want to change your rating later, finish-card stars update it in place.
 
 **I ran out of exam attempts.**
-Attempts are limited by your academy. Contact your administrator or
-instructor to request more.
+Attempts are limited by your academy — ask your administrator or instructor.
 
-**The exam timer ran out before I finished.**
-The attempt is submitted with the answers you gave. If you have attempts
-remaining, prepare and try again.
+**The exam timer ran out.**
+The attempt submits with the answers you gave. If you have attempts left,
+prepare and retry.
 
 **I paid but the course won't open.**
 Wait a few seconds and refresh — activation follows payment confirmation.
-Still locked after a minute? Check **Subscriptions** for the payment status,
-then contact your administrator with the time of payment.
+Still locked? Check **Subscriptions**, then contact your administrator with
+the payment time.
 
 **I didn't get the verification / invitation / reset email.**
-Check spam first, then use the resend option. If it never arrives, your
-academy's email may not be fully configured — the administrator can send
-your link manually.
+Check spam, use the resend option, then ask your administrator — they can
+send your link manually.
 
 **The AI Tutor gave a strange answer.**
-The tutor only knows what's in your academy's materials. Rephrase the
-question, or check the citations to read the source yourself.
+It only knows your academy's materials. Rephrase, or read the citations.
 
-**Can other people see my AI Tutor chats or my scores?**
-No. Tutor sessions are private to your account. Instructors and admins can
-see course progress and exam results (that's how they help you), but not
-your tutor conversations.
+**Who can see my AI Tutor chats, ratings or feedback?**
+Tutor chats: only you. Ratings: shown only as anonymous averages on the
+catalog. Feedback: your academy's admins (with your name, so they can follow
+up).
 
 **My streak reset and I'm sad about it.**
-Fair. Streaks need one activity per day — even a single flashcard review
-counts. Start a new one today.
+Fair. Even one flashcard review counts — start a new one today.
 
 ---
 
-*IFPI Learning Platform — Student User Guide v2.0*
+*IFPI Learning Platform — Student User Guide v3.0*
