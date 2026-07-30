@@ -497,7 +497,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
-| `routers/public_catalog.py` | 173 |
+| `routers/public_catalog.py` | 200 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 512 |
@@ -506,7 +506,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12882** |
+| **Total** | **12909** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -840,6 +840,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
 | `/api/public/catalog` | GET | List PUBLISHED courses in the caller's org. Read-only, no PII. |
 | `/api/public/certificates/verify/{code}` | GET | Anonymous verification. Rate-limited to 30/min per IP (Redis |
+| `/api/public/guides/{filename}` | GET | Anonymous download of the platform user-guide PDFs. |
 | `/api/rich-text/sanitize` | POST | Server-side HTML sanitizer for the rich-text editor preview. |
 | `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
 | `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
@@ -865,7 +866,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **276** registered API endpoints._
+_Total: **277** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
