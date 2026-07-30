@@ -59,7 +59,7 @@ def build(md_path: str, pdf_name: str, subtitle: str) -> Path:
     html = f"""<html><head><style>{CSS}</style></head><body>
     <div class="cover-band">
       <h1>IFPI Learning Platform</h1>
-      <div class="cover-sub">{subtitle} &nbsp;&middot;&nbsp; Version 1.0 &nbsp;&middot;&nbsp; July 2026</div>
+      <div class="cover-sub">{subtitle} &nbsp;&middot;&nbsp; Version 2.0 &nbsp;&middot;&nbsp; July 2026 &nbsp;&middot;&nbsp; Complete first-time walkthrough</div>
     </div>
     {body_html}
     <div id="footer_content">IFPI Learning Platform — {subtitle} — page <pdf:pagenumber> of <pdf:pagecount></div>
