@@ -1,6 +1,19 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## UAT Sandbox setup (2026-07-30)
+
+Team UAT enabled without dirtying pre-go-live data:
+- Pre-UAT DB snapshot at `backend/snapshots/pre_uat_ifpi_lms.db` (gitignored);
+  one-command restore via `scripts/reset_uat.sh`.
+- Isolated tenant `uat-sandbox` (org id 327, marketplace opt-out) with
+  `uat-admin@ifpi.org` + `uat-learner@ifpi.org` (see `test_credentials.md`).
+  Idempotent seed: `backend/scripts/setup_uat.py`. Both logins verified E2E.
+- Tester briefing: `docs/UAT_TESTER_GUIDE.md` (admin authoring manual + AI,
+  student onboarding, Stripe test-card billing, marketing tools, learner flow).
+- Note: production go-live uses a fresh Postgres DB, so preview data never
+  migrates unless deliberately exported.
+
 ## Billing Gateway spec joint review — Phase 0 (2026-07-30)
 
 Doc-only session. ERP360 shared their Billing Gateway API spec (DRAFT v0.1)
