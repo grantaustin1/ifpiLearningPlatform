@@ -1,6 +1,24 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 44 — Feedback widget + course ratings + chart toggle (2026-07-30)
+
+Certified by testing agent (iteration_44.json): backend 15/15, frontend 100%.
+
+- **In-app feedback widget**: floating FAB (`FeedbackWidget.tsx`, mounted in
+  DashboardLayout) → POST /api/feedback (BUG/IDEA/OTHER + auto page path);
+  admin review page `/feedback-admin` (sidebar "Feedback") with NEW/REVIEWED
+  toggle; org-isolated. Model `TesterFeedback` (engagement.py).
+- **Course ratings**: `CourseRating` model; POST /api/courses/{id}/rating
+  (1-5, requires Enrollment.completed_at, upsert) + GET .../rating; star
+  picker on the LearnPage completion card; amber avg-star badge on catalog
+  cards (`catalog-rating-{id}`); catalog serializer batches avg/count.
+- **Chart toggle**: enrollments-weekly endpoint gained `metric=
+  enrollments|completions`; WeeklyEnrollmentsCard has an Enrolments/
+  Completions toggle.
+- Migration `3c4d5e6f7a8b` (course_ratings + tester_feedback).
+- New regression file: `tests/test_iteration44_feedback_ratings.py`.
+
 ## Iteration 43 — Landing polish + cover gallery + weekly enrolments (2026-07-30)
 
 Certified by testing agent (iteration_39.json): backend 10/10, frontend 100%.
