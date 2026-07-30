@@ -166,8 +166,9 @@ DRAFT to **PUBLISHED** and the course appears in your catalog immediately.
 ## 6. Creating a Course with the AI Builder
 
 1. Click **Courses → AI Builder** (next to New Course).
-2. Describe what you want, for example: *"A 6-slide beginner course on music
-   licensing for independent labels, professional tone, with a short quiz."*
+2. Describe what you want, for example: *"A 6-slide beginner course on
+   client onboarding for new gym instructors, professional tone, with a
+   short quiz."*
 3. Click **Generate**. The AI drafts the full course: title, slides and
    content. This takes ~10–30 seconds.
 4. Review the draft in the preview. If it's not right, adjust your prompt

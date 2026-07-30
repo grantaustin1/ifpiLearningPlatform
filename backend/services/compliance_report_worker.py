@@ -3,7 +3,7 @@
 Sends a periodic (daily / weekly / monthly — env-configurable) email
 summarising all certificate REVOKE + UNREVOKE actions across every
 organisation to a single compliance officer address. Designed for
-regulated academies (music conservatoires, RTOs) who need an audit
+regulated academies (fitness certification bodies, RTOs) who need an audit
 trail delivered proactively rather than pulled from the admin UI.
 
 Configuration (backend/.env):

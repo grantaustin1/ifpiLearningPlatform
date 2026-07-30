@@ -141,10 +141,10 @@ export default function CatalogPage() {
             <Sparkles className="h-3.5 w-3.5" /> Marketplace
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 font-display">
-            Learn from the world&apos;s leading music-industry academies.
+            Learn from the world&apos;s leading fitness academies.
           </h1>
           <p className="text-lg text-indigo-100 max-w-2xl mb-8">
-            Browse published courses from IFPI members, conservatoires and labels. Enrol in minutes — free or paid, your choice.
+            Browse published courses from IFPI-accredited academies, gyms and wellness studios. Enrol in minutes — free or paid, your choice.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
             <div className="relative flex-1">

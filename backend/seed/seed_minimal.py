@@ -41,7 +41,8 @@ def seed(db: Session) -> None:
     if not org:
         org = Organization(
             name="IFPI Main Academy", slug="ifpi-main",
-            description="The primary training portal for IFPI members",
+            description="The primary training portal for members of the "
+                        "International Fitness Professionals Institute",
             primary_color="#6366f1",
         )
         db.add(org)
@@ -113,7 +114,7 @@ def seed(db: Session) -> None:
     if not course:
         course = Course(
             organization_id=org.id, title="IFPI Fundamentals",
-            description="Introduction to IFPI — mission, structure, and key programs.",
+            description="Introduction to IFPI — the International Fitness Professionals Institute: mission, standards, and member programs.",
             category="Foundation", status=CourseStatus.PUBLISHED,
             passing_score=70, duration_minutes=45,
             price_cents=0, currency="ZAR", created_by_id=admin.id,
@@ -123,13 +124,13 @@ def seed(db: Session) -> None:
         db.flush()
         slides = [
             ("Welcome to IFPI",
-             "<h2>Welcome to IFPI Fundamentals</h2><p>This course gives you a comprehensive overview of IFPI — who we are, what we do, and how we support the global recorded music industry.</p>"),
+             "<h2>Welcome to IFPI Fundamentals</h2><p>This course gives you a comprehensive overview of IFPI — who we are, what we do, and how we support fitness professionals worldwide.</p>"),
             ("What is IFPI?",
-             "<h2>What is IFPI?</h2><p>The International Federation of the Phonographic Industry represents the recording industry worldwide.</p><ul><li>Over 8,000 record labels</li><li>Active in 66 countries</li><li>Founded in 1933</li><li>Headquartered in London</li></ul>"),
+             "<h2>What is IFPI?</h2><p>The International Fitness Professionals Institute is the professional body for the fitness industry.</p><ul><li>Personal trainers and group-exercise coaches</li><li>Gyms, boutique studios and wellness centres</li><li>Certification and continuing-education standards</li><li>A global member community</li></ul>"),
             ("Our Mission",
-             "<h2>IFPI's Mission</h2><ol><li><strong>Licensing</strong> — ensuring rights are properly licensed</li><li><strong>Anti-piracy</strong> — combating illegal copying</li><li><strong>Government relations</strong> — advocating for fair copyright laws</li></ol>"),
-            ("Global Music Report",
-             "<h2>Global Music Report</h2><p>Each year IFPI publishes the definitive source of data on the international recorded music market.</p><ul><li>Streaming = 67% of global revenues</li><li>Physical music grew for the third consecutive year</li></ul>"),
+             "<h2>IFPI's Mission</h2><ol><li><strong>Certification standards</strong> — accrediting fitness qualifications you can trust</li><li><strong>Professional development</strong> — continuing education that keeps members current</li><li><strong>Member advocacy</strong> — representing fitness professionals to regulators and insurers</li></ol>"),
+            ("The Fitness Industry Landscape",
+             "<h2>The Fitness Industry Landscape</h2><p>The health and wellness sector continues to grow and diversify.</p><ul><li>Boutique studios and hybrid gym models are expanding</li><li>Digital and at-home fitness now complement in-person training</li><li>Employers and insurers increasingly require accredited certification</li></ul>"),
             ("Summary & Next Steps",
              "<h2>Congratulations!</h2><p>You've completed the IFPI Fundamentals overview. Take the assessment to earn your certificate.</p>"),
         ]
@@ -145,7 +146,7 @@ def seed(db: Session) -> None:
     if not exam:
         exam = Exam(
             organization_id=org.id, title="IFPI Fundamentals Assessment",
-            description="Test your knowledge of IFPI's mission and structure.",
+            description="Test your knowledge of IFPI's mission and the fitness industry.",
             course_id=course.id, time_limit_minutes=15, passing_score=70,
             max_attempts=3, is_published=True, created_by_id=admin.id,
         )
@@ -153,15 +154,19 @@ def seed(db: Session) -> None:
         db.flush()
         qs = [
             ("What does IFPI stand for?", "MULTIPLE_CHOICE",
-             ["International Federation of the Phonographic Industry",
-              "International Foundation for Performing Industry",
-              "International Forum for Publishing Interests",
-              "International Fund for Phonographic Innovation"], "0"),
-            ("In which year was IFPI founded?", "MULTIPLE_CHOICE",
-             ["1920", "1933", "1945", "1960"], "1"),
-            ("Where is IFPI headquartered?", "MULTIPLE_CHOICE",
-             ["New York", "Paris", "London", "Geneva"], "2"),
-            ("Streaming represents the majority of global music revenues.", "TRUE_FALSE",
+             ["International Fitness Professionals Institute",
+              "International Federation of Personal Instructors",
+              "Institute for Fitness Program Innovation",
+              "International Forum for Physical Instruction"], "0"),
+            ("Which of the following is part of IFPI's mission?", "MULTIPLE_CHOICE",
+             ["Operating gym franchises directly",
+              "Accrediting fitness qualifications and certification standards",
+              "Manufacturing exercise equipment",
+              "Selling health insurance"], "1"),
+            ("Who does IFPI primarily serve?", "MULTIPLE_CHOICE",
+             ["Professional athletes only", "Physiotherapy clinics",
+              "Fitness professionals, gyms and studios", "Sports broadcasters"], "2"),
+            ("Continuing professional development helps fitness professionals keep their certifications current.", "TRUE_FALSE",
              ["True", "False"], "true"),
         ]
         for i, (text, qt, opts, correct) in enumerate(qs, 1):
