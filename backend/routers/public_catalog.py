@@ -19,7 +19,6 @@ limiting lives in the ingress / CDN layer.
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Optional
 
@@ -93,7 +92,6 @@ def _ratelimit(ip: str) -> None:
 
 
 # ─── Anonymous user-guide PDF downloads ──────────────────────────────
-_GUIDES_DIR = "/app/docs/guides"
 _GUIDE_FILES = {
     "IFPI_Admin_User_Guide.pdf",
     "IFPI_Student_User_Guide.pdf",
@@ -106,13 +104,16 @@ def download_user_guide(filename: str, request: Request):
 
     Served from the backend (not the SPA dev server) so links stay valid
     regardless of frontend build/restart state. Filenames are whitelisted —
-    no path traversal surface.
+    no path traversal surface. The PDF is auto-rebuilt when its markdown
+    source in /app/docs/guides has changed (see services/guide_builder).
     """
     _ratelimit(_client_ip(request))
     if filename not in _GUIDE_FILES:
         raise HTTPException(status_code=404, detail="Guide not found")
-    path = os.path.join(_GUIDES_DIR, filename)
-    if not os.path.isfile(path):
+    from services.guide_builder import ensure_fresh
+    try:
+        path = str(ensure_fresh(filename))
+    except Exception:
         raise HTTPException(status_code=404, detail="Guide not built yet")
     return FileResponse(path, media_type="application/pdf", filename=filename)
 

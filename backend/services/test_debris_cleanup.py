@@ -70,6 +70,25 @@ COURSE_TITLE_PATTERNS = [
     "AI Test %",           # ai_authoring test residue
     "Bulk Import Test%",   # bulk-import test residue
     "Learning Path Test%",  # learning-path test residue
+    # ── Iter 40 additions (marketplace debris) ───────────────────────
+    "Entitlement Test%",   # iter39 entitlement harness residue
+    "Paid E2E%",           # iter39 Stripe E2E residue
+    "Stripe Test%",        # iter39 Stripe checkout harness residue
+    "Stripe Frontend E2E%",  # iter39 Stripe browser-flow residue
+    "Ent Inspect%",        # entitlements-inspector harness residue
+]
+
+# Org slugs created by test factories/harnesses. These orgs must never
+# surface in the cross-tenant public marketplace — the nightly pass
+# force-opts them out (their PUBLISHED faker courses otherwise pollute
+# the public catalog). Real academies never match these prefixes.
+TEST_ORG_SLUG_PATTERNS = [
+    "factory-org-%",
+    "test-acad-%",
+    "outbox-%",
+    "other-acad-%",
+    "ent-other-%",
+    "ui-acad-%",
 ]
 
 LIVE_SESSION_TITLE_PATTERNS = [
@@ -223,6 +242,20 @@ def _delete_stale_course_views(db: Session) -> int:
     return n
 
 
+def _optout_test_orgs_from_marketplace(db: Session) -> int:
+    """Force marketplace_opt_in=False on orgs whose slug matches a test
+    factory pattern. Returns rows flipped."""
+    from models import Organization
+    flipped = 0
+    for pat in TEST_ORG_SLUG_PATTERNS:
+        flipped += (db.query(Organization)
+                    .filter(Organization.slug.like(pat),
+                            Organization.marketplace_opt_in.is_(True))
+                    .update({"marketplace_opt_in": False},
+                            synchronize_session=False))
+    return flipped
+
+
 def tick(db: Session, dry_run: bool = False) -> dict:
     """Run the full cleanup pass. Returns a dict of {resource: rows_deleted}.
 
@@ -234,6 +267,7 @@ def tick(db: Session, dry_run: bool = False) -> dict:
         "terms_versions": _delete_stale_terms_versions(db),
         "outbox_messages": _delete_stale_outbox(db),
         "course_views": _delete_stale_course_views(db),
+        "marketplace_optouts": _optout_test_orgs_from_marketplace(db),
     }
     if dry_run:
         db.rollback()
