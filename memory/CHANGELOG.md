@@ -1,6 +1,25 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 42 — Course cover photos + admin Featured picks (2026-07-30)
+
+Certified by testing agent (iteration_38.json): backend 8/8, frontend 100%.
+
+- **Cover images end-to-end**: `cover_image` now in CourseUpdate/CourseSummary
+  schemas, course serializers, catalog serializers; rendered on public catalog
+  cards (`catalog-cover-img-*`), admin course cards (photo takes precedence
+  over mind-map thumb) and a new "Cover image" field in the course editor
+  (URL input + upload via /api/uploads/image, preview, remove).
+  `scripts/set_course_covers.py` downloaded 4 curated fitness photos into
+  local storage (`uploads/covers/*`) and set them on the 4 real courses
+  (live DB + UAT snapshot; snapshot also alembic-upgraded).
+- **Featured Course Pick**: new `courses.is_featured` column (migration
+  `2b3c4d5e6f7a`), org-scoped `POST /api/courses/{id}/toggle-featured`
+  (ADMIN/SUPER_ADMIN; learner 403, cross-org 404), catalog `featured=true`
+  returns flagged-first then most-enrolled fill to 6. Star toggle on admin
+  course cards (`feature-toggle-*`, amber when on). Course 222 flagged as demo.
+- New regression file: `tests/test_iteration42_covers_featured.py`.
+
 ## Iteration 41 — Help links + guide auto-rebuild + marketplace cleanup (2026-07-30)
 
 ### Follow-up (same day)
