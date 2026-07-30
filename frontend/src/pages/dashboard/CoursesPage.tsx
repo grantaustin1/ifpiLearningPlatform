@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { LearningStreakBadge } from 'components/LearningStreakBadge'
@@ -39,6 +39,15 @@ export default function CoursesPage() {
       toast.success(`Duplicated with ${d.slides_copied} slide${d.slides_copied !== 1 ? 's' : ''}`)
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not duplicate'),
+  })
+
+  const featureMut = useMutation({
+    mutationFn: async (id: number) => (await api.post(`/courses/${id}/toggle-featured`)).data,
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ['courses'] })
+      toast.success(d.is_featured ? 'Added to the marketplace Featured row' : 'Removed from the Featured row')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not update'),
   })
 
   const handleNewCourse = async () => {
@@ -114,7 +123,14 @@ export default function CoursesPage() {
           {filtered.map(c => (
             <div key={c.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow" data-testid={`course-card-${c.id}`}>
               <div className={`h-32 ${c.cover_color} flex items-end p-4 relative overflow-hidden`}>
-                {isAdmin && c.mindmap_thumbnail_svg && (
+                {c.cover_image ? (
+                  <>
+                    <img src={c.cover_image} alt={c.title} loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                      data-testid={`course-cover-img-${c.id}`} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                  </>
+                ) : isAdmin && c.mindmap_thumbnail_svg && (
                   <>
                     <img
                       alt="Mind map preview"
@@ -131,6 +147,16 @@ export default function CoursesPage() {
                 <span className={`relative z-10 text-[10px] font-medium px-2 py-0.5 rounded-full ${c.status === 'PUBLISHED' ? 'bg-white/20 text-white' : 'bg-black/20 text-white/80'}`}>
                   {c.status}
                 </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => featureMut.mutate(c.id)}
+                    disabled={featureMut.isPending}
+                    title={c.is_featured ? 'Remove from the marketplace Featured row' : 'Feature on the marketplace'}
+                    data-testid={`feature-toggle-${c.id}`}
+                    className={`absolute top-2 left-2 z-20 p-1.5 rounded-full transition-colors ${c.is_featured ? 'bg-amber-400 text-white shadow' : 'bg-black/25 text-white/70 hover:bg-black/40 hover:text-white'}`}>
+                    <Star className={`h-3.5 w-3.5 ${c.is_featured ? 'fill-current' : ''}`} />
+                  </button>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-slate-900 truncate">{c.title}</h3>

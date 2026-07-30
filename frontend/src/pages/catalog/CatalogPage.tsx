@@ -12,6 +12,8 @@ interface CatalogCourse {
   description?: string | null
   category?: string | null
   cover_color: string
+  cover_image?: string | null
+  is_featured?: boolean
   duration_minutes?: number | null
   price_cents: number
   currency: string
@@ -32,8 +34,16 @@ function CourseCard({ c, onEnroll }: { c: CatalogCourse; onEnroll: (c: CatalogCo
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-slate-100 flex flex-col" data-testid={`catalog-card-${c.id}`}>
       <Link to={`/catalog/${c.id}`} className="block group">
-        <div className={`h-32 ${c.cover_color} p-4 flex items-end`}>
-          {c.category && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">{c.category}</span>}
+        <div className={`h-32 ${c.cover_color} p-4 flex items-end relative overflow-hidden`}>
+          {c.cover_image && (
+            <>
+              <img src={c.cover_image} alt={c.title} loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-500"
+                data-testid={`catalog-cover-img-${c.id}`} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+            </>
+          )}
+          {c.category && <span className="relative z-10 text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm text-white">{c.category}</span>}
         </div>
       </Link>
       <div className="p-5 flex-1 flex flex-col">

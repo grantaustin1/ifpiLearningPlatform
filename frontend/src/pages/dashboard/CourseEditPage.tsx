@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { useConfirm } from 'components/ConfirmDialog'
@@ -16,6 +16,8 @@ export default function CourseEditPage() {
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [prereqs, setPrereqs] = useState<any[]>([])
   const [allCourses, setAllCourses] = useState<any[]>([])
@@ -44,7 +46,7 @@ export default function CourseEditPage() {
         title: course.title, description: course.description,
         category: course.category, duration_minutes: course.duration_minutes,
         price_cents: course.price_cents, passing_score: course.passing_score,
-        status: course.status,
+        status: course.status, cover_image: course.cover_image || null,
       })
       for (const s of slides.filter(x => !x._local)) {
         await api.patch(`/courses/${id}/slides/${s.id}`, {
@@ -247,6 +249,43 @@ export default function CourseEditPage() {
           <select value={course.status} onChange={e => setCourse({ ...course, status: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
             <option value="DRAFT">DRAFT</option><option value="PUBLISHED">PUBLISHED</option><option value="ARCHIVED">ARCHIVED</option>
           </select>
+        </Field>
+        <Field label="Cover image">
+          <div className="space-y-2">
+            {course.cover_image && (
+              <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200">
+                <img src={course.cover_image} alt="Cover" className="w-full h-full object-cover" data-testid="cover-image-preview" />
+                <button onClick={() => setCourse({ ...course, cover_image: '' })} title="Remove cover image"
+                  data-testid="cover-image-remove"
+                  className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-black/70">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input value={course.cover_image || ''} onChange={e => setCourse({ ...course, cover_image: e.target.value })}
+                placeholder="Image URL or upload →" data-testid="cover-image-url"
+                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+              <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover}
+                data-testid="cover-image-upload-btn" title="Upload an image (max 5MB)"
+                className="inline-flex items-center gap-1 text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
+                <Upload className="h-3.5 w-3.5" /> {uploadingCover ? '…' : 'Upload'}
+              </button>
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={async e => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                setUploadingCover(true)
+                try {
+                  const fd = new FormData()
+                  fd.append('file', f)
+                  const r = await api.post('/uploads/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                  setCourse((c: any) => ({ ...c, cover_image: r.data.url }))
+                  toast.success('Cover uploaded — remember to Save')
+                } catch (err: any) { toast.error(err?.response?.data?.detail || 'Upload failed') }
+                finally { setUploadingCover(false); e.target.value = '' }
+              }} />
+            </div>
+          </div>
         </Field>
 
         <div className="mt-6 pt-4 border-t border-slate-200" data-testid="prereqs-section">
