@@ -1,6 +1,27 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 41 — Help links + guide auto-rebuild + marketplace cleanup (2026-07-30)
+
+All certified by testing agent (iteration_37.json): backend 7/7, frontend 100%.
+
+- **Help & guides sidebar entry** (`DashboardLayout.tsx`, testid
+  `sidebar-help-link`) — role-aware: admins open the Admin User Guide PDF,
+  learners the Student User Guide, in a new tab.
+- **Guide auto-rebuild** — `services/guide_builder.py::ensure_fresh()`
+  regenerates a PDF when its markdown source in `/app/docs/guides` is newer;
+  called from the public download endpoint; idempotent; falls back to the
+  stale PDF if a rebuild fails. `scripts/build_user_guides_pdf.py` is now a
+  thin CLI wrapper.
+- **Marketplace cleanup** — one-off `scripts/purge_marketplace_debris.py`
+  opted 321 test orgs out of the marketplace and deleted 142 debris courses
+  (live DB + UAT snapshot). Nightly `test_debris_cleanup` extended: new course
+  patterns (Entitlement Test%, Paid E2E%, Stripe Test%, Stripe Frontend E2E%,
+  Ent Inspect%) + `TEST_ORG_SLUG_PATTERNS` force-opt-out via new
+  `marketplace_optouts` stat in `tick()`. Public catalog now shows only
+  'IFPI Fundamentals'.
+- New regression file: `tests/test_iteration41_guides_marketplace.py`.
+
 ## Iteration 40 — Fitness rebrand + custom theme presets (2026-07-30)
 
 ### Bug fix (post-release): PDF guide downloads
