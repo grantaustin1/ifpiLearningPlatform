@@ -103,6 +103,21 @@ async def upload_image(
     return {"url": url, "key": key, "size": len(data)}
 
 
+@uploads_router.get("/cover-library")
+def cover_library(current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Curated course-cover photo gallery (Iter 43). Files are placed by
+    scripts/build_cover_library.py into uploads/covers/library/."""
+    lib_dir = Path(__file__).resolve().parents[1] / "uploads" / "covers" / "library"
+    items = []
+    if lib_dir.is_dir():
+        for f in sorted(lib_dir.glob("*.jpg")):
+            items.append({
+                "url": f"/api/uploads/files/covers/library/{f.name}",
+                "label": f.stem.replace("_", " ").title(),
+            })
+    return items
+
+
 @uploads_router.get("/files/{path:path}")
 def serve_upload(path: str):
     """Serve a previously-uploaded file. ONLY meaningful for the `local`

@@ -17,7 +17,17 @@ export default function CourseEditPage() {
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
+  const [gallery, setGallery] = useState<any[]>([])
   const coverInputRef = useRef<HTMLInputElement>(null)
+
+  const openGallery = async () => {
+    setShowGallery(true)
+    if (gallery.length === 0) {
+      try { setGallery((await api.get('/uploads/cover-library')).data) }
+      catch { toast.error('Could not load the photo gallery') }
+    }
+  }
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [prereqs, setPrereqs] = useState<any[]>([])
   const [allCourses, setAllCourses] = useState<any[]>([])
@@ -266,6 +276,10 @@ export default function CourseEditPage() {
               <input value={course.cover_image || ''} onChange={e => setCourse({ ...course, cover_image: e.target.value })}
                 placeholder="Image URL or upload →" data-testid="cover-image-url"
                 className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+              <button onClick={openGallery} data-testid="cover-gallery-btn" title="Choose from the curated photo gallery"
+                className="inline-flex items-center gap-1 text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium">
+                <Sparkles className="h-3.5 w-3.5" /> Gallery
+              </button>
               <button onClick={() => coverInputRef.current?.click()} disabled={uploadingCover}
                 data-testid="cover-image-upload-btn" title="Upload an image (max 5MB)"
                 className="inline-flex items-center gap-1 text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
@@ -322,6 +336,33 @@ export default function CourseEditPage() {
           </div>
         )}
       </aside>
+
+      {showGallery && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="cover-gallery-modal">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">Choose a cover photo</h3>
+              <button onClick={() => setShowGallery(false)} data-testid="cover-gallery-close"><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+            <div className="p-6 max-h-[28rem] overflow-y-auto">
+              {gallery.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">Loading gallery…</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {gallery.map((g: any) => (
+                    <button key={g.url} onClick={() => { setCourse({ ...course, cover_image: g.url }); setShowGallery(false); toast.success('Cover selected — remember to Save') }}
+                      data-testid={`gallery-photo-${g.label.toLowerCase().replace(/\s+/g, '-')}`}
+                      className={`relative h-24 rounded-xl overflow-hidden border-2 group transition-all ${course.cover_image === g.url ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-transparent hover:border-indigo-300'}`}>
+                      <img src={g.url} alt={g.label} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <span className="absolute bottom-0 inset-x-0 text-[10px] font-medium text-white bg-gradient-to-t from-black/70 to-transparent px-2 pt-4 pb-1 text-left">{g.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddPrereq && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="add-prereq-modal">
