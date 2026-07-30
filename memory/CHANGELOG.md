@@ -3,6 +3,17 @@
 
 ## Iteration 40 — Fitness rebrand + custom theme presets (2026-07-30)
 
+### Bug fix (post-release): PDF guide downloads
+- Old links served PDFs via the React dev server (`/guides/*.pdf`) — 502/landing
+  page during frontend restarts/pod wake. Now served by the backend:
+  `GET /api/public/guides/{filename}` (anonymous, rate-limited, filename
+  whitelist, FileResponse from `/app/docs/guides/`). Build script output moved
+  to `/app/docs/guides/`; `frontend/public/guides` removed.
+- Verified by testing agent (iteration_36.json): 5/5 — 200 application/pdf with
+  Content-Disposition, JSON 404 for unknown names, traversal-safe, cert-verify
+  regression clean. New test file `tests/test_public_guides.py`.
+
+
 **IFPI = International Fitness Professionals Institute** (user correction —
 early build wrongly assumed the music-industry IFPI).
 
