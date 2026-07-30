@@ -47,6 +47,7 @@ import EmailDiagnosticsPage from 'pages/dashboard/EmailDiagnosticsPage'
 import AffiliatePage from 'pages/dashboard/AffiliatePage'
 import LiveSessionsPage from 'pages/dashboard/LiveSessionsPage'
 import MarketplaceAnalyticsPage from 'pages/dashboard/MarketplaceAnalyticsPage'
+import FeedbackAdminPage from 'pages/dashboard/FeedbackAdminPage'
 import PreferencesPage from 'pages/dashboard/PreferencesPage'
 import Erp360IntegrationsPage from 'pages/dashboard/Erp360IntegrationsPage'
 import EntitlementsInspectorPage from 'pages/dashboard/EntitlementsInspectorPage'
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="/affiliate" element={<Protected adminOnly><AffiliatePage /></Protected>} />
         <Route path="/live-sessions" element={<LiveSessionsPage />} />
         <Route path="/marketplace-analytics" element={<Protected adminOnly><MarketplaceAnalyticsPage /></Protected>} />
+        <Route path="/feedback-admin" element={<Protected adminOnly><FeedbackAdminPage /></Protected>} />
         <Route path="/preferences" element={<PreferencesPage />} />
         <Route path="/integrations/erp360" element={<Protected adminOnly><Erp360IntegrationsPage /></Protected>} />
         <Route path="/entitlements" element={<Protected adminOnly><EntitlementsInspectorPage /></Protected>} />

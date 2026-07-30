@@ -14,6 +14,9 @@ export default function LearnPage() {
   const [current, setCurrent] = useState(0)
   const [completed, setCompleted] = useState<Set<number>>(new Set())
   const [result, setResult] = useState<any>(null)
+  const [myRating, setMyRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
+  const [ratingBusy, setRatingBusy] = useState(false)
   const [finishing, setFinishing] = useState(false)
 
   useEffect(() => {
@@ -112,6 +115,28 @@ export default function LearnPage() {
                     <Star className="h-4 w-4" /> +{result.xp_earned} XP
                   </div>
                 )}
+                <div className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4" data-testid="course-rating-block">
+                  <p className="text-sm font-medium text-slate-700 mb-2">{myRating ? 'Thanks for rating this course!' : 'How was this course?'}</p>
+                  <div className="flex items-center justify-center gap-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} disabled={ratingBusy}
+                        onClick={async () => {
+                          setRatingBusy(true)
+                          try {
+                            await api.post(`/courses/${courseId}/rating`, { rating: n })
+                            setMyRating(n)
+                            toast.success('Rating saved — thank you!')
+                          } catch (e: any) { toast.error(e?.response?.data?.detail || 'Could not save rating') }
+                          finally { setRatingBusy(false) }
+                        }}
+                        onMouseEnter={() => setHoverRating(n)} onMouseLeave={() => setHoverRating(0)}
+                        data-testid={`rate-star-${n}`}
+                        className="p-0.5 transition-transform hover:scale-110">
+                        <Star className={`h-7 w-7 ${(hoverRating || myRating) >= n ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <button onClick={() => nav('/certificates')} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium">View Certificate</button>
               </div>
             </div>

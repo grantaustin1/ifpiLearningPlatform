@@ -110,10 +110,12 @@ from .ai import (
     SourceDocument,
 )
 from .engagement import (
+    CourseRating,
     CourseView,
     LiveSession,
     LiveSessionRsvp,
     SlideView,
+    TesterFeedback,
 )
 
 __all__ = [
@@ -147,5 +149,5 @@ __all__ = [
     "AIJob", "AITutorMessage", "AITutorSession", "AIUsageLedger",
     "Flashcard", "FlashcardReview", "SourceChunk", "SourceDocument",
     # engagement
-    "CourseView", "LiveSession", "LiveSessionRsvp", "SlideView",
+    "CourseRating", "CourseView", "LiveSession", "LiveSessionRsvp", "SlideView", "TesterFeedback",
 ]
