@@ -1,6 +1,24 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 43 — Landing polish + cover gallery + weekly enrolments (2026-07-30)
+
+Certified by testing agent (iteration_39.json): backend 10/10, frontend 100%.
+
+- **Landing page**: fitness hero ("Training that powers the fitness industry",
+  "Trusted by fitness professionals worldwide"), CPD/multi-academy feature copy,
+  new **Featured courses** photo strip (`landing-featured`, up to 3 cards from
+  `/api/catalog?featured=true`, linking to /catalog/{id}).
+- **Cover photo gallery**: 15 curated fitness photos in
+  `uploads/covers/library/` (`scripts/build_cover_library.py`, idempotent);
+  `GET /api/uploads/cover-library` (INSTRUCTOR+); course editor "Gallery"
+  button → modal grid (`cover-gallery-modal`) → click fills cover_image.
+- **Weekly enrolments chart**: `GET /api/admin/analytics/enrollments-weekly`
+  (ADMIN, weeks 4–26, org-scoped via Course.organization_id, consecutive
+  Monday buckets); `WeeklyEnrollmentsCard.tsx` CSS bar chart on the admin
+  dashboard next to Recent Activity.
+- New regression file: `tests/test_iteration43_landing_gallery_analytics.py`.
+
 ## Iteration 42 — Course cover photos + admin Featured picks (2026-07-30)
 
 Certified by testing agent (iteration_38.json): backend 8/8, frontend 100%.
