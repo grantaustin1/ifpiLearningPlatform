@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import logging
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,9 @@ def build(pdf_name: str) -> Path:
     from xhtml2pdf import pisa
 
     md_file, subtitle = GUIDES[pdf_name]
-    md_text = (GUIDES_DIR / md_file).read_text(encoding="utf-8")
+    md_path = GUIDES_DIR / md_file
+    md_text = md_path.read_text(encoding="utf-8")
+    updated = datetime.fromtimestamp(md_path.stat().st_mtime).strftime("%-d %B %Y")
     lines = md_text.splitlines()
     if lines and lines[0].startswith("# "):
         lines = lines[1:]  # cover band replaces the markdown H1
@@ -69,10 +72,10 @@ def build(pdf_name: str) -> Path:
     html = f"""<html><head><style>{CSS}</style></head><body>
     <div class="cover-band">
       <h1>IFPI Learning Platform</h1>
-      <div class="cover-sub">{subtitle} &nbsp;&middot;&nbsp; Complete first-time walkthrough</div>
+      <div class="cover-sub">{subtitle} &nbsp;&middot;&nbsp; Complete first-time walkthrough &nbsp;&middot;&nbsp; Updated {updated}</div>
     </div>
     {body_html}
-    <div id="footer_content">IFPI Learning Platform — {subtitle} — page <pdf:pagenumber> of <pdf:pagecount></div>
+    <div id="footer_content">IFPI Learning Platform — {subtitle} — updated {updated} — page <pdf:pagenumber> of <pdf:pagecount></div>
     </body></html>"""
     out = GUIDES_DIR / pdf_name
     buf = io.BytesIO()

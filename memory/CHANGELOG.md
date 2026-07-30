@@ -3,6 +3,17 @@
 
 ## Iteration 41 — Help links + guide auto-rebuild + marketplace cleanup (2026-07-30)
 
+### Follow-up (same day)
+- **3 genuine fitness courses seeded** (`scripts/seed_fitness_courses.py`,
+  idempotent, live DB + UAT snapshot): Foundations of Exercise Science
+  (6 slides / 5-q exam), Client Onboarding & Consultation Skills (5/5),
+  Gym Health & Safety Essentials (6/5). Marketplace now shows 4 real courses.
+- **Guide version stamp** — `guide_builder.build()` prints "Updated {md mtime
+  date}" on the cover band and page footer; stays accurate via auto-rebuild.
+- **Billing answers marked FINAL** in `docs/BILLING_GATEWAY_REVIEW_ANSWERS.md`
+  — ready for user to relay to the ERP360 team.
+
+
 All certified by testing agent (iteration_37.json): backend 7/7, frontend 100%.
 
 - **Help & guides sidebar entry** (`DashboardLayout.tsx`, testid

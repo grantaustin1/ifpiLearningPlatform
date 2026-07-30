@@ -3,6 +3,7 @@
 > Fill this in, commit it in the IFPI repo, and send it back to the ERP360 team.
 > Spec under review: `docs/BILLING_GATEWAY_API_SPEC.md` (DRAFT v0.1, mirrored from ERP360).
 > Reviewers: IFPI Engineering  Date: 2026-07-30
+> **STATUS: FINAL — reviewed and approved for send-off to the ERP360 team (2026-07-30).**
 
 ## Overall verdict
 - [ ] APPROVED as-is
