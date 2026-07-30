@@ -1,6 +1,25 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Billing Gateway spec joint review — Phase 0 (2026-07-30)
+
+Doc-only session. ERP360 shared their Billing Gateway API spec (DRAFT v0.1)
+via mirror script (checklist item A5 / IFPI B2).
+
+- Mirrored spec → `docs/BILLING_GATEWAY_API_SPEC.md` (do not edit; canonical
+  copy lives in the ERP360 repo).
+- Drafted IFPI answers → `docs/BILLING_GATEWAY_REVIEW_ANSWERS.md`:
+  verdict **APPROVED with changes**; DEBIT_ORDER-only OK for Phase 2 (native
+  Stripe covers card recurring); global webhook endpoint with `org_slug`
+  routing (mirrors `/api/erp360/webhooks/user`); `external_ref` stays
+  required, auto-link via optional `sso_sub`; asked for
+  `GET /subscriptions/{id}/transactions`, sandbox fixtures, full per-event
+  `data` schemas, longer retry tail / event replay, `Retry-After` on 503,
+  published rate budgets.
+- B1 + B2 prerequisites confirmed already landed; billing webhook receiver
+  (`POST /api/erp360/webhooks/billing`) deferred until sandbox fixtures exist.
+- No code, env, or service changes.
+
 ## Iter 39 · Lint extended with decorator-pass (2026-02-13)
 
 Extends the ForwardRef preflight lint to catch the bug at DEFINITION time, not just after decorators have been attached to endpoints.
