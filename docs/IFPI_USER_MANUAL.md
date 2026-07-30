@@ -484,7 +484,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
 | `routers/exams.py` | 212 |
-| `routers/extras.py` | 545 |
+| `routers/extras.py` | 655 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
@@ -506,7 +506,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12772** |
+| **Total** | **12882** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -532,6 +532,7 @@ Core entities (see `backend/models/` for the full list):
 | `CoursePrerequisite` | `course_prerequisites` |
 | `CourseSlide` | `course_slides` |
 | `CourseView` | `course_views` |
+| `CustomThemePreset` | `custom_theme_presets` |
 | `EmailVerificationToken` | `email_verification_tokens` |
 | `Enrollment` | `enrollments` |
 | `Erp360SeenEvent` | `erp360_seen_events` |
@@ -575,7 +576,7 @@ Core entities (see `backend/models/` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **60** ORM models._
+_Total: **61** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -830,7 +831,10 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/organization/smtp` | GET | Returns the SMTP config minus the password. Password is write-only. |
 | `/api/organization/smtp` | PUT |  |
 | `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
-| `/api/organization/themes` | GET | Read-only list of curated theme presets an ADMIN can apply in one click. |
+| `/api/organization/themes` | GET | Built-in presets + this org's custom presets (marked `custom: true`). |
+| `/api/organization/themes` | POST | Create a custom theme preset for the caller's organization. |
+| `/api/organization/themes/{preset_id}` | DELETE | Delete a custom theme preset. Orgs currently using it keep their |
+| `/api/organization/themes/{preset_id}` | PUT | Update a custom theme preset (org-scoped). |
 | `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
 | `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
 | `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
@@ -861,7 +865,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **273** registered API endpoints._
+_Total: **276** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

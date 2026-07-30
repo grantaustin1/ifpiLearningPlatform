@@ -247,7 +247,7 @@ function AIBuilderModal({ onClose, onApplied }: { onClose: () => void; onApplied
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Topic *</label>
               <input value={topic} onChange={e => setTopic(e.target.value)} data-testid="ai-topic"
-                placeholder="e.g. Introduction to Music Copyright Law"
+                placeholder="e.g. Foundations of Exercise Science"
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>

@@ -38,6 +38,7 @@ from ._common import (
 )
 from .identity import (
     AccountDeletionRequest,
+    CustomThemePreset,
     EmailVerificationToken,
     Invitation,
     Organization,
@@ -123,7 +124,7 @@ __all__ = [
     "LifecycleStage", "OrganizationStatus", "QuestionType", "SlideType",
     "SubscriptionStatus",
     # identity
-    "AccountDeletionRequest", "EmailVerificationToken", "Invitation",
+    "AccountDeletionRequest", "CustomThemePreset", "EmailVerificationToken", "Invitation",
     "Organization", "PasswordResetToken", "Person", "RefreshToken",
     "SsoJtiSeen", "Erp360SeenEvent", "ProgressOutbox", "User", "UserRole",
     # learning

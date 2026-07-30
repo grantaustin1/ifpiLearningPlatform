@@ -1,6 +1,7 @@
 """Extras: public lead capture, org branding update, outbox audit, path reorder."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
-from models import LearningPath, LearningPathItem, LifecycleStage, Organization, OutboxMessage, Person
+from models import CustomThemePreset, LearningPath, LearningPathItem, LifecycleStage, Organization, OutboxMessage, Person
 
 
 # ── Lead capture (public — no auth) ───────────────────────────────────
@@ -323,18 +324,127 @@ def send_cohort_digest_now(db: Session = Depends(get_db),
 
 
 @org_router.get("/themes")
-def list_theme_presets(current: CurrentUser = Depends(get_current_user)):
-    """Read-only list of curated theme presets an ADMIN can apply in one click."""
+def list_theme_presets(db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(get_current_user)):
+    """Built-in presets + this org's custom presets (marked `custom: true`)."""
     from services.theme_presets import PRESETS
-    return PRESETS
+    custom = (db.query(CustomThemePreset)
+              .filter(CustomThemePreset.organization_id == current.organization_id)
+              .order_by(CustomThemePreset.created_at).all())
+    return [dict(p, custom=False) for p in PRESETS] + [{
+        "id": c.id, "slug": c.slug, "name": c.name,
+        "description": c.description or "",
+        "primary_color": c.primary_color,
+        "cert_accent_color": c.cert_accent_color,
+        "cert_signature_text_suggestion": c.cert_signature_text_suggestion or "",
+        "cert_footer_text_suggestion": c.cert_footer_text_suggestion or "",
+        "cover_color": c.cover_color or "bg-indigo-500",
+        "custom": True,
+    } for c in custom]
+
+
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+class ThemePresetIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=300)
+    primary_color: str = "#6366f1"
+    cert_accent_color: str = "#6366f1"
+    cert_signature_text_suggestion: Optional[str] = Field(default=None, max_length=200)
+    cert_footer_text_suggestion: Optional[str] = None
+
+
+def _validate_theme_body(body: ThemePresetIn) -> None:
+    for field in ("primary_color", "cert_accent_color"):
+        if not _HEX_RE.match(getattr(body, field) or ""):
+            raise HTTPException(status_code=422,
+                                detail=f"{field} must be a hex colour like #1e293b")
+
+
+def _get_custom_preset(db: Session, current: CurrentUser, preset_id: int) -> "CustomThemePreset":
+    row = (db.query(CustomThemePreset)
+           .filter(CustomThemePreset.id == preset_id,
+                   CustomThemePreset.organization_id == current.organization_id)
+           .first())
+    if not row:
+        raise HTTPException(status_code=404, detail="Custom theme preset not found")
+    return row
+
+
+@org_router.post("/themes", status_code=201)
+def create_custom_theme(body: ThemePresetIn, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Create a custom theme preset for the caller's organization."""
+    from services.theme_presets import PRESETS
+    _validate_theme_body(body)
+    base_slug = re.sub(r"[^a-z0-9]+", "_", body.name.lower()).strip("_") or "custom"
+    slug, n = f"custom_{base_slug}", 2
+    taken = ({p["slug"] for p in PRESETS} |
+             {c.slug for c in db.query(CustomThemePreset)
+              .filter(CustomThemePreset.organization_id == current.organization_id).all()})
+    while slug in taken:
+        slug, n = f"custom_{base_slug}_{n}", n + 1
+    row = CustomThemePreset(
+        organization_id=current.organization_id, slug=slug, name=body.name,
+        description=body.description,
+        primary_color=body.primary_color, cert_accent_color=body.cert_accent_color,
+        cert_signature_text_suggestion=body.cert_signature_text_suggestion,
+        cert_footer_text_suggestion=body.cert_footer_text_suggestion,
+    )
+    db.add(row)
+    db.commit()
+    return {"ok": True, "id": row.id, "slug": row.slug}
+
+
+@org_router.put("/themes/{preset_id}")
+def update_custom_theme(preset_id: int, body: ThemePresetIn,
+                        db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Update a custom theme preset (org-scoped)."""
+    _validate_theme_body(body)
+    row = _get_custom_preset(db, current, preset_id)
+    row.name = body.name
+    row.description = body.description
+    row.primary_color = body.primary_color
+    row.cert_accent_color = body.cert_accent_color
+    row.cert_signature_text_suggestion = body.cert_signature_text_suggestion
+    row.cert_footer_text_suggestion = body.cert_footer_text_suggestion
+    db.commit()
+    return {"ok": True, "id": row.id, "slug": row.slug}
+
+
+@org_router.delete("/themes/{preset_id}")
+def delete_custom_theme(preset_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Delete a custom theme preset. Orgs currently using it keep their
+    applied colours (values were copied at apply time)."""
+    row = _get_custom_preset(db, current, preset_id)
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 @org_router.post("/apply-theme/{slug}")
 def apply_theme_preset(slug: str, db: Session = Depends(get_db),
                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
-    """Copy a preset's branding values onto the caller's organization."""
+    """Copy a preset's branding values onto the caller's organization.
+    Looks up built-ins first, then the org's custom presets."""
     from services.theme_presets import get_preset
     preset = get_preset(slug)
+    if not preset:
+        row = (db.query(CustomThemePreset)
+               .filter(CustomThemePreset.slug == slug,
+                       CustomThemePreset.organization_id == current.organization_id)
+               .first())
+        if row:
+            preset = {
+                "slug": row.slug,
+                "primary_color": row.primary_color,
+                "cert_accent_color": row.cert_accent_color,
+                "cert_signature_text_suggestion": row.cert_signature_text_suggestion or "",
+                "cert_footer_text_suggestion": row.cert_footer_text_suggestion or "",
+            }
     if not preset:
         raise HTTPException(status_code=404, detail="Theme preset not found")
     o = db.query(Organization).filter(Organization.id == current.organization_id).first()

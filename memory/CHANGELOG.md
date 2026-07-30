@@ -1,6 +1,26 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 40 — Fitness rebrand + custom theme presets (2026-07-30)
+
+**IFPI = International Fitness Professionals Institute** (user correction —
+early build wrongly assumed the music-industry IFPI).
+
+### Fitness rebrand sweep (all music-era copy removed)
+- Catalog hero → "world's leading fitness academies… IFPI-accredited academies, gyms and wellness studios"
+- CoursesPage placeholder → "Foundations of Exercise Science"
+- `ai_quiz_service` system prompt → "fitness-industry education expert"
+- `theme_presets.py` → 5 neutral built-ins (IFPI Classic, Crimson & Gold, Teal & Magenta, Slate & Emerald, Monochrome); footer suggestion now "International Fitness Professionals Institute"
+- Seed course/exam ("IFPI Fundamentals") rewritten with fitness content; `scripts/rebrand_fitness_content.py` updated rows IN PLACE in live DB + UAT snapshot (ids preserved)
+- Admin PDF guide example updated; PDFs rebuilt
+
+### New feature: admin-configurable theme presets
+- New table `custom_theme_presets` (org-scoped, migration `1a2b3c4d5e6f`)
+- `GET /api/organization/themes` merges built-ins + org customs (`custom: true`)
+- `POST/PUT/DELETE /api/organization/themes[/{id}]` (ADMIN; hex validation; slug auto-generated `custom_*`); `apply-theme/{slug}` resolves customs too
+- Settings → Branding: "New preset" form, Custom badge, Edit/Delete with confirm dialog
+- Tests: 5/5 `test_iteration40_theme_presets.py` (CRUD+apply, neutral-copy guard, 422 colour, learner 403, fitness seed guard); tsc clean; pre_finish_check PASSED
+
 ## UAT Sandbox setup (2026-07-30)
 
 Team UAT enabled without dirtying pre-go-live data:
