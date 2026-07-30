@@ -479,7 +479,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 655 |
+| `routers/courses.py` | 671 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
@@ -493,7 +493,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1210 |
+| `routers/misc.py` | 1223 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -506,7 +506,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12910** |
+| **Total** | **12939** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -762,6 +762,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
+| `/api/courses/{course_id}/toggle-featured` | POST | Flip the marketplace 'Featured' flag on a course (Iter 42). |
 | `/api/courses/{course_id}/unpublish` | POST |  |
 | `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
@@ -866,7 +867,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **277** registered API endpoints._
+_Total: **278** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

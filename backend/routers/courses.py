@@ -30,7 +30,8 @@ def _summary(c: Course) -> CourseSummary:
     meta = c.metadata_json or {}
     return CourseSummary(
         id=c.id, title=c.title, description=c.description, category=c.category,
-        cover_color=c.cover_color, status=c.status.value,
+        cover_color=c.cover_color, cover_image=c.cover_image,
+        is_featured=bool(c.is_featured), status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
         currency=c.currency, slide_count=len(c.slides),
         enrollment_count=len(c.enrollments), created_at=c.created_at,
@@ -108,7 +109,8 @@ def _detail(c: Course) -> CourseDetail:
     meta = c.metadata_json or {}
     return CourseDetail(
         id=c.id, title=c.title, description=c.description, category=c.category,
-        cover_color=c.cover_color, status=c.status.value,
+        cover_color=c.cover_color, cover_image=c.cover_image,
+        is_featured=bool(c.is_featured), status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
         currency=c.currency, passing_score=c.passing_score,
         slide_count=len(c.slides), enrollment_count=len(c.enrollments),
@@ -152,6 +154,20 @@ def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_
     db.commit()
     db.refresh(c)
     return _detail(c)
+
+
+@router.post("/{course_id}/toggle-featured")
+def toggle_featured(course_id: int, db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Flip the marketplace 'Featured' flag on a course (Iter 42)."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    c.is_featured = not bool(c.is_featured)
+    db.commit()
+    return {"id": c.id, "is_featured": c.is_featured}
 
 
 @router.delete("/{course_id}")

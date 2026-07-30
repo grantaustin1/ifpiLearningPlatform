@@ -1122,17 +1122,28 @@ def catalog(q: str | None = Query(None),
         query = query.filter(Course.organization_id == org)
     total = query.count()
     if featured:
-        # Featured = top 6 by enrollment count (SQL-side)
+        # Featured = admin-flagged courses first (Iter 42), padded with the
+        # most-enrolled courses up to 6 so the row never looks empty.
         enroll_sq = (
             db.query(Enrollment.course_id, func.count(Enrollment.id).label("n"))
             .group_by(Enrollment.course_id).subquery()
         )
-        courses = (
-            query.outerjoin(enroll_sq, enroll_sq.c.course_id == Course.id)
-                 .order_by(func.coalesce(enroll_sq.c.n, 0).desc(), Course.created_at.desc())
+        flagged = (
+            query.filter(Course.is_featured == True)  # noqa: E712
+                 .order_by(Course.display_order.asc(), Course.created_at.desc())
                  .options(selectinload(Course.slides), selectinload(Course.enrollments))
                  .limit(6).all()
         )
+        courses = list(flagged)
+        if len(courses) < 6:
+            fill = (
+                query.filter(Course.id.notin_([c.id for c in courses] or [0]))
+                     .outerjoin(enroll_sq, enroll_sq.c.course_id == Course.id)
+                     .order_by(func.coalesce(enroll_sq.c.n, 0).desc(), Course.created_at.desc())
+                     .options(selectinload(Course.slides), selectinload(Course.enrollments))
+                     .limit(6 - len(courses)).all()
+            )
+            courses.extend(fill)
     else:
         # Apply sort
         if sort == "price_asc":
@@ -1165,6 +1176,7 @@ def catalog(q: str | None = Query(None),
         "courses": [{
             "id": c.id, "title": c.title, "description": c.description,
             "category": c.category, "cover_color": c.cover_color,
+            "cover_image": c.cover_image, "is_featured": bool(c.is_featured),
             "duration_minutes": c.duration_minutes, "price_cents": c.price_cents,
             "currency": c.currency, "slide_count": len(c.slides),
             "enrollment_count": len(c.enrollments),
@@ -1198,6 +1210,7 @@ def catalog_detail(course_id: int, db: Session = Depends(get_db)):
     slides = sorted(course.slides, key=lambda s: s.order_index)[:8]
     return {
         "id": course.id, "title": course.title, "description": course.description,
+        "cover_image": course.cover_image, "is_featured": bool(course.is_featured),
         "category": course.category, "cover_color": course.cover_color,
         "duration_minutes": course.duration_minutes, "price_cents": course.price_cents,
         "currency": course.currency,
