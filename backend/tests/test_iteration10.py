@@ -14,7 +14,7 @@ import requests
 import pytest
 import yaml
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://last-checkpoint-15.preview.emergentagent.com").rstrip("/")
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
 
 

@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/seo", tags=["SEO"])
 def _base(req: Request) -> str:
     """Iter 29 — Prefer the `PUBLIC_BASE_URL` env var so preview
     environments emit the public preview hostname (e.g.
-    `https://foo.preview.emergentagent.com`) rather than the K8s
+    `https://last-checkpoint-15.preview.emergentagent.com`) rather than the K8s
     cluster-internal hostname derived from the ingress `Host` header.
     Falls back to `request.base_url` in dev/prod when the env var is
     unset."""
