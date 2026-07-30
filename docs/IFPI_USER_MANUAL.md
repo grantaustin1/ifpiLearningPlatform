@@ -488,12 +488,12 @@ Core entities (see `backend/models/` for the full list):
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
-| `routers/iter5.py` | 337 |
+| `routers/iter5.py` | 352 |
 | `routers/iter8.py` | 305 |
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1223 |
+| `routers/misc.py` | 1248 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -506,7 +506,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12939** |
+| **Total** | **12979** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -598,6 +598,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
 | `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
 | `/api/admin/analytics` | GET |  |
+| `/api/admin/analytics/enrollments-weekly` | GET | Enrolments per ISO week for the last `weeks` weeks (Iter 43 dashboard chart). |
 | `/api/admin/api-tokens` | GET |  |
 | `/api/admin/api-tokens` | POST |  |
 | `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
@@ -860,6 +861,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/tutor/sessions/{session_id}` | GET |  |
 | `/api/tutor/sessions/{session_id}/archive` | POST |  |
 | `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
+| `/api/uploads/cover-library` | GET | Curated course-cover photo gallery (Iter 43). Files are placed by |
 | `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
 | `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
@@ -867,7 +869,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **278** registered API endpoints._
+_Total: **280** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

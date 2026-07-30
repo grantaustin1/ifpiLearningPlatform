@@ -917,6 +917,31 @@ def streak_leaderboard(
 admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 
+@admin_router.get("/analytics/enrollments-weekly")
+def enrollments_weekly(weeks: int = Query(12, ge=4, le=26),
+                       db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Enrolments per ISO week for the last `weeks` weeks (Iter 43 dashboard chart)."""
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = monday - timedelta(weeks=weeks - 1)
+    rows = (db.query(Enrollment.enrolled_at)
+            .join(Course, Course.id == Enrollment.course_id)
+            .filter(Course.organization_id == current.organization_id,
+                    Enrollment.enrolled_at >= start.replace(tzinfo=None))
+            .all())
+    buckets = {(start + timedelta(weeks=i)).date().isoformat(): 0 for i in range(weeks)}
+    for (ts,) in rows:
+        if ts is None:
+            continue
+        d = ts if ts.tzinfo is None else ts.replace(tzinfo=None)
+        wk = (d - timedelta(days=d.weekday())).date().isoformat()
+        if wk in buckets:
+            buckets[wk] += 1
+    return {"weeks": [{"week_start": k, "count": v} for k, v in buckets.items()]}
+
+
 @admin_router.get("/analytics", response_model=AnalyticsOverview)
 def analytics(db: Session = Depends(get_db),
               current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):

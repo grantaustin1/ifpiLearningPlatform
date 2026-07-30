@@ -6,6 +6,7 @@ import { timeAgo } from 'lib/utils'
 import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
 import { OnboardingBoard } from './OnboardingBoard'
 import { DocsEngagementTile } from './DocsEngagementTile'
+import { WeeklyEnrollmentsCard } from './WeeklyEnrollmentsCard'
 
 export default function DashboardPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -100,6 +101,7 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+        <WeeklyEnrollmentsCard />
       </div>
     </div>
   )
