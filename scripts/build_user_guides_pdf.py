@@ -15,7 +15,9 @@ GUIDES = [
     ("/app/docs/guides/STUDENT_USER_GUIDE.md", "IFPI_Student_User_Guide.pdf",
      "Student User Guide"),
 ]
-OUT_DIR = Path("/app/frontend/public/guides")
+# Served by the backend at /api/public/guides/{filename} — see
+# routers/public_catalog.py. Backend serving survives frontend restarts.
+OUT_DIR = Path("/app/docs/guides")
 
 CSS = """
 @page {

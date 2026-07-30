@@ -19,10 +19,12 @@ limiting lives in the ingress / CDN layer.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user
@@ -88,6 +90,31 @@ def _ratelimit(ip: str) -> None:
         max_requests=_VERIFY_MAX_REQUESTS,
         window_secs=_VERIFY_WINDOW_SECS,
     )
+
+
+# ─── Anonymous user-guide PDF downloads ──────────────────────────────
+_GUIDES_DIR = "/app/docs/guides"
+_GUIDE_FILES = {
+    "IFPI_Admin_User_Guide.pdf",
+    "IFPI_Student_User_Guide.pdf",
+}
+
+
+@router.get("/guides/{filename}")
+def download_user_guide(filename: str, request: Request):
+    """Anonymous download of the platform user-guide PDFs.
+
+    Served from the backend (not the SPA dev server) so links stay valid
+    regardless of frontend build/restart state. Filenames are whitelisted —
+    no path traversal surface.
+    """
+    _ratelimit(_client_ip(request))
+    if filename not in _GUIDE_FILES:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    path = os.path.join(_GUIDES_DIR, filename)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Guide not built yet")
+    return FileResponse(path, media_type="application/pdf", filename=filename)
 
 
 # ─── Anonymous certificate verify ────────────────────────────────────
