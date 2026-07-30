@@ -919,17 +919,21 @@ admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 @admin_router.get("/analytics/enrollments-weekly")
 def enrollments_weekly(weeks: int = Query(12, ge=4, le=26),
+                       metric: str = Query("enrollments"),
                        db: Session = Depends(get_db),
                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
-    """Enrolments per ISO week for the last `weeks` weeks (Iter 43 dashboard chart)."""
+    """Enrolments or completions per ISO week (Iter 43/44 dashboard chart)."""
     from datetime import datetime, timedelta, timezone
+    if metric not in ("enrollments", "completions"):
+        raise HTTPException(status_code=422, detail="metric must be enrollments or completions")
+    ts_col = Enrollment.completed_at if metric == "completions" else Enrollment.enrolled_at
     now = datetime.now(timezone.utc)
     monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     start = monday - timedelta(weeks=weeks - 1)
-    rows = (db.query(Enrollment.enrolled_at)
+    rows = (db.query(ts_col)
             .join(Course, Course.id == Enrollment.course_id)
             .filter(Course.organization_id == current.organization_id,
-                    Enrollment.enrolled_at >= start.replace(tzinfo=None))
+                    ts_col >= start.replace(tzinfo=None))
             .all())
     buckets = {(start + timedelta(weeks=i)).date().isoformat(): 0 for i in range(weeks)}
     for (ts,) in rows:
@@ -1194,6 +1198,17 @@ def catalog(q: str | None = Query(None),
     # Bulk-load orgs for the resulting courses
     org_ids = {c.organization_id for c in courses}
     orgs = {o.id: o for o in db.query(Organization).filter(Organization.id.in_(org_ids)).all()} if org_ids else {}
+
+    from models import CourseRating
+    course_ids = [c.id for c in courses]
+    ratings = {}
+    if course_ids:
+        for cid, avg, n in (db.query(CourseRating.course_id,
+                                     func.avg(CourseRating.rating),
+                                     func.count(CourseRating.id))
+                            .filter(CourseRating.course_id.in_(course_ids))
+                            .group_by(CourseRating.course_id).all()):
+            ratings[cid] = (round(float(avg), 1), n)
     cats = [r[0] for r in db.query(Course.category).filter(
         Course.status == CourseStatus.PUBLISHED, Course.category.isnot(None),
     ).distinct().all() if r[0]]
@@ -1202,6 +1217,8 @@ def catalog(q: str | None = Query(None),
             "id": c.id, "title": c.title, "description": c.description,
             "category": c.category, "cover_color": c.cover_color,
             "cover_image": c.cover_image, "is_featured": bool(c.is_featured),
+            "avg_rating": ratings.get(c.id, (None, 0))[0],
+            "rating_count": ratings.get(c.id, (None, 0))[1],
             "duration_minutes": c.duration_minutes, "price_cents": c.price_cents,
             "currency": c.currency, "slide_count": len(c.slides),
             "enrollment_count": len(c.enrollments),

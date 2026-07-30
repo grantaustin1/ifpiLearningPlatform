@@ -479,12 +479,13 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 671 |
+| `routers/courses.py` | 715 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
 | `routers/exams.py` | 212 |
 | `routers/extras.py` | 655 |
+| `routers/feedback.py` | 72 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
@@ -493,7 +494,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1248 |
+| `routers/misc.py` | 1265 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -506,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **12979** |
+| **Total** | **13112** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -530,6 +531,7 @@ Core entities (see `backend/models/` for the full list):
 | `CertificateRevocationEvent` | `certificate_revocation_events` |
 | `Course` | `courses` |
 | `CoursePrerequisite` | `course_prerequisites` |
+| `CourseRating` | `course_ratings` |
 | `CourseSlide` | `course_slides` |
 | `CourseView` | `course_views` |
 | `CustomThemePreset` | `custom_theme_presets` |
@@ -569,6 +571,7 @@ Core entities (see `backend/models/` for the full list):
 | `Subscription` | `subscriptions` |
 | `TermsAcceptance` | `terms_acceptances` |
 | `TermsVersion` | `terms_versions` |
+| `TesterFeedback` | `tester_feedback` |
 | `User` | `users` |
 | `UserBadge` | `user_badges` |
 | `UserRole` | `user_roles` |
@@ -576,7 +579,7 @@ Core entities (see `backend/models/` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **61** ORM models._
+_Total: **63** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -598,7 +601,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
 | `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
 | `/api/admin/analytics` | GET |  |
-| `/api/admin/analytics/enrollments-weekly` | GET | Enrolments per ISO week for the last `weeks` weeks (Iter 43 dashboard chart). |
+| `/api/admin/analytics/enrollments-weekly` | GET | Enrolments or completions per ISO week (Iter 43/44 dashboard chart). |
 | `/api/admin/api-tokens` | GET |  |
 | `/api/admin/api-tokens` | POST |  |
 | `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
@@ -620,6 +623,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/entitlements/user/{user_id}` | GET | List every paid course in the caller's org + whether the target |
 | `/api/admin/entitlements/user/{user_id}/course/{course_id}` | GET | One user, one course — the "why can't they enroll?" answer. |
 | `/api/admin/feature-flags/{flag_key}` | PUT |  |
+| `/api/admin/feedback` | GET | All feedback for the caller's org, newest first. |
+| `/api/admin/feedback/{feedback_id}/status` | POST | Flip a feedback item between NEW and REVIEWED. |
 | `/api/admin/imports` | GET |  |
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
@@ -756,6 +761,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
 | `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
+| `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
+| `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
 | `/api/courses/{course_id}/slides` | POST |  |
 | `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
 | `/api/courses/{course_id}/slides/{slide_id}` | DELETE |  |
@@ -779,6 +786,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}/attempts` | POST |  |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
 | `/api/feature-flags` | GET |  |
+| `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
@@ -869,7 +877,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **280** registered API endpoints._
+_Total: **285** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

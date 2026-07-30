@@ -156,6 +156,50 @@ def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_
     return _detail(c)
 
 
+@router.post("/{course_id}/rating")
+def rate_course(course_id: int, body: dict, db: Session = Depends(get_db),
+                current: CurrentUser = Depends(get_current_user)):
+    """Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44."""
+    from models import CourseRating
+    rating = body.get("rating")
+    if not isinstance(rating, int) or not 1 <= rating <= 5:
+        raise HTTPException(status_code=422, detail="rating must be an integer 1-5")
+    enr = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id, Enrollment.user_id == current.id,
+        Enrollment.completed_at.isnot(None),
+    ).first()
+    if not enr:
+        raise HTTPException(status_code=403, detail="Complete the course before rating it")
+    row = db.query(CourseRating).filter(
+        CourseRating.course_id == course_id, CourseRating.user_id == current.id,
+    ).first()
+    if row:
+        row.rating = rating
+        row.comment = (body.get("comment") or None)
+    else:
+        db.add(CourseRating(course_id=course_id, user_id=current.id,
+                            rating=rating, comment=body.get("comment") or None))
+    db.commit()
+    avg, count = db.query(func.avg(CourseRating.rating), func.count(CourseRating.id)) \
+        .filter(CourseRating.course_id == course_id).one()
+    return {"ok": True, "my_rating": rating,
+            "avg_rating": round(float(avg), 1) if avg else None, "rating_count": count}
+
+
+@router.get("/{course_id}/rating")
+def get_course_rating(course_id: int, db: Session = Depends(get_db),
+                      current: CurrentUser = Depends(get_current_user)):
+    """Average + count + the caller's own rating for a course."""
+    from models import CourseRating
+    avg, count = db.query(func.avg(CourseRating.rating), func.count(CourseRating.id)) \
+        .filter(CourseRating.course_id == course_id).one()
+    mine = db.query(CourseRating.rating).filter(
+        CourseRating.course_id == course_id, CourseRating.user_id == current.id,
+    ).scalar()
+    return {"avg_rating": round(float(avg), 1) if avg else None,
+            "rating_count": count, "my_rating": mine}
+
+
 @router.post("/{course_id}/toggle-featured")
 def toggle_featured(course_id: int, db: Session = Depends(get_db),
                     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
-import { BookOpen, Search, GraduationCap, Clock, Users, Sparkles, ArrowRight, TrendingUp } from 'lucide-react'
+import { BookOpen, Search, GraduationCap, Clock, Users, Sparkles, ArrowRight, TrendingUp, Star } from 'lucide-react'
 import { formatCurrency } from 'lib/utils'
 
 interface CatalogCourse {
@@ -14,6 +14,8 @@ interface CatalogCourse {
   cover_color: string
   cover_image?: string | null
   is_featured?: boolean
+  avg_rating?: number | null
+  rating_count?: number
   duration_minutes?: number | null
   price_cents: number
   currency: string
@@ -57,6 +59,12 @@ function CourseCard({ c, onEnroll }: { c: CatalogCourse; onEnroll: (c: CatalogCo
         <div className="flex items-center gap-3 mt-3 text-xs text-slate-500">
           <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" /> {c.slide_count} slides</span>
           {c.duration_minutes && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {c.duration_minutes}m</span>}
+          {c.avg_rating != null && (c.rating_count || 0) > 0 && (
+            <span className="flex items-center gap-1 text-amber-500 font-semibold" data-testid={`catalog-rating-${c.id}`}>
+              <Star className="h-3.5 w-3.5 fill-current" /> {c.avg_rating}
+              <span className="text-slate-400 font-normal">({c.rating_count})</span>
+            </span>
+          )}
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {c.enrollment_count}</span>
         </div>
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
