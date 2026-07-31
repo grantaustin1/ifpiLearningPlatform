@@ -1,0 +1,34 @@
+{
+  "summary": "Verification-of-non-bug: confirmed both reported console messages (Bing CSP violation from main-yEBWDwhV.js, and 'Allow attribute will take precedence over allowfullscreen') do NOT originate from the IFPI app. Both come from the Emergent platform host shell (Vite-based) that iframes the preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verification_evidence": {
+    "static_source_grep": "grep -rn 'bing|posthog|supabase|bat.bing' /app/frontend/src /app/frontend/public => 0 matches (only unrelated 'grabbing' cursor hits)",
+    "html_shell": "curl of /login shows only <script defer src='/static/js/bundle.js'></script> plus Cloudflare beacon. No main-*.js (Vite naming), no bing/posthog/supabase scripts. CRA (webpack) output is bundle.js, not main-[hash].js.",
+    "bundle_js_grep": "295KB /static/js/bundle.js has 0 matches for bing.com | bat.bing | posthog | supabase | main-yEBW. Only iframes in bundle are webpack-dev-server error-overlay iframes (src='about:blank').",
+    "learn_page_iframes": {
+      "file": "/app/frontend/src/pages/learn/LearnPage.tsx",
+      "video_line_92": "<iframe src={media_url} allowFullScreen title='video' /> -- allowFullScreen ONLY, no allow= attribute",
+      "scorm_line_96": "<iframe src={media_url} allow='autoplay; fullscreen' title='scorm' /> -- allow= ONLY, no allowFullScreen attribute",
+      "conclusion": "No iframe in IFPI combines allow AND allowFullScreen on same element, so the Chrome warning cannot originate here."
+    },
+    "runtime_console_capture": "Attempted Playwright captures against the preview URL directly (out of iframe). Cloudflare bot-challenge blocked React mount in headless runs (root had 0 children, screenshots blank), so runtime console was empty. This is a preview-only sandbox side-effect and not app behaviour. Static + bundle grep + HTML shell verification provide conclusive evidence."
+  },
+  "conclusion": "Both console messages originate from the Emergent host page (Vite bundle main-yEBWDwhV.js with Bing/PostHog/Supabase trackers), not from the IFPI app. Main agent's analysis is correct. No code change required.",
+  "test_report_links": [],
+  "action_items": ["None - not an app bug. Optionally advise user to reproduce in the raw preview URL (outside Emergent platform shell) to verify absence of the warnings."],
+  "critical_code_review_comments": [
+    "Cloudflare bot-challenge in front of the preview URL blocks headless Playwright from mounting the React app (root remains empty). This is a testing-environment issue, not an app bug, but future testing agents should be aware."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "verification complete"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The IFPI CRA bundle is served at /static/js/bundle.js. The reported main-yEBWDwhV.js is the Emergent host shell (Vite). No trackers in IFPI. LearnPage iframes never combine allow+allowFullScreen. Note: Cloudflare bot challenge may block headless Playwright from mounting React; use non-headless or add human-like waits if runtime interaction is needed.",
+  "rca of the issue": "Report-only CSP violation for bat.bing.com and 'Allow will take precedence over allowfullscreen' warning come from the Emergent platform's own tracking/preview page (Vite bundle main-yEBWDwhV.js) that hosts the app in an iframe. IFPI codebase has zero third-party tracker references and no iframe combines both allow and allowFullScreen attributes. NOT AN IFPI BUG."
+}
