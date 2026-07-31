@@ -1,0 +1,46 @@
+{
+  "summary": "Verified dompurify lockfile CI fix in /app/frontend. All 6 requested checks PASS: frozen-lockfile install is clean (no 'lockfile needs to be updated'), @types/dompurify removed from package.json with no stub-types warning, yarn.lock retains dompurify@^3.4.12 runtime resolution, `yarn typecheck` (tsc --noEmit) exits 0 including src/lib/sanitize.ts which imports dompurify via its bundled types, cold-cache CI simulation (package.json+yarn.lock copied to /tmp/ci_sim with isolated cache) completed in 22.76s exit 0, and the app is healthy (frontend / and /catalog return 200; catalog renders featured courses). Package.json + yarn.lock pair is consistent and ready for commit.",
+  "verifications": {
+    "frozen_lockfile_install": "PASS - yarn install --frozen-lockfile exit 0, output: 'success Already up-to-date. Done in 0.30s.'",
+    "no_types_dompurify_in_package_json": "PASS - only 'dompurify: ^3.4.12' remains; no @types/dompurify stub-types warning printed",
+    "dompurify_in_yarn_lock": "PASS - yarn.lock has 'dompurify@^3.4.12:' resolution entry",
+    "typecheck": "PASS - yarn typecheck (tsc --noEmit) exit 0 in 8.94s, sanitize.ts compiles using dompurify bundled types",
+    "cold_cache_ci_simulation": "PASS - copied package.json+yarn.lock to /tmp/ci_sim, ran `yarn install --frozen-lockfile --cache-folder /tmp/ci_sim_cache` exit 0 in 22.76s. Only unrelated peer-dep warnings from react-scripts>eslint-plugin-flowtype (pre-existing). Temp dir cleaned up; app node_modules untouched.",
+    "app_health": "PASS - HTTP 200 on both / and /catalog on REACT_APP_BACKEND_URL; catalog page renders 'Marketplace / Learn from the world's leading fitness academies' + featured course cards (Client Onboarding, IFPI Fundamentals, Gym Health & Safety)."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "out_of_scope_observations": [
+      {
+        "component": "src/components/layout/DashboardLayout.tsx",
+        "issue": "CRA dev-server ESLint overlay shows 'FeedbackWidget is not defined  react/jsx-no-undef' at line 162:10, even though the component is imported on line 10 and FeedbackWidget.tsx exists. tsc --noEmit passes cleanly, so this is an ESLint-only false positive (likely eslint TSX resolution rule config) that appears as a dev-mode overlay on all pages using DashboardLayout. Page still renders under the overlay. UNRELATED to the dompurify lockfile fix and pre-existing in supervisor logs.",
+        "priority": "MEDIUM (pre-existing, not part of this task)"
+      },
+      {
+        "component": "public /catalog console",
+        "issue": "Two 401 responses in browser console when catalog loads (likely auth-guarded /api/users/me probe on public page). Pre-existing, unrelated to dompurify.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Lockfile fix is verified — safe to commit /app/frontend/package.json + /app/frontend/yarn.lock to GitHub; the CI failure ('Your lockfile needs to be updated' + @types/dompurify stub warning) will not recur.",
+    "SEPARATE from this task: fix pre-existing ESLint 'react/jsx-no-undef' false positive for FeedbackWidget in DashboardLayout.tsx (likely needs eslint TSX resolver config or the rule disabled since tsc already validates undef references)."
+  ],
+  "critical_code_review_comments": [
+    "dompurify is used correctly via named default import in src/lib/sanitize.ts and consumes bundled types — @types/dompurify was indeed redundant.",
+    "safeHtml/safeSvg profiles are explicit and correct; good defense-in-depth pattern."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% (6/6 verification checks passed)"},
+  "test_credentials": "N/A - lockfile/build verification, no auth required",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Lockfile fix (dompurify runtime + removal of @types/dompurify stub) is fully verified via native, typecheck, and cold-cache install. If future testing hits the ESLint overlay for FeedbackWidget on any dashboard route, that is a separate pre-existing issue (not caused by this change) — the page still renders behind the overlay and tsc passes.",
+  "rca of the issue": "Original CI failure: dompurify (^3.4.12) + @types/dompurify (^3.2.0) were added on 2025-07-29 as an XSS security fix but yarn.lock was never regenerated/committed, so `yarn install --frozen-lockfile` in GitHub Actions failed. Additionally @types/dompurify@3.2.0 is a stub (dompurify ships its own types since v3). Mitigation applied by main agent (verified here): `yarn remove @types/dompurify` + regenerate yarn.lock. Post-fix: frozen install passes both warm (0.3s) and cold-cache (22.76s in isolated dir), typecheck passes, app serves 200."
+}
