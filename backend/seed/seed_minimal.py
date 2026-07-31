@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -176,6 +177,40 @@ def seed(db: Session) -> None:
                 correct_answer=correct, points=1, order_index=i,
             ))
         logger.info("Seeded exam: %s", exam.title)
+
+    # 6. Fitness demo catalog — the three flagship demo courses (slides +
+    #    exams + cover photos) so a fresh deployment starts with a stocked
+    #    marketplace. Idempotent by course title; cover files ship with the
+    #    repo under uploads/covers/.
+    try:
+        from scripts.seed_fitness_courses import seed_courses
+        created = seed_courses(db, org, admin)
+        if created:
+            logger.info("Seeded %d fitness demo courses", created)
+        _covers = {
+            "IFPI Fundamentals": "covers/ifpi_fundamentals.jpg",
+            "Foundations of Exercise Science": "covers/exercise_science.jpg",
+            "Client Onboarding & Consultation Skills": "covers/client_onboarding.jpg",
+            "Gym Health & Safety Essentials": "covers/health_safety.jpg",
+        }
+        uploads_root = Path(__file__).resolve().parents[1] / "uploads"
+        for title, key in _covers.items():
+            row = db.query(Course).filter(
+                Course.title == title, Course.organization_id == org.id,
+            ).first()
+            if row and not row.cover_image and (uploads_root / key).exists():
+                row.cover_image = f"/api/uploads/files/{key}"
+        featured = db.query(Course).filter(
+            Course.title == "Client Onboarding & Consultation Skills",
+            Course.organization_id == org.id,
+        ).first()
+        if featured:
+            featured.is_featured = True
+        if not org.marketplace_opt_in:
+            org.marketplace_opt_in = True
+            logger.info("Enabled marketplace opt-in for %s", org.slug)
+    except Exception:
+        logger.exception("Fitness demo course seed failed — continuing startup")
 
     db.commit()
 

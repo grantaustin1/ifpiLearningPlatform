@@ -134,47 +134,54 @@ COURSES = [
 ]
 
 
+def seed_courses(db, org, admin) -> int:
+    """Create the demo fitness courses (idempotent by title). Returns count created."""
+    created = 0
+    for spec in COURSES:
+        if db.query(Course).filter(Course.title == spec["title"],
+                                   Course.organization_id == org.id).first():
+            print(f"• '{spec['title']}' already exists — skipped")
+            continue
+        course = Course(
+            organization_id=org.id, title=spec["title"],
+            description=spec["description"], category=spec["category"],
+            status=CourseStatus.PUBLISHED, passing_score=70,
+            duration_minutes=spec["duration_minutes"], price_cents=0,
+            currency="ZAR", created_by_id=admin.id,
+            cover_color=spec["cover_color"],
+        )
+        db.add(course)
+        db.flush()
+        for i, (title, content) in enumerate(spec["slides"], 1):
+            db.add(CourseSlide(course_id=course.id, title=title, content=content,
+                               slide_type=SlideType.TEXT, order_index=i))
+        exam = Exam(
+            organization_id=org.id, title=f"{spec['title']} Assessment",
+            description=spec["exam"]["description"], course_id=course.id,
+            time_limit_minutes=15, passing_score=70, max_attempts=3,
+            is_published=True, created_by_id=admin.id,
+        )
+        db.add(exam)
+        db.flush()
+        for i, (text, opts, correct) in enumerate(spec["exam"]["questions"], 1):
+            qtype = QuestionType("TRUE_FALSE" if correct in ("true", "false")
+                                 else "MULTIPLE_CHOICE")
+            db.add(ExamQuestion(exam_id=exam.id, question_text=text,
+                                question_type=qtype, options=opts,
+                                correct_answer=correct, points=1, order_index=i))
+        print(f"• created '{spec['title']}' ({len(spec['slides'])} slides, "
+              f"{len(spec['exam']['questions'])}-question exam)")
+        created += 1
+    return created
+
+
 def main() -> None:
     with SessionLocal() as db:
         org = db.query(Organization).filter(Organization.slug == "ifpi-main").first()
         admin = db.query(User).filter(User.email == "admin@ifpi.org").first()
         if not org or not admin:
             raise SystemExit("ifpi-main org or admin@ifpi.org missing — run the base seed first")
-
-        for spec in COURSES:
-            if db.query(Course).filter(Course.title == spec["title"],
-                                       Course.organization_id == org.id).first():
-                print(f"• '{spec['title']}' already exists — skipped")
-                continue
-            course = Course(
-                organization_id=org.id, title=spec["title"],
-                description=spec["description"], category=spec["category"],
-                status=CourseStatus.PUBLISHED, passing_score=70,
-                duration_minutes=spec["duration_minutes"], price_cents=0,
-                currency="ZAR", created_by_id=admin.id,
-                cover_color=spec["cover_color"],
-            )
-            db.add(course)
-            db.flush()
-            for i, (title, content) in enumerate(spec["slides"], 1):
-                db.add(CourseSlide(course_id=course.id, title=title, content=content,
-                                   slide_type=SlideType.TEXT, order_index=i))
-            exam = Exam(
-                organization_id=org.id, title=f"{spec['title']} Assessment",
-                description=spec["exam"]["description"], course_id=course.id,
-                time_limit_minutes=15, passing_score=70, max_attempts=3,
-                is_published=True, created_by_id=admin.id,
-            )
-            db.add(exam)
-            db.flush()
-            for i, (text, opts, correct) in enumerate(spec["exam"]["questions"], 1):
-                qtype = QuestionType("TRUE_FALSE" if correct in ("true", "false")
-                                     else "MULTIPLE_CHOICE")
-                db.add(ExamQuestion(exam_id=exam.id, question_text=text,
-                                    question_type=qtype, options=opts,
-                                    correct_answer=correct, points=1, order_index=i))
-            print(f"• created '{spec['title']}' ({len(spec['slides'])} slides, "
-                  f"{len(spec['exam']['questions'])}-question exam)")
+        seed_courses(db, org, admin)
         db.commit()
     print("done")
 

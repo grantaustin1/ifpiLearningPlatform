@@ -2179,3 +2179,14 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Testing: iteration_47.json — backend 10/10, frontend all flows pass.
   Test file: backend/tests/test_iteration47_reviews_share.py.
   UAT org marketplace_opt_in reverted to False post-test; test courses deleted.
+
+## 2026-07-31 — Deploy-ready startup seed
+- `seed/seed_minimal.py` now also seeds the 3 flagship fitness demo courses
+  (via refactored `scripts/seed_fitness_courses.py::seed_courses`), assigns
+  the shipped cover photos (uploads/covers/*.jpg), features "Client
+  Onboarding & Consultation Skills", and enables marketplace opt-in for the
+  ifpi-main org. Runs automatically at backend startup — a fresh deployed DB
+  boots with admin account + 4 published courses + 4 exams + stocked
+  marketplace. Verified against a simulated empty DB and idempotent against
+  the live preview DB. Admin seeds as admin123 with must_change_password=True
+  (or set SEED_ADMIN_PASSWORD deploy env var).
