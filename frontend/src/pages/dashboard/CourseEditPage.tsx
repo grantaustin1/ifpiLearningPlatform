@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
+import { CourseReviewsPanel } from './CourseReviewsPanel'
 
 const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 
@@ -335,6 +336,9 @@ export default function CourseEditPage() {
             <CourseFunnelPanel courseId={course.id} />
           </div>
         )}
+
+        {/* Iter 47 — Written review moderation */}
+        {course?.id && <CourseReviewsPanel courseId={course.id} />}
       </aside>
 
       {showGallery && (

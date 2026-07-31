@@ -175,7 +175,8 @@ def rate_course(course_id: int, body: dict, db: Session = Depends(get_db),
     ).first()
     if row:
         row.rating = rating
-        row.comment = (body.get("comment") or None)
+        if "comment" in body:
+            row.comment = body.get("comment") or None
     else:
         db.add(CourseRating(course_id=course_id, user_id=current.id,
                             rating=rating, comment=body.get("comment") or None))
@@ -193,11 +194,57 @@ def get_course_rating(course_id: int, db: Session = Depends(get_db),
     from models import CourseRating
     avg, count = db.query(func.avg(CourseRating.rating), func.count(CourseRating.id)) \
         .filter(CourseRating.course_id == course_id).one()
-    mine = db.query(CourseRating.rating).filter(
+    mine = db.query(CourseRating).filter(
         CourseRating.course_id == course_id, CourseRating.user_id == current.id,
-    ).scalar()
+    ).first()
     return {"avg_rating": round(float(avg), 1) if avg else None,
-            "rating_count": count, "my_rating": mine}
+            "rating_count": count,
+            "my_rating": mine.rating if mine else None,
+            "my_comment": mine.comment if mine else None}
+
+
+@router.get("/{course_id}/reviews")
+def list_course_reviews(course_id: int, db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """All written reviews for a course (incl. hidden) — admin moderation view. Iter 47."""
+    from models import CourseRating, User
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    rows = (db.query(CourseRating, User.name, User.email)
+            .join(User, User.id == CourseRating.user_id)
+            .filter(CourseRating.course_id == course_id,
+                    CourseRating.comment.isnot(None), CourseRating.comment != "")
+            .order_by(CourseRating.created_at.desc()).all())
+    return [{
+        "id": r.id, "rating": r.rating, "comment": r.comment,
+        "hidden": r.hidden_at is not None,
+        "reviewer_name": name or email,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r, name, email in rows]
+
+
+@router.post("/{course_id}/reviews/{rating_id}/toggle-hidden")
+def toggle_review_hidden(course_id: int, rating_id: int, db: Session = Depends(get_db),
+                         current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Hide/unhide a written review from the public course page. Iter 47."""
+    from datetime import datetime, timezone
+    from models import CourseRating
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    row = db.query(CourseRating).filter(
+        CourseRating.id == rating_id, CourseRating.course_id == course_id,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Review not found")
+    row.hidden_at = None if row.hidden_at else datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True, "hidden": row.hidden_at is not None}
 
 
 @router.post("/{course_id}/toggle-featured")

@@ -479,7 +479,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 715 |
+| `routers/courses.py` | 762 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
@@ -494,7 +494,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1265 |
+| `routers/misc.py` | 1307 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13112** |
+| **Total** | **13201** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -732,6 +732,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/catalog` | GET |  |
 | `/api/catalog/organizations` | GET | Iter 27 — Cross-tenant marketplace search: list opted-in |
 | `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
+| `/api/catalog/{course_id}/reviews` | GET | Best written reviews for a public course — highest stars first, |
 | `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
@@ -763,6 +764,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
 | `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
 | `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
+| `/api/courses/{course_id}/reviews` | GET | All written reviews for a course (incl. hidden) — admin moderation view. Iter 47. |
+| `/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden` | POST | Hide/unhide a written review from the public course page. Iter 47. |
 | `/api/courses/{course_id}/slides` | POST |  |
 | `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
 | `/api/courses/{course_id}/slides/{slide_id}` | DELETE |  |
@@ -877,7 +880,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **285** registered API endpoints._
+_Total: **288** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

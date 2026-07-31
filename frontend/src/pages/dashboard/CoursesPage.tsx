@@ -6,6 +6,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { ShareCourseButton } from 'components/ShareCourseButton'
 import { LearningStreakBadge } from 'components/LearningStreakBadge'
 import { StreakLeaderboardTrigger } from 'components/StreakLeaderboardModal'
 
@@ -177,14 +178,18 @@ export default function CoursesPage() {
                         className="inline-flex items-center justify-center text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
+                      <ShareCourseButton courseId={c.id} mode="menu" />
                       <Link to={`/learn/${c.id}`} className="inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium">
                         <Eye className="h-3.5 w-3.5" /> Preview
                       </Link>
                     </>
                   ) : (
-                    <Link to={`/learn/${c.id}`} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-1.5 font-medium">
-                      <LogIn className="h-3.5 w-3.5" /> Start Course
-                    </Link>
+                    <>
+                      <Link to={`/learn/${c.id}`} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-1.5 font-medium">
+                        <LogIn className="h-3.5 w-3.5" /> Start Course
+                      </Link>
+                      <ShareCourseButton courseId={c.id} mode="menu" />
+                    </>
                   )}
                 </div>
               </div>

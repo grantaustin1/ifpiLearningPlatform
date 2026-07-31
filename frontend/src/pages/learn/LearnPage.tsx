@@ -17,6 +17,8 @@ export default function LearnPage() {
   const [myRating, setMyRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [ratingBusy, setRatingBusy] = useState(false)
+  const [reviewText, setReviewText] = useState('')
+  const [reviewSaved, setReviewSaved] = useState(false)
   const [finishing, setFinishing] = useState(false)
 
   useEffect(() => {
@@ -136,6 +138,30 @@ export default function LearnPage() {
                       </button>
                     ))}
                   </div>
+                  {myRating > 0 && !reviewSaved && (
+                    <div className="mt-3 text-left" data-testid="review-comment-block">
+                      <textarea value={reviewText} onChange={e => setReviewText(e.target.value)}
+                        rows={3} maxLength={500} data-testid="review-comment-input"
+                        placeholder="Add a short review (optional) — what did you like?"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                      <button disabled={ratingBusy || !reviewText.trim()} data-testid="submit-review-btn"
+                        onClick={async () => {
+                          setRatingBusy(true)
+                          try {
+                            await api.post(`/courses/${courseId}/rating`, { rating: myRating, comment: reviewText.trim() })
+                            setReviewSaved(true)
+                            toast.success('Review saved — thank you!')
+                          } catch (e: any) { toast.error(e?.response?.data?.detail || 'Could not save review') }
+                          finally { setRatingBusy(false) }
+                        }}
+                        className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg py-2 disabled:opacity-50">
+                        Submit review
+                      </button>
+                    </div>
+                  )}
+                  {reviewSaved && (
+                    <p className="mt-2 text-xs text-emerald-600 font-medium" data-testid="review-saved-note">Your review may appear on the course page.</p>
+                  )}
                 </div>
                 <button onClick={() => nav('/certificates')} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium">View Certificate</button>
               </div>
