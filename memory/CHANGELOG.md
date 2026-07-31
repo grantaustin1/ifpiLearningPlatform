@@ -1,6 +1,20 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 45 — CI lockfile guard (2026-07-30)
+
+- Fixed the GitHub Actions `yarn install --frozen-lockfile` failure: removed
+  the redundant `@types/dompurify` stub and regenerated `yarn.lock` (verified
+  by testing agent iteration_45.json incl. cold-cache CI simulation). User
+  must commit both files via Save to GitHub.
+- New guard `backend/scripts/check_lockfile_sync.py`: asserts every
+  `name@range` in frontend/package.json has a resolution key in yarn.lock
+  (offline, <1s). Wired into `pre_finish_check.py` as step 5, so every
+  handoff now fails fast on lockfile drift. Negative-tested (injected fake
+  dep → exit 1).
+- Also cleared a stale CRA ESLint cache that produced a false
+  "FeedbackWidget is not defined" dev overlay after node_modules rebuild.
+
 ## Iteration 44 — Feedback widget + course ratings + chart toggle (2026-07-30)
 
 Certified by testing agent (iteration_44.json): backend 15/15, frontend 100%.
