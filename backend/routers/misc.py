@@ -1303,5 +1303,7 @@ def catalog_reviews(course_id: int, limit: int = Query(6, ge=1, le=20),
     return [{
         "id": r.id, "rating": r.rating, "comment": r.comment,
         "reviewer": _display(name),
+        "reply_text": r.reply_text,
+        "reply_at": r.reply_at.isoformat() if r.reply_at else None,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r, name in rows]

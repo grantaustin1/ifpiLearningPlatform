@@ -31,6 +31,8 @@ interface Review {
   rating: number
   comment: string
   reviewer: string
+  reply_text?: string | null
+  reply_at?: string | null
   created_at: string | null
 }
 
@@ -210,6 +212,14 @@ export default function CourseDetailPage() {
                     <p className="text-xs text-slate-400 mt-2 font-medium">
                       {r.reviewer}{r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}` : ''}
                     </p>
+                    {r.reply_text && (
+                      <div className="mt-3 border-l-2 border-indigo-200 bg-indigo-50/60 rounded-r-lg px-3 py-2" data-testid={`review-reply-${r.id}`}>
+                        <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">
+                          Response from {data.organization?.name || 'the academy'}
+                        </p>
+                        <p className="text-xs text-slate-600 leading-relaxed">{r.reply_text}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -23,7 +23,9 @@ export const ShareCourseButton = ({ courseId, mode = 'icon', className = '' }:
 { courseId: number; mode?: 'icon' | 'menu' | 'button'; className?: string }) => {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const publicUrl = `${window.location.origin}/catalog/${courseId}`
+  // /api/seo/courses/share/{id} unfurls with cover photo + star rating in
+  // WhatsApp/LinkedIn, then instantly redirects humans to /catalog/{id}.
+  const publicUrl = `${window.location.origin}/api/seo/courses/share/${courseId}`
   const inAppUrl = `${window.location.origin}/learn/${courseId}`
 
   const copyPublic = () => {

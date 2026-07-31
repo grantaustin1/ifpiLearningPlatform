@@ -221,9 +221,40 @@ def list_course_reviews(course_id: int, db: Session = Depends(get_db),
     return [{
         "id": r.id, "rating": r.rating, "comment": r.comment,
         "hidden": r.hidden_at is not None,
+        "reply_text": r.reply_text,
+        "reply_at": r.reply_at.isoformat() if r.reply_at else None,
         "reviewer_name": name or email,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r, name, email in rows]
+
+
+@router.post("/{course_id}/reviews/{rating_id}/reply")
+def reply_to_review(course_id: int, rating_id: int, body: dict,
+                    db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Post/update a public academy reply under a learner review.
+    Empty string clears the reply. Iter 48."""
+    from datetime import datetime, timezone
+    from models import CourseRating
+    reply = body.get("reply")
+    if not isinstance(reply, str) or len(reply) > 1000:
+        raise HTTPException(status_code=422, detail="reply must be a string of at most 1000 characters")
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    row = db.query(CourseRating).filter(
+        CourseRating.id == rating_id, CourseRating.course_id == course_id,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Review not found")
+    reply = reply.strip()
+    row.reply_text = reply or None
+    row.reply_at = datetime.now(timezone.utc) if reply else None
+    db.commit()
+    return {"ok": True, "reply_text": row.reply_text,
+            "reply_at": row.reply_at.isoformat() if row.reply_at else None}
 
 
 @router.post("/{course_id}/reviews/{rating_id}/toggle-hidden")
