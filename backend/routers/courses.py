@@ -269,7 +269,35 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
-    db.delete(c)
+    # Iter 47 — clean up FK dependents so the delete never 500s.
+    from models import (
+        AITutorSession, Certificate, CoursePrerequisite, CourseRating,
+        CourseView, Exam, Flashcard, LearningPathItem, ScormPackage,
+        SlideComment, SlideVersion, SlideView, SourceDocument, Subscription,
+        LiveSession,
+    )
+    slide_ids = [s.id for s in c.slides]
+    if slide_ids:
+        for model in (SlideComment, SlideView, SlideVersion):
+            db.query(model).filter(model.slide_id.in_(slide_ids)) \
+                .delete(synchronize_session=False)
+        db.query(ScormPackage).filter(ScormPackage.slide_id.in_(slide_ids)) \
+            .update({ScormPackage.slide_id: None}, synchronize_session=False)
+    # Course-owned rows — hard delete alongside the course
+    for model in (Flashcard, CourseRating, CourseView, LearningPathItem,
+                  AITutorSession):
+        db.query(model).filter(model.course_id == course_id) \
+            .delete(synchronize_session=False)
+    db.query(CoursePrerequisite).filter(
+        (CoursePrerequisite.course_id == course_id)
+        | (CoursePrerequisite.prerequisite_course_id == course_id)
+    ).delete(synchronize_session=False)
+    # Historical records — keep the row, detach the course reference
+    for model in (Exam, Certificate, Subscription, SourceDocument,
+                  LiveSession, ScormPackage):
+        db.query(model).filter(model.course_id == course_id) \
+            .update({model.course_id: None}, synchronize_session=False)
+    db.delete(c)  # slides + enrollments cascade via ORM relationships
     db.commit()
     return {"ok": True}
 
