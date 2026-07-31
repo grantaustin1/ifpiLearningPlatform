@@ -2147,3 +2147,14 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - **Route naming**: `/bulk-revoke`, `/admin-list`, `/admin-export.csv` use single-segment paths to avoid FastAPI parsing `admin`/`bulk` as `{cert_id}` (int). Documented in code.
 - **Bulk-revoke reason input** intentionally uses `window.prompt()` (single text input; a full modal would be nice but out of scope). Not a `window.confirm` regression.
 - **Cwd-sensitive SQLite path** — `DATABASE_URL=sqlite:///./ifpi_lms.db` is relative. Always run pytest from `/app/backend`. Optional future hardening: absolute path.
+
+## 2026-07-31 — Blank preview screen fix
+- **Bug**: Preview URL rendered a blank white page in all browsers. Root cause:
+  two empty stray files `frontend/src/index.js` and `frontend/src/App.js`
+  (created 2026-07-31 03:21) shadowed `index.tsx`/`App.tsx` — webpack resolves
+  `.js` before `.tsx`, so the app entry compiled to an empty module (bundle
+  shrank to 295KB, no console errors). Deleted both files, restarted frontend;
+  bundle back to 5.6MB. Verified landing page + UAT admin login → dashboard
+  live on the preview URL. `pre_finish_check.py` PASSED.
+- **Learning**: if the preview goes blank with a clean compile and no JS
+  errors, check for empty `.js` files shadowing `.tsx` sources in `src/`.
