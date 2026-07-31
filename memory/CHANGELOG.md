@@ -2190,3 +2190,20 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
   marketplace. Verified against a simulated empty DB and idempotent against
   the live preview DB. Admin seeds as admin123 with must_change_password=True
   (or set SEED_ADMIN_PASSWORD deploy env var).
+
+## 2026-07-31 — Iter 48: Review replies + social preview cards
+- **Review Replies**: admins reply publicly under learner reviews.
+  New cols reply_text/reply_at (migration 5e6f7a8b9c0d). POST
+  /api/courses/{cid}/reviews/{rid}/reply (empty string clears). Reply shown
+  on public course page as "Response from {org}" (review-reply-{id}); admin
+  ReplyBox in CourseReviewsPanel (reply-btn/reply-input/save-reply/edit-reply).
+- **Social Preview Cards**: GET /api/seo/courses/share/{id} serves OG HTML
+  (og:image = absolute cover URL, star rating + lessons + price in
+  description, JS redirect to /catalog/{id}). ShareCourseButton public link
+  now copies the share URL so WhatsApp/LinkedIn unfurl properly.
+- Testing: iteration_48.json — backend 14/14, frontend all pass. Test file:
+  backend/tests/test_iteration48_reply_share.py. Leftover TEST_ courses
+  224-227 deleted via API (confirms Iter 47 delete fix; tester's carry-over
+  note was stale). UAT org opt-in verified False.
+- **Backlog note (user decision)**: Postgres cutover stays in backlog — NOT
+  doing it now.
