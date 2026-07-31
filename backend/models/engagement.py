@@ -23,6 +23,8 @@ class CourseRating(Base):
     rating = Column(Integer, nullable=False)  # 1..5
     comment = Column(Text)
     hidden_at = Column(DateTime, nullable=True)  # Iter 47 — admin moderation
+    reply_text = Column(Text)                    # Iter 48 — academy reply
+    reply_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
 

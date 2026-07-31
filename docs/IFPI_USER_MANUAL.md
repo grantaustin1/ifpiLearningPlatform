@@ -479,7 +479,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 790 |
+| `routers/courses.py` | 821 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
@@ -494,7 +494,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1307 |
+| `routers/misc.py` | 1309 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -502,12 +502,12 @@ Core entities (see `backend/models/` for the full list):
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
 | `routers/scorm_xapi.py` | 512 |
-| `routers/seo.py` | 257 |
+| `routers/seo.py` | 369 |
 | `routers/stripe_payments.py` | 303 |
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13229** |
+| **Total** | **13374** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -765,6 +765,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
 | `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
 | `/api/courses/{course_id}/reviews` | GET | All written reviews for a course (incl. hidden) — admin moderation view. Iter 47. |
+| `/api/courses/{course_id}/reviews/{rating_id}/reply` | POST | Post/update a public academy reply under a learner review. |
 | `/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden` | POST | Hide/unhide a written review from the public course page. Iter 47. |
 | `/api/courses/{course_id}/slides` | POST |  |
 | `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
@@ -858,6 +859,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
 | `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
 | `/api/seo/certificates/share/{code}` | GET | Iter 28 — Public shareable brag-card for a certificate. |
+| `/api/seo/courses/share/{course_id}` | GET | Iter 48 — Public shareable link for a marketplace course. |
 | `/api/seo/robots.txt` | GET |  |
 | `/api/seo/sitemap-{org_id}.xml` | GET |  |
 | `/api/seo/sitemap.xml` | GET |  |
@@ -880,7 +882,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **288** registered API endpoints._
+_Total: **290** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

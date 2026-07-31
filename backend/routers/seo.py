@@ -255,3 +255,115 @@ def cert_share(code: str, request: Request, db: Session = Depends(get_db)):
     return Response(html_body, media_type="text/html", headers={
         "Cache-Control": "public, max-age=300" if revoked else "public, max-age=3600",
     })
+
+
+# ───────────── Course share (marketplace OG preview) ────────────
+@router.get("/courses/share/{course_id}", response_class=Response)
+def course_share(course_id: int, request: Request, db: Session = Depends(get_db)):
+    """Iter 48 — Public shareable link for a marketplace course.
+
+    Social crawlers (WhatsApp/LinkedIn/Twitter) read the OpenGraph tags
+    and unfurl the cover photo + star rating. Humans are redirected to
+    the SPA course page via JS (crawlers don't execute it) with an HTML
+    fallback card + link."""
+    from sqlalchemy import func
+    from models import CourseRating
+    course = (
+        db.query(Course)
+        .join(Organization, Organization.id == Course.organization_id)
+        .filter(Course.id == course_id)
+        .filter(Course.status == CourseStatus.PUBLISHED)
+        .filter(Organization.marketplace_opt_in == True)  # noqa: E712
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not publicly listed")
+    org = db.query(Organization).filter(Organization.id == course.organization_id).first()
+    avg, n = db.query(func.avg(CourseRating.rating), func.count(CourseRating.id)) \
+        .filter(CourseRating.course_id == course.id).one()
+
+    base = _base(request)
+    catalog_url = f"{base}/catalog/{course.id}"
+    share_url = f"{base}/api/seo/courses/share/{course.id}"
+
+    desc_bits = []
+    if avg and n:
+        plural = "s" if n != 1 else ""
+        desc_bits.append(f"★ {round(float(avg), 1)} ({n} rating{plural})")
+    desc_bits.append(f"{len(course.slides)} lessons")
+    if course.duration_minutes:
+        desc_bits.append(f"{course.duration_minutes} min")
+    desc_bits.append("Free" if course.price_cents == 0
+                     else f"{course.currency} {course.price_cents / 100:.2f}")
+    if org:
+        desc_bits.append(f"by {org.name}")
+    description = " · ".join(desc_bits)
+    if course.description:
+        description = f"{course.description[:140].strip()} — {description}"
+
+    image_url = ""
+    cover = course.cover_image or (org.logo_url if org else None)
+    if cover:
+        image_url = cover if cover.startswith("http") else f"{base}{cover}"
+
+    e_title = html.escape(course.title)
+    e_desc = html.escape(description)
+    e_img = html.escape(image_url)
+    e_url = html.escape(share_url)
+    e_catalog = html.escape(catalog_url)
+    img_meta = (f'\n  <meta property="og:image" content="{e_img}" />'
+                f'\n  <meta name="twitter:image" content="{e_img}" />') if image_url else ""
+    stars = ""
+    if avg and n:
+        filled = "★" * round(float(avg))
+        hollow = "☆" * (5 - round(float(avg)))
+        plural = "s" if n != 1 else ""
+        stars = (f'<p style="color:#f59e0b;font-size:20px;margin:0 0 4px;">'
+                 f'{filled}{hollow} '
+                 f'<span style="color:#64748b;font-size:14px;">{round(float(avg), 1)} · {n} rating{plural}</span></p>')
+
+    body = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{e_title}</title>
+  <meta name="description" content="{e_desc}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="{e_title}" />
+  <meta property="og:description" content="{e_desc}" />
+  <meta property="og:url" content="{e_url}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{e_title}" />
+  <meta name="twitter:description" content="{e_desc}" />{img_meta}
+  <script>window.location.replace("{e_catalog}");</script>
+  <style>
+    body {{ font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%);
+      min-height: 100vh; margin: 0; display: flex;
+      align-items: center; justify-content: center; padding: 24px; }}
+    .card {{ background: white; border-radius: 24px; overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.08); max-width: 560px; text-align: center; }}
+    .card .inner {{ padding: 32px 40px 40px; }}
+    .card img.cover {{ width: 100%; height: 240px; object-fit: cover; display: block; }}
+    .card h1 {{ font-size: 26px; margin: 0 0 8px; color: #1e293b; }}
+    .card p.meta {{ font-size: 14px; color: #64748b; margin: 0 0 24px; }}
+    .card a {{ display: inline-block; background: #4f46e5; color: white;
+      padding: 12px 24px; border-radius: 12px; text-decoration: none;
+      font-weight: 600; font-size: 14px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    {f'<img class="cover" src="{e_img}" alt="" />' if image_url else ''}
+    <div class="inner">
+      {stars}
+      <h1>{e_title}</h1>
+      <p class="meta">{e_desc}</p>
+      <a href="{e_catalog}">View course</a>
+    </div>
+  </div>
+</body>
+</html>"""
+    return Response(body, media_type="text/html",
+                    headers={"Cache-Control": "public, max-age=3600"})
