@@ -2158,3 +2158,24 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
   live on the preview URL. `pre_finish_check.py` PASSED.
 - **Learning**: if the preview goes blank with a clean compile and no JS
   errors, check for empty `.js` files shadowing `.tsx` sources in `src/`.
+
+## 2026-07-31 — Iter 47: Share links + Rating comments + Go-Live prep
+- **Shareable Course Links**: `ShareCourseButton.tsx` (icon/menu/button modes).
+  Public catalog cards + course detail page copy the public URL; /courses
+  cards have a menu with "Copy public link" / "Copy in-app link".
+- **Rating Comments**: optional written review after star rating on course
+  completion (LearnPage). Best reviews (stars desc, recent) shown on public
+  /catalog/{id} under "What learners say". Admin moderation panel in
+  CourseEditPage sidebar (hide/unhide). New: `hidden_at` col (migration
+  4d5e6f7a8b9c), GET /api/catalog/{id}/reviews (public), GET
+  /api/courses/{id}/reviews + POST .../reviews/{rid}/toggle-hidden (admin).
+  Re-POSTing star-only rating preserves existing comment.
+- **Bug fixes**: DELETE /api/courses/{id} 500 (FK dependents now cleaned:
+  slide comments/views/versions, flashcards, ratings, prereqs deleted;
+  exams/certs/subscriptions/scorm/live-sessions detached). AI Tutor launcher
+  pill moved to bottom-24 so it never occludes the Complete button.
+- **Go-Live**: deployment_agent readiness check PASSED. SQLite persists on
+  container disk (resets on redeploy) — Postgres cutover still P2 backlog.
+- Testing: iteration_47.json — backend 10/10, frontend all flows pass.
+  Test file: backend/tests/test_iteration47_reviews_share.py.
+  UAT org marketplace_opt_in reverted to False post-test; test courses deleted.
