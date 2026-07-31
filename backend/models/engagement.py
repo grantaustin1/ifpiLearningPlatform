@@ -22,6 +22,7 @@ class CourseRating(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     rating = Column(Integer, nullable=False)  # 1..5
     comment = Column(Text)
+    hidden_at = Column(DateTime, nullable=True)  # Iter 47 — admin moderation
     created_at = Column(DateTime, default=_utcnow)
 
 

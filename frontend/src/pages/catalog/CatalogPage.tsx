@@ -5,6 +5,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import { BookOpen, Search, GraduationCap, Clock, Users, Sparkles, ArrowRight, TrendingUp, Star } from 'lucide-react'
 import { formatCurrency } from 'lib/utils'
+import { ShareCourseButton } from 'components/ShareCourseButton'
 
 interface CatalogCourse {
   id: number
@@ -69,10 +70,13 @@ function CourseCard({ c, onEnroll }: { c: CatalogCourse; onEnroll: (c: CatalogCo
         </div>
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
           <p className="text-sm font-semibold text-slate-900">{c.price_cents === 0 ? 'Free' : formatCurrency(c.price_cents, c.currency)}</p>
-          <button onClick={() => onEnroll(c)} data-testid={`enroll-btn-${c.id}`}
-            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
-            {c.price_cents === 0 ? 'Enrol' : 'Get access'}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ShareCourseButton courseId={c.id} />
+            <button onClick={() => onEnroll(c)} data-testid={`enroll-btn-${c.id}`}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+              {c.price_cents === 0 ? 'Enrol' : 'Get access'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

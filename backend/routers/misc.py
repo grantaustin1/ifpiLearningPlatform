@@ -1250,8 +1250,13 @@ def catalog_detail(course_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Course not found or not publicly listed")
     org = db.query(Organization).filter(Organization.id == course.organization_id).first()
     slides = sorted(course.slides, key=lambda s: s.order_index)[:8]
+    from models import CourseRating
+    from sqlalchemy import func
+    avg, n = db.query(func.avg(CourseRating.rating), func.count(CourseRating.id)) \
+        .filter(CourseRating.course_id == course.id).one()
     return {
         "id": course.id, "title": course.title, "description": course.description,
+        "avg_rating": round(float(avg), 1) if avg else None, "rating_count": n,
         "cover_image": course.cover_image, "is_featured": bool(course.is_featured),
         "category": course.category, "cover_color": course.cover_color,
         "duration_minutes": course.duration_minutes, "price_cents": course.price_cents,
@@ -1263,3 +1268,40 @@ def catalog_detail(course_id: int, db: Session = Depends(get_db)):
             "id": org.id, "name": org.name, "logo_url": org.logo_url,
         } if org else None,
     }
+
+
+@catalog_router.get("/{course_id}/reviews")
+def catalog_reviews(course_id: int, limit: int = Query(6, ge=1, le=20),
+                    db: Session = Depends(get_db)):
+    """Best written reviews for a public course — highest stars first,
+    then most recent. Hidden (moderated) reviews excluded. Iter 47."""
+    from models import CourseRating, Organization, User
+    course = (
+        db.query(Course)
+        .join(Organization, Organization.id == Course.organization_id)
+        .filter(Course.id == course_id)
+        .filter(Course.status == CourseStatus.PUBLISHED)
+        .filter(Organization.marketplace_opt_in == True)  # noqa: E712
+        .first()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found or not publicly listed")
+    rows = (db.query(CourseRating, User.name)
+            .join(User, User.id == CourseRating.user_id)
+            .filter(CourseRating.course_id == course_id,
+                    CourseRating.comment.isnot(None), CourseRating.comment != "",
+                    CourseRating.hidden_at.is_(None))
+            .order_by(CourseRating.rating.desc(), CourseRating.created_at.desc())
+            .limit(limit).all())
+
+    def _display(name: str | None) -> str:
+        if not name:
+            return "A learner"
+        parts = name.strip().split()
+        return parts[0] + (f" {parts[-1][0]}." if len(parts) > 1 else "")
+
+    return [{
+        "id": r.id, "rating": r.rating, "comment": r.comment,
+        "reviewer": _display(name),
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r, name in rows]
