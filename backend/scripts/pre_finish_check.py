@@ -68,6 +68,8 @@ def main() -> int:
         (["python", "-m", "pytest", "tests/test_docs_completeness.py",
           "-q", "--tb=short"],
          "4. Docs completeness test suite"),
+        (["python", "scripts/check_lockfile_sync.py"],
+         "5. Frontend lockfile sync (package.json ↔ yarn.lock)"),
     ]
 
     all_ok = True
