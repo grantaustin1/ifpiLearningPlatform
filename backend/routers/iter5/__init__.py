@@ -27,3 +27,11 @@ def sign_outgoing_payload(body: bytes) -> dict:
     return {"X-Signature": sig, "X-Timestamp": ts, "X-Service-Token": secret}
 
 
+from . import (  # noqa: E402, F401
+    _academies_routes,
+    _comments_routes,
+    _portal_routes,
+    _preview_routes,
+    _uploads_routes,
+)
+
