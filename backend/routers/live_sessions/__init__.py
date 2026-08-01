@@ -20,3 +20,4 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/live-sessions", tags=["Live Sessions"])
 
+from . import _attendance_routes, _ics_routes, _routes  # noqa: E402, F401
