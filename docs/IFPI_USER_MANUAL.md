@@ -576,7 +576,135 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 <!-- AUTO:BEGIN api_routes -->
 | Endpoint | Verb | Purpose |
 |---|---|---|
-| _(unable to introspect — run locally with the backend importable)_ | | |
+| `/api` | GET |  |
+| `/api/admin/affiliate/codes` | GET |  |
+| `/api/admin/affiliate/codes` | POST |  |
+| `/api/admin/affiliate/codes/{code_id}` | PATCH |  |
+| `/api/admin/affiliate/earnings` | GET | Aggregate earnings by status. Cents-based to avoid float drift. |
+| `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
+| `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
+| `/api/admin/api-tokens` | GET |  |
+| `/api/admin/api-tokens` | POST |  |
+| `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
+| `/api/admin/api-tokens/analytics/usage` | GET | Return per-day request counts for the org over the last `days` days, |
+| `/api/admin/api-tokens/{token_id}` | DELETE |  |
+| `/api/admin/api-tokens/{token_id}/revoke` | POST |  |
+| `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
+| `/api/admin/dashboard/docs-engagement` | GET | Iter 33c — Docs engagement tile for the Owner dashboard. |
+| `/api/admin/dashboard/members-needing-action` | GET |  |
+| `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
+| `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
+| `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
+| `/api/admin/email/send-test` | POST | Queue a test email and dispatch it synchronously so the admin |
+| `/api/admin/email/transport-status` | GET | Report which delivery transports are active for THIS org, in |
+| `/api/admin/entitlements/user/{user_id}` | GET | List every paid course in the caller's org + whether the target |
+| `/api/admin/entitlements/user/{user_id}/course/{course_id}` | GET | One user, one course — the "why can't they enroll?" answer. |
+| `/api/admin/feature-flags/{flag_key}` | PUT |  |
+| `/api/admin/imports` | GET |  |
+| `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
+| `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
+| `/api/admin/imports/{job_id}` | GET |  |
+| `/api/admin/imports/{job_id}/rollback` | POST | Undo an import job — deletes every course / learning path it created. |
+| `/api/admin/kiosk/settings` | PUT |  |
+| `/api/admin/marketplace-funnel` | GET | Iter 25 — Cross-course marketplace funnel roll-up for the current |
+| `/api/admin/marketplace-funnel/{course_id}` | GET |  |
+| `/api/admin/onboarding/checklist` | GET |  |
+| `/api/admin/organizations` | GET | List every org in the deployment (super-admin only — regular |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | GET |  |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | PATCH | Merge-update the org's ERP360 integration config. Only the |
+| `/api/admin/query-builder/build` | POST |  |
+| `/api/admin/scheduled-reports` | GET |  |
+| `/api/admin/scheduled-reports` | POST |  |
+| `/api/admin/scheduled-reports/{report_id}` | DELETE |  |
+| `/api/admin/scheduled-reports/{report_id}` | PUT |  |
+| `/api/admin/scheduled-reports/{report_id}/run-now` | POST |  |
+| `/api/admin/scorm` | GET |  |
+| `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
+| `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
+| `/api/admin/terms` | GET |  |
+| `/api/admin/terms` | POST |  |
+| `/api/admin/terms/acceptances` | GET |  |
+| `/api/admin/users/{user_id}/2fa/disable` | POST |  |
+| `/api/admin/webhooks` | GET |  |
+| `/api/admin/webhooks` | POST |  |
+| `/api/admin/webhooks/deliveries` | GET | Recent WebhookDelivery rows across ALL subscriptions in the |
+| `/api/admin/webhooks/{sub_id}` | DELETE |  |
+| `/api/admin/webhooks/{sub_id}` | PUT |  |
+| `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
+| `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
+| `/api/affiliate/lookup/{code}` | GET | Public — thin preview so signup forms can show |
+| `/api/auth/2fa/challenge` | POST | Public — accepts {challenge_id, code} and returns the standard |
+| `/api/auth/2fa/disable` | POST |  |
+| `/api/auth/2fa/setup` | POST |  |
+| `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
+| `/api/auth/2fa/status` | GET |  |
+| `/api/authoring/budget` | GET |  |
+| `/api/authoring/budget` | PUT |  |
+| `/api/authoring/flashcards/bulk-save` | POST | Persist a reviewed batch. Overwrites nothing — creates fresh rows. |
+| `/api/authoring/flashcards/by-course/{course_id}` | GET |  |
+| `/api/authoring/flashcards/generate` | POST | Preview AI-generated flashcards. Does NOT persist — the client shows a |
+| `/api/authoring/flashcards/{card_id}` | DELETE |  |
+| `/api/authoring/flashcards/{card_id}` | PATCH |  |
+| `/api/authoring/mindmap/{course_id}` | POST |  |
+| `/api/authoring/mindmap/{course_id}/layout` | DELETE |  |
+| `/api/authoring/mindmap/{course_id}/layout` | GET |  |
+| `/api/authoring/mindmap/{course_id}/layout` | PUT |  |
+| `/api/authoring/narration/generate` | POST |  |
+| `/api/authoring/narration/languages` | GET | Static list of supported TTS languages — surfaced in the picker. |
+| `/api/authoring/narration/{slide_id}` | DELETE |  |
+| `/api/authoring/pptx/{course_id}` | GET |  |
+| `/api/authoring/redaction/preview` | POST | Small utility endpoint: shows staff exactly what PII gets stripped |
+| `/api/authoring/research` | GET | List recent research jobs for the org's history view. |
+| `/api/authoring/research/start` | POST | Kick off a deep research job. Returns immediately with the AIJob id. |
+| `/api/authoring/research/{job_id}` | GET |  |
+| `/api/authoring/sources` | GET |  |
+| `/api/authoring/sources` | POST | Upload a source. Two modes: |
+| `/api/authoring/sources/search` | POST |  |
+| `/api/authoring/sources/{doc_id}` | DELETE |  |
+| `/api/authoring/status` | GET | Landing endpoint that the frontend hits when a staff user opens the |
+| `/api/authoring/tutor/ask` | POST |  |
+| `/api/authoring/video/generate` | POST | Kick off a Sora 2 job. Returns 202 with the AIJob id — poll |
+| `/api/authoring/video/history` | GET |  |
+| `/api/authoring/video/preview` | POST | Show the estimated cost + remaining budget BEFORE firing a Sora |
+| `/api/authoring/video/{job_id}` | GET |  |
+| `/api/authoring/visuals/generate` | POST | Generates a PNG infographic. If `slide_id + attach_to_slide` are set, |
+| `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
+| `/api/catalog/{course_id}/track-view` | POST |  |
+| `/api/erp360/sync/status` | GET | Public probe. Returns whether IFPI is ready to receive ERP360 |
+| `/api/erp360/sync/test-ping` | POST | Round-trip verification. Currently a stub — synthetic outbound |
+| `/api/erp360/webhooks/user` | POST | Receive `user.role_changed` and `user.deactivated` events from ERP360. |
+| `/api/feature-flags` | GET |  |
+| `/api/health` | GET |  |
+| `/api/kiosk/settings` | GET |  |
+| `/api/kiosk/unlock` | POST |  |
+| `/api/learn/flashcards/courses/{course_id}/due` | GET | Return the learner's due-today queue for a course. Mixes: |
+| `/api/learn/flashcards/courses/{course_id}/stats` | GET |  |
+| `/api/learn/flashcards/streak` | GET | Learner's current + longest flashcard streak. Computed from |
+| `/api/learn/flashcards/{card_id}/review` | POST |  |
+| `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
+| `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
+| `/api/public/catalog` | GET | List PUBLISHED courses in the caller's org. Read-only, no PII. |
+| `/api/public/certificates/verify/{code}` | GET | Anonymous verification. Rate-limited to 30/min per IP (Redis |
+| `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
+| `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
+| `/api/seo/certificates/share/{code}` | GET | Iter 28 — Public shareable brag-card for a certificate. |
+| `/api/seo/robots.txt` | GET |  |
+| `/api/seo/sitemap-{org_id}.xml` | GET |  |
+| `/api/seo/sitemap.xml` | GET |  |
+| `/api/terms/accept` | POST |  |
+| `/api/terms/current` | GET |  |
+| `/api/tutor/ask` | POST |  |
+| `/api/tutor/save-as-flashcard` | POST |  |
+| `/api/tutor/sessions` | GET |  |
+| `/api/tutor/sessions/{session_id}` | GET |  |
+| `/api/tutor/sessions/{session_id}/archive` | POST |  |
+| `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
+| `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
+| `/api/webhook/stripe` | POST | Stripe webhook receiver. Idempotent — the poll path and the |
+| `/api/xapi/statements` | GET |  |
+| `/api/xapi/statements` | POST |  |
+
+_Total: **127** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
