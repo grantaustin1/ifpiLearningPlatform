@@ -295,10 +295,6 @@ export default function LoginPage() {
               <span>📚</span> Browse the public catalog · verify a certificate
             </Link>
           </div>
-          <p className="text-center text-[11px] text-slate-400 mt-5">
-            Demo: <code className="bg-slate-100 px-1.5 py-0.5 rounded">admin@ifpi.org / admin123</code><br />
-            or <code className="bg-slate-100 px-1.5 py-0.5 rounded">learner@ifpi.org / learner123</code>
-          </p>
         </div>
       </div>
     </div>
