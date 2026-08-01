@@ -22,7 +22,11 @@ logger = logging.getLogger("ifpi.ai_quiz")
 
 
 _SYSTEM_PROMPT = (
+<<<<<<< HEAD
     "You are a fitness-industry education expert who writes high-quality exam "
+=======
+    "You are a music-industry education expert who writes high-quality exam "
+>>>>>>> origin/main
     "questions. Output STRICT JSON only — no commentary, no markdown fences."
 )
 

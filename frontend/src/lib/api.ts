@@ -5,7 +5,11 @@
  * - Bearer token added if present in memory (dual-mode auth).
  * - 401 → tries one silent refresh; on failure redirects to /login.
  */
+<<<<<<< HEAD
 import axios, { AxiosError, AxiosRequestConfig } from 'axios'
+=======
+import axios, { AxiosError, AxiosRequestConfig, AxiosHeaders } from 'axios'
+>>>>>>> origin/main
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || ''
 export const API_BASE = `${BACKEND_URL}/api`
@@ -22,6 +26,7 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (accessTokenMem) {
+<<<<<<< HEAD
     (config.headers as any) = config.headers || {}
     ;(config.headers as any).Authorization = `Bearer ${accessTokenMem}`
   }
@@ -38,10 +43,17 @@ api.interceptors.request.use((config) => {
       ;(config.headers as any) = config.headers || {}
       ;(config.headers as any)['X-CSRF-Token'] = csrf
     }
+=======
+    const h = new AxiosHeaders()
+    if (config.headers) Object.assign(h, config.headers)
+    h.set('Authorization', `Bearer ${accessTokenMem}`)
+    config.headers = h
+>>>>>>> origin/main
   }
   return config
 })
 
+<<<<<<< HEAD
 function readCookie(name: string): string | null {
   const target = `${name}=`
   const parts = (document.cookie || '').split(';')
@@ -65,6 +77,17 @@ async function tryRefresh(): Promise<'ok' | 'fail'> {
     if (token) accessTokenMem = token
     return 'ok'
   } catch { return 'fail' }
+=======
+let refreshing: Promise<string | null> | null = null
+
+async function tryRefresh(): Promise<string | null> {
+  try {
+    const r = await axios.post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true })
+    const token = r.data?.access_token || null
+    if (token) accessTokenMem = token
+    return token
+  } catch { return null }
+>>>>>>> origin/main
 }
 
 api.interceptors.response.use(
@@ -76,6 +99,7 @@ api.interceptors.response.use(
     if (status === 401 && !original._retried && !isAuthEndpoint) {
       original._retried = true
       refreshing = refreshing || tryRefresh()
+<<<<<<< HEAD
       const outcome = await refreshing
       refreshing = null
       if (outcome === 'ok') {
@@ -85,6 +109,15 @@ api.interceptors.response.use(
           (original.headers as any) = original.headers || {}
           ;(original.headers as any).Authorization = `Bearer ${accessTokenMem}`
         }
+=======
+      const newTok = await refreshing
+      refreshing = null
+      if (newTok) {
+        const h = new AxiosHeaders()
+        if (original.headers) Object.assign(h, original.headers)
+        h.set('Authorization', `Bearer ${newTok}`)
+        original.headers = h
+>>>>>>> origin/main
         return api.request(original)
       }
       // Hard fail — clear token, redirect. Iter 33d: don't bounce the

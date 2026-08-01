@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useEffect, useState } from 'react'
+=======
+import { useEffect, useRef, useState } from 'react'
+>>>>>>> origin/main
 import { api } from 'lib/api'
 import { Sparkles, Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, FileText } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,6 +40,7 @@ export default function ResearchPage() {
     } finally { setLoading(false) }
   }
 
+<<<<<<< HEAD
   useEffect(() => { load() }, [])
 
   const pollJob = async (id: number) => {
@@ -44,6 +49,43 @@ export default function ResearchPage() {
       await new Promise(r => setTimeout(r, 2500))
       try {
         const r = await api.get(`/authoring/research/${id}`)
+=======
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    load()
+    return () => { abortRef.current?.abort() }
+  }, [])
+
+  const start = async () => {
+    if (query.trim().length < 3) return toast.error('Query must be at least 3 characters')
+    setStarting(true)
+    try {
+      const r = await api.post('/authoring/research/start', { query: query.trim(), depth })
+      toast.success('Research started')
+      setQuery('')
+      await load()
+      abortRef.current = new AbortController()
+      pollJob(r.data.job_id, abortRef.current.signal)
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      if (typeof detail === 'object' && detail?.code === 'tavily_key_missing') {
+        toast.error('Add TAVILY_API_KEY to backend/.env and restart')
+      } else {
+        toast.error(String(detail ?? 'Failed to start research'))
+      }
+    } finally { setStarting(false) }
+  }
+
+  const pollJob = async (id: number, signal: AbortSignal) => {
+    setActivePolls(p => ({ ...p, [id]: true }))
+    for (let i = 0; i < 60; i++) {
+      if (signal.aborted) break
+      await new Promise(r => setTimeout(r, 2500))
+      if (signal.aborted) break
+      try {
+        const r = await api.get(`/authoring/research/${id}`, { signal })
+>>>>>>> origin/main
         setJobs(js => js.map(j => (j.id === id ? { ...j, ...r.data } : j)))
         if (r.data.status === 'COMPLETED' || r.data.status === 'FAILED') break
       } catch (e) {
@@ -56,6 +98,7 @@ export default function ResearchPage() {
     setActivePolls(p => ({ ...p, [id]: false }))
   }
 
+<<<<<<< HEAD
   const start = async () => {
     if (query.trim().length < 3) return toast.error('Query must be at least 3 characters')
     setStarting(true)
@@ -75,6 +118,8 @@ export default function ResearchPage() {
     } finally { setStarting(false) }
   }
 
+=======
+>>>>>>> origin/main
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
       <div className="flex items-start justify-between">
@@ -168,7 +213,14 @@ export default function ResearchPage() {
               </div>
               {j.status !== 'COMPLETED' && j.status !== 'FAILED' && !activePolls[j.id] && (
                 <button
+<<<<<<< HEAD
                   onClick={() => pollJob(j.id)}
+=======
+                  onClick={() => {
+                    abortRef.current = new AbortController()
+                    pollJob(j.id, abortRef.current.signal)
+                  }}
+>>>>>>> origin/main
                   className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
                   data-testid={`research-poll-${j.id}`}
                 >

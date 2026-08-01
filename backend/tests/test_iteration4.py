@@ -7,6 +7,10 @@ from __future__ import annotations
 import os
 import time
 import uuid
+<<<<<<< HEAD
+=======
+from pathlib import Path
+>>>>>>> origin/main
 
 import pytest
 import requests
@@ -18,6 +22,29 @@ if not BASE_URL:
 
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER = {"email": "learner@ifpi.org", "password": "learner123"}
+<<<<<<< HEAD
+=======
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
+if DATABASE_URL.startswith("sqlite:///"):
+    DB_PATH = DATABASE_URL.replace("sqlite:///", "", 1)
+    if not os.path.isabs(DB_PATH):
+        DB_PATH = os.path.join(BACKEND_DIR, DB_PATH)
+else:
+    DB_PATH = os.path.join(BACKEND_DIR, "ifpi_lms.db")
+DB_PATH = os.path.abspath(DB_PATH)
+
+
+def _backend_dir() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _sqlite_db_path() -> Path:
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
+    if database_url.startswith("sqlite:///"):
+        return Path(database_url.replace("sqlite:///", "", 1)).resolve()
+    return (_backend_dir() / "ifpi_lms.db").resolve()
+>>>>>>> origin/main
 
 
 def _login(email, password):
@@ -45,13 +72,22 @@ def test_alembic_head_iteration4():
     """Iter 4 migration must remain in the history. Later iterations push the
     head forward — that's expected; we just verify our chain is intact."""
     import subprocess
+<<<<<<< HEAD
     hist = subprocess.check_output(["alembic", "history"], cwd="/app/backend").decode()
     assert "7497425df8bc" in hist, hist[:500]
+=======
+    out = subprocess.check_output(["alembic", "current"], cwd=BACKEND_DIR).decode()
+    assert "(head)" in out, out
+>>>>>>> origin/main
 
 
 def test_org_cert_branding_columns_exist():
     import sqlite3
+<<<<<<< HEAD
     conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+=======
+    conn = sqlite3.connect(DB_PATH)
+>>>>>>> origin/main
     cols = {r[1] for r in conn.execute("PRAGMA table_info(organizations)")}
     conn.close()
     for c in ("cert_accent_color", "cert_signature_text",
@@ -214,7 +250,11 @@ def test_pdf_cert_with_branding_and_bad_color(admin, learner):
     learner.post(f"{BASE_URL}/api/courses/1/enroll")
     learner.post(f"{BASE_URL}/api/courses/1/complete")
     import sqlite3
+<<<<<<< HEAD
     conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+=======
+    conn = sqlite3.connect(DB_PATH)
+>>>>>>> origin/main
     row = conn.execute(
         "SELECT id FROM certificates WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') LIMIT 1"
     ).fetchone()
@@ -249,7 +289,11 @@ def test_outbox_worker_drains_queued(admin, learner):
     """
     # Wipe certificate so completion regenerates it
     import sqlite3
+<<<<<<< HEAD
     conn = sqlite3.connect("/app/backend/ifpi_lms.db")
+=======
+    conn = sqlite3.connect(DB_PATH)
+>>>>>>> origin/main
     conn.execute(
         "UPDATE enrollments SET completed_at=NULL, status='IN_PROGRESS' "
         "WHERE user_id=(SELECT id FROM users WHERE email='learner@ifpi.org') AND course_id=1"

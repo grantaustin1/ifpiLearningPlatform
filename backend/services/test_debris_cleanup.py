@@ -70,6 +70,7 @@ COURSE_TITLE_PATTERNS = [
     "AI Test %",           # ai_authoring test residue
     "Bulk Import Test%",   # bulk-import test residue
     "Learning Path Test%",  # learning-path test residue
+<<<<<<< HEAD
     # ── Iter 40 additions (marketplace debris) ───────────────────────
     "Entitlement Test%",   # iter39 entitlement harness residue
     "Paid E2E%",           # iter39 Stripe E2E residue
@@ -89,6 +90,8 @@ TEST_ORG_SLUG_PATTERNS = [
     "other-acad-%",
     "ent-other-%",
     "ui-acad-%",
+=======
+>>>>>>> origin/main
 ]
 
 LIVE_SESSION_TITLE_PATTERNS = [
@@ -242,6 +245,7 @@ def _delete_stale_course_views(db: Session) -> int:
     return n
 
 
+<<<<<<< HEAD
 def _optout_test_orgs_from_marketplace(db: Session) -> int:
     """Force marketplace_opt_in=False on orgs whose slug matches a test
     factory pattern. Returns rows flipped."""
@@ -256,6 +260,8 @@ def _optout_test_orgs_from_marketplace(db: Session) -> int:
     return flipped
 
 
+=======
+>>>>>>> origin/main
 def tick(db: Session, dry_run: bool = False) -> dict:
     """Run the full cleanup pass. Returns a dict of {resource: rows_deleted}.
 
@@ -267,7 +273,10 @@ def tick(db: Session, dry_run: bool = False) -> dict:
         "terms_versions": _delete_stale_terms_versions(db),
         "outbox_messages": _delete_stale_outbox(db),
         "course_views": _delete_stale_course_views(db),
+<<<<<<< HEAD
         "marketplace_optouts": _optout_test_orgs_from_marketplace(db),
+=======
+>>>>>>> origin/main
     }
     if dry_run:
         db.rollback()

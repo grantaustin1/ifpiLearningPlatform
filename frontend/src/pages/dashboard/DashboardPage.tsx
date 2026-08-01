@@ -3,10 +3,16 @@ import { api } from 'lib/api'
 import { Link } from 'react-router-dom'
 import { BookOpen, ClipboardList, Users, Award, ArrowRight, Plus, Sparkles, TrendingUp } from 'lucide-react'
 import { timeAgo } from 'lib/utils'
+<<<<<<< HEAD
 import { MembersNeedingActionWidget } from './MembersNeedingActionWidget'
 import { OnboardingBoard } from './OnboardingBoard'
 import { DocsEngagementTile } from './DocsEngagementTile'
 import { WeeklyEnrollmentsCard } from './WeeklyEnrollmentsCard'
+=======
+import MembersNeedingActionWidget from './MembersNeedingActionWidget'
+import OnboardingBoard from './OnboardingBoard'
+import { DocsEngagementTile } from './DocsEngagementTile'
+>>>>>>> origin/main
 
 export default function DashboardPage() {
   const { data: analytics, isLoading } = useQuery({
@@ -69,6 +75,7 @@ export default function DashboardPage() {
         </div>
         <div className="space-y-5">
           <DocsEngagementTile />
+<<<<<<< HEAD
           <div className="bg-white rounded-2xl card-glow p-5">
             <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-2">
@@ -80,6 +87,8 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+=======
+>>>>>>> origin/main
         </div>
       </div>
 
@@ -101,7 +110,21 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+<<<<<<< HEAD
         <WeeklyEnrollmentsCard />
+=======
+        <div className="bg-white rounded-2xl card-glow p-5">
+          <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {actions.map(a => (
+              <Link key={a.href} to={a.href}
+                className={`flex flex-col items-center gap-2 ${a.color} text-white text-xs font-semibold py-4 rounded-xl shadow transition-all hover:-translate-y-0.5`}>
+                <a.icon className="h-5 w-5" /> {a.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+>>>>>>> origin/main
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { AlertTriangle, Info } from 'lucide-react'
@@ -124,4 +125,62 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
       </Dialog.Root>
     </ConfirmContext.Provider>
   )
+=======
+import { useState, useCallback } from 'react';
+
+interface ConfirmOptions {
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  variant?: 'danger' | 'default';
+}
+
+export function useConfirm() {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<ConfirmOptions | null>(null);
+  const [resolveRef, setResolveRef] = useState<((value: boolean) => void) | null>(null);
+
+  const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
+    setOptions(opts);
+    setOpen(true);
+    return new Promise((resolve) => {
+      setResolveRef(() => resolve);
+    });
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    setOpen(false);
+    resolveRef?.(true);
+    setResolveRef(null);
+  }, [resolveRef]);
+
+  const handleCancel = useCallback(() => {
+    setOpen(false);
+    resolveRef?.(false);
+    setResolveRef(null);
+  }, [resolveRef]);
+
+  const ConfirmDialog = useCallback(() => {
+    if (!open || !options) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+          <h3 className="text-lg font-semibold">{options.title}</h3>
+          <p className="text-muted-foreground mt-2">{options.description}</p>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={handleCancel} className="px-4 py-2 rounded border">Cancel</button>
+            <button
+              onClick={handleConfirm}
+              className={`px-4 py-2 rounded text-white ${options.variant === 'danger' ? 'bg-red-600' : 'bg-indigo-600'}`}
+            >
+              {options.confirmLabel || 'Confirm'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }, [open, options, handleCancel, handleConfirm]);
+
+  return { confirm, ConfirmDialog };
+>>>>>>> origin/main
 }

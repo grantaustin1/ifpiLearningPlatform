@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { MessageSquare } from 'lucide-react'
@@ -158,4 +159,26 @@ export function PromptDialogProvider({ children }: { children: ReactNode }) {
       </Dialog.Root>
     </PromptContext.Provider>
   )
+=======
+import { useCallback } from 'react';
+
+interface PromptOptions {
+  title: string;
+  description: string;
+  placeholder?: string;
+  required?: boolean;
+  maxLength?: number;
+  confirmLabel?: string;
+}
+
+export function usePrompt() {
+  const prompt = useCallback((opts: PromptOptions): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const result = window.prompt(`${opts.title}\n${opts.description}\n${opts.placeholder || ''}`);
+      resolve(result);
+    });
+  }, []);
+
+  return prompt;
+>>>>>>> origin/main
 }

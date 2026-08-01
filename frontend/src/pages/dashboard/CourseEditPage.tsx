@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
@@ -7,6 +8,14 @@ import { SortableList } from 'components/SortableList'
 import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
 import { CourseReviewsPanel } from './CourseReviewsPanel'
+=======
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { api } from 'lib/api'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import { SortableList } from 'components/SortableList'
+>>>>>>> origin/main
 
 const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 
@@ -17,6 +26,7 @@ export default function CourseEditPage() {
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+<<<<<<< HEAD
   const [uploadingCover, setUploadingCover] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [gallery, setGallery] = useState<any[]>([])
@@ -29,13 +39,19 @@ export default function CourseEditPage() {
       catch { toast.error('Could not load the photo gallery') }
     }
   }
+=======
+>>>>>>> origin/main
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [prereqs, setPrereqs] = useState<any[]>([])
   const [allCourses, setAllCourses] = useState<any[]>([])
   const [showAddPrereq, setShowAddPrereq] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
+<<<<<<< HEAD
   const load = async () => {
+=======
+  const load = useCallback(async () => {
+>>>>>>> origin/main
     const [r, p, all] = await Promise.all([
       api.get(`/courses/${id}`),
       api.get(`/courses/${id}/prerequisites`),
@@ -46,8 +62,13 @@ export default function CourseEditPage() {
     setActive(r.data.slides?.[0]?.id ?? null)
     setPrereqs(p.data)
     setAllCourses(all.data)
+<<<<<<< HEAD
   }
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+=======
+  }, [id])
+  useEffect(() => { load() }, [load])
+>>>>>>> origin/main
 
   const save = async () => {
     if (!course) return
@@ -57,7 +78,11 @@ export default function CourseEditPage() {
         title: course.title, description: course.description,
         category: course.category, duration_minutes: course.duration_minutes,
         price_cents: course.price_cents, passing_score: course.passing_score,
+<<<<<<< HEAD
         status: course.status, cover_image: course.cover_image || null,
+=======
+        status: course.status,
+>>>>>>> origin/main
       })
       for (const s of slides.filter(x => !x._local)) {
         await api.patch(`/courses/${id}/slides/${s.id}`, {
@@ -181,7 +206,11 @@ export default function CourseEditPage() {
               <Sparkles className="h-3.5 w-3.5" /> Mind map
             </button>
             <a
+<<<<<<< HEAD
               href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+=======
+              href={`${process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+>>>>>>> origin/main
               onClick={(e) => {
                 // Attach auth token as query fallback isn't safe; fetch + blob download instead.
                 e.preventDefault()
@@ -248,7 +277,11 @@ export default function CourseEditPage() {
         ) : <div className="flex-1 flex items-center justify-center text-slate-400">Select or add a slide to start</div>}
       </div>
 
+<<<<<<< HEAD
       <aside className="w-80 xl:w-[36rem] bg-white border-l p-4 overflow-y-auto">
+=======
+      <aside className="w-72 bg-white border-l p-4 overflow-y-auto">
+>>>>>>> origin/main
         <h3 className="font-semibold text-slate-900 text-sm mb-4">Course Settings</h3>
         <Field label="Title"><input value={course.title || ''} onChange={e => setCourse({ ...course, title: e.target.value })} data-testid="sidebar-course-title" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
         <Field label="Description"><textarea value={course.description || ''} onChange={e => setCourse({ ...course, description: e.target.value })} rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" /></Field>
@@ -261,6 +294,7 @@ export default function CourseEditPage() {
             <option value="DRAFT">DRAFT</option><option value="PUBLISHED">PUBLISHED</option><option value="ARCHIVED">ARCHIVED</option>
           </select>
         </Field>
+<<<<<<< HEAD
         <Field label="Cover image">
           <div className="space-y-2">
             {course.cover_image && (
@@ -302,13 +336,20 @@ export default function CourseEditPage() {
             </div>
           </div>
         </Field>
+=======
+>>>>>>> origin/main
 
         <div className="mt-6 pt-4 border-t border-slate-200" data-testid="prereqs-section">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> Prerequisites</h4>
             <button onClick={() => setShowAddPrereq(true)} data-testid="add-prereq-btn"
               className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"><Plus className="h-3 w-3" /> Add</button>
+<<<<<<< HEAD
           </div>          {prereqs.length === 0 ? (
+=======
+          </div>
+          {prereqs.length === 0 ? (
+>>>>>>> origin/main
             <p className="text-xs text-slate-400">No prerequisites — learners can enrol directly.</p>
           ) : (
             <div className="space-y-1.5">
@@ -329,6 +370,7 @@ export default function CourseEditPage() {
             </div>
           )}
         </div>
+<<<<<<< HEAD
 
         {/* Iter 24 — Marketplace funnel analytics */}
         {course?.id && (
@@ -368,6 +410,10 @@ export default function CourseEditPage() {
         </div>
       )}
 
+=======
+      </aside>
+
+>>>>>>> origin/main
       {showAddPrereq && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="add-prereq-modal">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -410,7 +456,10 @@ export default function CourseEditPage() {
 
 function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
   { courseId: number; slideId: number; onClose: () => void; onRestored: () => void }) {
+<<<<<<< HEAD
   const confirm = useConfirm()
+=======
+>>>>>>> origin/main
   const [versions, setVersions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [restoring, setRestoring] = useState<number | null>(null)
@@ -422,11 +471,15 @@ function SlideHistoryModal({ courseId, slideId, onClose, onRestored }:
   }, [courseId, slideId])
 
   const restore = async (n: number) => {
+<<<<<<< HEAD
     if (!(await confirm({
       title: `Restore to version ${n}?`,
       description: 'Your current content will be saved as a new version first, so nothing is lost.',
       confirmLabel: 'Restore',
     }))) return
+=======
+    if (!window.confirm(`Restore this slide to version ${n}? Your current content will be saved as a new version first, so nothing is lost.`)) return
+>>>>>>> origin/main
     setRestoring(n)
     try {
       await api.post(`/courses/${courseId}/slides/${slideId}/versions/${n}/restore`)
@@ -491,7 +544,10 @@ const NARRATION_LANGS = [
 ] as const
 
 function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }) {
+<<<<<<< HEAD
   const confirm = useConfirm()
+=======
+>>>>>>> origin/main
   const [voice, setVoice] = useState(slide.narration_voice || 'nova')
   const [model, setModel] = useState<'tts-1' | 'tts-1-hd'>('tts-1')
   const [language, setLanguage] = useState<string>('en')
@@ -513,12 +569,16 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
   }
 
   const clear = async () => {
+<<<<<<< HEAD
     if (!(await confirm({
       title: 'Remove narration?',
       description: 'You can regenerate anytime — no data is lost permanently.',
       confirmLabel: 'Remove',
       variant: 'danger',
     }))) return
+=======
+    if (!window.confirm('Remove this narration? You can regenerate anytime.')) return
+>>>>>>> origin/main
     await api.delete(`/authoring/narration/${slide.id}`)
     toast.success('Narration cleared')
     onUpdated()
@@ -545,8 +605,12 @@ function NarrationEditor({ slide, onUpdated }: { slide: any; onUpdated: () => vo
           data-testid="narration-voice-select">
           {NARRATION_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
+<<<<<<< HEAD
         <select value={model} onChange={e => setModel(e.target.value as any)}
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
+=======
+        <select value={model} onChange={e => setModel(e.target.value as 'tts-1' | 'tts-1-hd')}
+>>>>>>> origin/main
           data-testid="narration-model-select">
           <option value="tts-1">tts-1 (fast)</option>
           <option value="tts-1-hd">tts-1-hd (higher quality)</option>
@@ -679,13 +743,21 @@ function VideoEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void }
         className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-400"
         data-testid="video-prompt-input" />
       <div className="flex flex-wrap items-center gap-2">
+<<<<<<< HEAD
         <select value={model} onChange={e => setModel(e.target.value as any)}
+=======
+        <select value={model} onChange={e => setModel(e.target.value as 'sora-2' | 'sora-2-pro')}
+>>>>>>> origin/main
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="video-model-select">
           <option value="sora-2">sora-2</option>
           <option value="sora-2-pro">sora-2-pro (higher quality)</option>
         </select>
+<<<<<<< HEAD
         <select value={duration} onChange={e => setDuration(Number(e.target.value) as any)}
+=======
+        <select value={duration} onChange={e => setDuration(Number(e.target.value) as 4 | 8 | 12)}
+>>>>>>> origin/main
           className="text-xs border border-slate-200 bg-white rounded px-2 py-1"
           data-testid="video-duration-select">
           <option value={4}>4s</option>

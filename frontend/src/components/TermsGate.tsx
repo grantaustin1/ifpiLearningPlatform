@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Iter 30l — Global T&Cs acceptance gate.
  *
@@ -78,4 +79,8 @@ export function TermsGate() {
       </div>
     </div>
   )
+=======
+export function TermsGate() {
+  return null;
+>>>>>>> origin/main
 }
