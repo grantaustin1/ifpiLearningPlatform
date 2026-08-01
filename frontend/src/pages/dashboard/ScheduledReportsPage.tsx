@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Iter 30p — Scheduled Reports admin UI.
  *
@@ -187,4 +188,17 @@ export default function ScheduledReportsPage() {
       </section>
     </div>
   )
+=======
+import React from 'react';
+
+export default function ScheduledReportsPage() {
+  return (
+    <div className="p-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <h1 className="text-xl font-semibold text-slate-900">Scheduled Reports</h1>
+        <p className="text-slate-500 mt-2">Scheduled reports coming soon.</p>
+      </div>
+    </div>
+  );
+>>>>>>> origin/main
 }

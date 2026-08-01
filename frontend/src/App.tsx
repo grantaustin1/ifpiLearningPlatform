@@ -47,13 +47,20 @@ import EmailDiagnosticsPage from 'pages/dashboard/EmailDiagnosticsPage'
 import AffiliatePage from 'pages/dashboard/AffiliatePage'
 import LiveSessionsPage from 'pages/dashboard/LiveSessionsPage'
 import MarketplaceAnalyticsPage from 'pages/dashboard/MarketplaceAnalyticsPage'
+<<<<<<< HEAD
 import FeedbackAdminPage from 'pages/dashboard/FeedbackAdminPage'
+=======
+>>>>>>> origin/main
 import PreferencesPage from 'pages/dashboard/PreferencesPage'
 import Erp360IntegrationsPage from 'pages/dashboard/Erp360IntegrationsPage'
 import EntitlementsInspectorPage from 'pages/dashboard/EntitlementsInspectorPage'
 import WebhookDeliveriesPage from 'pages/dashboard/WebhookDeliveriesPage'
 import { TermsGate } from 'components/TermsGate'
 import { KioskShell } from 'components/KioskShell'
+<<<<<<< HEAD
+=======
+import { ErrorBoundary } from 'components/ErrorBoundary'
+>>>>>>> origin/main
 
 function Protected({ children, adminOnly = false }:
 { children: React.ReactNode; adminOnly?: boolean }) {
@@ -79,6 +86,7 @@ function FullPageSpinner() {
 
 export default function App() {
   return (
+<<<<<<< HEAD
     <KioskShell>
       <TermsGate />
       <Routes>
@@ -144,5 +152,73 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </KioskShell>
+=======
+    <ErrorBoundary>
+      <KioskShell>
+        <TermsGate />
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
+          <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/catalog/:id" element={<CourseDetailPage />} />
+          <Route path="/marketplace" element={<CatalogPage />} />
+          <Route path="/marketplace/:id" element={<CourseDetailPage />} />
+          <Route path="/verify/:code" element={<VerifyCertPage />} />
+          <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
+          <Route path="/a/:slug" element={<PortalPage />} />
+
+          <Route element={<Protected><DashboardLayout /></Protected>}>
+            <Route path="/dashboard" element={<Protected adminOnly><DashboardPage /></Protected>} />
+            <Route path="/courses" element={<CoursesPage />} />
+            <Route path="/courses/:id/edit" element={<Protected adminOnly><CourseEditPage /></Protected>} />
+            <Route path="/exams" element={<ExamsPage />} />
+            <Route path="/learning-paths" element={<LearningPathsPage />} />
+            <Route path="/learning-paths/:id/edit" element={<Protected adminOnly><LearningPathEditPage /></Protected>} />
+            <Route path="/certificates" element={<CertificatesPage />} />
+            <Route path="/admin/certificates" element={<Protected adminOnly><AdminCertificatesPage /></Protected>} />
+            <Route path="/users" element={<Protected adminOnly><UsersPage /></Protected>} />
+            <Route path="/reports" element={<Protected adminOnly><ReportsPage /></Protected>} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/outbox" element={<Protected adminOnly><OutboxPage /></Protected>} />
+            <Route path="/settings" element={<Protected adminOnly><OrganizationSettingsPage /></Protected>} />
+            <Route path="/academies" element={<Protected adminOnly><AcademiesPage /></Protected>} />
+            <Route path="/badge-tiers" element={<Protected adminOnly><BadgeTiersPage /></Protected>} />
+            <Route path="/audit" element={<Protected adminOnly><AuditLogPage /></Protected>} />
+            <Route path="/query-builder" element={<Protected adminOnly><QueryBuilderPage /></Protected>} />
+            <Route path="/scheduled-reports" element={<Protected adminOnly><ScheduledReportsPage /></Protected>} />
+            <Route path="/email-diagnostics" element={<Protected adminOnly><EmailDiagnosticsPage /></Protected>} />
+            <Route path="/affiliate" element={<Protected adminOnly><AffiliatePage /></Protected>} />
+            <Route path="/live-sessions" element={<LiveSessionsPage />} />
+            <Route path="/marketplace-analytics" element={<Protected adminOnly><MarketplaceAnalyticsPage /></Protected>} />
+            <Route path="/preferences" element={<PreferencesPage />} />
+            <Route path="/integrations/erp360" element={<Protected adminOnly><Erp360IntegrationsPage /></Protected>} />
+            <Route path="/entitlements" element={<Protected adminOnly><EntitlementsInspectorPage /></Protected>} />
+            <Route path="/webhooks/deliveries" element={<Protected adminOnly><WebhookDeliveriesPage /></Protected>} />
+            <Route path="/webhooks" element={<Protected adminOnly><WebhooksPage /></Protected>} />
+            <Route path="/imports" element={<Protected adminOnly><ImportsPage /></Protected>} />
+            <Route path="/tokens" element={<Protected adminOnly><ApiTokensPage /></Protected>} />
+            <Route path="/research" element={<Protected adminOnly><ResearchPage /></Protected>} />
+            <Route path="/courses/:courseId/flashcards" element={<Protected adminOnly><FlashcardsAuthoringPage /></Protected>} />
+            <Route path="/courses/:courseId/mindmap" element={<Protected adminOnly><MindMapPage /></Protected>} />
+          </Route>
+
+          <Route path="/public" element={<PublicCatalogPage />} />
+          <Route path="/verify" element={<PublicCatalogPage />} />
+          <Route path="/billing/success" element={<Protected><BillingSuccessPage /></Protected>} />
+          <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
+          <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
+          <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </KioskShell>
+    </ErrorBoundary>
+>>>>>>> origin/main
   )
 }

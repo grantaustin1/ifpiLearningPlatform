@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { Webhook, Plus, Trash2, Send, Eye, EyeOff, Copy, Check, AlertCircle, Activity } from 'lucide-react'
 import { toast } from 'sonner'
+<<<<<<< HEAD
 import { useConfirm } from 'components/ConfirmDialog'
+=======
+>>>>>>> origin/main
 
 interface Subscription {
   id: number
@@ -36,7 +39,10 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function WebhooksPage() {
+<<<<<<< HEAD
   const confirm = useConfirm()
+=======
+>>>>>>> origin/main
   const [subs, setSubs] = useState<Subscription[]>([])
   const [knownEvents, setKnownEvents] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -85,11 +91,15 @@ export default function WebhooksPage() {
   }
 
   const remove = async (id: number) => {
+<<<<<<< HEAD
     if (!(await confirm({
       title: 'Delete webhook subscription?',
       description: 'The subscription and all delivery history will be removed. External systems relying on it will stop receiving events.',
       confirmLabel: 'Delete', variant: 'danger',
     }))) return
+=======
+    if (!window.confirm('Delete this webhook subscription? Deliveries will be removed too.')) return
+>>>>>>> origin/main
     try {
       await api.delete(`/admin/webhooks/${id}`)
       toast.success('Subscription deleted')

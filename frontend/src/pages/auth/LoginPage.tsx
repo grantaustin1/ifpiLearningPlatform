@@ -7,7 +7,11 @@ import { toast } from 'sonner'
 
 export default function LoginPage() {
   const nav = useNavigate()
+<<<<<<< HEAD
   const { login, challenge2FA, ssoExchange } = useAuth()
+=======
+  const { login, ssoExchange } = useAuth()
+>>>>>>> origin/main
   const [params] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,10 +21,13 @@ export default function LoginPage() {
   const [ssoEnabled, setSsoEnabled] = useState(false)
   const [ssoInitiateUrl, setSsoInitiateUrl] = useState<string | null>(null)
   const [ssoExchanging, setSsoExchanging] = useState(false)
+<<<<<<< HEAD
   // Iter 30i — 2FA gate state. When the login response says
   // requires_2fa=true, we swap the password form for a TOTP code form.
   const [twoFA, setTwoFA] = useState<{ challengeId: string } | null>(null)
   const [twoFACode, setTwoFACode] = useState('')
+=======
+>>>>>>> origin/main
   const [brand, setBrand] = useState<{ name: string; logo_url: string | null; primary_color: string; accent_color: string }>({
     name: 'IFPI Learning', logo_url: null, primary_color: '#262262', accent_color: '#F5A500',
   })
@@ -37,9 +44,13 @@ export default function LoginPage() {
       .catch(() => { /* silent — fall back to defaults */ })
   }, [])
 
+<<<<<<< HEAD
   const backend = (import.meta as any).env?.VITE_API_URL
     || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
     || ''
+=======
+  const backend = process.env.REACT_APP_BACKEND_URL || ''
+>>>>>>> origin/main
   const resolvedLogo = brand.logo_url
     ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
     : null
@@ -76,6 +87,7 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('')
     try {
+<<<<<<< HEAD
       const outcome = await login(email, password)
       if (outcome.kind === 'requires_2fa') {
         setTwoFA({ challengeId: outcome.challengeId })
@@ -97,10 +109,18 @@ export default function LoginPage() {
       nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
     } catch (err: any) {
       setError(err?.response?.data?.error?.message || err?.response?.data?.detail || 'Invalid email or password')
+=======
+      const u = await login(email, password)
+      toast.success(`Welcome back, ${u.name || u.email}`)
+      nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Invalid email or password')
+>>>>>>> origin/main
       setLoading(false)
     }
   }
 
+<<<<<<< HEAD
   const onSubmit2FA = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('')
     if (!twoFA) return
@@ -121,6 +141,8 @@ export default function LoginPage() {
 
   const cancel2FA = () => { setTwoFA(null); setTwoFACode(''); setError('') }
 
+=======
+>>>>>>> origin/main
   const onSsoClick = () => {
     if (ssoInitiateUrl) {
       // Full redirect — ERP360 will bounce back with ?erp_token=…
@@ -218,6 +240,7 @@ export default function LoginPage() {
             </>
           )}
 
+<<<<<<< HEAD
           <form onSubmit={twoFA ? onSubmit2FA : onSubmit} className="space-y-4" data-testid="login-form">
             {!twoFA && (
               <>
@@ -266,10 +289,32 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+=======
+          <form onSubmit={onSubmit} className="space-y-4" data-testid="login-form">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Email</label>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com" autoComplete="email" data-testid="login-email"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Password</label>
+              <div className="relative">
+                <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" autoComplete="current-password" data-testid="login-password"
+                  className="w-full px-4 py-3 pr-11 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+>>>>>>> origin/main
             <button type="submit" disabled={loading} data-testid="login-submit"
               style={{ backgroundColor: brand.primary_color }}
               className="w-full flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 text-white font-semibold py-3 rounded-xl shadow-lg hover:-translate-y-0.5 transition-all">
               {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+<<<<<<< HEAD
                        : <>{twoFA ? 'Verify code' : 'Sign in'} <ArrowRight className="h-4 w-4" /></>}
             </button>
           </form>
@@ -284,6 +329,12 @@ export default function LoginPage() {
             </div>
           )}
 
+=======
+                       : <>Sign in <ArrowRight className="h-4 w-4" /></>}
+            </button>
+          </form>
+
+>>>>>>> origin/main
           <p className="text-center text-sm text-slate-500 mt-6">
             Don&apos;t have an account?{' '}
             <Link to="/register" style={{ color: brand.primary_color }}
@@ -295,6 +346,13 @@ export default function LoginPage() {
               <span>📚</span> Browse the public catalog · verify a certificate
             </Link>
           </div>
+<<<<<<< HEAD
+=======
+          <p className="text-center text-[11px] text-slate-400 mt-5">
+            Demo: <code className="bg-slate-100 px-1.5 py-0.5 rounded">admin@ifpi.org / admin123</code><br />
+            or <code className="bg-slate-100 px-1.5 py-0.5 rounded">learner@ifpi.org / learner123</code>
+          </p>
+>>>>>>> origin/main
         </div>
       </div>
     </div>

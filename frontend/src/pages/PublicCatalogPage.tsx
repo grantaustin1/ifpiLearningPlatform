@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'react-router-dom'
+<<<<<<< HEAD
 import axios from 'axios'
 import { BookOpen, CheckCircle2, XCircle, Search, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,6 +12,29 @@ interface Item { id: number; title: string; description?: string; category?: str
 interface Cert {
   code: string; type: string; issued_at: string | null; score: number | null;
   holder_name: string; course_title: string | null; organization_name: string | null;
+=======
+import axios, { AxiosError } from 'axios'
+import { BookOpen, CheckCircle2, XCircle, Search, ShieldCheck } from 'lucide-react'
+
+const API = process.env.REACT_APP_BACKEND_URL || ''
+
+interface Item {
+  id: number
+  title: string
+  description?: string
+  category?: string
+  duration_minutes?: number
+}
+
+interface Cert {
+  code: string
+  type: string
+  issued_at: string | null
+  score: number | null
+  holder_name: string
+  course_title: string | null
+  organization_name: string | null
+>>>>>>> origin/main
 }
 
 export default function PublicCatalogPage() {
@@ -55,13 +79,23 @@ function CatalogTab() {
   const load = async () => {
     setLoading(true); setError(null)
     try {
+<<<<<<< HEAD
       const headers: any = tokenInput ? { Authorization: `Bearer ${tokenInput}` } : {}
+=======
+      const headers: Record<string, string> = tokenInput ? { Authorization: `Bearer ${tokenInput}` } : {}
+>>>>>>> origin/main
       const r = await axios.get(`${API}/api/public/catalog`, {
         headers, params: q ? { q } : undefined,
       })
       setItems(r.data.items)
+<<<<<<< HEAD
     } catch (e: any) {
       setError(e?.response?.data?.detail || 'Load failed. You may need an API token with `read:catalog` scope.')
+=======
+    } catch (e) {
+      const detail = (e as AxiosError<{ detail?: string }>)?.response?.data?.detail
+      setError(detail || 'Load failed. You may need an API token with `read:catalog` scope.')
+>>>>>>> origin/main
     } finally { setLoading(false) }
   }
 
@@ -133,6 +167,7 @@ function VerifyTab() {
   const [cert, setCert] = useState<Cert | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState(false)
+<<<<<<< HEAD
   const prompt = usePrompt()
 
   const verify = async () => {
@@ -144,6 +179,20 @@ function VerifyTab() {
     } catch (e: any) {
       if (e?.response?.status === 404) setNotFound(true)
       else if (e?.response?.status === 429) toast.error('Too many verification attempts — please try again in a minute.')
+=======
+  const [rateLimitMsg, setRateLimitMsg] = useState<string | null>(null)
+
+  const verify = async () => {
+    if (!code.trim()) return
+    setBusy(true); setCert(null); setNotFound(false); setRateLimitMsg(null)
+    try {
+      const r = await axios.get(`${API}/api/public/certificates/verify/${encodeURIComponent(code.trim())}`)
+      setCert(r.data)
+    } catch (e) {
+      const status = (e as AxiosError)?.response?.status
+      if (status === 404) setNotFound(true)
+      else if (status === 429) setRateLimitMsg('Too many verification attempts — please try again in a minute.')
+>>>>>>> origin/main
     } finally { setBusy(false) }
   }
 
@@ -157,7 +206,11 @@ function VerifyTab() {
           <h2 className="font-semibold">Verify a certificate</h2>
         </div>
         <p className="text-xs text-slate-500">
+<<<<<<< HEAD
           Paste the certificate code (e.g. from a physical or PDF certificate) to confirm it's authentic.
+=======
+          Paste the certificate code (e.g. from a physical or PDF certificate) to confirm it&apos;s authentic.
+>>>>>>> origin/main
         </p>
         <div className="flex gap-2">
           <input value={code} onChange={e => setCode(e.target.value)}
@@ -171,6 +224,14 @@ function VerifyTab() {
             {busy ? 'Checking…' : 'Verify'}
           </button>
         </div>
+<<<<<<< HEAD
+=======
+        {rateLimitMsg && (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {rateLimitMsg}
+          </div>
+        )}
+>>>>>>> origin/main
       </div>
 
       {cert && (
@@ -199,6 +260,7 @@ function VerifyTab() {
             <button
               onClick={() => {
                 const url = `${window.location.origin}/verify/${encodeURIComponent(cert.code)}`
+<<<<<<< HEAD
                 const showManualCopy = () => prompt({
                   title: 'Copy this verify link',
                   description: 'Your browser blocked automatic copy. Select the text and copy it manually.',
@@ -214,6 +276,12 @@ function VerifyTab() {
                 } else {
                   showManualCopy()
                 }
+=======
+                navigator.clipboard?.writeText(url).then(
+                  () => window.alert(`Verify link copied:\n${url}`),
+                  () => window.prompt('Copy this link:', url),
+                )
+>>>>>>> origin/main
               }}
               data-testid="pub-cert-copy-link"
               className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg inline-flex items-center gap-2"
@@ -229,7 +297,11 @@ function VerifyTab() {
           <XCircle className="h-6 w-6 text-rose-600 flex-shrink-0" />
           <div>
             <h3 className="font-bold text-rose-800">Certificate not found</h3>
+<<<<<<< HEAD
             <p className="text-sm text-rose-700 mt-1">This code doesn't match any certificate we've issued. Double-check the code or contact IFPI.</p>
+=======
+            <p className="text-sm text-rose-700 mt-1">This code doesn&apos;t match any certificate we&apos;ve issued. Double-check the code or contact IFPI.</p>
+>>>>>>> origin/main
           </div>
         </div>
       )}

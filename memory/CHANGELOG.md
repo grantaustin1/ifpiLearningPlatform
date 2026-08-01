@@ -1,6 +1,7 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+<<<<<<< HEAD
 ## Iteration 45 — CI lockfile guard (2026-07-30)
 
 - Fixed the GitHub Actions `yarn install --frozen-lockfile` failure: removed
@@ -212,6 +213,8 @@ Guards against the class of bug that took down CI's agent 008 (Iter 39 fix earli
 **Total: 91/91 backend tests passing, 1 skipped.**
 
 
+=======
+>>>>>>> origin/main
 ## Iter 39 · Webhook Deliveries admin page (read-only) (2026-02-13)
 
 Small ops-visibility addition on top of the outbound dispatcher. Zero interactive complexity — read-only list, auto-refresh 15s, two filters.
@@ -2147,6 +2150,7 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - **Route naming**: `/bulk-revoke`, `/admin-list`, `/admin-export.csv` use single-segment paths to avoid FastAPI parsing `admin`/`bulk` as `{cert_id}` (int). Documented in code.
 - **Bulk-revoke reason input** intentionally uses `window.prompt()` (single text input; a full modal would be nice but out of scope). Not a `window.confirm` regression.
 - **Cwd-sensitive SQLite path** — `DATABASE_URL=sqlite:///./ifpi_lms.db` is relative. Always run pytest from `/app/backend`. Optional future hardening: absolute path.
+<<<<<<< HEAD
 
 ## 2026-07-31 — Blank preview screen fix
 - **Bug**: Preview URL rendered a blank white page in all browsers. Root cause:
@@ -2230,3 +2234,5 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - yarn --frozen-lockfile CI failure: workspace package.json+yarn.lock verified
   consistent via fresh-dir simulation (EXIT:0). GitHub repo copy is stale —
   user must push via Save to GitHub.
+=======
+>>>>>>> origin/main

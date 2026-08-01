@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { KeyRound, Plus, X, Copy, ShieldOff, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+<<<<<<< HEAD
 import { useConfirm } from 'components/ConfirmDialog'
+=======
+>>>>>>> origin/main
 
 interface Token {
   id: number
@@ -18,7 +21,10 @@ interface Token {
 const SCOPES = ['LEARNER', 'INSTRUCTOR', 'ADMIN', 'SUPER_ADMIN', 'read:catalog']
 
 export default function ApiTokensPage() {
+<<<<<<< HEAD
   const confirm = useConfirm()
+=======
+>>>>>>> origin/main
   const [tokens, setTokens] = useState<Token[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -35,23 +41,31 @@ export default function ApiTokensPage() {
   useEffect(() => { load() }, [])
 
   const revoke = async (id: number) => {
+<<<<<<< HEAD
     if (!(await confirm({
       title: 'Revoke this token?',
       description: 'Any external system using it will lose access immediately.',
       confirmLabel: 'Revoke',
       variant: 'danger',
     }))) return
+=======
+    if (!window.confirm('Revoke this token? Any external system using it will lose access immediately.')) return
+>>>>>>> origin/main
     await api.post(`/admin/api-tokens/${id}/revoke`)
     toast.success('Token revoked')
     load()
   }
   const remove = async (id: number) => {
+<<<<<<< HEAD
     if (!(await confirm({
       title: 'Delete token permanently?',
       description: 'This removes the token row from the database. Revoked tokens can still be re-activated — deleted ones cannot.',
       confirmLabel: 'Delete',
       variant: 'danger',
     }))) return
+=======
+    if (!window.confirm('Delete this token row permanently?')) return
+>>>>>>> origin/main
     await api.delete(`/admin/api-tokens/${id}`)
     toast.success('Token deleted')
     load()

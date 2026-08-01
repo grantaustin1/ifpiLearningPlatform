@@ -97,6 +97,30 @@ def _summarize_route(route) -> Tuple[str, str, str]:
     return verb, path, summary
 
 
+<<<<<<< HEAD
+=======
+def _collect_routes(router_or_app) -> List:
+    """Recursively collect all route objects from a FastAPI app or router.
+
+    FastAPI ≥ 0.139 stores included routers as ``_IncludedRouter``
+    wrappers rather than immediately flattening them into the parent's
+    ``routes`` list.  We unwrap those transparently so route introspection
+    works correctly regardless of FastAPI version.
+    """
+    from fastapi.routing import APIRoute
+    collected = []
+    for r in getattr(router_or_app, "routes", []):
+        if isinstance(r, APIRoute):
+            collected.append(r)
+        elif hasattr(r, "original_router"):
+            # FastAPI 0.139+ _IncludedRouter
+            collected.extend(_collect_routes(r.original_router))
+        elif hasattr(r, "routes"):
+            collected.extend(_collect_routes(r))
+    return collected
+
+
+>>>>>>> origin/main
 def _gen_api_routes() -> str:
     app = _load_app()
     if app is None:
@@ -104,7 +128,11 @@ def _gen_api_routes() -> str:
                 "|---|---|---|\n"
                 "| _(unable to introspect — run locally with the backend importable)_ | | |")
     rows: List[Tuple[str, str, str]] = []
+<<<<<<< HEAD
     for route in app.routes:
+=======
+    for route in _collect_routes(app):
+>>>>>>> origin/main
         path = getattr(route, "path", "") or ""
         if not path.startswith("/api"):
             continue
