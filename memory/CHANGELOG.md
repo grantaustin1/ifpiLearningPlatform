@@ -2207,3 +2207,16 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
   note was stale). UAT org opt-in verified False.
 - **Backlog note (user decision)**: Postgres cutover stays in backlog — NOT
   doing it now.
+
+## 2026-08-01 — Login page cleanup
+- Removed the "Demo: admin@ifpi.org / admin123" credentials hint from
+  LoginPage.tsx (confusing for UAT testers + security footgun for deploy).
+- Hid "Continue with ERP360" SSO button: SSO_ENABLED=false in backend/.env
+  AND disabled integrations.erp360.sso_enabled on 7 outbox-* test-debris
+  orgs (they were forcing /api/auth/sso-status enabled=true).
+- Fixed ifpi-main org logo_url (was test debris https://example.com/testing.png
+  → /api/uploads/files/ifpi_brand_logo.png).
+- Restocked UAT Sandbox (org 327) with the 3 fitness demo courses + covers
+  (previous UAT courses were deleted as test debris).
+- All verified via screenshots + curl. NOTE: deployed app will also hide the
+  demo hint; SSO button stays hidden until ERP360 is configured per-org.
