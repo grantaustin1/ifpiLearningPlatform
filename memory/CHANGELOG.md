@@ -2220,3 +2220,13 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
   (previous UAT courses were deleted as test debris).
 - All verified via screenshots + curl. NOTE: deployed app will also hide the
   demo hint; SSO button stays hidden until ERP360 is configured per-org.
+
+## 2026-08-01 — CI fixes (GitHub Actions)
+- Fixed 2 test files that crashed at import in CI (no pod env):
+  test_public_guides.py (raw open of /app/frontend/.env → try/except),
+  test_iteration41_guides_marketplace.py (module-level assert BASE_URL →
+  graceful fallback). conftest.py auto-skip now covers them. Verified via
+  simulated import with env removed + local run (12 passed).
+- yarn --frozen-lockfile CI failure: workspace package.json+yarn.lock verified
+  consistent via fresh-dir simulation (EXIT:0). GitHub repo copy is stale —
+  user must push via Save to GitHub.

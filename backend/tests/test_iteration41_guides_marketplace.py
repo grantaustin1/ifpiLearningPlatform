@@ -8,7 +8,14 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-assert BASE_URL, "REACT_APP_BACKEND_URL is required"
+if not BASE_URL:
+    try:
+        with open("/app/frontend/.env") as f:
+            for line in f:
+                if line.startswith("REACT_APP_BACKEND_URL="):
+                    BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+    except FileNotFoundError:
+        pass  # CI — conftest auto-skips the suite when no backend is reachable
 
 GUIDES_DIR = Path("/app/docs/guides")
 STUDENT_PDF = GUIDES_DIR / "IFPI_Student_User_Guide.pdf"
