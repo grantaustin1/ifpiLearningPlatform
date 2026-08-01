@@ -12,3 +12,17 @@ admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 billing_router = APIRouter(prefix="/api/billing", tags=["Billing"])
 catalog_router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 
+from . import (  # noqa: E402, F401
+    _admin_routes,
+    _ai_builder_routes,
+    _billing_routes,
+    _catalog_routes,
+    _cert_admin_routes,
+    _cert_export_routes,
+    _cert_lifecycle_routes,
+    _cert_verify_routes,
+    _enrollment_routes,
+    _gamification_routes,
+    _notification_routes,
+)
+
