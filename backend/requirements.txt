@@ -120,7 +120,7 @@ pydantic_core==2.46.4
 pyee==13.0.1
 pyflakes==3.4.0
 Pygments==2.20.0
-pyHanko==0.35.1
+pyHanko==0.36.2
 pyhanko-certvalidator==0.31.1
 PyJWT==2.13.0
 PyOTP==2.10.0
