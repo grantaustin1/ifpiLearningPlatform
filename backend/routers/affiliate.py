@@ -23,11 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-<<<<<<< HEAD
 from auth.dependencies import CurrentUser, get_current_user, requires_admin, requires_roles
-=======
-from auth.dependencies import CurrentUser, requires_admin, requires_roles
->>>>>>> origin/main
 from core.database import get_db
 from models import AffiliateCode, AffiliateReferral, Organization
 from services import audit_service
@@ -86,11 +82,7 @@ def _serialize_code(c: AffiliateCode) -> dict:
 @router.post("/api/admin/affiliate/codes")
 def create_code(body: CodeCreateIn, request: Request,
                 current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
                 db: Session = Depends(get_db)):
-=======
-                db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     code = (body.code or _generate_code(db)).upper()
     # Uniqueness check
     if db.query(AffiliateCode).filter(AffiliateCode.code == code).first():
@@ -114,11 +106,7 @@ def create_code(body: CodeCreateIn, request: Request,
 
 @router.get("/api/admin/affiliate/codes")
 def list_codes(current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
                db: Session = Depends(get_db)):
-=======
-               db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     rows = (db.query(AffiliateCode)
             .filter(AffiliateCode.organization_id == current.organization_id)
             .order_by(AffiliateCode.created_at.desc()).all())
@@ -128,11 +116,7 @@ def list_codes(current: CurrentUser = Depends(requires_admin()),
 @router.patch("/api/admin/affiliate/codes/{code_id}")
 def update_code(code_id: int, body: CodePatchIn, request: Request,
                 current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
                 db: Session = Depends(get_db)):
-=======
-                db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     row = db.query(AffiliateCode).filter(
         AffiliateCode.id == code_id,
         AffiliateCode.organization_id == current.organization_id).first()
@@ -156,11 +140,7 @@ def update_code(code_id: int, body: CodePatchIn, request: Request,
 
 @router.get("/api/admin/affiliate/referrals")
 def list_referrals(current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
                    db: Session = Depends(get_db)):
-=======
-                   db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     """Referrals attributed to codes I own."""
     q = (db.query(AffiliateReferral, AffiliateCode, Organization)
          .join(AffiliateCode, AffiliateCode.id == AffiliateReferral.code_id)
@@ -181,11 +161,7 @@ def list_referrals(current: CurrentUser = Depends(requires_admin()),
 
 @router.get("/api/admin/affiliate/earnings")
 def earnings(current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
              db: Session = Depends(get_db)):
-=======
-             db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     """Aggregate earnings by status. Cents-based to avoid float drift."""
     q = (db.query(AffiliateReferral.status,
                   func.count(AffiliateReferral.id).label("count"),
@@ -208,11 +184,7 @@ def earnings(current: CurrentUser = Depends(requires_admin()),
 
 
 @router.get("/api/affiliate/lookup/{code}")
-<<<<<<< HEAD
 def lookup(code: str, db: Session = Depends(get_db)):
-=======
-def lookup(code: str, db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     """Public — thin preview so signup forms can show
     'You're being referred by ACME Corp'. Does NOT return internal ids."""
     row = (db.query(AffiliateCode, Organization)
@@ -238,11 +210,7 @@ class MarkCreditedIn(BaseModel):
 @router.post("/api/admin/affiliate/referrals/{referral_id}/mark-credited")
 def mark_credited(referral_id: int, body: MarkCreditedIn, request: Request,
                   current: CurrentUser = Depends(requires_roles("SUPER_ADMIN")),
-<<<<<<< HEAD
                   db: Session = Depends(get_db)):
-=======
-                  db: Session = Depends(get_db)) -> dict:
->>>>>>> origin/main
     ref = db.query(AffiliateReferral).filter(
         AffiliateReferral.id == referral_id).first()
     if not ref:

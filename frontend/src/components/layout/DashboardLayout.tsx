@@ -4,16 +4,10 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-<<<<<<< HEAD
   GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 import { FeedbackWidget } from 'components/FeedbackWidget'
-=======
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search,
-} from 'lucide-react'
-import { cn } from 'lib/utils'
->>>>>>> origin/main
 
 const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
@@ -33,10 +27,7 @@ const ADMIN_NAV = [
   { href: '/query-builder', label: 'Query builder', icon: Database },
   { href: '/users',         label: 'Users',        icon: Users },
   { href: '/outbox',        label: 'Email Outbox', icon: Mail },
-<<<<<<< HEAD
   { href: '/feedback-admin', label: 'Feedback',    icon: MessageSquare },
-=======
->>>>>>> origin/main
   { href: '/billing',       label: 'Billing',      icon: CreditCard },
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
@@ -82,13 +73,9 @@ export default function DashboardLayout() {
     return () => window.clearInterval(id)
   }, [])
   const brandName = org.name || 'IFPI Learning'
-<<<<<<< HEAD
   const backend = (import.meta as any).env?.VITE_API_URL
     || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
     || ''
-=======
-  const backend = process.env.REACT_APP_BACKEND_URL || ''
->>>>>>> origin/main
   const resolvedLogo = org.logo_url
     ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
     : null
@@ -128,7 +115,6 @@ export default function DashboardLayout() {
               <span className="truncate">{item.label}</span>
             </NavLink>
           ))}
-<<<<<<< HEAD
           <a
             href={`${backend}/api/public/guides/${isAdmin ? 'IFPI_Admin_User_Guide.pdf' : 'IFPI_Student_User_Guide.pdf'}`}
             target="_blank" rel="noopener noreferrer"
@@ -138,8 +124,6 @@ export default function DashboardLayout() {
             <HelpCircle className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">Help &amp; guides</span>
           </a>
-=======
->>>>>>> origin/main
         </nav>
         <div className="border-t border-white/5 p-3">
           {streak && streak.current_streak > 0 && (
@@ -176,10 +160,7 @@ export default function DashboardLayout() {
       </aside>
       <main className="flex-1 overflow-y-auto bg-slate-50">
         <Outlet />
-<<<<<<< HEAD
         <FeedbackWidget />
-=======
->>>>>>> origin/main
       </main>
     </div>
   )

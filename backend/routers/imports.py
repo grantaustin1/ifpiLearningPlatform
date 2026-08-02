@@ -5,10 +5,7 @@ All endpoints require ADMIN / SUPER_ADMIN.
 """
 from __future__ import annotations
 
-<<<<<<< HEAD
 import json
-=======
->>>>>>> origin/main
 import logging
 import re
 import traceback
@@ -361,10 +358,7 @@ def run_import(body: ImportRunIn, background_tasks: BackgroundTasks,
 # 3) Drag-and-drop ZIP upload — extract into staging, then run import
 # ─────────────────────────────────────────────────────────────────────
 import shutil
-<<<<<<< HEAD
 import tempfile
-=======
->>>>>>> origin/main
 import zipfile
 
 # Hard cap on uploaded ZIP size (defensive — bigger trees should be SCP'd in)

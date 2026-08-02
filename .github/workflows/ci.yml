@@ -101,7 +101,6 @@ jobs:
             printf "$VIOL"
           fi
 
-<<<<<<< HEAD
   # ─── Endpoint signature lint ────────────────────────────────────
   # Catches ForwardRef leaks caused by decorators whose wrapper module
   # doesn't import the annotation's type. Introduced after CI Iter 39
@@ -125,8 +124,6 @@ jobs:
         working-directory: backend
         run: python scripts/lint_endpoint_signatures.py --check-decorators
 
-=======
->>>>>>> origin/main
   # ─── QA Agents: governance + infra (allow E2E to be optional) ──
   qa-agents:
     name: QA Agents (007 invariants + 010 infra)
@@ -180,11 +177,7 @@ jobs:
 
   # ─── Frontend lint + typecheck ─────────────────────────────────
   frontend:
-<<<<<<< HEAD
-    name: Frontend Lint + Build
-=======
     name: Frontend Typecheck + Build
->>>>>>> origin/main
     runs-on: ubuntu-latest
     needs: secret-scan
     steps:
@@ -194,10 +187,7 @@ jobs:
       - working-directory: frontend
         run: |
           yarn install --frozen-lockfile
-<<<<<<< HEAD
-=======
           yarn typecheck
->>>>>>> origin/main
           CI=true yarn build
 
 

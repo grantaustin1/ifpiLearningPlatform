@@ -29,10 +29,7 @@ this service is not consulted for them.
 from __future__ import annotations
 
 import logging
-<<<<<<< HEAD
 from typing import Optional
-=======
->>>>>>> origin/main
 
 from sqlalchemy.orm import Session
 

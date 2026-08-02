@@ -167,7 +167,6 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all,delete-orphan")
 
 
-<<<<<<< HEAD
 class CustomThemePreset(Base):
     """Org-defined theme preset (admin console → Settings → Branding).
 
@@ -191,8 +190,6 @@ class CustomThemePreset(Base):
     created_at = Column(DateTime, default=_utcnow)
 
 
-=======
->>>>>>> origin/main
 class UserRole(Base):
     __tablename__ = "user_roles"
     __table_args__ = (UniqueConstraint("user_id", "role", name="uq_user_role"),)

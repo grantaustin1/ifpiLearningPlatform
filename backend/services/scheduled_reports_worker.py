@@ -12,20 +12,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-<<<<<<< HEAD
 from typing import Callable, Optional
-=======
-from typing import Callable
->>>>>>> origin/main
 
 from sqlalchemy.orm import Session
 
 from models import (
-<<<<<<< HEAD
     Course, Enrollment, EnrollmentStatus, OutboxMessage, ScheduledReport, User,
-=======
-    Enrollment, EnrollmentStatus, OutboxMessage, ScheduledReport, User,
->>>>>>> origin/main
 )
 
 logger = logging.getLogger("ifpi.scheduled_reports")

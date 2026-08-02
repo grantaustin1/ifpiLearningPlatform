@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
@@ -399,17 +398,4 @@ function RevocationHistoryDrawer({ cert, onClose }: { cert: Row; onClose: () => 
       </div>
     </div>
   )
-=======
-import React from 'react';
-
-export default function AdminCertificatesPage() {
-  return (
-    <div className="p-6">
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Admin Certificates</h1>
-        <p className="text-slate-500 mt-2">Certificate administration coming soon.</p>
-      </div>
-    </div>
-  );
->>>>>>> origin/main
 }

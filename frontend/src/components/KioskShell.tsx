@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /**
  * Iter 30l — Kiosk-mode idle-lock wrapper.
  *
@@ -134,10 +133,4 @@ export function KioskShell({ children }: { children: React.ReactNode }) {
       )}
     </>
   )
-=======
-import React from 'react';
-
-export function KioskShell({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
->>>>>>> origin/main
 }

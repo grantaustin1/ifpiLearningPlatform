@@ -19,17 +19,11 @@ limiting lives in the ingress / CDN layer.
 """
 from __future__ import annotations
 
-<<<<<<< HEAD
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
-=======
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
->>>>>>> origin/main
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user
@@ -97,7 +91,6 @@ def _ratelimit(ip: str) -> None:
     )
 
 
-<<<<<<< HEAD
 # ─── Anonymous user-guide PDF downloads ──────────────────────────────
 _GUIDE_FILES = {
     "IFPI_Admin_User_Guide.pdf",
@@ -125,8 +118,6 @@ def download_user_guide(filename: str, request: Request):
     return FileResponse(path, media_type="application/pdf", filename=filename)
 
 
-=======
->>>>>>> origin/main
 # ─── Anonymous certificate verify ────────────────────────────────────
 @router.get("/certificates/verify/{code}")
 def verify_certificate(code: str, request: Request, db: Session = Depends(get_db)):

@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from 'lib/api'
-<<<<<<< HEAD
 import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy, FileText, ShieldCheck, ScrollText, Plus, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from 'components/ConfirmDialog'
@@ -14,13 +13,6 @@ const EMPTY_PRESET = {
   name: '', description: '', primary_color: '#6366f1', cert_accent_color: '#6366f1',
   cert_signature_text_suggestion: '', cert_footer_text_suggestion: '',
 }
-=======
-import { Save, Palette, Award, Building2, Eye, Upload, Sparkles, Check, Mail, Send, Trophy, FileText } from 'lucide-react'
-import { toast } from 'sonner'
-import { DocumentsTab } from './OrganizationDocumentsTab'
-
-type SettingsTab = 'branding' | 'documents'
->>>>>>> origin/main
 
 export default function OrganizationSettingsPage() {
   const [org, setOrg] = useState<any>(null)
@@ -29,7 +21,6 @@ export default function OrganizationSettingsPage() {
   const [previewing, setPreviewing] = useState(false)
   const [themes, setThemes] = useState<any[]>([])
   const [applyingTheme, setApplyingTheme] = useState<string | null>(null)
-<<<<<<< HEAD
   const [presetForm, setPresetForm] = useState<any>(null) // null = closed; {id?} = editing
   const [savingPreset, setSavingPreset] = useState(false)
   const [tab, setTab] = useState<SettingsTab>('branding')
@@ -71,17 +62,6 @@ export default function OrganizationSettingsPage() {
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Could not delete preset') }
   }
 
-=======
-  const [tab, setTab] = useState<SettingsTab>('branding')
-  const logoInputRef = useRef<HTMLInputElement>(null)
-  const sigInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    api.get('/organization').then(r => setOrg(r.data))
-    api.get('/organization/themes').then(r => setThemes(r.data)).catch(() => {})
-  }, [])
-
->>>>>>> origin/main
   const applyTheme = async (slug: string) => {
     setApplyingTheme(slug)
     try {
@@ -186,11 +166,8 @@ export default function OrganizationSettingsPage() {
         {([
           { key: 'branding', label: 'Branding & Certificates', icon: Palette },
           { key: 'documents', label: 'Documents', icon: FileText },
-<<<<<<< HEAD
           { key: 'security', label: 'Security', icon: ShieldCheck },
           { key: 'compliance', label: 'Terms & Kiosk', icon: ScrollText },
-=======
->>>>>>> origin/main
         ] as const).map(t => {
           const Icon = t.icon
           const active = tab === t.key
@@ -214,13 +191,10 @@ export default function OrganizationSettingsPage() {
 
       {tab === 'documents' ? (
         <DocumentsTab />
-<<<<<<< HEAD
       ) : tab === 'security' ? (
         <SecurityTab />
       ) : tab === 'compliance' ? (
         <ComplianceTab />
-=======
->>>>>>> origin/main
       ) : (
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
       <div className="xl:col-span-3">
@@ -259,7 +233,6 @@ export default function OrganizationSettingsPage() {
           )}
         </Section>
 
-<<<<<<< HEAD
         <Section icon={Sparkles} title="Theme presets" help="Hover for Preview / Apply. Preview renders the cert with the preset's colors WITHOUT saving. Apply persists. Create your own presets with New preset.">
           <div className="flex justify-end mb-2">
             <button type="button" onClick={() => setPresetForm({ ...EMPTY_PRESET })}
@@ -311,9 +284,6 @@ export default function OrganizationSettingsPage() {
               </div>
             </div>
           )}
-=======
-        <Section icon={Sparkles} title="Theme presets" help="Hover for Preview / Apply. Preview renders the cert with the preset's colors WITHOUT saving. Apply persists.">
->>>>>>> origin/main
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-testid="theme-presets-grid">
             {themes.map((t: any) => {
               const active = org.theme_preset === t.slug
@@ -327,11 +297,7 @@ export default function OrganizationSettingsPage() {
                     <span className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ background: t.cert_accent_color }} />
                   </div>
                   <div className="flex-1 min-w-0">
-<<<<<<< HEAD
                     <p className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">{t.name}{t.custom && <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-1.5 py-0.5">Custom</span>}{active && <Check className="h-3.5 w-3.5 text-indigo-600" />}</p>
-=======
-                    <p className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">{t.name}{active && <Check className="h-3.5 w-3.5 text-indigo-600" />}</p>
->>>>>>> origin/main
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{t.description}</p>
                     <div className="flex gap-2 mt-2">
                       <button type="button" onClick={() => previewPreset(t)}
@@ -344,7 +310,6 @@ export default function OrganizationSettingsPage() {
                         className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 disabled:text-slate-400 disabled:hover:bg-transparent px-2 py-1 rounded-md inline-flex items-center gap-1">
                         <Check className="h-3 w-3" /> {active ? 'Applied' : 'Apply'}
                       </button>
-<<<<<<< HEAD
                       {t.custom && (
                         <>
                           <button type="button" onClick={() => setPresetForm({ ...t })}
@@ -359,8 +324,6 @@ export default function OrganizationSettingsPage() {
                           </button>
                         </>
                       )}
-=======
->>>>>>> origin/main
                     </div>
                   </div>
                 </div>
@@ -397,10 +360,7 @@ export default function OrganizationSettingsPage() {
 
         <SmtpSection inputCls={inputCls} />
         <CohortSettingsSection inputCls={inputCls} />
-<<<<<<< HEAD
         <MarketplaceSection />
-=======
->>>>>>> origin/main
       </div>
 
       <aside className="xl:col-span-2 sticky top-6 self-start">
@@ -717,7 +677,6 @@ function CohortSettingsSection({ inputCls }: { inputCls: string }) {
     </Section>
   )
 }
-<<<<<<< HEAD
 
 
 
@@ -763,5 +722,3 @@ function MarketplaceSection() {
     </Section>
   )
 }
-=======
->>>>>>> origin/main

@@ -5,10 +5,7 @@ import { safeHtml } from 'lib/sanitize'
 import { ChevronLeft, ChevronRight, CheckCircle, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
-<<<<<<< HEAD
 import { AITutorPanel } from 'components/AITutorPanel'
-=======
->>>>>>> origin/main
 
 export default function LearnPage() {
   const { courseId } = useParams()
@@ -17,14 +14,11 @@ export default function LearnPage() {
   const [current, setCurrent] = useState(0)
   const [completed, setCompleted] = useState<Set<number>>(new Set())
   const [result, setResult] = useState<any>(null)
-<<<<<<< HEAD
   const [myRating, setMyRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [ratingBusy, setRatingBusy] = useState(false)
   const [reviewText, setReviewText] = useState('')
   const [reviewSaved, setReviewSaved] = useState(false)
-=======
->>>>>>> origin/main
   const [finishing, setFinishing] = useState(false)
 
   useEffect(() => {
@@ -36,7 +30,6 @@ export default function LearnPage() {
     })()
   }, [courseId])
 
-<<<<<<< HEAD
   const slide = course?.slides?.[current]
 
   // Iter 26 — Slide-view drop-off tracking. Fire once per (slide,
@@ -49,11 +42,6 @@ export default function LearnPage() {
 
   if (!course) return <div className="flex items-center justify-center h-screen"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
 
-=======
-  if (!course) return <div className="flex items-center justify-center h-screen"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
-
-  const slide = course.slides[current]
->>>>>>> origin/main
   const progress = course.slides.length ? (completed.size / course.slides.length) * 100 : 0
   const isLast = current === course.slides.length - 1
 
@@ -129,7 +117,6 @@ export default function LearnPage() {
                     <Star className="h-4 w-4" /> +{result.xp_earned} XP
                   </div>
                 )}
-<<<<<<< HEAD
                 <div className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4" data-testid="course-rating-block">
                   <p className="text-sm font-medium text-slate-700 mb-2">{myRating ? 'Thanks for rating this course!' : 'How was this course?'}</p>
                   <div className="flex items-center justify-center gap-1">
@@ -176,8 +163,6 @@ export default function LearnPage() {
                     <p className="mt-2 text-xs text-emerald-600 font-medium" data-testid="review-saved-note">Your review may appear on the course page.</p>
                   )}
                 </div>
-=======
->>>>>>> origin/main
                 <button onClick={() => nav('/certificates')} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium">View Certificate</button>
               </div>
             </div>
@@ -194,10 +179,7 @@ export default function LearnPage() {
           </div>
         )}
       </div>
-<<<<<<< HEAD
       <AITutorPanel courseId={course.id} />
-=======
->>>>>>> origin/main
     </div>
   )
 }

@@ -3,19 +3,13 @@ import { useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { CheckCircle2, XCircle, Award, Link as LinkIcon } from 'lucide-react'
 import { toast } from 'sonner'
-<<<<<<< HEAD
 import { usePrompt } from 'components/PromptDialog'
-=======
->>>>>>> origin/main
 
 export default function VerifyCertPage() {
   const { code } = useParams()
   const [cert, setCert] = useState<any>(null)
   const [error, setError] = useState('')
-<<<<<<< HEAD
   const prompt = usePrompt()
-=======
->>>>>>> origin/main
 
   useEffect(() => {
     // Prefer the rate-limited public endpoint (Iter 28) to protect against
@@ -41,7 +35,6 @@ export default function VerifyCertPage() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => toast.success('Verify link copied — share with recruiters'))
     } else {
-<<<<<<< HEAD
       // Fallback for older browsers — show the URL in an on-brand dialog
       // with pre-selected text so the user can Cmd/Ctrl+C manually.
       prompt({
@@ -51,9 +44,6 @@ export default function VerifyCertPage() {
         confirmLabel: 'Done',
         cancelLabel: 'Close',
       })
-=======
-      window.prompt('Copy this link:', url)
->>>>>>> origin/main
     }
   }
 

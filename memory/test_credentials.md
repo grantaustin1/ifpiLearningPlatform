@@ -2,7 +2,6 @@
 
 Both accounts live in the default "IFPI Main Academy" tenant (`organization_id=1`).
 
-<<<<<<< HEAD
 ## UAT Sandbox tenant (org `uat-sandbox`, created 2026-07-30)
 Isolated tenant for team UAT. See `/app/docs/UAT_TESTER_GUIDE.md`.
 - UAT Admin: `uat-admin@ifpi.org` / `UatAdmin!2026` (ADMIN, no forced password change, email pre-verified)
@@ -10,8 +9,6 @@ Isolated tenant for team UAT. See `/app/docs/UAT_TESTER_GUIDE.md`.
 - Setup script (idempotent): `python /app/backend/scripts/setup_uat.py`
 - Factory reset (restores pre-UAT DB snapshot): `bash /app/scripts/reset_uat.sh`
 
-=======
->>>>>>> origin/main
 ## Admin
 - Email: `admin@ifpi.org`
 - Password: `admin123`

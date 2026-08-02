@@ -30,11 +30,7 @@ from collections import OrderedDict
 from threading import Lock
 from typing import Any, Callable, Optional
 
-<<<<<<< HEAD
 from fastapi import Request, Response, BackgroundTasks  # noqa: F401 — see lint_endpoint_signatures
-=======
-from fastapi import Response
->>>>>>> origin/main
 from sqlalchemy.exc import OperationalError
 
 logger = logging.getLogger(__name__)

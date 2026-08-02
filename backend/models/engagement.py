@@ -11,7 +11,6 @@ from core.database import Base
 from ._common import _utcnow
 
 
-<<<<<<< HEAD
 class CourseRating(Base):
     """Learner star rating for a completed course (Iter 44)."""
     __tablename__ = "course_ratings"
@@ -42,8 +41,6 @@ class TesterFeedback(Base):
     created_at = Column(DateTime, default=_utcnow)
 
 
-=======
->>>>>>> origin/main
 class LiveSession(Base):
     """A scheduled cohort session hosted on an external meeting provider
     (Zoom/Meet/Teams — admin pastes the join URL). Learners RSVP, and

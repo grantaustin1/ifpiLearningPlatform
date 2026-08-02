@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useState } from 'react'
-=======
-import { useState, useEffect } from 'react'
->>>>>>> origin/main
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { Link2, ShieldCheck, ShieldOff, Save, Info } from 'lucide-react'
@@ -33,16 +29,9 @@ export default function Erp360IntegrationsPage() {
     queryKey: ['erp360-integration', orgId],
     queryFn: async () =>
       (await api.get(`/admin/organizations/${orgId}/integrations/erp360`)).data,
-<<<<<<< HEAD
     // Snapshot into local draft on first load
     onSuccess: (r) => { if (!draft) setDraft(r) },
   } as any)
-=======
-  })
-
-  // Snapshot into local draft on first load
-  useEffect(() => { if (data && !draft) setDraft(data) }, [data, draft])
->>>>>>> origin/main
 
   const saveMut = useMutation({
     mutationFn: async (patch: Partial<Integration>) =>
