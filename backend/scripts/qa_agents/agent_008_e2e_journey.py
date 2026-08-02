@@ -50,6 +50,19 @@ API = _api_url()
 LOG: list[dict] = []
 
 
+def _is_completion_status_ok(status_code: int, already_completed: bool) -> bool:
+    """Return whether a course-completion response status is expected.
+
+    200/201 are always OK. 422 is OK only when the course was already
+    marked complete (idempotent retry).
+    """
+    if status_code in (200, 201):
+        return True
+    if status_code == 422 and already_completed:
+        return True
+    return False
+
+
 def step(name: str, ok: bool, detail: str = "") -> None:
     LOG.append({"step": name, "ok": ok, "detail": detail})
     flag = "PASS" if ok else "FAIL"

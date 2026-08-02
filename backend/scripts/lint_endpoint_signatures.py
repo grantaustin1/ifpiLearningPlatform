@@ -87,7 +87,7 @@ def _check_decorator_modules() -> int:
             if py_file.name.startswith("_") or py_file.name.startswith("test_"):
                 continue
             try:
-                tree = ast.parse(py_file.read_text(), filename=str(py_file))
+                tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
             except SyntaxError:
                 continue
 

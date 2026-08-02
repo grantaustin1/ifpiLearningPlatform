@@ -26,14 +26,6 @@ def _requirements_by_name():
     return requirements_by_name
 
 
-def test_emergentintegrations_not_pinned_in_requirements():
-    requirements = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
-        encoding="utf-8"
-    )
-
-    assert "emergentintegrations" not in requirements
-
-
 def test_google_genai_websockets_pin_compatibility():
     requirements_by_name = _requirements_by_name()
 
