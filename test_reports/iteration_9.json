@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 9 verified end-to-end. Backend pytest /app/backend/tests/test_iteration9.py — 11/11 PASS (100%). agent_008_e2e_journey.py exits 0 with all 18 PASS steps (admin login, fixture course+exam present, bulk-invite with cohort=AGENT008, invitation accept, learner login + enrol, 5 slides marked complete, exam submitted with score 100.0, course marked complete, certificate issued, transcript PDF 2507 bytes, and agent_007 invariants still clean at the end). agent_007_invariants.py exits 0 with 'OK — all 9 invariants clean.' Alembic head is a9c2470b8e15, upgrade head idempotent, downgrade -1 + upgrade head succeeds. Cohort celebrations: prior AGENT008 audit row already exists (left over from iter 8 testing), so check_cohorts(db) is idempotent and returned 0 as expected; the test covers both the first-fire (audit + outbox queued + 2nd-call=0) and the already-celebrated (returns 0) branches. Frontend Playwright: /reports renders the new Cohort breakdown card between platform stats and Monthly Enrolments; dropdown shows 'All learners' + 'AGENT008 (3)' + 'PROP-TEST-1780932731 (1)'; selecting AGENT008 updates the 5 tiles to (3, 3, 100%, 100%, 3) with the Completion rate tile in indigo; selecting back to All learners restores (53, 6, 83.3%, 100%, 20). Regression: /audit, /certificates, /badge-tiers, /academies, /settings, /users all loaded with their h1 headers. Both admin@ifpi.org/admin123 and learner@ifpi.org/learner123 logged in successfully (learner lands on /courses which is expected — learner portal home).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9.py",
+    "/app/test_reports/pytest/iteration9_results.xml",
+    "/app/test_reports/agent_008.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/cohort_celebrations.py:69 — _already_celebrated uses `func.cast(audit_metadata, String).like('%\"threshold\": 75%')` to dedupe across DBs. Works on SQLite (TEXT) and Postgres (JSONB casts to text), but the LIKE substring will produce false positives if any other metadata value happens to contain the literal string 'threshold': 75. Low risk because target_type='cohort' + target_id=<cohort> already narrows it, but using `AuditLog.audit_metadata['threshold'].astext == str(threshold)` on Postgres would be safer. For SQLite-only this is fine.",
+    "services/cohort_celebrations.py:117 — the inner `_SystemActor` class has `id = None`. audit_service.record on most code paths sets `actor_id = actor.id`, which becomes NULL — verify the DB column allows null (the audit_logs table appears to since system events fire). The actor_email field will also be empty in the resulting audit row. Consider stamping actor_email='system@ifpi.cohort' so it's distinguishable from missing-actor bugs in the audit UI.",
+    "services/outbox_worker.py:140 — cohort_celebrations job runs every 60s with max_instances=1 + coalesce=True (good). However if check_cohorts() takes >60s on a tenant with thousands of cohorts the next tick is silently skipped. Recommend logging slow ticks (>30s) and adding a `misfire_grace_time` argument to the job for visibility.",
+    "scripts/qa_agents/agent_008_e2e_journey.py:69 — runs `seed.seed_minimal.run_if_empty()` at the start. This is a no-op if the DB has any users, so the test is safe to re-run, but if the seed file is altered while the DB is already partially seeded the assertions on course_id=1 / exam_id=1 will be misleading. Consider pinning by title (already done for course query, but ExamQuestion query relies on the fixed FK).",
+    "frontend/src/pages/dashboard/ReportsPage.tsx:19 — params include `cohort: cohort || undefined`; when cohort is empty string this correctly omits the param, but TanStack Query's queryKey includes the empty string ['cohort-stats', ''] which is fine. Just be aware switching back to 'All learners' refetches via a fresh key — works as intended.",
+    "frontend/src/pages/dashboard/ReportsPage.tsx — there's no loading / empty / error state on `cohortStats` (only render `&& cohortStats`). If the API errors silently the tiles vanish without explanation. Minor UX nit — fine for v1."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9.py (new — 11 tests for iteration 9 cohort widget, celebrations, alembic, logins)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 iter9 pytest + agent_007 9/9 invariants + agent_008 18/18 e2e steps + alembic head=a9c2470b8e15 + idempotency proven)",
+    "frontend": "100% of iteration-9 critical flows (cohort widget present, dropdown options correct, AGENT008 stats update + switch-back, 6 regression routes loaded, both admin + learner logins succeed)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123 (ADMIN + SUPER_ADMIN). learner@ifpi.org / learner123.",
+  "seed_data_creation": "agent_008 created one transient learner per run (agent008_<hex>@example.com) in cohort=AGENT008, enrolled them on IFPI Fundamentals, completed all 5 slides, scored 100 on the exam, issued a cert and downloaded the transcript. The COHORT_MILESTONE_REACHED audit row for AGENT008 was created by the prior iteration's test run and persists; it is the dedupe key that makes check_cohorts() idempotent on subsequent invocations.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iteration9.py tests/test_iteration8.py tests/test_iteration7.py -v. To test cohort celebrations' first-fire branch from scratch: DELETE FROM audit_logs WHERE action='COHORT_MILESTONE_REACHED' AND target_id='AGENT008' against /app/backend/ifpi_lms.db, then call services.cohort_celebrations.check_cohorts(db) — it must return ≥1 the first time, insert exactly one audit row, queue outbox messages with template='cohort_milestone' for each admin in org_id=1, and return 0 on the next call. agent_008 is now CI-safe and idempotent — repeated runs leave only one transient learner per execution and never duplicate certificates or audit rows. IP rate-limit hint from iter 8 holds: space the two logins ≥1s apart (the test fixtures sleep 1.2s between them).",
+  "rca_of_the_issue": "N/A — no bugs found this iteration."
+}

@@ -1,0 +1,33 @@
+{
+  "summary": "Full backend + frontend regression for Iter 47 (shareable course links + written rating reviews). All 10 backend pytest cases pass and every frontend flow (learner rating+review, catalog detail avg-rating + reviews section + share button, marketplace card share icon, dashboard /courses share menu with public+in-app options, admin moderation panel Hide/Unhide toggle with public-visibility sync) verified end-to-end against the live preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "LearnPage /learn/{id}", "issues": ["AI Tutor drawer is open by default and overlaps the bottom-right 'Complete' button at viewport widths <= 1440px, so learners on laptop-class screens may not be able to click Complete without first closing the drawer. At 1920px viewport the button has room and clicks land. Consider auto-closing / collapsing the tutor drawer on mount or reserving right-column space so the action row is never occluded."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration47_reviews_share.py",
+    "/app/test_reports/pytest/iter47_results.xml"
+  ],
+  "action_items": [
+    "(low) LearnPage: prevent AI Tutor drawer from occluding the 'Complete' next-slide-btn on <=1440px viewports.",
+    "(pre-existing, unrelated) DELETE /api/courses/{id} returns 500 with SQLAlchemy 'DELETE FROM course_slides' foreign-key error — cascade on slide deletion is broken. Left test courses 227 & 228 in UAT tenant for nightly cleanup because delete cannot succeed via API."
+  ],
+  "critical_code_review_comments": [
+    "rate_course upsert semantics (courses.py:159-187) correctly preserve prior comment when the request omits the 'comment' key (verified by test_repost_rating_only_preserves_comment). Good use of `if \"comment\" in body` rather than truthy check.",
+    "catalog_reviews (misc.py:1273-1307) correctly filters CourseRating.hidden_at.is_(None) and non-empty comments, and orders by rating desc then created_at desc. Anonymisation ('First L.') implemented.",
+    "toggle_review_hidden (courses.py:229-247) enforces org scoping via the join on Course.organization_id. Good.",
+    "GET /api/courses/{id}/reviews (admin) returns full 'reviewer_name' (email fallback) — leaks PII to admin/instructor which is intended for moderation. OK for this role, but ensure the response is never proxied to non-admin UI code."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration47_reviews_share.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all Iter 47 selectors and flows verified)"},
+  "test_credentials": "UAT admin uat-admin@ifpi.org / UatAdmin!2026, UAT learner uat-learner@ifpi.org / UatLearner!2026 used throughout.",
+  "seed_data_creation": "Set organizations.id=327 (UAT Sandbox) marketplace_opt_in=True (was False) so its published courses surface on the public /api/catalog. Two throwaway courses (ids 227 & 228, TEST_ prefixed) created for UI verification remain in DB — API DELETE fails with the unrelated cascade bug; nightly cleanup will remove them. Rating id 4 exists on course 227 (5-star, comment 'Excellent hands-on content, highly recommended!') and was left in un-hidden state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reusable pytest file: /app/backend/tests/test_iteration47_reviews_share.py (10 tests, 3 test classes). Uses UAT tenant. Requires UAT org marketplace_opt_in=True (currently ON). Frontend Playwright tip: at viewport 1440x900 the AI Tutor drawer overlaps the bottom next-slide-btn on LearnPage — use 1920 wide or click via evaluate(). Toast selector: '[data-sonner-toast]'.",
+  "rca of the issue": "N/A — no Iter 47 bugs found. The single design nit (AI Tutor drawer overlap) is pre-existing and orthogonal to the shipped feature."
+}

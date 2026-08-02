@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
+<<<<<<< HEAD
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+=======
 import { Link, useNavigate } from 'react-router-dom'
+>>>>>>> origin/main
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import { GraduationCap } from 'lucide-react'
@@ -7,6 +11,10 @@ import { toast } from 'sonner'
 
 export default function RegisterPage() {
   const nav = useNavigate()
+<<<<<<< HEAD
+  const [params] = useSearchParams()
+=======
+>>>>>>> origin/main
   const { register } = useAuth()
   const [name, setName] = useState(''); const [email, setEmail] = useState('')
   const [password, setPassword] = useState(''); const [loading, setLoading] = useState(false)
@@ -26,7 +34,12 @@ export default function RegisterPage() {
       .catch(() => {})
   }, [])
 
+<<<<<<< HEAD
+  const backend = (import.meta as any).env?.VITE_API_URL
+    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL) || ''
+=======
   const backend = process.env.REACT_APP_BACKEND_URL || ''
+>>>>>>> origin/main
   const resolvedLogo = brand.logo_url
     ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
     : null
@@ -36,7 +49,20 @@ export default function RegisterPage() {
     try {
       await register(email, password, name)
       toast.success('Welcome to IFPI Learning!')
+<<<<<<< HEAD
+      // Honor ?next=... so marketplace signup handoff works
+      // (auto_enroll flag is picked up by CourseDetailPage after auth)
+      const next = params.get('next')
+      const autoEnroll = params.get('auto_enroll')
+      if (next) {
+        const suffix = autoEnroll ? (next.includes('?') ? `&auto_enroll=${autoEnroll}` : `?auto_enroll=${autoEnroll}`) : ''
+        nav(`${next}${suffix}`)
+      } else {
+        nav('/courses')
+      }
+=======
       nav('/courses')
+>>>>>>> origin/main
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Registration failed')
       setLoading(false)

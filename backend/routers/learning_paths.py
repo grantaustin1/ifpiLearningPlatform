@@ -1,0 +1,285 @@
+"""Learning Paths router — group ordered courses with prerequisites.
+
+Public endpoints (any authenticated user):
+  GET    /api/learning-paths             list (LEARNERs see only PUBLISHED)
+  GET    /api/learning-paths/{id}        detail with items
+  POST   /api/learning-paths/{id}/enroll enrol in path
+
+Admin endpoints (INSTRUCTOR/ADMIN):
+  POST   /api/learning-paths              create
+  PATCH  /api/learning-paths/{id}         update
+  DELETE /api/learning-paths/{id}         delete
+  POST   /api/learning-paths/{id}/items   add course to path
+  DELETE /api/learning-paths/{id}/items/{course_id} remove
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
+from auth.dependencies import CurrentUser, get_current_user, requires_roles
+from core.database import get_db
+from core.role_registry import INSTRUCTOR_ROLES
+from models import (
+    Course, Enrollment, EnrollmentStatus, LearningPath, LearningPathEnrollment,
+    LearningPathItem, LearningPathStatus,
+)
+
+router = APIRouter(prefix="/api/learning-paths", tags=["Learning Paths"])
+
+
+# ── Schemas ──────────────────────────────────────────────────────────
+class PathCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    cover_color: str = "bg-violet-500"
+    estimated_hours: Optional[int] = None
+    price_cents: int = 0
+    currency: str = "ZAR"
+
+
+class PathUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    cover_color: Optional[str] = None
+    estimated_hours: Optional[int] = None
+    price_cents: Optional[int] = None
+    status: Optional[str] = None
+
+
+class PathItemIn(BaseModel):
+    course_id: int
+    order_index: Optional[int] = None
+    is_required: bool = True
+
+
+class PathItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    course_id: int
+    course_title: str
+    course_status: str
+    order_index: int
+    is_required: bool
+
+
+class PathSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+    description: Optional[str]
+    cover_color: str
+    status: str
+    estimated_hours: Optional[int]
+    price_cents: int
+    currency: str
+    course_count: int
+    enrollment_count: int
+
+
+class PathDetail(PathSummary):
+    items: List[PathItemOut]
+    user_progress: float = 0.0
+    user_status: Optional[str] = None
+
+
+def _can_manage(user: CurrentUser) -> bool:
+    return user.has_any_role(INSTRUCTOR_ROLES)
+
+
+def _summary(p: LearningPath) -> PathSummary:
+    return PathSummary(
+        id=p.id, title=p.title, description=p.description,
+        cover_color=p.cover_color, status=p.status.value,
+        estimated_hours=p.estimated_hours, price_cents=p.price_cents,
+        currency=p.currency, course_count=len(p.items),
+        enrollment_count=len(p.enrollments),
+    )
+
+
+def _detail(p: LearningPath, user_id: int) -> PathDetail:
+    items = [PathItemOut(
+        id=i.id, course_id=i.course_id, course_title=i.course.title,
+        course_status=i.course.status.value, order_index=i.order_index,
+        is_required=i.is_required,
+    ) for i in p.items]
+    # Compute progress for this user
+    enrollment_row = next((e for e in p.enrollments if e.user_id == user_id), None)
+    return PathDetail(
+        **_summary(p).model_dump(),
+        items=items,
+        user_progress=enrollment_row.progress if enrollment_row else 0.0,
+        user_status=enrollment_row.status.value if enrollment_row else None,
+    )
+
+
+# ── Routes ───────────────────────────────────────────────────────────
+@router.get("", response_model=List[PathSummary])
+def list_paths(db: Session = Depends(get_db),
+               current: CurrentUser = Depends(get_current_user)):
+    q = db.query(LearningPath).filter(LearningPath.organization_id == current.organization_id)
+    if not _can_manage(current):
+        q = q.filter(LearningPath.status == LearningPathStatus.PUBLISHED)
+    return [_summary(p) for p in q.order_by(LearningPath.created_at.desc()).all()]
+
+
+@router.post("", response_model=PathDetail)
+def create_path(body: PathCreate, db: Session = Depends(get_db),
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    p = LearningPath(
+        organization_id=current.organization_id, title=body.title,
+        description=body.description, cover_color=body.cover_color,
+        estimated_hours=body.estimated_hours, price_cents=body.price_cents,
+        currency=body.currency, created_by_id=current.id,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return _detail(p, current.id)
+
+
+@router.get("/{path_id}", response_model=PathDetail)
+def get_path(path_id: int, db: Session = Depends(get_db),
+             current: CurrentUser = Depends(get_current_user)):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    if p.status != LearningPathStatus.PUBLISHED and not _can_manage(current):
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    return _detail(p, current.id)
+
+
+@router.patch("/{path_id}", response_model=PathDetail)
+def update_path(path_id: int, body: PathUpdate, db: Session = Depends(get_db),
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    data = body.model_dump(exclude_unset=True)
+    if "status" in data and data["status"] in LearningPathStatus.__members__:
+        p.status = LearningPathStatus(data.pop("status"))
+    for k, v in data.items():
+        setattr(p, k, v)
+    db.commit()
+    db.refresh(p)
+    return _detail(p, current.id)
+
+
+@router.delete("/{path_id}")
+def delete_path(path_id: int, db: Session = Depends(get_db),
+                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    db.delete(p)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{path_id}/items", response_model=PathItemOut)
+def add_item(path_id: int, body: PathItemIn, db: Session = Depends(get_db),
+             current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    course = db.query(Course).filter(
+        Course.id == body.course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    existing = db.query(LearningPathItem).filter(
+        LearningPathItem.path_id == path_id,
+        LearningPathItem.course_id == body.course_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Course already in this path")
+    order = body.order_index if body.order_index is not None else (len(p.items) + 1)
+    item = LearningPathItem(
+        path_id=path_id, course_id=body.course_id,
+        order_index=order, is_required=body.is_required,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return PathItemOut(
+        id=item.id, course_id=item.course_id, course_title=course.title,
+        course_status=course.status.value, order_index=item.order_index,
+        is_required=item.is_required,
+    )
+
+
+@router.delete("/{path_id}/items/{course_id}")
+def remove_item(path_id: int, course_id: int, db: Session = Depends(get_db),
+                current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    item = db.query(LearningPathItem).join(LearningPath).filter(
+        LearningPathItem.path_id == path_id,
+        LearningPathItem.course_id == course_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{path_id}/enroll")
+def enroll_in_path(path_id: int, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(get_current_user)):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+        LearningPath.status == LearningPathStatus.PUBLISHED,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    existing = db.query(LearningPathEnrollment).filter(
+        LearningPathEnrollment.user_id == current.id,
+        LearningPathEnrollment.path_id == path_id,
+    ).first()
+    if existing:
+        return {"ok": True, "already": True}
+    db.add(LearningPathEnrollment(user_id=current.id, path_id=path_id))
+    # Also enrol them in each of the path's courses (idempotent)
+    for it in p.items:
+        ex = db.query(Enrollment).filter(
+            Enrollment.user_id == current.id, Enrollment.course_id == it.course_id,
+        ).first()
+        if not ex:
+            db.add(Enrollment(user_id=current.id, course_id=it.course_id))
+    db.commit()
+    return {"ok": True, "already": False, "courses_enrolled": len(p.items)}
+
+
+# ── Publish workflow (validates the path has at least one course) ─────
+@router.post("/{path_id}/publish")
+def publish_path(path_id: int, db: Session = Depends(get_db),
+                 current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    p = db.query(LearningPath).filter(
+        LearningPath.id == path_id,
+        LearningPath.organization_id == current.organization_id,
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    if len(p.items) == 0:
+        raise HTTPException(status_code=400, detail="Add at least one course before publishing")
+    p.status = LearningPathStatus.PUBLISHED
+    p.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True, "status": p.status.value}

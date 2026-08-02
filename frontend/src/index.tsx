@@ -5,6 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
+<<<<<<< HEAD
+import { ConfirmDialogProvider } from './components/ConfirmDialog'
+import { PromptDialogProvider } from './components/PromptDialog'
+=======
+>>>>>>> origin/main
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -16,8 +21,17 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+<<<<<<< HEAD
+          <ConfirmDialogProvider>
+            <PromptDialogProvider>
+              <App />
+              <Toaster position="bottom-right" richColors closeButton />
+            </PromptDialogProvider>
+          </ConfirmDialogProvider>
+=======
           <App />
           <Toaster position="bottom-right" richColors closeButton />
+>>>>>>> origin/main
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

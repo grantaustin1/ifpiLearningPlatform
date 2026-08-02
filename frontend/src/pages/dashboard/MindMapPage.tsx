@@ -7,6 +7,10 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { api } from 'lib/api'
+<<<<<<< HEAD
+import { useConfirm } from 'components/ConfirmDialog'
+=======
+>>>>>>> origin/main
 import { ArrowLeft, Sparkles, Loader2, RefreshCw, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -65,6 +69,10 @@ function buildGraph(map: Mindmap, positions: Positions): { nodes: Node[]; edges:
 }
 
 export default function MindMapPage() {
+<<<<<<< HEAD
+  const confirm = useConfirm()
+=======
+>>>>>>> origin/main
   const { courseId } = useParams()
   const nav = useNavigate()
   const cid = Number(courseId)
@@ -164,7 +172,16 @@ export default function MindMapPage() {
   }
 
   const clearSaved = async () => {
+<<<<<<< HEAD
+    if (!(await confirm({
+      title: 'Clear saved layout?',
+      description: 'The next visit will regenerate the mind-map from scratch — you\u2019ll lose any manual repositioning.',
+      confirmLabel: 'Clear',
+      variant: 'danger',
+    }))) return
+=======
     if (!window.confirm('Clear the saved layout? The next visit will regenerate from scratch.')) return
+>>>>>>> origin/main
     await api.delete(`/authoring/mindmap/${cid}/layout`)
     setHasSaved(false)
     toast.success('Saved layout cleared')

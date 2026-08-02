@@ -5,6 +5,9 @@ credentials.json
 *.pem
 *.key
 .credentials
+<<<<<<< HEAD
+backend/snapshots/
+=======
 
 # Python cache
 __pycache__/
@@ -43,3 +46,4 @@ build/
 backend/uploads/
 frontend/build/
 frontend/node_modules/.cache/
+>>>>>>> origin/main

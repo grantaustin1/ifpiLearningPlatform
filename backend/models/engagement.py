@@ -11,6 +11,39 @@ from core.database import Base
 from ._common import _utcnow
 
 
+<<<<<<< HEAD
+class CourseRating(Base):
+    """Learner star rating for a completed course (Iter 44)."""
+    __tablename__ = "course_ratings"
+    __table_args__ = (
+        UniqueConstraint("course_id", "user_id", name="uq_course_rating_user"),
+    )
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)  # 1..5
+    comment = Column(Text)
+    hidden_at = Column(DateTime, nullable=True)  # Iter 47 — admin moderation
+    reply_text = Column(Text)                    # Iter 48 — academy reply
+    reply_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class TesterFeedback(Base):
+    """In-app feedback widget submissions (Iter 44 — UAT + beyond)."""
+    __tablename__ = "tester_feedback"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    page = Column(String(300))
+    category = Column(String(30), default="BUG")  # BUG | IDEA | OTHER
+    message = Column(Text, nullable=False)
+    status = Column(String(20), default="NEW", nullable=False)  # NEW | REVIEWED
+    created_at = Column(DateTime, default=_utcnow)
+
+
+=======
+>>>>>>> origin/main
 class LiveSession(Base):
     """A scheduled cohort session hosted on an external meeting provider
     (Zoom/Meet/Teams — admin pastes the join URL). Learners RSVP, and

@@ -64,6 +64,8 @@ def test_docs_have_no_drift():
     )
 
 
+<<<<<<< HEAD
+=======
 def _collect_routes(router_or_app):
     """Recursively collect all route objects.
 
@@ -83,6 +85,7 @@ def _collect_routes(router_or_app):
     return collected
 
 
+>>>>>>> origin/main
 def test_every_api_route_mentioned_in_a_manual():
     """New routes must at least appear somewhere in a manual.
 
@@ -102,7 +105,11 @@ def test_every_api_route_mentioned_in_a_manual():
             combined += p.read_text(encoding="utf-8") + "\n"
 
     missing = []
+<<<<<<< HEAD
+    for route in app.routes:
+=======
     for route in _collect_routes(app):
+>>>>>>> origin/main
         path = getattr(route, "path", "") or ""
         if not path.startswith("/api"):
             continue

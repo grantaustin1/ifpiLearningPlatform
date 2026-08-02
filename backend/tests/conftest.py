@@ -103,7 +103,11 @@ def pytest_collection_modifyitems(config, items):
 # ─────────────────────────────────────────────────────────────────
 
 
+<<<<<<< HEAD
+def authed_session(email: str, password: str, base_url: str = ""):
+=======
 def authed_session(email: str, password: str, base_url: str = "") -> "requests.Session":
+>>>>>>> origin/main
     """Log in and return a cookie-authenticated `requests.Session`.
 
     Uses ONLY the HttpOnly session cookie + CSRF cookie/header pair —

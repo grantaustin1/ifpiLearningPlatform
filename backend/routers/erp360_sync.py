@@ -23,7 +23,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_admin
+<<<<<<< HEAD
+=======
 from core.config import settings
+>>>>>>> origin/main
 from core.database import get_db, SessionLocal
 from models import AuditLog, Erp360SeenEvent, Organization, User, UserRole
 from services.db_locks import advisory_lock, retry_on_deadlock
@@ -43,6 +46,12 @@ _TIMESTAMP_SKEW_SECONDS = int(os.environ.get("ERP360_TIMESTAMP_SKEW_SECONDS", "3
 
 
 def _shared_secret() -> Optional[str]:
+<<<<<<< HEAD
+    return (
+        os.environ.get("IFPI_WEBHOOK_OUTBOUND_SECRET")
+        or os.environ.get("ERP360_WEBHOOK_OUTBOUND_SECRET")
+    )
+=======
     """Return the configured outbound webhook secret.
 
     Uses the unified settings property which reads IFPI_WEBHOOK_OUTBOUND_SECRET
@@ -50,6 +59,7 @@ def _shared_secret() -> Optional[str]:
     settings field as fallback.
     """
     return settings.webhook_outbound_secret or None
+>>>>>>> origin/main
 
 
 def _verify_signature(raw: bytes, header_value: Optional[str]) -> None:
@@ -397,7 +407,11 @@ def erp360_sync_status(response: Response) -> dict:
     without recomputing env-var lookups + timestamps on every hit.
     """
     secret_configured = bool(_shared_secret())
+<<<<<<< HEAD
+    sso_configured = bool(os.environ.get("ERP360_SSO_SHARED_SECRET"))
+=======
     sso_configured = bool(settings.erp360_sso_shared_secret)
+>>>>>>> origin/main
     return {
         "sso": sso_configured,
         "webhook_outbound_healthy": secret_configured,
@@ -427,4 +441,8 @@ def erp360_sync_test_ping(
             "Inbound surface reachable. Full outbound-webhook dispatch "
             "will be wired in P1 (ERP360-side handoff item 4)."
         ),
+<<<<<<< HEAD
     }
+=======
+    }
+>>>>>>> origin/main

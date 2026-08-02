@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 41 verified: (1) sidebar Help link renders with correct role-aware href for both admin (IFPI_Admin_User_Guide.pdf) and learner (IFPI_Student_User_Guide.pdf), target=_blank, data-testid=sidebar-help-link present. (2) guide auto-rebuild works: touching STUDENT_USER_GUIDE.md causes the next GET to rebuild the PDF (mtime advanced), and a subsequent GET is idempotent (mtime unchanged). (3) anonymous /api/public/guides/*.pdf returns 200 application/pdf with %PDF magic. (4) /api/catalog contains 'IFPI Fundamentals' and no debris (Stripe Test/Ent Inspect/Entitlement Test/Paid E2E/TEST_/Nelson PLC). (5) services.test_debris_cleanup.tick(db, dry_run=True) runs cleanly and its stats include the new 'marketplace_optouts' key. (6) /catalog public page renders the fitness hero and only 'IFPI Fundamentals' cards (featured + all-courses). All 7 pytest cases pass; all frontend UI assertions pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration41_guides_marketplace.py",
+    "/app/test_reports/pytest/iter41_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "guide_builder.ensure_fresh graceful degradation is correct: if a rebuild fails and a stale PDF exists, it still serves the stale PDF - good resilience.",
+    "test_debris_cleanup.tick returns stats dict with 'marketplace_optouts' key; TEST_ORG_SLUG_PATTERNS is scoped to slug prefixes only (factory-org-%, test-acad-% etc.) so real academies (e.g. IFPI Main Academy) can never be opted out - safe.",
+    "DashboardLayout renders href as '${backend}/api/public/guides/...' but observed href is relative '/api/public/guides/...' in the DOM (backend var likely empty in dev proxy). Still ends with the expected suffix so the assertion passes and the link works through ingress; consider whether that variable should always be present (minor)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration41_guides_marketplace.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all critical assertions pass)"},
+  "test_credentials": "UAT admin/learner used as specified. IFPI Fundamentals preserved (not modified).",
+  "seed_data_creation": "none - only touched STUDENT_USER_GUIDE.md mtime (self-healing per spec)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New regression file at /app/backend/tests/test_iteration41_guides_marketplace.py covers: guides download + auto-rebuild idempotence + /api/catalog cleanliness + tick(dry_run=True) marketplace_optouts key. Uses X-Test-Client-Ip header to sidestep the anonymous guide rate limiter. Frontend catalog currently returns only IFPI Fundamentals (single real course), which is expected after the debris purge.",
+  "rca of the issue": "n/a - all features working as specified"
+}

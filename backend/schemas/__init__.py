@@ -132,6 +132,10 @@ class CourseUpdate(BaseModel):
     currency: Optional[str] = None
     status: Optional[str] = None
     cover_color: Optional[str] = None
+<<<<<<< HEAD
+    cover_image: Optional[str] = None
+=======
+>>>>>>> origin/main
 
 
 class CourseSummary(BaseModel):
@@ -141,6 +145,11 @@ class CourseSummary(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     cover_color: str
+<<<<<<< HEAD
+    cover_image: Optional[str] = None
+    is_featured: bool = False
+=======
+>>>>>>> origin/main
     status: str
     duration_minutes: Optional[int] = None
     price_cents: int = 0

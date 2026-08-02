@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 6 testing complete. Backend pytest /app/backend/tests/test_iteration6.py — 11/11 PASS (100%). Iteration 5 regression suite — 20/20 PASS. Frontend Playwright verified: theme presets section on /settings (5 cards, Conservatoire apply → toast 'Applied \"Conservatoire\" theme' + color pickers update to #7f1d1d/#b45309 + active border+checkmark, IFPI Classic restores #6366f1/#6366f1), /courses Reorder toggle → Done flow, /academies search/status/sort/Clear controls (search 'ifpi' makes Clear button visible, two dropdowns present), and smoke tests on /dashboard, /courses, /certificates, /outbox, /reports, /leaderboard, /users, /learning-paths, /a/ifpi-main, /learn/1 — all load without runtime errors. ERP360_INTEGRATION.md doc file confirmed present at /app/docs/.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration6.py",
+    "/app/test_reports/pytest/iteration6_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "extras.py:200-203 — apply_theme_preset checks `(o.cert_signature_text or '').strip()` before seeding. Correct behaviour: never overwrites admin-customised text. Verified by inspection.",
+    "courses.py:52 — list ordering `display_order asc, created_at desc` is consistent with portal_router (iter5.py:290). Good DRY adherence.",
+    "courses.py:60-73 — reorder silently ignores cross-org / unknown IDs (only courses matching org_id are looped). Multi-tenant isolation verified by test (sent course_id=99999999 and got updated=3 not 4).",
+    "iter5.py:222 — list_academies sort=newest is the default and the in-Python sort for users/courses runs AFTER the SQL order_by — slightly wasteful but correct.",
+    "iter5.py:106-123 — serve_upload uses `{path:path}` so nested keys like 'branding/<uuid>.png' work; legacy flat keys also work because the storage backend treats them identically. Verified by test_upload_image_nested_key_serves.",
+    "iter5.py:57 — Cert preview uses `settings.public_base_url or str(request.base_url).rstrip('/')` — correctly falls back when env var is empty (the case in this test env). Test confirms 200 + PDF magic bytes.",
+    "Frontend OrganizationSettingsPage correctly inserts 'Theme presets' between Identity and Brand colours sections per spec.",
+    "Frontend AcademiesPage 'Clear' link is rendered as a `<button>Clear</button>` only when filters are non-default (q non-empty / status != all / sort != newest). Initial render has no Clear — confirmed by my repro: when search is empty, Clear count=0; after typing 'ifpi', Clear count=1. Matches the review-request spec exactly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration6.py (new — 11 tests covering all iteration 6 backend features)"
+  ],
+  "success_rate": {"backend": "100% (11/11 new + 20/20 iter5 regression)", "frontend": "100% of iteration-6 critical flows verified"},
+  "test_credentials": "admin@ifpi.org / admin123 (has BOTH ADMIN and SUPER_ADMIN). learner@ifpi.org / learner123.",
+  "seed_data_creation": "Test uploaded one tiny PNG into branding/<uuid>.png via /api/uploads/image. Harmless — disk storage, single file. No org/course/user mutations beyond the temporary theme apply/restore (ended at IFPI Classic defaults).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && REACT_APP_BACKEND_URL=https://last-checkpoint-15.preview.emergentagent.com python -m pytest tests/test_iteration6.py -v. All 6 review-request bullets verified: themes list (5), apply-theme (admin only, 404 for unknown), courses/reorder (with cross-org ignore), academies q+status_filter+sort with all 4 sort modes, nested upload key serving, cert preview env-var fallback. Two prior iter5 bugs (upload URL host + outbox retry) are confirmed FIXED — both pass cleanly in iter5 suite.",
+  "rca_of_the_issue": "N/A — no bugs found this iteration."
+}

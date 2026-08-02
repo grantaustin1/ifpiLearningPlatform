@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 11 verified end-to-end. Backend pytest /app/backend/tests/test_iteration11.py — 14/14 PASS (100%) covering AI quiz TRUE_FALSE/SHORT_ANSWER/MIXED question types, avoid_topics LLM honoring, PUT /exams/{id}/questions accepting TF+SA rows, GET /admin/leaderboard.csv (format + cohort filter + 403 non-admin), GET /admin/audit-digest (shape + days clamp 1/90 + 403 non-admin + deterministic fallback when EMERGENT_LLM_KEY is empty — fallback string 'In the last 14 days: N admin action(s)' confirmed). Frontend Playwright: /audit AuditDigestCard renders with default days=14, LLM-generated 4-sentence summary visible (662 chars, 'In the last 14 days, the IFPI Learning Academy administration...'), counts_by_action pills visible, days dropdown switching 14→30 triggers new GET /audit-digest?days=30, refresh button bypasses cache and re-fetches. /leaderboard CSV button (data-testid='leaderboard-csv') downloads file named 'leaderboard.csv' (frontend overrides filename). /exams AI quiz modal: TRUE_FALSE mode generated 3 cards each with 'TRUE FALSE' type pill, ✓ True (emerald) or ✓ False highlighted, italic explanation, per-card Regenerate button (RefreshCw icon). Clicking Regenerate on Q0 updated only Q0 (verified Q1 text unchanged, toast 'Regenerated' fired). Save flow with Create-new-exam / Append radios visible. Regression flows from iter 10 unaffected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/leaderboard CSV download", "issues": ["Frontend hard-codes the download filename to 'leaderboard.csv' (or 'leaderboard_COHORT.csv') in LeaderboardPage.tsx:53, overriding the backend's nicer date-stamped 'leaderboard_YYYYMMDD.csv' Content-Disposition. Minor — works fine but loses the date suffix the backend already provides. Could simply omit the explicit `download` attribute or read it from the response header."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration11.py",
+    "/app/test_reports/pytest/iteration11_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/services/ai_quiz_service.py:51 — `avoid_topics: Optional[List[str]] = None` references `Optional` but the module only imports `List` from typing. Works at runtime only because `from __future__ import annotations` defers evaluation. Recommend adding `from typing import List, Optional` for clarity and to avoid silent breakage if __future__ annotations is ever removed.",
+    "backend/routers/iter8.py:137 audit_digest — when `rows` is empty the deterministic summary ends with 'no admin activity to summarise.' and skips the LLM call entirely. That's correct, but the punctuation produces ' . no admin activity to summarise.' with a leading space when by_action is empty. Cosmetic.",
+    "backend/routers/iter8.py:181 — when LLM call fails, the fallback string appends ' (AI summary unavailable: <ExceptionName>)' to the deterministic summary. This leaks the exception class name to the UI. Consider logging instead of leaking the type name to admin users (low priority).",
+    "frontend/src/pages/dashboard/LeaderboardPage.tsx:53 — the frontend overrides the backend's date-stamped filename. Either trust the Content-Disposition header (drop the `a.download` value or set it from the header) or align with the backend's date suffix.",
+    "frontend/src/pages/dashboard/ExamsPage.tsx — after AI quiz generates, the form fields (course/numq/type) are replaced by the review state. To test multiple modes back-to-back the user must click 'Generate more' to return to the form. Works as designed; no bug.",
+    "backend/routers/exams.py:181 — AIQuizRequest.question_type uses Literal[...] which correctly rejects bad values with 422 — addresses the mode-validation feedback from iter10. Nice."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration11.py (new — 14 tests covering iter 11 AI quiz types, avoid_topics, TF+SA row creation, leaderboard CSV, audit digest + deterministic fallback)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 iteration11 pytest in 45s)",
+    "frontend": "100% of iteration-11 critical UI flows verified (audit digest card with LLM summary + days switch + refresh + pills, CSV download button + filename, AI quiz TRUE_FALSE rendering with TRUE/FALSE pill + emerald ✓ + per-card Regenerate + isolated update)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123 (ADMIN + SUPER_ADMIN). learner@ifpi.org / learner123.",
+  "seed_data_creation": "AI quiz tests generated audit rows (AI_QUIZ_GENERATED) — these are append-only telemetry by design and are not cleaned up. One TEST_iter11_types exam was created and deleted in test teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iteration11.py -v. The MIXED test calls LLM with num_questions=5 — takes ~10-15s. Avoid-topics test takes ~3-5s. For frontend AI quiz testing: after the modal generates questions, the form fields (course/numq/type) are hidden and replaced by the review state — to test a second question_type in the same session click 'Generate more' to reopen the form, or close the modal and reopen it. The leaderboard CSV download uses the frontend-supplied filename 'leaderboard.csv', NOT the backend's date-stamped Content-Disposition. AuditDigestCard default is days=14; the deterministic fallback string format is 'In the last X days: N admin action(s). Action_Name: count, ...'.",
+  "rca_of_the_issue": "N/A — no bugs found this iteration. All 5 iter-11 features (TF/SA/MIXED quiz, avoid_topics, audit digest LLM+fallback, leaderboard CSV, per-card Regenerate) work end-to-end. Minor cosmetic findings only (filename override, exception type leak in fallback) — see critical_code_review_comments."
+}

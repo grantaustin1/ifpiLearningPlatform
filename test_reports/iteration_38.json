@@ -1,0 +1,34 @@
+{
+  "summary": "Iter 42: Course cover images + Featured Course Pick — full backend + frontend E2E verified. All 8 pytest cases pass; UI catalog shows Featured section with course 222 first and photo cover images; UAT admin star toggle emits toast + amber star; course editor Cover image field saves + reloads + removes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration42_covers_featured.py",
+    "/app/test_reports/pytest/iter42.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Public /api/catalog is rate-limited by IP; using X-Test-Client-Ip override worked correctly in tests."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration42_covers_featured.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "test_credentials": "admin@ifpi.org/admin123, learner@ifpi.org/learner123, uat-admin@ifpi.org/UatAdmin!2026",
+  "seed_data_creation": "Created + deleted one TEST_ course in UAT org during UI flow. Also deleted a leftover 'Untitled Course' (id 224) that was created by earlier automated 'New Course' click and never renamed. Course 222 left is_featured=true as required.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: pytest /app/backend/tests/test_iteration42_covers_featured.py. Course 222 = 'Client Onboarding & Consultation Skills' remains flagged featured=true. UAT org has 0 courses again after cleanup.",
+  "verifications": {
+    "catalog_returns_4_courses_with_cover_and_is_featured": true,
+    "cover_images_publicly_accessible_jpeg": true,
+    "featured_flag_first_in_ordering": true,
+    "course_222_first_in_featured": true,
+    "admin_toggle_flips_and_returns_id_is_featured": true,
+    "learner_toggle_returns_403": true,
+    "other_org_admin_toggle_returns_404": true,
+    "patch_cover_image_persists": true,
+    "frontend_catalog_cover_img_testids_present": true,
+    "frontend_featured_section_shows_flagged_first": true,
+    "frontend_admin_star_toggle_amber_and_toast": true,
+    "frontend_editor_cover_image_field_save_reload_remove": true
+  }
+}

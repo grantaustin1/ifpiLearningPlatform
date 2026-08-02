@@ -1,0 +1,48 @@
+{
+  "summary": "Iter 22 certification: Auth security posture (X-Return-Token gated by ALLOW_TEST_TOKEN_HEADER env), Marketplace (public catalog + featured + course detail + opt-in gate), Live Sessions (admin CRUD + learner RSVP + attendance + cohort filter + ICS + role-based UI) — ALL DELIVERABLES GREEN. Backend full regression: 486 passed / 3 skipped / 0 failures (489 tests total, iter22_full.xml). 17/17 new iter-22 tests pass on the public preview URL. Frontend E2E validated end-to-end via Playwright: anonymous marketplace → course detail → /register?next=&auto_enroll=1 handoff, admin schedule-session modal → session card with Join/.ics/Attendance buttons, learner /live-sessions with role-gated UI + RSVP toggle (RSVP ↔ RSVP'd) + toast integration + .ics download, admin settings marketplace-opt-in-row visible with toggle state=true.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration22_marketplace.py",
+    "/app/backend/tests/test_iteration22_live_sessions.py",
+    "/app/test_reports/pytest/iter22_new_results.xml",
+    "/app/test_reports/pytest/iter22_full.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: The stray `iter30l-audit-1783073838` active TermsVersion (id=6) was still present in DB at test start — I cleaned it (row + its acceptances). Main agent should audit the iter30l teardown path so no leftover current=true rows remain post-suite; consider adding a guard in scripts/build_docs.py or seed script to demote any test-named versions on boot.",
+    "OPTIONAL: DB seed has significant TEST_Paid_*/TEST_prereq_*/Iter21 AutoComplete* course debris from earlier test runs (visible on /courses for learner). Not iter-22 related; consider a nightly cleanup task."
+  ],
+  "critical_code_review_comments": [
+    "ALLOW_TEST_TOKEN_HEADER gate: verified — with the env var set to true (dev), POST /api/auth/login with X-Return-Token: true DOES return access_token in body. Cookie-mode still primary (HttpOnly + CSRF). Correct posture for production hardening.",
+    "/api/catalog returns full pagination shape {courses, categories, total, page, page_size}. Every course carries an organization={id,name,logo_url} block. page_size defaults to 24 (<=100).",
+    "/api/catalog?featured=true returns <= 6 courses (verified 6 returned).",
+    "/api/catalog/{id} returns syllabus_preview (verified len 5 <= 8) + organization block; 404 on unknown id.",
+    "Marketplace opt-in gate: PATCH /api/organization {marketplace_opt_in: false} hides the org's courses from public /api/catalog. GET /api/organization surfaces the flag. Toggling back restores catalog. Verified in the module-scoped iter22 marketplace test.",
+    "Live Sessions router: proper 201/200/204 status codes; DELETE returns 204 and subsequent GET is 404. Learner cannot POST (401/403). RSVP toggle status flips RSVP ↔ CANCELLED with counts excluding CANCELLED. Bulk mark-attendance auto-creates walk-in RSVPs. Learner /upcoming honors cohort filtering.",
+    "ICS export: valid text/calendar content-type, BEGIN:VCALENDAR..END:VCALENDAR envelope, DTSTART/DTEND/SUMMARY present.",
+    "Frontend: marketplace-hero, featured-section, cta-enroll, marketplace-opt-in-row, new-session-btn, create-session-modal, input-title, input-meeting-url, input-start-at, submit-session all present with correct data-testids.",
+    "Anonymous → signup handoff: clicking Enrol on /catalog/159 correctly redirects to /register?next=/catalog/159&auto_enroll=1.",
+    "Role-based UI on /live-sessions: admin gets Schedule/Attendance/delete; learner gets RSVP/.ics only (no new-session-btn, no Attendance). Verified.",
+    "RSVP toggle: 'RSVP' → click → 'RSVP'd' → click → 'RSVP' with 'RSVP cancelled' toast. Cohort filtering server-side confirmed.",
+    "Modal field-testids are input-title / input-meeting-url / input-start-at (not session-title as review-request loosely described). This is a doc mismatch, not a bug — actual DOM has correct testids.",
+    "Test suite is self-cleaning: session_id fixture deletes on teardown, marketplace_opt_in test restores in finally block. Verified admin@ifpi.org 2FA remains disabled, marketplace_opt_in remains True, LiveSessions count=0 post-teardown."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (486/489 iter22-full, 3 env-conditional skips: SSO_disabled + learner-exhausted-exam + no-PENDING-import-job; 17/17 iter22 new tests)",
+    "frontend": "100% (marketplace anonymous flow, admin live-sessions create+delete, learner RSVP toggle, admin settings opt-in row — all verified end-to-end on public preview URL)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123, learner@ifpi.org / learner123",
+  "seed_data_creation": "Created & CLEANED: (1) UITEST-DELETE-ME-9871 & UITEST-LEARNER-SESSION LiveSession rows — deleted via DB cleanup script; (2) Removed stray active TermsVersion id=6 (iter30l-audit-1783073838) that was blocking the /live-sessions UI (main agent had said this was cleaned but one leftover remained); (3) confirmed marketplace_opt_in=True on org 1 post-run; (4) admin 2FA fields confirmed null. Final DB state: 0 LiveSessions, 0 active TermsVersion, marketplace_opt_in=True.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 22 fully green. Full regression command: `cd /app/backend && python -m pytest tests/ -q --junitxml=/app/test_reports/pytest/full.xml` (~5 min, 489 tests). New iter-22 tests: `python -m pytest tests/test_iteration22_marketplace.py tests/test_iteration22_live_sessions.py -v` (3.8s). NOTE for future testers: the previous flaky test_iteration3.py::test_cert_email_outbox_no_duplicate that iter-21 flagged now passes (486/489 clean). Terms cleanup: `iter30l-audit-*` rows in terms_versions with is_current=True can block UI — clean via `db.query(TermsVersion).filter(TermsVersion.version.like('iter30l-audit%')).delete()`. Modal field testids: input-title, input-meeting-url, input-start-at (NOT session-title). Marketplace opt-in row testid: marketplace-opt-in-row. Learner lands on /courses after login, not /dashboard.",
+  "rca of the issue": "N/A — no functional regressions. One environmental cleanup performed (stale iter30l-audit terms version)."
+}

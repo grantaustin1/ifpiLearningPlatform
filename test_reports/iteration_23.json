@@ -1,0 +1,48 @@
+{
+  "summary": "Iter-23 certification: (1) Marketplace sort (backend + frontend), (2) Live-session recurrence + 15-min reminder worker + cascade delete, (3) Test-debris cleanup service + CLI. ALL THREE DELIVERABLES GREEN. Backend: 499 passed / 3 skipped / 1 pre-existing flaky timing test (test_iteration30e::test_pdf_cached_between_requests fails on 1ms cold/warm delta — unrelated to iter-23, passes in isolation). 20/20 iter-23-relevant tests pass (10 iter-23-new + 10 iter-22 marketplace-sort). Frontend: catalog-sort dropdown functional with all 4 options; live-sessions recurrence modal opens with 5 repeat options (Does not repeat / Weekly / Every 2 weeks / Daily / Custom RRULE), recurrence-count appears on Weekly/Biweekly/Daily, recurrence-custom-rrule appears on Custom; weekly submit with count=4 created 4 session cards with Series badges (data-testid=series-badge-{id}), success toast 'Session scheduled with 4 occurrences'; delete on head triggers window.confirm cascade-vs-single choice and cascade removes all 4 series rows. CLI: `python scripts/cleanup_test_debris.py --dry-run` exits 0, apply mode also verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_iteration30e.py::test_pdf_cached_between_requests", "issue": "Pre-existing flaky perf test: asserts warm (0.062s) < cold (0.061s), fails on 1ms noise. NOT iter-23 related. Passes in isolation. Consider using tolerance or removing timing assertion."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration23_recurrence_reminders.py",
+    "/app/backend/tests/test_iteration23_test_debris_cleanup.py",
+    "/app/backend/tests/test_iteration22_marketplace.py",
+    "/app/test_reports/pytest/iter23_new.xml",
+    "/app/test_reports/pytest/iter23_full.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Stabilise test_iteration30e::test_pdf_cached_between_requests — replace warm<cold hard assertion with a ratio tolerance (e.g. warm <= cold * 1.5) or drop the perf check. Currently causes 1 sporadic failure in full-suite runs, passes in isolation.",
+    "OPTIONAL: The docs-build path continues to insert active `iter30l-audit-*` TermsVersion rows that block the /live-sessions UI (I cleaned id=16 during this run, same issue flagged in iter-22 cert). The iter-23 cleanup service INTENTIONALLY preserves is_current=True rows (safety guard). Fix should be in scripts/build_docs.py or the seed — do not demote via the cleanup service."
+  ],
+  "critical_code_review_comments": [
+    "MARKETPLACE SORT — Backend verified: sort=price_asc/price_desc/most_enrolled/newest all produce correctly ordered results; sort=random rejected with 422. SQL-side aggregation via subquery for most_enrolled (not Python fallback) confirmed by test_catalog_sort_most_enrolled_returns_high_first.",
+    "MARKETPLACE SORT — Frontend verified: <select data-testid='catalog-sort'> sits between category filter and grid; four options 'Newest' / 'Most enrolled' / 'Price: low to high' / 'Price: high to low' visible on anonymous /catalog; changing selection triggers a re-fetch (React Query key includes sort param).",
+    "RECURRENCE MATERIALISATION — Backend verified: FREQ=WEEKLY;COUNT=5 → series_instances_created=4 (5 rows total incl head). FREQ=DAILY;COUNT=1000 correctly capped at 26 children. Invalid RRULE 'GARBAGE=RULE' does not 500 — head created with series_instances_created=0 (graceful degradation).",
+    "CASCADE DELETE — Backend verified: DELETE /api/live-sessions/{head_id}?cascade_series=true removes head + all children in one call. Default (no query param) removes only the specific row. Frontend verified end-to-end: window.confirm with 'OK = delete the whole series' message, single click removed all 4 UITEST rows.",
+    "REMINDER WORKER — Direct-DB test verified: session with start_at=now+15min gets exactly 1 outbox row template='live_session_reminder', reminder_sent_at stamped. Session with start_at=now+60min NOT touched. Second tick() returns 0 (idempotent). CANCELLED RSVPs correctly skipped (no reminder queued).",
+    "TEST-DEBRIS CLEANUP — Verified: TEST_/iter22-/iter30l- patterns purged from courses/live_sessions/terms_versions/outbox_messages. is_current=True TermsVersion PRESERVED (safety guard confirmed). Dry-run reports counts without committing. Idempotent (second tick on clean DB returns all zeros). CLI --dry-run exits 0.",
+    "SERIES BADGE — Rendered on any card with recurrence_rule OR parent_series_id (both head and children). data-testid=series-badge-{id} present. Delete button data-testid=del-{id}.",
+    "MODAL FIELDS verified: input-title, input-meeting-url, input-start-at, recurrence-type (select with 5 options), recurrence-count (number input, shows on non-none/non-custom), recurrence-custom-rrule (text input, shows on custom), submit-session, create-session-modal — all correct data-testids.",
+    "AUTH POSTURE preserved — ALLOW_TEST_TOKEN_HEADER remains true in backend/.env; existing legacy tests using X-Return-Token continue to work.",
+    "TEARDOWN VERIFIED — Final DB state: 0 LiveSessions, 0 active TermsVersion, admin@ifpi.org 2FA disabled, 0 UITEST/iter22-/iter30l- residue, 0 TEST_ courses (cleaned via manual CLI apply)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "99.8% (499/500 executed; 3 env-conditional skips; the 1 fail is pre-existing flaky perf test unrelated to iter-23)",
+    "frontend": "100% (marketplace sort dropdown + all 4 options functional; live-sessions recurrence modal all fields functional; weekly submit creates 4 cards with Series badges; cascade delete via window.confirm removes all 4 rows)"
+  },
+  "test_credentials": "admin@ifpi.org / admin123, learner@ifpi.org / learner123",
+  "seed_data_creation": "Created & cleaned during run: (1) 4 UITEST-iter23-weekly LiveSession rows (head + 3 children) — cleaned via cascade-delete flow in Frontend UI test. (2) Sample debris course/session/terms rows in pytest fixture — cleaned by fixture teardown. (3) Removed stale TermsVersion id=16 (iter30l-audit-1783076729, was is_current=True and blocking UI) — same recurring issue as iter-22 cert. (4) Ran `python scripts/cleanup_test_debris.py` (apply) to purge 1 residual TEST_prereq_dbbcf4 course + 4 orphaned iter30l terms rows. Final DB state: 0 LiveSessions, 0 active TermsVersion, 0 TEST_/UITEST-/iter22-/iter30l- rows, admin 2FA disabled.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter-23 fully green. Full regression command: `cd /app/backend && python -m pytest tests/ -q --junitxml=/app/test_reports/pytest/full.xml` (~4.5 min, 503 tests). New iter-23 tests: `python -m pytest tests/test_iteration23_recurrence_reminders.py tests/test_iteration23_test_debris_cleanup.py tests/test_iteration22_marketplace.py -v` (3.6s, 20/20 pass). Known flaky: test_iteration30e::test_pdf_cached_between_requests — timing-noise, ignore or ratio-fix. Modal field testids: input-title, input-meeting-url, input-start-at, recurrence-type, recurrence-count, recurrence-custom-rrule. Delete button: del-{id}. Series badge: series-badge-{id}. Sort dropdown: catalog-sort. The iter30l-audit-* terms version keeps reappearing — clean before /live-sessions UI tests via db.query(TermsVersion).filter(TermsVersion.version.like('iter30l-audit%')).delete(); cleanup service will NOT remove these (is_current=True guard, by design).",
+  "rca of the issue": "N/A — no functional regressions. One pre-existing flaky perf test unrelated to iter-23; one environmental cleanup (stale iter30l-audit TermsVersion) performed."
+}

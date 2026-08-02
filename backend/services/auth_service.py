@@ -9,6 +9,10 @@ from typing import Optional, Tuple
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+<<<<<<< HEAD
+from core.config import settings
+=======
+>>>>>>> origin/main
 from core.role_registry import normalize_role_names
 from core.security import (
     create_access_token, create_refresh_token, decode_token,

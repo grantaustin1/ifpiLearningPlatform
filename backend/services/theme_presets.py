@@ -37,6 +37,36 @@ PRESETS: list[ThemePreset] = [
         "description": "The default indigo IFPI palette — clean, neutral, conference-floor friendly.",
         "primary_color": "#6366f1",
         "cert_accent_color": "#6366f1",
+<<<<<<< HEAD
+        "cert_signature_text_suggestion": "Programme Director",
+        "cert_footer_text_suggestion": "International Fitness Professionals Institute",
+        "cover_color": "bg-indigo-500",
+    },
+    {
+        "slug": "crimson_gold",
+        "name": "Crimson & Gold",
+        "description": "Deep burgundy + gold — traditional, prestigious, heritage feel.",
+        "primary_color": "#7f1d1d",
+        "cert_accent_color": "#b45309",
+        "cert_signature_text_suggestion": "Director of Studies",
+        "cert_footer_text_suggestion": "Awarded by the academy.",
+        "cover_color": "bg-red-900",
+    },
+    {
+        "slug": "teal_magenta",
+        "name": "Teal & Magenta",
+        "description": "Vibrant teal + magenta — energetic and contemporary.",
+        "primary_color": "#0d9488",
+        "cert_accent_color": "#db2777",
+        "cert_signature_text_suggestion": "Head of Curriculum",
+        "cert_footer_text_suggestion": "This certificate verifies completion of an approved training programme.",
+        "cover_color": "bg-teal-600",
+    },
+    {
+        "slug": "slate_emerald",
+        "name": "Slate & Emerald",
+        "description": "Slate + emerald — understated and professional, for trade bodies and federations.",
+=======
         "cert_signature_text_suggestion": "Frances Moore, CEO",
         "cert_footer_text_suggestion": "International Federation of the Phonographic Industry · ifpi.org",
         "cover_color": "bg-indigo-500",
@@ -65,6 +95,7 @@ PRESETS: list[ThemePreset] = [
         "slug": "industry_body",
         "name": "Industry Body",
         "description": "Slate + emerald — for trade associations, performing rights orgs, and member federations.",
+>>>>>>> origin/main
         "primary_color": "#1e293b",
         "cert_accent_color": "#059669",
         "cert_signature_text_suggestion": "Chief Executive",
@@ -72,6 +103,15 @@ PRESETS: list[ThemePreset] = [
         "cover_color": "bg-slate-800",
     },
     {
+<<<<<<< HEAD
+        "slug": "mono_neon",
+        "name": "Monochrome",
+        "description": "Black + neon yellow — bold, high-contrast, modern brand energy.",
+        "primary_color": "#0a0a0a",
+        "cert_accent_color": "#facc15",
+        "cert_signature_text_suggestion": "Head of Education",
+        "cert_footer_text_suggestion": "An accredited training initiative.",
+=======
         "slug": "label_academy",
         "name": "Label Academy",
         "description": "Monochrome black + neon yellow — for record-label-run training programs.",
@@ -79,6 +119,7 @@ PRESETS: list[ThemePreset] = [
         "cert_accent_color": "#facc15",
         "cert_signature_text_suggestion": "Head of A&R Education",
         "cert_footer_text_suggestion": "A label-led training initiative.",
+>>>>>>> origin/main
         "cover_color": "bg-neutral-900",
     },
 ]
