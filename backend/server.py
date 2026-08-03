@@ -97,6 +97,9 @@ logger = logging.getLogger("ifpi")
 # any missing tables on fresh checkouts; in production Alembic has already
 # created everything so this is a no-op.
 import models  # noqa: F401  — ensures all models register on metadata
+if not os.environ.get("SKIP_AUTO_CREATE_TABLES"):
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+
 Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(
