@@ -44,6 +44,25 @@ jobs:
           DATABASE_URL: sqlite:///./ifpi_ci.db
           MONGO_URL: mongodb://localhost:27017
           DB_NAME: ifpi_test
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: |
+          alembic upgrade head
+          python -c "from seed_data import seed; seed()" || true
+      - name: Run pytest
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci.db
+          SMTP_ALLOW_PLAINTEXT: '1'
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: pytest -q --maxfail=5
+      - name: Bootstrap DB
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci.db
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: ifpi_test
         run: |
           alembic upgrade head
           python -c "from seed_data import seed; seed()" || true
@@ -118,6 +137,15 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r backend/requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
       - name: Bootstrap DB (for import-time side effects)
+        working-directory: backend
+        env:
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: python -c "from server import app; print('imported', len(app.routes), 'routes')"
+      - name: Lint endpoint annotations resolve
+        working-directory: backend
+        env:
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: python scripts/lint_endpoint_signatures.py --check-decorators
         working-directory: backend
         run: python -c "from server import app; print('imported', len(app.routes), 'routes')"
       - name: Lint endpoint annotations resolve
@@ -213,6 +241,30 @@ jobs:
           pip install -r backend/requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
           pip install pytest
       - name: Regenerate check
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: |
+          python -c "import server" || true  # warm import; failures OK — build_docs handles it
+          python scripts/build_docs.py --check
+      - name: Route + router coverage
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+          RUN_INTEGRATION_TESTS: '0'
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: |
+          python -m pytest tests/test_docs_completeness.py -q --maxfail=3
+      - name: Emit HTML render (artifact for preview)
+        working-directory: backend
+        env:
+          JWT_SECRET: test-secret-for-ci
+          DATABASE_URL: sqlite:///./ifpi_ci_docs.db
+          SKIP_AUTO_CREATE_TABLES: '1'
+        run: python scripts/build_docs.py --html
         working-directory: backend
         env:
           JWT_SECRET: test-secret-for-ci
