@@ -10,15 +10,12 @@ from __future__ import annotations
 
 import os
 import time
-from pathlib import Path
 import requests
 import pytest
 import yaml
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://last-checkpoint-15.preview.emergentagent.com").rstrip("/")
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
-HAS_EMERGENT_LLM_KEY = bool(os.environ.get("EMERGENT_LLM_KEY", "").strip())
-BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ──────────────────── Fixtures ────────────────────
@@ -83,19 +80,18 @@ class TestOrgCohortSettings:
 # ──────────────────── Cohort celebrations idempotency ────────────────────
 class TestCohortCelebrationsIdempotency:
     def test_lowering_threshold_does_not_refire_existing(self, admin_client):
-        # Set to 60 and verify a second run is idempotent regardless of seed state.
+        # Set to 60 — AGENT008 audit row already exists at 75 from prev iters
         admin_client.put(f"{BASE_URL}/api/organization/cohort-settings",
                          json={"cohort_threshold": 60})
         # Invoke check_cohorts directly via the in-process DB
         import sys
-        sys.path.insert(0, BACKEND_DIR)
+        sys.path.insert(0, "/app/backend")
         from core.database import SessionLocal
         from services.cohort_celebrations import check_cohorts
         db = SessionLocal()
         try:
-            check_cohorts(db)
-            fired_second = check_cohorts(db)
-            assert fired_second == 0, f"Expected idempotent second run to be 0, got {fired_second}"
+            fired = check_cohorts(db)
+            assert fired == 0, f"Expected 0 new fires after lowering threshold, got {fired}"
         finally:
             db.close()
 
@@ -120,13 +116,11 @@ class TestLeaderboardCohort:
             pass
         all_rows = admin_client.get(f"{BASE_URL}/api/gamification/leaderboard").json()
         assert len(rows) <= len(all_rows)
+        # Sanity: filter returns at least 1 (AGENT008 exists per iter 9)
+        assert len(rows) >= 1
 
 
 # ──────────────────── AI quiz generator ────────────────────
-@pytest.mark.skipif(
-    not HAS_EMERGENT_LLM_KEY,
-    reason="EMERGENT_LLM_KEY is required for AI quiz generation tests",
-)
 class TestAIQuiz:
     course_id = 1
 
@@ -229,13 +223,9 @@ class TestAppendQuestions:
 # ──────────────────── GH Actions workflow YAML ────────────────────
 class TestWorkflowYaml:
     def test_workflow_file_exists_and_valid(self):
-        repo_root = next((p for p in Path(__file__).resolve().parents if (p / ".git").exists()), None)
-        if repo_root is None:
-            repo_root = next((p for p in Path(__file__).resolve().parents if (p / ".github").exists()), None)
-        assert repo_root is not None, "could not locate repository root"
-        path = repo_root / ".github/workflows/pr-agent-comments.yml"
-        assert path.exists(), f"missing: {path}"
-        with path.open() as f:
+        path = "/app/.github/workflows/pr-agent-comments.yml"
+        assert os.path.exists(path), f"missing: {path}"
+        with open(path) as f:
             doc = yaml.safe_load(f)
         assert doc is not None
         # yaml maps "on" key — could be the str "on" or True (bool gotcha)

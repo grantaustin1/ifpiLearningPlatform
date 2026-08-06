@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session

@@ -19,9 +19,11 @@ limiting lives in the ingress / CDN layer.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user
@@ -87,6 +89,33 @@ def _ratelimit(ip: str) -> None:
         max_requests=_VERIFY_MAX_REQUESTS,
         window_secs=_VERIFY_WINDOW_SECS,
     )
+
+
+# ─── Anonymous user-guide PDF downloads ──────────────────────────────
+_GUIDE_FILES = {
+    "IFPI_Admin_User_Guide.pdf",
+    "IFPI_Student_User_Guide.pdf",
+}
+
+
+@router.get("/guides/{filename}")
+def download_user_guide(filename: str, request: Request):
+    """Anonymous download of the platform user-guide PDFs.
+
+    Served from the backend (not the SPA dev server) so links stay valid
+    regardless of frontend build/restart state. Filenames are whitelisted —
+    no path traversal surface. The PDF is auto-rebuilt when its markdown
+    source in /app/docs/guides has changed (see services/guide_builder).
+    """
+    _ratelimit(_client_ip(request))
+    if filename not in _GUIDE_FILES:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    from services.guide_builder import ensure_fresh
+    try:
+        path = str(ensure_fresh(filename))
+    except Exception:
+        raise HTTPException(status_code=404, detail="Guide not built yet")
+    return FileResponse(path, media_type="application/pdf", filename=filename)
 
 
 # ─── Anonymous certificate verify ────────────────────────────────────

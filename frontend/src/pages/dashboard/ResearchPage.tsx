@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
 import { Sparkles, Loader2, ExternalLink, CheckCircle2, AlertTriangle, Clock, FileText } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,41 +36,14 @@ export default function ResearchPage() {
     } finally { setLoading(false) }
   }
 
-  const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    load()
-    return () => { abortRef.current?.abort() }
-  }, [])
-
-  const start = async () => {
-    if (query.trim().length < 3) return toast.error('Query must be at least 3 characters')
-    setStarting(true)
-    try {
-      const r = await api.post('/authoring/research/start', { query: query.trim(), depth })
-      toast.success('Research started')
-      setQuery('')
-      await load()
-      abortRef.current = new AbortController()
-      pollJob(r.data.job_id, abortRef.current.signal)
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail
-      if (typeof detail === 'object' && detail?.code === 'tavily_key_missing') {
-        toast.error('Add TAVILY_API_KEY to backend/.env and restart')
-      } else {
-        toast.error(String(detail ?? 'Failed to start research'))
-      }
-    } finally { setStarting(false) }
-  }
-
-  const pollJob = async (id: number, signal: AbortSignal) => {
+  const pollJob = async (id: number) => {
     setActivePolls(p => ({ ...p, [id]: true }))
     for (let i = 0; i < 60; i++) {
-      if (signal.aborted) break
       await new Promise(r => setTimeout(r, 2500))
-      if (signal.aborted) break
       try {
-        const r = await api.get(`/authoring/research/${id}`, { signal })
+        const r = await api.get(`/authoring/research/${id}`)
         setJobs(js => js.map(j => (j.id === id ? { ...j, ...r.data } : j)))
         if (r.data.status === 'COMPLETED' || r.data.status === 'FAILED') break
       } catch (e) {
@@ -81,6 +54,25 @@ export default function ResearchPage() {
       }
     }
     setActivePolls(p => ({ ...p, [id]: false }))
+  }
+
+  const start = async () => {
+    if (query.trim().length < 3) return toast.error('Query must be at least 3 characters')
+    setStarting(true)
+    try {
+      const r = await api.post('/authoring/research/start', { query: query.trim(), depth })
+      toast.success('Research started')
+      setQuery('')
+      await load()
+      pollJob(r.data.job_id)
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      if (typeof detail === 'object' && detail?.code === 'tavily_key_missing') {
+        toast.error('Add TAVILY_API_KEY to backend/.env and restart')
+      } else {
+        toast.error(String(detail ?? 'Failed to start research'))
+      }
+    } finally { setStarting(false) }
   }
 
   return (
@@ -176,10 +168,7 @@ export default function ResearchPage() {
               </div>
               {j.status !== 'COMPLETED' && j.status !== 'FAILED' && !activePolls[j.id] && (
                 <button
-                  onClick={() => {
-                    abortRef.current = new AbortController()
-                    pollJob(j.id, abortRef.current.signal)
-                  }}
+                  onClick={() => pollJob(j.id)}
                   className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
                   data-testid={`research-poll-${j.id}`}
                 >

@@ -4,9 +4,10 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
+import { FeedbackWidget } from 'components/FeedbackWidget'
 
 const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
@@ -26,6 +27,7 @@ const ADMIN_NAV = [
   { href: '/query-builder', label: 'Query builder', icon: Database },
   { href: '/users',         label: 'Users',        icon: Users },
   { href: '/outbox',        label: 'Email Outbox', icon: Mail },
+  { href: '/feedback-admin', label: 'Feedback',    icon: MessageSquare },
   { href: '/billing',       label: 'Billing',      icon: CreditCard },
   { href: '/settings',      label: 'Settings',     icon: Settings },
   { href: '/audit',         label: 'Audit log',    icon: Shield },
@@ -71,7 +73,9 @@ export default function DashboardLayout() {
     return () => window.clearInterval(id)
   }, [])
   const brandName = org.name || 'IFPI Learning'
-  const backend = process.env.REACT_APP_BACKEND_URL || ''
+  const backend = (import.meta as any).env?.VITE_API_URL
+    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
+    || ''
   const resolvedLogo = org.logo_url
     ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
     : null
@@ -111,6 +115,15 @@ export default function DashboardLayout() {
               <span className="truncate">{item.label}</span>
             </NavLink>
           ))}
+          <a
+            href={`${backend}/api/public/guides/${isAdmin ? 'IFPI_Admin_User_Guide.pdf' : 'IFPI_Student_User_Guide.pdf'}`}
+            target="_blank" rel="noopener noreferrer"
+            data-testid="sidebar-help-link"
+            title={isAdmin ? 'Open the Administrator User Guide (PDF)' : 'Open the Student User Guide (PDF)'}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all">
+            <HelpCircle className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Help &amp; guides</span>
+          </a>
         </nav>
         <div className="border-t border-white/5 p-3">
           {streak && streak.current_streak > 0 && (
@@ -147,6 +160,7 @@ export default function DashboardLayout() {
       </aside>
       <main className="flex-1 overflow-y-auto bg-slate-50">
         <Outlet />
+        <FeedbackWidget />
       </main>
     </div>
   )

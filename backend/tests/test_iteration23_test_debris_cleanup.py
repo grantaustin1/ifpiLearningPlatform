@@ -170,4 +170,4 @@ def test_cleanup_is_idempotent():
         stats = tick(db)
     assert stats == {"courses": 0, "live_sessions": 0,
                      "terms_versions": 0, "outbox_messages": 0,
-                     "course_views": 0}
+                     "course_views": 0, "marketplace_optouts": 0}

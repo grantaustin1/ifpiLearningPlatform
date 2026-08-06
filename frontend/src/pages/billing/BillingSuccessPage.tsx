@@ -41,7 +41,6 @@ export default function BillingSuccessPage() {
     }
 
     let cancelled = false
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const poll = async (n: number) => {
       if (cancelled) return
@@ -63,7 +62,7 @@ export default function BillingSuccessPage() {
           }
           // Navigate to the course after a short beat so the user
           // sees the success state.
-          timeoutId = setTimeout(() => nav(`/learn/${data.course_id}`), 1500)
+          setTimeout(() => nav(`/learn/${data.course_id}`), 1500)
           return
         }
 
@@ -76,9 +75,8 @@ export default function BillingSuccessPage() {
           setStatus('failed')
           return
         }
-        timeoutId = setTimeout(() => poll(n + 1), POLL_INTERVAL_MS)
+        setTimeout(() => poll(n + 1), POLL_INTERVAL_MS)
       } catch (e: any) {
-        if (cancelled) return
         setStatus('error')
         setErrorMsg(e?.response?.data?.detail
           || e?.response?.data?.error?.message
@@ -87,10 +85,7 @@ export default function BillingSuccessPage() {
     }
 
     poll(0)
-    return () => {
-      cancelled = true
-      if (timeoutId) clearTimeout(timeoutId)
-    }
+    return () => { cancelled = true }
   }, [sessionId, nav])
 
 

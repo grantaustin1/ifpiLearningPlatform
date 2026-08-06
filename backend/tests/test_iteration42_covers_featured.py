@@ -8,6 +8,17 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _purge_debris_first():
+    """Earlier suite files (Stripe/entitlement harnesses) leave debris
+    courses behind — purge them so catalog assertions see a clean state."""
+    from core.database import SessionLocal
+    from services.test_debris_cleanup import tick
+    with SessionLocal() as db:
+        tick(db)
+        db.commit()
 if not BASE_URL:
     pytest.skip("REACT_APP_BACKEND_URL not set", allow_module_level=True)
 

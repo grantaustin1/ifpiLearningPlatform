@@ -43,7 +43,7 @@ def learner_h(learner_token):
 
 
 # --- THEMES ---------------------------------------------------------
-EXPECTED_SLUGS = {"ifpi_classic", "conservatoire", "music_school", "industry_body", "label_academy"}
+EXPECTED_SLUGS = {"ifpi_classic", "crimson_gold", "teal_magenta", "slate_emerald", "mono_neon"}
 
 
 def test_themes_list_requires_auth():
@@ -71,21 +71,21 @@ def test_apply_theme_unknown_slug_404(admin_h):
 
 
 def test_apply_theme_non_admin_403(learner_h):
-    r = requests.post(f"{BASE_URL}/api/organization/apply-theme/conservatoire",
+    r = requests.post(f"{BASE_URL}/api/organization/apply-theme/crimson_gold",
                       headers=learner_h, timeout=10)
     assert r.status_code == 403
 
 
 def test_apply_theme_conservatoire_then_restore_classic(admin_h):
     # Apply conservatoire
-    r = requests.post(f"{BASE_URL}/api/organization/apply-theme/conservatoire",
+    r = requests.post(f"{BASE_URL}/api/organization/apply-theme/crimson_gold",
                       headers=admin_h, timeout=10)
     assert r.status_code == 200, r.text
-    assert r.json().get("applied") == "conservatoire"
+    assert r.json().get("applied") == "crimson_gold"
 
     # Verify org reflects it
     org = requests.get(f"{BASE_URL}/api/organization", headers=admin_h, timeout=10).json()
-    assert org["theme_preset"] == "conservatoire"
+    assert org["theme_preset"] == "crimson_gold"
     assert org["primary_color"].lower() == "#7f1d1d"
     assert org["cert_accent_color"].lower() == "#b45309"
 
@@ -101,8 +101,7 @@ def test_apply_theme_conservatoire_then_restore_classic(admin_h):
 # --- COURSES REORDER -----------------------------------------------
 def test_courses_reorder_and_listing_order(admin_h):
     courses = requests.get(f"{BASE_URL}/api/courses", headers=admin_h, timeout=10).json()
-    if len(courses) < 3:
-        pytest.skip(f"Need at least 3 courses to validate reorder, got {len(courses)}")
+    assert len(courses) >= 3
     ids = [c["id"] for c in courses[:3]]
     reversed_ids = list(reversed(ids))
     # also include a fake id to verify silent ignore
@@ -136,8 +135,6 @@ def test_academies_requires_super_admin(learner_h):
 def test_academies_search_and_sort(admin_h):
     # Seed via create_academy isn't strictly necessary — list whatever exists.
     base = requests.get(f"{BASE_URL}/api/academies", headers=admin_h, timeout=10)
-    if base.status_code == 403:
-        pytest.skip("admin seed user is not SUPER_ADMIN in this environment")
     assert base.status_code == 200
     all_rows = base.json()
     assert isinstance(all_rows, list) and len(all_rows) >= 1

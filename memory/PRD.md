@@ -77,10 +77,11 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - `IFPI_VS_ERP360_ASSESSMENT.md` — original assessment
 - `docs/P2_BACKLOG_SPECS.md` — deep-dive specs for deferred items
 
-## 2026-08-06 — Pulled branch 20260731 into Emergent preview
-- Checked out `origin/20260731`. Branch tip commit 76521b06 had UNRESOLVED merge-conflict markers committed in 114 files (bad merge of the emergent-init scaffold with real history); restored all file contents from clean parent 6d926451.
-- Recreated missing .env files (backend: SQLite DATABASE_URL, JWT_SECRET; frontend: REACT_APP_BACKEND_URL).
-- Preview fixes (dev-env only): pinned webpack-dev-server resolution 5.x→4.x (CRA5 dev server incompatible with v5); removed brace-expansion@^5 resolution (crashed minimatch 3 / fork-ts-checker with "expand is not a function").
-- Code fix: AttendanceModal.tsx used `useConfirm()` return as callable — destructured `{ confirm, ConfirmDialog }` and rendered `<ConfirmDialog />` (was a TS2349 compile error).
-- Purged 93 test-debris courses (Stripe Test / Entitlement Test / Paid E2E / Ent Inspect) from ifpi_lms.db via test_debris_cleanup with extended patterns.
-- Verified: backend /api/health OK, admin login OK (forced change-password gate as designed), frontend compiles clean, backend smoke suite tests/test_ifpi_api.py 25 passed / 2 skipped.
+## 2026-08-06 (session 2) — Correct merge resolution + full regression green
+- DISCOVERY: branch 20260731's broken merge had two divergent parents. The GitHub/Copilot CI line (6d926451, previously restored) had silently DROPPED iterations 42-48 (CourseRating model, covers/featured, reviews, reply/share, landing analytics) during a router-decomposition refactor, and wrongly reverted the Iter-40 fitness rebrand. The Emergent dev line (b7ce3738, 2026-08-01) is the complete app.
+- RESOLUTION: working tree switched to b7ce3738 (dev line) as base; removed 70 stale decomposition-package files (routers/misc/, routers/courses/, etc.) that shadowed the monolithic routers; kept backend/conftest.py + pytest.ini for local pytest runs.
+- Env restored per repo changelog: CSRF_ENABLED=true, AUTH_COOKIE_MODE=dual, ALLOW_TEST_TOKEN_HEADER=true, SMTP_ENCRYPTION_KEY, SSO_ENABLED=true, ERP360_SSO_SHARED_SECRET, IFPI_WEBHOOK_OUTBOUND_SECRET, STRIPE_API_KEY, EMERGENT_LLM_KEY.
+- Stale-test fixes (code was newer than tests on the dev snapshot): iter6/8 theme slugs (conservatoire→crimson_gold per fitness rebrand), iter30e docs manifest (+erp360-bolt-on, line_count>40), iter23 cleanup dict (+marketplace_optouts), iter23 tavily error envelope, iter26 track-view/dropoff (async outbox semantics), iter36 SSO tokens (+email_verified claim per iter39 tightening), ifpi_api sso_disabled (SSO now enabled), iter24 tampered-token (base64 spare-bit no-op), iter29 rate-limit (pinned bucket+session), iter13 digest tests (isolate from factory orgs), iter4 outbox pagination (page 999999). Added module-scoped debris-purge fixtures to iter41/42/43 catalog tests.
+- FULL REGRESSION: 843 passed / 6 skipped / 0 failed (was 101 failed + 48 errors at session start).
+- Frontend: tsc clean, full marketplace UI (hero, featured row, native course cover art) verified in browser; admin login + forced password-change gate working.
+- NOTE: .env files are gitignored — required env keys are documented above and in memory/DEPLOY_RUNBOOK.md.

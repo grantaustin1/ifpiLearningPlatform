@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -81,8 +82,12 @@ def test_track_slide_view_records_impression(learner, course_with_slides):
                       timeout=10)
     assert r2.status_code == 200
     body2 = r2.json()
-    assert body2.get("tracked") is False
-    assert body2.get("reason") == "already_counted_today"
+    # Iter 38 — writes go through the async progress outbox; dedup happens
+    # at insert time via the (slide, user, day) unique constraint, so the
+    # handler returns queued=True instead of a synchronous dedup verdict.
+    assert body2.get("queued") is True or (
+        body2.get("tracked") is False
+        and body2.get("reason") == "already_counted_today")
 
 
 def test_track_slide_view_rejects_unknown_slide(learner, course_with_slides):
@@ -99,9 +104,16 @@ def test_course_dropoff_endpoint_shape(admin, learner, course_with_slides):
     # Ensure at least first slide has a view
     learner.post(f"{BASE_URL}/api/catalog/{cid}/slides/{slides[0]}/track-view",
                  timeout=10)
-    r = admin.get(f"{BASE_URL}/api/admin/course-dropoff/{cid}", timeout=10)
-    assert r.status_code == 200, r.text
-    body = r.json()
+    # Iter 38 — track-view is queued via the progress outbox and
+    # materialised by the background worker (~2s tick). Poll briefly.
+    body = None
+    for _ in range(10):
+        r = admin.get(f"{BASE_URL}/api/admin/course-dropoff/{cid}", timeout=10)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        if body["baseline_viewers"] >= 1:
+            break
+        time.sleep(1)
     assert body["course_id"] == cid
     assert body["baseline_viewers"] >= 1
     assert len(body["slides"]) == 3

@@ -5,41 +5,4 @@ credentials.json
 *.pem
 *.key
 .credentials
-
-# Python cache
-__pycache__/
-*.py[cod]
-*.pyo
-
-# CI/QA test report artifacts
-test_reports/
-
-# Local SQLite databases
-*.db
-
-# Uploaded files
-backend/uploads/
-frontend/build/
-frontend/node_modules/.cache/
-
-# Node dependencies
-node_modules/
-frontend/node_modules/
-
-# Logs
-*.log
-logs/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Python test artifacts
-.pytest_cache/
-.coverage
-*.egg-info/
-dist/
-build/
-backend/uploads/
-frontend/build/
-frontend/node_modules/.cache/
+backend/snapshots/

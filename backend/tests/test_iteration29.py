@@ -36,10 +36,14 @@ def learner() -> requests.Session:
 
 # ─── Rate limiter (30/min per IP) ────────────────────────────────────
 def test_verify_rate_limit_kicks_in_after_30_calls():
-    """Anonymous verify endpoint returns 429 after 30 hits in a minute."""
+    """Anonymous verify endpoint returns 429 after 30 hits in a minute.
+    Uses a pinned X-Test-Client-Ip bucket + a keep-alive session so the
+    45 hits land inside one 60s window even when the suite is under load."""
     seen_429 = False
+    s = requests.Session()
+    s.headers["X-Test-Client-Ip"] = "10.29.99.99"
     for i in range(45):
-        r = requests.get(f"{BASE_URL}/api/public/certificates/verify/BLAH{i}", timeout=5)
+        r = s.get(f"{BASE_URL}/api/public/certificates/verify/BLAH{i}", timeout=5)
         if r.status_code == 429:
             seen_429 = True
             assert "Retry-After" in r.headers
