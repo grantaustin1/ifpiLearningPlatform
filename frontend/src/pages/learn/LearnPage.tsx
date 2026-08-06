@@ -48,6 +48,7 @@ export default function LearnPage() {
   const next = async () => {
     const newSet = new Set(completed); newSet.add(current); setCompleted(newSet)
     if (isLast) {
+      setCompleted(new Set(course.slides.map((_: unknown, i: number) => i)))
       setFinishing(true)
       try {
         const r = await api.post(`/courses/${courseId}/complete`)
