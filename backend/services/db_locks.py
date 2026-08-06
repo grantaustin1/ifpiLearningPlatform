@@ -26,6 +26,18 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+# Re-exports so that when `@retry_on_deadlock` wraps a FastAPI endpoint
+# using `from __future__ import annotations`, FastAPI's `get_type_hints`
+# call — which inspects the wrapper's `__globals__` (this module) —
+# can still resolve string-annotations like `request: Request`,
+# `response: Response`, and `bg: BackgroundTasks`. Without these names
+# being in scope here, FastAPI treats the param as a query param and
+# 422s the endpoint. Keep this block in sync with the FastAPI ASGI
+# types that `scripts/lint_endpoint_signatures.py --check-decorators`
+# expects.
+from fastapi import Request, Response, BackgroundTasks  # noqa: F401
+from starlette.requests import Request as _StarletteRequest  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 # Postgres SQLSTATE codes we consider retriable.
@@ -89,34 +101,5 @@ def retry_on_deadlock(max_retries: int = 1,
                         sqlstate, fn.__name__, attempts, max_retries, delay * 1000,
                     )
                     time.sleep(delay)
-
-        # FastAPI compatibility: when the decorated function's module uses
-        # `from __future__ import annotations`, all annotations are stored as
-        # strings.  FastAPI's `get_typed_signature` resolves those strings
-        # against `_wrapped.__globals__` — which points to *this* module
-        # (db_locks.py), not the original function's module.  Any type name
-        # not imported here (e.g. `Request`, `CurrentUser`) is left as an
-        # unresolved `ForwardRef`, which FastAPI then treats as a required
-        # body/query parameter, causing a 422 on requests that don't supply
-        # that parameter.
-        #
-        # Fix: for each *simple* (non-generic) string annotation in `fn`,
-        # look up the name in `fn`'s own globals and, if it is a class,
-        # inject it into `_wrapped.__globals__` using `setdefault` so we
-        # never overwrite names already defined in this module.
-        # We restrict injection to `type` instances to avoid leaking
-        # arbitrary module-level objects from the caller's namespace.
-        # Note: generic annotations such as `List[Request]` contain nested
-        # names that are not injected by this loop; in practice the route
-        # handlers in this codebase only use simple type names here.
-        fn_globals = getattr(fn, "__globals__", {})
-        for _annotation in getattr(fn, "__annotations__", {}).values():
-            if (
-                isinstance(_annotation, str)
-                and _annotation in fn_globals
-                and isinstance(fn_globals[_annotation], type)
-            ):
-                _wrapped.__globals__.setdefault(_annotation, fn_globals[_annotation])
-
         return _wrapped
     return _decorator

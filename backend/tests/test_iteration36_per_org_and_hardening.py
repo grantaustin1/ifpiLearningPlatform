@@ -77,6 +77,7 @@ def _mint_sso_token(sub, email, roles, *,
         "iat": now,
         "exp": now + 60,
         "jti": uuid.uuid4().hex,
+        "email_verified": True,
     }
     if org_slug is not None:
         claims["org_slug"] = org_slug

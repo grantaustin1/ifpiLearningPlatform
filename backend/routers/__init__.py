@@ -112,6 +112,11 @@ def register_all(app: FastAPI) -> None:
     from routers import public_catalog
     app.include_router(public_catalog.router)
 
+    # Iter 44 — in-app feedback widget
+    from routers import feedback
+    app.include_router(feedback.router)
+    app.include_router(feedback.admin_router)
+
     # ── Iter 30e: Docs Library (downloadable manuals) ────────────────
     from routers import docs_library
     app.include_router(docs_library.router)

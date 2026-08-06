@@ -15,13 +15,20 @@ export interface User {
 interface AuthCtx {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<User>
+  login: (email: string, password: string) => Promise<LoginOutcome>
+  challenge2FA: (challengeId: string, code: string) => Promise<User>
   register: (email: string, password: string, name: string) => Promise<User>
   ssoExchange: (erpToken: string) => Promise<User>
   logout: () => Promise<void>
   refresh: () => Promise<void>
   hasRole: (...allowed: string[]) => boolean
 }
+
+/** Login outcome: either fully signed-in with a user object, or the
+ *  backend gate demanded a 2FA challenge. */
+export type LoginOutcome =
+  | { kind: 'ok'; user: User }
+  | { kind: 'requires_2fa'; challengeId: string; expiresIn: number }
 
 const Ctx = createContext<AuthCtx | undefined>(undefined)
 
@@ -43,8 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { fetchMe() }, [fetchMe])
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginOutcome> => {
     const r = await api.post('/auth/login', { email, password })
+    if (r.data?.requires_2fa) {
+      return { kind: 'requires_2fa', challengeId: r.data.challenge_id, expiresIn: r.data.expires_in }
+    }
+    if (r.data?.access_token) setAccessToken(r.data.access_token)
+    setUser(r.data.user)
+    return { kind: 'ok', user: r.data.user as User }
+  }
+
+  const challenge2FA = async (challengeId: string, code: string) => {
+    const r = await api.post('/auth/2fa/challenge', { challenge_id: challengeId, code })
     if (r.data?.access_token) setAccessToken(r.data.access_token)
     setUser(r.data.user)
     return r.data.user as User
@@ -76,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     !!user && allowed.some((r) => user.roles.includes(r))
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, ssoExchange, logout, refresh, hasRole }}>
+    <Ctx.Provider value={{ user, loading, login, challenge2FA, register, ssoExchange, logout, refresh, hasRole }}>
       {children}
     </Ctx.Provider>
   )

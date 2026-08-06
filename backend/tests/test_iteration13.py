@@ -151,16 +151,23 @@ class TestDigestService:
         from services.cohort_digest import send_weekly_digests
 
         with SessionLocal() as db:
-            org = db.query(Organization).filter(Organization.slug == "ifpi-main").first()
-            assert org is not None
-            org.cohort_digest_enabled = False
+            # Earlier suite files create factory orgs with digests on —
+            # disable them all for this assertion, restore after.
+            enabled_ids = [o.id for o in db.query(Organization)
+                           .filter(Organization.cohort_digest_enabled == True).all()]  # noqa: E712
+            db.query(Organization).filter(Organization.id.in_(enabled_ids)) \
+                .update({Organization.cohort_digest_enabled: False},
+                        synchronize_session=False)
             db.commit()
-            total = send_weekly_digests(db)
-            # No emails should have been queued for the only org
-            assert total == 0
-            # Restore
-            org.cohort_digest_enabled = True
-            db.commit()
+            try:
+                total = send_weekly_digests(db)
+                # No emails should have been queued — every org is disabled
+                assert total == 0
+            finally:
+                db.query(Organization).filter(Organization.id.in_(enabled_ids)) \
+                    .update({Organization.cohort_digest_enabled: True},
+                            synchronize_session=False)
+                db.commit()
 
     def test_weekly_digest_dedupes_recent_sends(self):
         from datetime import datetime, timezone
@@ -171,10 +178,24 @@ class TestDigestService:
         with SessionLocal() as db:
             org = db.query(Organization).filter(Organization.slug == "ifpi-main").first()
             assert org is not None
+            # Disable every other digest-enabled org (factory debris) so
+            # the weekly-path count isolates ifpi-main's dedup behaviour.
+            other_ids = [o.id for o in db.query(Organization)
+                         .filter(Organization.cohort_digest_enabled == True,  # noqa: E712
+                                 Organization.id != org.id).all()]
+            db.query(Organization).filter(Organization.id.in_(other_ids)) \
+                .update({Organization.cohort_digest_enabled: False},
+                        synchronize_session=False)
             org.cohort_digest_enabled = True
             # Fire one send to set last_sent_at to now
             send_digest_for_org(db, org)
             db.commit()
-            # Immediate second run via weekly path should skip (within 6 days)
-            total = send_weekly_digests(db)
-            assert total == 0
+            try:
+                # Immediate second run via weekly path should skip (within 6 days)
+                total = send_weekly_digests(db)
+                assert total == 0
+            finally:
+                db.query(Organization).filter(Organization.id.in_(other_ids)) \
+                    .update({Organization.cohort_digest_enabled: True},
+                            synchronize_session=False)
+                db.commit()

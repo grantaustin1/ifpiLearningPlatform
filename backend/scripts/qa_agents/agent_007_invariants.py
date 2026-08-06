@@ -18,7 +18,7 @@ Invariants checked:
 - I-009  No Invitation that's both accepted_at and revoked_at populated
 
 Exit code 0 if clean, 1 if any violation found. JSON report written to
-test_reports/agent_007.json (or AGENT_REPORT_DIR override) for CI artifact upload.
+/app/test_reports/agent_007.json for CI artefact upload.
 """
 from __future__ import annotations
 
@@ -55,21 +55,6 @@ from models import (  # noqa: E402
     AuditLog, BadgeTier, Certificate, Course, CourseStatus, Enrollment,
     Invitation, Organization, OutboxMessage, SlideComment, User,
 )
-
-
-def _report_path(name: str) -> Path:
-    report_dir = os.environ.get("AGENT_REPORT_DIR")
-    if report_dir:
-        candidate = Path(report_dir)
-        try:
-            candidate.mkdir(parents=True, exist_ok=True)
-            if os.access(candidate, os.W_OK):
-                return candidate / name
-        except OSError:
-            pass
-    fallback = Path(__file__).absolute().parents[3] / "test_reports"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback / name
 
 
 def main() -> int:

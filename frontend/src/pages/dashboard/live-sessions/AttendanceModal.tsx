@@ -33,7 +33,7 @@ export function AttendanceModal({ sessionId, onClose }: {
   sessionId: number
   onClose: () => void
 }) {
-  const { confirm, ConfirmDialog } = useConfirm()
+  const confirm = useConfirm()
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [users, setUsers] = useState<Record<number, { name: string; email: string }>>({})
   const [saving, setSaving] = useState(false)
@@ -158,7 +158,6 @@ export function AttendanceModal({ sessionId, onClose }: {
           )}
         </div>
       </div>
-      <ConfirmDialog />
     </div>
   )
 }

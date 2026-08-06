@@ -27,6 +27,7 @@ class Course(Base):
     category = Column(String(80), index=True)
     cover_color = Column(String(32), default="bg-indigo-500")
     cover_image = Column(String(500))
+    is_featured = Column(Boolean, default=False, nullable=False, server_default="0")  # Iter 42 — admin-picked marketplace featured row
     status = Column(SQLEnum(CourseStatus), default=CourseStatus.DRAFT, index=True)
     passing_score = Column(Integer, default=70)
     duration_minutes = Column(Integer)
