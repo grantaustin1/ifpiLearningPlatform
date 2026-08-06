@@ -11,6 +11,7 @@ HTTP 403 by design (see docs/AI_AUTHORING_SUITE_ROADMAP.md §2).
 """
 from __future__ import annotations
 
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

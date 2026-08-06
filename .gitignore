@@ -5,6 +5,7 @@ credentials.json
 *.pem
 *.key
 .credentials
+backend/snapshots/
 
 # Python cache
 __pycache__/

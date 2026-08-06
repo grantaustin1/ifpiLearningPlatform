@@ -6,23 +6,15 @@ Run with:
 import os
 import sqlite3
 import time
-from pathlib import Path
 
 import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    pytest.skip("REACT_APP_BACKEND_URL is required", allow_module_level=True)
-BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./ifpi_lms.db")
-if DATABASE_URL.startswith("sqlite:///"):
-    SQLITE_PATH = DATABASE_URL.replace("sqlite:///", "", 1)
-    if not os.path.isabs(SQLITE_PATH):
-        SQLITE_PATH = os.path.join(BACKEND_DIR, SQLITE_PATH)
-else:
-    SQLITE_PATH = os.path.join(BACKEND_DIR, "ifpi_lms.db")
-SQLITE_PATH = os.path.abspath(SQLITE_PATH)
+    import pytest
+    pytest.skip("REACT_APP_BACKEND_URL not set — skipping integration tests", allow_module_level=True)
+SQLITE_PATH = "/app/backend/ifpi_lms.db"
 
 ADMIN = {"email": "admin@ifpi.org", "password": "admin123"}
 LEARNER = {"email": "learner@ifpi.org", "password": "learner123"}
@@ -196,8 +188,6 @@ class TestAcademyAudit:
             "admin_name": "Audit Admin",
         }
         r = admin_client.post(f"{BASE_URL}/api/academies", json=payload)
-        if r.status_code == 403:
-            pytest.skip("admin seed user is not SUPER_ADMIN in this environment")
         assert r.status_code in (200, 201), r.text
         time.sleep(0.3)
         r2 = admin_client.get(f"{BASE_URL}/api/admin/audit-log",

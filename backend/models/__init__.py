@@ -38,6 +38,7 @@ from ._common import (
 )
 from .identity import (
     AccountDeletionRequest,
+    CustomThemePreset,
     EmailVerificationToken,
     Invitation,
     Organization,
@@ -109,10 +110,12 @@ from .ai import (
     SourceDocument,
 )
 from .engagement import (
+    CourseRating,
     CourseView,
     LiveSession,
     LiveSessionRsvp,
     SlideView,
+    TesterFeedback,
 )
 
 __all__ = [
@@ -123,7 +126,7 @@ __all__ = [
     "LifecycleStage", "OrganizationStatus", "QuestionType", "SlideType",
     "SubscriptionStatus",
     # identity
-    "AccountDeletionRequest", "EmailVerificationToken", "Invitation",
+    "AccountDeletionRequest", "CustomThemePreset", "EmailVerificationToken", "Invitation",
     "Organization", "PasswordResetToken", "Person", "RefreshToken",
     "SsoJtiSeen", "Erp360SeenEvent", "ProgressOutbox", "User", "UserRole",
     # learning
@@ -146,5 +149,5 @@ __all__ = [
     "AIJob", "AITutorMessage", "AITutorSession", "AIUsageLedger",
     "Flashcard", "FlashcardReview", "SourceChunk", "SourceDocument",
     # engagement
-    "CourseView", "LiveSession", "LiveSessionRsvp", "SlideView",
+    "CourseRating", "CourseView", "LiveSession", "LiveSessionRsvp", "SlideView", "TesterFeedback",
 ]

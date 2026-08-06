@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 
 export default function LoginPage() {
   const nav = useNavigate()
-  const { login, ssoExchange } = useAuth()
+  const { login, challenge2FA, ssoExchange } = useAuth()
   const [params] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,6 +17,10 @@ export default function LoginPage() {
   const [ssoEnabled, setSsoEnabled] = useState(false)
   const [ssoInitiateUrl, setSsoInitiateUrl] = useState<string | null>(null)
   const [ssoExchanging, setSsoExchanging] = useState(false)
+  // Iter 30i — 2FA gate state. When the login response says
+  // requires_2fa=true, we swap the password form for a TOTP code form.
+  const [twoFA, setTwoFA] = useState<{ challengeId: string } | null>(null)
+  const [twoFACode, setTwoFACode] = useState('')
   const [brand, setBrand] = useState<{ name: string; logo_url: string | null; primary_color: string; accent_color: string }>({
     name: 'IFPI Learning', logo_url: null, primary_color: '#262262', accent_color: '#F5A500',
   })
@@ -33,7 +37,9 @@ export default function LoginPage() {
       .catch(() => { /* silent — fall back to defaults */ })
   }, [])
 
-  const backend = process.env.REACT_APP_BACKEND_URL || ''
+  const backend = (import.meta as any).env?.VITE_API_URL
+    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
+    || ''
   const resolvedLogo = brand.logo_url
     ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
     : null
@@ -70,14 +76,50 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('')
     try {
-      const u = await login(email, password)
+      const outcome = await login(email, password)
+      if (outcome.kind === 'requires_2fa') {
+        setTwoFA({ challengeId: outcome.challengeId })
+        setLoading(false)
+        toast.info('Enter the 6-digit code from your authenticator')
+        return
+      }
+      const u = outcome.user
       toast.success(`Welcome back, ${u.name || u.email}`)
+      // Iter 33d — Route forced-password-change users DIRECTLY to the
+      // change-password page. Going via /dashboard first creates a
+      // flash/race with <Protected> and can be aborted mid-transition
+      // by any background API 401 (KioskShell, TermsGate). Direct nav
+      // guarantees the form stays put until the user completes it.
+      if (u.must_change_password) {
+        nav('/change-password?forced=1', { replace: true })
+        return
+      }
       nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Invalid email or password')
+      setError(err?.response?.data?.error?.message || err?.response?.data?.detail || 'Invalid email or password')
       setLoading(false)
     }
   }
+
+  const onSubmit2FA = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true); setError('')
+    if (!twoFA) return
+    try {
+      const u = await challenge2FA(twoFA.challengeId, twoFACode.trim())
+      toast.success(`Welcome back, ${u.name || u.email}`)
+      if (u.must_change_password) {
+        nav('/change-password?forced=1', { replace: true })
+        return
+      }
+      nav(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN') ? '/dashboard' : '/courses')
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.detail || 'Invalid code'
+      setError(msg)
+      setLoading(false)
+    }
+  }
+
+  const cancel2FA = () => { setTwoFA(null); setTwoFACode(''); setError('') }
 
   const onSsoClick = () => {
     if (ssoInitiateUrl) {
@@ -176,32 +218,71 @@ export default function LoginPage() {
             </>
           )}
 
-          <form onSubmit={onSubmit} className="space-y-4" data-testid="login-form">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" autoComplete="email" data-testid="login-email"
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Password</label>
-              <div className="relative">
-                <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••" autoComplete="current-password" data-testid="login-password"
-                  className="w-full px-4 py-3 pr-11 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
-                <button type="button" onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          <form onSubmit={twoFA ? onSubmit2FA : onSubmit} className="space-y-4" data-testid="login-form">
+            {!twoFA && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Email</label>
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email" data-testid="login-email"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Password</label>
+                  <div className="relative">
+                    <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
+                      placeholder="••••••••" autoComplete="current-password" data-testid="login-password"
+                      className="w-full px-4 py-3 pr-11 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
+                    <button type="button" onClick={() => setShowPw(!showPw)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            {twoFA && (
+              <div data-testid="login-2fa-form">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">
+                  Authenticator code
+                </label>
+                <input type="text" required inputMode="numeric" autoFocus
+                  value={twoFACode}
+                  onChange={e => setTwoFACode(e.target.value)}
+                  placeholder="000000 or recovery code"
+                  data-testid="login-2fa-code"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-lg font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400" />
+                <p className="text-xs text-slate-500 mt-2">
+                  Enter the 6-digit code from your authenticator app — or a single-use recovery code.
+                </p>
+                <button type="button" onClick={cancel2FA} data-testid="login-2fa-cancel"
+                        className="text-xs text-slate-500 hover:text-slate-700 mt-2 underline">
+                  Use a different account
                 </button>
               </div>
-            </div>
+            )}
+            {error && (
+              <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2" data-testid="login-error">
+                {error}
+              </div>
+            )}
             <button type="submit" disabled={loading} data-testid="login-submit"
               style={{ backgroundColor: brand.primary_color }}
               className="w-full flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60 text-white font-semibold py-3 rounded-xl shadow-lg hover:-translate-y-0.5 transition-all">
               {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                       : <>Sign in <ArrowRight className="h-4 w-4" /></>}
+                       : <>{twoFA ? 'Verify code' : 'Sign in'} <ArrowRight className="h-4 w-4" /></>}
             </button>
           </form>
+
+          {/* Iter 32 — Forgot-password link. Hidden during 2FA challenge. */}
+          {!twoFA && (
+            <div className="text-center mt-4">
+              <Link to="/forgot-password" data-testid="login-forgot-password"
+                className="text-xs text-slate-500 hover:text-indigo-600 hover:underline">
+                Forgot your password?
+              </Link>
+            </div>
+          )}
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Don&apos;t have an account?{' '}
@@ -214,10 +295,6 @@ export default function LoginPage() {
               <span>📚</span> Browse the public catalog · verify a certificate
             </Link>
           </div>
-          <p className="text-center text-[11px] text-slate-400 mt-5">
-            Demo: <code className="bg-slate-100 px-1.5 py-0.5 rounded">admin@ifpi.org / admin123</code><br />
-            or <code className="bg-slate-100 px-1.5 py-0.5 rounded">learner@ifpi.org / learner123</code>
-          </p>
         </div>
       </div>
     </div>

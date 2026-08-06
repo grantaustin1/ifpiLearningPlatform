@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useConfirm } from 'components/ConfirmDialog'
 import { api } from 'lib/api'
 import { Upload, Play, RefreshCw, FolderInput, CheckCircle2, XCircle, AlertCircle, Clock, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -29,6 +30,7 @@ const STATUS_META: Record<string, { icon: any; cls: string; label: string }> = {
 }
 
 export default function ImportsPage() {
+  const confirm = useConfirm()
   const [jobs, setJobs] = useState<ImportJob[]>([])
   const [loading, setLoading] = useState(true)
   const [showRun, setShowRun] = useState(false)
@@ -43,7 +45,12 @@ export default function ImportsPage() {
   }
 
   const rollback = async (jobId: number) => {
-    if (!window.confirm('Roll back this import? All courses and learning paths it created will be permanently deleted. This cannot be undone.')) return
+    if (!(await confirm({
+      title: 'Roll back this import?',
+      description: 'All courses and learning paths it created will be permanently deleted. This cannot be undone.',
+      confirmLabel: 'Roll back',
+      variant: 'danger',
+    }))) return
     try {
       const r = await api.post(`/admin/imports/${jobId}/rollback`)
       toast.success(`Rolled back — deleted ${r.data.deleted_courses} courses, ${r.data.deleted_paths} paths`)

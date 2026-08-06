@@ -26,6 +26,18 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+# Re-exports so that when `@retry_on_deadlock` wraps a FastAPI endpoint
+# using `from __future__ import annotations`, FastAPI's `get_type_hints`
+# call — which inspects the wrapper's `__globals__` (this module) —
+# can still resolve string-annotations like `request: Request`,
+# `response: Response`, and `bg: BackgroundTasks`. Without these names
+# being in scope here, FastAPI treats the param as a query param and
+# 422s the endpoint. Keep this block in sync with the FastAPI ASGI
+# types that `scripts/lint_endpoint_signatures.py --check-decorators`
+# expects.
+from fastapi import Request, Response, BackgroundTasks  # noqa: F401
+from starlette.requests import Request as _StarletteRequest  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 # Postgres SQLSTATE codes we consider retriable.

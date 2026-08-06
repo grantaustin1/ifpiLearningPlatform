@@ -8,14 +8,11 @@
 import os
 import subprocess
 import sys
-import importlib.util
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://code-quality-check-31.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://last-checkpoint-15.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-HAS_EMERGENT_LLM_KEY = bool(os.environ.get("EMERGENT_LLM_KEY", "").strip())
-BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 @pytest.fixture(scope="module")
@@ -65,10 +62,6 @@ def first_course_id(admin_headers):
 
 # ---------- AI quiz: question types ----------
 
-@pytest.mark.skipif(
-    not HAS_EMERGENT_LLM_KEY,
-    reason="EMERGENT_LLM_KEY is required for AI quiz generation tests",
-)
 class TestAIQuizQuestionTypes:
     def test_true_false_returns_two_options(self, admin_headers, first_course_id):
         r = requests.post(f"{API}/exams/ai-generate-questions",
@@ -257,7 +250,7 @@ class TestAuditDigest:
             "import os, asyncio, sys\n"
             "os.environ.pop('EMERGENT_LLM_KEY', None)\n"
             "os.environ['EMERGENT_LLM_KEY']=''\n"
-            f"sys.path.insert(0, {BACKEND_DIR!r})\n"
+            "sys.path.insert(0, '/app/backend')\n"
             "from core.database import SessionLocal\n"
             "from auth.dependencies import CurrentUser\n"
             "from routers.iter8 import audit_digest\n"

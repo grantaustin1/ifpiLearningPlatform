@@ -1,0 +1,30 @@
+{
+  "ok": false,
+  "steps": [
+    {
+      "step": "fixture seeded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "admin login",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "step": "fixture course present",
+      "ok": true,
+      "detail": "course_id=1"
+    },
+    {
+      "step": "fixture exam present",
+      "ok": true,
+      "detail": "exam_id=1"
+    },
+    {
+      "step": "bulk invite queued",
+      "ok": false,
+      "detail": "body={\"error\":{\"code\":\"CSRF_TOKEN_MISMATCH\",\"message\":\"CSRF token missing or invalid \u2014 refresh the page and retry.\",\"status\":403,\"correlation_id\":null}}"
+    }
+  ]
+}

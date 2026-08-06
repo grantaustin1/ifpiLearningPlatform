@@ -19,8 +19,7 @@ Journey:
     9. Download /api/certificates/transcript
    10. Re-run agent_007 invariants — should still be clean
 
-Exit 0 on success, 1 on failure. JSON report at test_reports/agent_008.json
-(or AGENT_REPORT_DIR override).
+Exit 0 on success, 1 on failure. JSON report at /app/test_reports/agent_008.json.
 """
 from __future__ import annotations
 
@@ -49,7 +48,19 @@ def _api_url() -> str:
 
 API = _api_url()
 LOG: list[dict] = []
-MAX_ERROR_BODY_LENGTH = 200
+
+
+def _is_completion_status_ok(status_code: int, already_completed: bool) -> bool:
+    """Return whether a course-completion response status is expected.
+
+    200/201 are always OK. 422 is OK only when the course was already
+    marked complete (idempotent retry).
+    """
+    if status_code in (200, 201):
+        return True
+    if status_code == 422 and already_completed:
+        return True
+    return False
 
 
 def step(name: str, ok: bool, detail: str = "") -> None:
@@ -61,29 +72,16 @@ def step(name: str, ok: bool, detail: str = "") -> None:
         raise SystemExit(1)
 
 
-def _is_completion_status_ok(status_code: int, is_already_completed: bool) -> bool:
-    """Accept normal success codes, plus 422 only when completion state is
-    already persisted (idempotent outcome)."""
-    return status_code in (200, 201) or (status_code == 422 and is_already_completed)
-
-
-def _report_path(name: str) -> Path:
-    report_dir = os.environ.get("AGENT_REPORT_DIR")
-    if report_dir:
-        candidate = Path(report_dir)
-        try:
-            candidate.mkdir(parents=True, exist_ok=True)
-            if os.access(candidate, os.W_OK):
-                return candidate / name
-        except OSError:
-            pass
-    fallback = Path(__file__).absolute().parents[3] / "test_reports"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback / name
-
-
 def _write_report(ok: bool) -> None:
-    out = _report_path("agent_008.json")
+    env_dir = os.environ.get("QA_REPORT_DIR")
+    if env_dir:
+        out = Path(env_dir) / "agent_008.json"
+    else:
+        try:
+            Path("/app/test_reports").mkdir(parents=True, exist_ok=True)
+            out = Path("/app/test_reports/agent_008.json")
+        except (PermissionError, OSError):
+            out = Path(__file__).resolve().parents[3] / "test_reports" / "agent_008.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"ok": ok, "steps": LOG}, indent=2))
 
@@ -107,7 +105,7 @@ def main() -> int:
     step("fixture seeded", True)
 
     from core.database import SessionLocal
-    from models import Certificate, Course, Enrollment, EnrollmentStatus, Exam, Invitation, User
+    from models import Course, Exam, Invitation, User
 
     # 2) Admin session
     s = requests.Session()
@@ -169,33 +167,7 @@ def main() -> int:
 
     # 7b) Mark the course complete (issues the certificate)
     r = ls.post(f"{API}/api/courses/{course.id}/complete", timeout=15)
-    completed_despite_422 = False
-    if r.status_code == 422:
-        with SessionLocal() as db:
-            from sqlalchemy import and_
-
-            completed_despite_422 = db.query(Enrollment.id).join(
-                User, User.id == Enrollment.user_id,
-            ).join(
-                Certificate,
-                and_(
-                    Certificate.user_id == Enrollment.user_id,
-                    Certificate.course_id == Enrollment.course_id,
-                ),
-            ).filter(
-                User.email == learner_email,
-                Enrollment.course_id == course.id,
-                Enrollment.status == EnrollmentStatus.COMPLETED,
-            ).first() is not None
-    step(
-        "course marked complete",
-        _is_completion_status_ok(r.status_code, completed_despite_422),
-        (
-            f"status={r.status_code} (already completed + cert issued)"
-            if completed_despite_422
-            else f"status={r.status_code} body={r.text[:MAX_ERROR_BODY_LENGTH]}"
-        ),
-    )
+    step("course marked complete", r.status_code in (200, 201), f"status={r.status_code}")
 
     # 8) Cert auto-issued?
     r = ls.get(f"{API}/api/certificates", timeout=15)

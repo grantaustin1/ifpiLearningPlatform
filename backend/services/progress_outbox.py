@@ -21,6 +21,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from models import ProgressOutbox

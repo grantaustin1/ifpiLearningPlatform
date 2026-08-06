@@ -1,0 +1,27 @@
+{
+  "summary": "Full backend + frontend regression for Iter 48 (Review Replies + Social Preview Cards). All 14 backend pytest cases pass (reply auth/validation, catalog+admin lists include reply_text/reply_at, /api/seo/courses/share OG HTML w/ og:image, star rating in description, JS redirect to /catalog/{id}, 404 for draft/non-marketplace, HTML escaping). Frontend flows verified end-to-end: admin course-edit reviews panel Reply publicly → editor → publish (toast + Your reply block), Edit reply → clear text → save (toast 'Reply removed', reply block removed from public page), public catalog page shows 'Response from {org name}' block via data-testid review-reply-{id}, ShareCourseButton copies {origin}/api/seo/courses/share/{id} on catalog detail card AND /courses dashboard exposes both 'Copy public link' (share URL) and 'Copy in-app link' (/learn/{id}) with correct clipboards, opening /api/seo/courses/share/{id} in the browser JS-redirects humans to /catalog/{id}.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration48_reply_share.py",
+    "/app/test_reports/pytest/iter48_results.xml"
+  ],
+  "action_items": [
+    "(pre-existing carry-over, not Iter 48) DELETE /api/courses/{id} may still fail with the SQLAlchemy cascade FK error for courses that have slides — noted in iter 47 report. Some TEST_Iter48 courses will remain in UAT tenant if their deletion 500s; low priority."
+  ],
+  "critical_code_review_comments": [
+    "reply_to_review (courses.py:231-257) correctly validates isinstance(str) + len<=1000 (422), enforces org scoping (course.organization_id == current.organization_id → 404), and clears both reply_text AND reply_at atomically when reply is empty. Good.",
+    "course_share (seo.py:262-369) properly gates on Course.status==PUBLISHED AND Organization.marketplace_opt_in==True (404 else), escapes title/description/image/url with html.escape, embeds JS redirect via window.location.replace to /catalog/{id}, and computes absolute og:image URL. Star description uses round() so avg 4.6 shows as 5.0 in the ★★★★★ visual — acceptable but note the numeric ★ 4.6 (n rating(s)) inside og:description keeps precision to 1 decimal.",
+    "catalog_reviews (misc.py:1273-1309) exposes reply_text/reply_at publicly for non-hidden reviews only — consistent with hidden semantics. Good.",
+    "ReplyBox (CourseReviewsPanel.tsx) uses correct data-testids (reply-btn-{id}, reply-editor-{id}, reply-input-{id}, save-reply-{id}, edit-reply-{id}); toggles button label to 'Remove reply' when text cleared — nice UX cue.",
+    "Minor: seo.course_share falls back to org.logo_url for og:image when course.cover_image is missing — good, but this couples 'course share preview' to org logo which may surprise users; consider a placeholder image if neither exists (currently no og:image tag is emitted at all, which some crawlers dislike)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration48_reply_share.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (all Iter 48 selectors and flows verified)"},
+  "test_credentials": "UAT admin uat-admin@ifpi.org / UatAdmin!2026, UAT learner uat-learner@ifpi.org / UatLearner!2026",
+  "seed_data_creation": "Test file temporarily flips organizations.slug='uat-sandbox' marketplace_opt_in True during the module and reverts to False at teardown (verified reverted at end of run). A couple of TEST_Iter48_* courses (incl. course 227 from prior iter) remain in UAT tenant due to pre-existing DELETE cascade bug; benign.",
+  "retest_needed": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Reusable pytest: /app/backend/tests/test_iteration48_reply_share.py (14 tests, 2 classes). It self-manages UAT org marketplace_opt_in via SQLAlchemy fixture, so it can be run standalone. UAT opt_in is False in baseline DB. Frontend Playwright tips: use ctx.grant_permissions(['clipboard-read','clipboard-write']) to read ShareCourseButton's copied text; the /courses dashboard shows a dropdown menu with 'Copy public link' + 'Copy in-app link' items after clicking share-course-btn-{id}; on catalog card and course detail page the share button copies directly without opening a menu.",
+  "rca of the issue": "N/A — no Iter 48 bugs found. Both new features (review replies + course social share OG endpoint) work end-to-end."
+}

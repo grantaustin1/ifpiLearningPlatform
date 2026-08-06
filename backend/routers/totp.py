@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
+from core.config import settings as _settings
 from core.security import verify_password
 from models import User
 from schemas import (
@@ -94,7 +95,7 @@ def clear_challenge(challenge_id: str) -> None:
 
 @user_router.get("/status")
 def totp_status(current: CurrentUser = Depends(get_current_user),
-                db: Session = Depends(get_db)) -> dict:
+                db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == current.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -109,7 +110,7 @@ def totp_status(current: CurrentUser = Depends(get_current_user),
 
 @user_router.post("/setup-init")
 def setup_init(current: CurrentUser = Depends(get_current_user),
-               db: Session = Depends(get_db)) -> dict:
+               db: Session = Depends(get_db)):
     """Return a fresh secret + QR. Nothing is persisted here — the
     client MUST call /setup with a verified code + the same secret to
     activate. Idempotent: existing 2FA users can regenerate (their
@@ -126,7 +127,7 @@ def setup_init(current: CurrentUser = Depends(get_current_user),
 @user_router.post("/setup", response_model=dict)
 def setup(body: TOTPSetupIn, request: Request,
           current: CurrentUser = Depends(get_current_user),
-          db: Session = Depends(get_db)) -> dict:
+          db: Session = Depends(get_db)):
     if not totp_service.verify_code(body.secret, body.code):
         raise HTTPException(status_code=400, detail={
             "message": "Invalid TOTP code — did you enter the current 6-digit code from your authenticator?",
@@ -159,7 +160,7 @@ def setup(body: TOTPSetupIn, request: Request,
 @user_router.post("/disable")
 def disable(body: TOTPDisableIn, request: Request,
             current: CurrentUser = Depends(get_current_user),
-            db: Session = Depends(get_db)) -> dict:
+            db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == current.id).first()
     if not user or not user.totp_secret_enc:
         raise HTTPException(status_code=400, detail="2FA is not enabled")
@@ -190,7 +191,7 @@ def disable(body: TOTPDisableIn, request: Request,
 
 @user_router.post("/challenge", response_model=LoginResponse)
 def challenge(body: TOTPChallengeIn, request: Request, response: Response,
-              db: Session = Depends(get_db)) -> LoginResponse:
+              db: Session = Depends(get_db)):
     """Public — accepts {challenge_id, code} and returns the standard
     LoginResponse if the code is valid."""
     user_id = _consume_challenge(body.challenge_id)
@@ -241,7 +242,7 @@ def challenge(body: TOTPChallengeIn, request: Request, response: Response,
 @admin_router.post("/{user_id}/2fa/disable")
 def admin_disable(user_id: int, request: Request,
                   current: CurrentUser = Depends(requires_roles("SUPER_ADMIN")),
-                  db: Session = Depends(get_db)) -> dict:
+                  db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id,
                                  User.organization_id == current.organization_id).first()
     if not user:
@@ -262,6 +263,6 @@ def admin_disable(user_id: int, request: Request,
 
 # The register_all() shim expects a `router` symbol — we export TWO,
 # grouped as a tuple for that consumer.
-def register(app) -> None:
+def register(app):
     app.include_router(user_router)
     app.include_router(admin_router)

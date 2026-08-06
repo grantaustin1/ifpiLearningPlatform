@@ -1,0 +1,29 @@
+{
+  "summary": "Iter 44 — feedback widget, course ratings, dashboard chart toggle. Backend: 15/15 pytest pass (feedback POST/list/status/org-isolation, ratings pre/post-completion + upsert + GET, catalog rating fields, weekly metric=enrollments/completions/bogus). Frontend: learner FAB (feedback-widget-btn) opens panel, submits IDEA feedback, panel closes on success, message appears in admin /feedback-admin list; admin 'Mark reviewed' -> 'Reopen' toggle works; UAT admin dashboard weekly-enrollments-chart title flips 'Weekly enrolments' <-> 'Weekly completions' via weekly-metric-completions / weekly-metric-enrollments buttons; Recent Activity still renders on dashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration44_feedback_ratings.py",
+    "/app/test_reports/pytest/iter44.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/feedback.py POST /api/feedback returns 201 as required and validates category via Pydantic constant set + explicit 422; status endpoint accepts raw dict body — consider a Pydantic model for consistency, but functional.",
+    "routers/courses.py rate_course explicitly rejects float/non-int with a clean 422 message and re-uses avg_rating rounding logic identical to the catalog serializer.",
+    "misc.py enrollments_weekly correctly org-scopes via Course.organization_id join for both enrolments and completions metrics."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration44_feedback_ratings.py"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% of tested flows"},
+  "test_credentials": "uat-admin@ifpi.org/UatAdmin!2026, uat-learner@ifpi.org/UatLearner!2026, admin@ifpi.org/admin123 (X-Return-Token: true for API)",
+  "seed_data_creation": "One TEST_ published course (single slide) created + auto-deleted in module teardown; ~5 TEST_iter44 feedback rows submitted in UAT org (all prefixed TEST_ for easy cleanup); 1 rating on the disposable TEST_ course (removed with course).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "pytest /app/backend/tests/test_iteration44_feedback_ratings.py covers the full iter 44 backend surface. Frontend gotcha: Playwright's Locator.click(force=True) on the FAB can land on the inner <svg><path> and be swallowed by pointer-events on some SVG paths — use page.mouse.click(x, y) via bounding_box() instead. All rating and feedback API assertions include Create->Read verification.",
+  "rca of the issue": "None — features work end-to-end. Note: a stale CRA dev-server compile-error overlay ('FeedbackWidget is not defined') persisted at page load until a supervisorctl restart of the frontend; after restart the app compiled cleanly ('No issues found.') and remained stable. Root cause was almost certainly a webpack/eslint cache from a partially-saved edit during dev — main agent should verify that all three files (DashboardLayout.tsx, LearnPage.tsx, CatalogPage.tsx) still have their imports (FeedbackWidget, Star, myRating state) after any further edits."
+}

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from 'lib/api'
 import { Sparkles, Loader2, Trash2, Save, ArrowLeft, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from 'components/ConfirmDialog'
 
 interface Card {
   id?: number
@@ -19,6 +20,7 @@ interface Card {
 interface Course { id: number; title: string }
 
 export default function FlashcardsAuthoringPage() {
+  const confirm = useConfirm()
   const { courseId } = useParams()
   const nav = useNavigate()
   const cid = Number(courseId)
@@ -84,7 +86,11 @@ export default function FlashcardsAuthoringPage() {
   }
 
   const deleteExisting = async (id: number) => {
-    if (!window.confirm('Delete this flashcard?')) return
+    if (!(await confirm({
+      title: 'Delete this flashcard?',
+      description: 'The card and any review history for it will be removed. This cannot be undone.',
+      confirmLabel: 'Delete', variant: 'danger',
+    }))) return
     await api.delete(`/authoring/flashcards/${id}`)
     load()
   }

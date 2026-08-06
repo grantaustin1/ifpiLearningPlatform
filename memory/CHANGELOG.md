@@ -1,6 +1,217 @@
 # IFPI Learning Platform — Product Requirements & Status
 <!-- lockfile-sync: 2026-07-09 -->
 
+## Iteration 45 — CI lockfile guard (2026-07-30)
+
+- Fixed the GitHub Actions `yarn install --frozen-lockfile` failure: removed
+  the redundant `@types/dompurify` stub and regenerated `yarn.lock` (verified
+  by testing agent iteration_45.json incl. cold-cache CI simulation). User
+  must commit both files via Save to GitHub.
+- New guard `backend/scripts/check_lockfile_sync.py`: asserts every
+  `name@range` in frontend/package.json has a resolution key in yarn.lock
+  (offline, <1s). Wired into `pre_finish_check.py` as step 5, so every
+  handoff now fails fast on lockfile drift. Negative-tested (injected fake
+  dep → exit 1).
+- Also cleared a stale CRA ESLint cache that produced a false
+  "FeedbackWidget is not defined" dev overlay after node_modules rebuild.
+
+## Iteration 44 — Feedback widget + course ratings + chart toggle (2026-07-30)
+
+Certified by testing agent (iteration_44.json): backend 15/15, frontend 100%.
+
+- **In-app feedback widget**: floating FAB (`FeedbackWidget.tsx`, mounted in
+  DashboardLayout) → POST /api/feedback (BUG/IDEA/OTHER + auto page path);
+  admin review page `/feedback-admin` (sidebar "Feedback") with NEW/REVIEWED
+  toggle; org-isolated. Model `TesterFeedback` (engagement.py).
+- **Course ratings**: `CourseRating` model; POST /api/courses/{id}/rating
+  (1-5, requires Enrollment.completed_at, upsert) + GET .../rating; star
+  picker on the LearnPage completion card; amber avg-star badge on catalog
+  cards (`catalog-rating-{id}`); catalog serializer batches avg/count.
+- **Chart toggle**: enrollments-weekly endpoint gained `metric=
+  enrollments|completions`; WeeklyEnrollmentsCard has an Enrolments/
+  Completions toggle.
+- Migration `3c4d5e6f7a8b` (course_ratings + tester_feedback).
+- New regression file: `tests/test_iteration44_feedback_ratings.py`.
+
+## Iteration 43 — Landing polish + cover gallery + weekly enrolments (2026-07-30)
+
+Certified by testing agent (iteration_39.json): backend 10/10, frontend 100%.
+
+- **Landing page**: fitness hero ("Training that powers the fitness industry",
+  "Trusted by fitness professionals worldwide"), CPD/multi-academy feature copy,
+  new **Featured courses** photo strip (`landing-featured`, up to 3 cards from
+  `/api/catalog?featured=true`, linking to /catalog/{id}).
+- **Cover photo gallery**: 15 curated fitness photos in
+  `uploads/covers/library/` (`scripts/build_cover_library.py`, idempotent);
+  `GET /api/uploads/cover-library` (INSTRUCTOR+); course editor "Gallery"
+  button → modal grid (`cover-gallery-modal`) → click fills cover_image.
+- **Weekly enrolments chart**: `GET /api/admin/analytics/enrollments-weekly`
+  (ADMIN, weeks 4–26, org-scoped via Course.organization_id, consecutive
+  Monday buckets); `WeeklyEnrollmentsCard.tsx` CSS bar chart on the admin
+  dashboard next to Recent Activity.
+- New regression file: `tests/test_iteration43_landing_gallery_analytics.py`.
+
+## Iteration 42 — Course cover photos + admin Featured picks (2026-07-30)
+
+Certified by testing agent (iteration_38.json): backend 8/8, frontend 100%.
+
+- **Cover images end-to-end**: `cover_image` now in CourseUpdate/CourseSummary
+  schemas, course serializers, catalog serializers; rendered on public catalog
+  cards (`catalog-cover-img-*`), admin course cards (photo takes precedence
+  over mind-map thumb) and a new "Cover image" field in the course editor
+  (URL input + upload via /api/uploads/image, preview, remove).
+  `scripts/set_course_covers.py` downloaded 4 curated fitness photos into
+  local storage (`uploads/covers/*`) and set them on the 4 real courses
+  (live DB + UAT snapshot; snapshot also alembic-upgraded).
+- **Featured Course Pick**: new `courses.is_featured` column (migration
+  `2b3c4d5e6f7a`), org-scoped `POST /api/courses/{id}/toggle-featured`
+  (ADMIN/SUPER_ADMIN; learner 403, cross-org 404), catalog `featured=true`
+  returns flagged-first then most-enrolled fill to 6. Star toggle on admin
+  course cards (`feature-toggle-*`, amber when on). Course 222 flagged as demo.
+- New regression file: `tests/test_iteration42_covers_featured.py`.
+
+## Iteration 41 — Help links + guide auto-rebuild + marketplace cleanup (2026-07-30)
+
+### Follow-up (same day)
+- **3 genuine fitness courses seeded** (`scripts/seed_fitness_courses.py`,
+  idempotent, live DB + UAT snapshot): Foundations of Exercise Science
+  (6 slides / 5-q exam), Client Onboarding & Consultation Skills (5/5),
+  Gym Health & Safety Essentials (6/5). Marketplace now shows 4 real courses.
+- **Guide version stamp** — `guide_builder.build()` prints "Updated {md mtime
+  date}" on the cover band and page footer; stays accurate via auto-rebuild.
+- **Billing answers marked FINAL** in `docs/BILLING_GATEWAY_REVIEW_ANSWERS.md`
+  — ready for user to relay to the ERP360 team.
+
+
+All certified by testing agent (iteration_37.json): backend 7/7, frontend 100%.
+
+- **Help & guides sidebar entry** (`DashboardLayout.tsx`, testid
+  `sidebar-help-link`) — role-aware: admins open the Admin User Guide PDF,
+  learners the Student User Guide, in a new tab.
+- **Guide auto-rebuild** — `services/guide_builder.py::ensure_fresh()`
+  regenerates a PDF when its markdown source in `/app/docs/guides` is newer;
+  called from the public download endpoint; idempotent; falls back to the
+  stale PDF if a rebuild fails. `scripts/build_user_guides_pdf.py` is now a
+  thin CLI wrapper.
+- **Marketplace cleanup** — one-off `scripts/purge_marketplace_debris.py`
+  opted 321 test orgs out of the marketplace and deleted 142 debris courses
+  (live DB + UAT snapshot). Nightly `test_debris_cleanup` extended: new course
+  patterns (Entitlement Test%, Paid E2E%, Stripe Test%, Stripe Frontend E2E%,
+  Ent Inspect%) + `TEST_ORG_SLUG_PATTERNS` force-opt-out via new
+  `marketplace_optouts` stat in `tick()`. Public catalog now shows only
+  'IFPI Fundamentals'.
+- New regression file: `tests/test_iteration41_guides_marketplace.py`.
+
+## Iteration 40 — Fitness rebrand + custom theme presets (2026-07-30)
+
+### Bug fix (post-release): PDF guide downloads
+- Old links served PDFs via the React dev server (`/guides/*.pdf`) — 502/landing
+  page during frontend restarts/pod wake. Now served by the backend:
+  `GET /api/public/guides/{filename}` (anonymous, rate-limited, filename
+  whitelist, FileResponse from `/app/docs/guides/`). Build script output moved
+  to `/app/docs/guides/`; `frontend/public/guides` removed.
+- Verified by testing agent (iteration_36.json): 5/5 — 200 application/pdf with
+  Content-Disposition, JSON 404 for unknown names, traversal-safe, cert-verify
+  regression clean. New test file `tests/test_public_guides.py`.
+
+
+**IFPI = International Fitness Professionals Institute** (user correction —
+early build wrongly assumed the music-industry IFPI).
+
+### Fitness rebrand sweep (all music-era copy removed)
+- Catalog hero → "world's leading fitness academies… IFPI-accredited academies, gyms and wellness studios"
+- CoursesPage placeholder → "Foundations of Exercise Science"
+- `ai_quiz_service` system prompt → "fitness-industry education expert"
+- `theme_presets.py` → 5 neutral built-ins (IFPI Classic, Crimson & Gold, Teal & Magenta, Slate & Emerald, Monochrome); footer suggestion now "International Fitness Professionals Institute"
+- Seed course/exam ("IFPI Fundamentals") rewritten with fitness content; `scripts/rebrand_fitness_content.py` updated rows IN PLACE in live DB + UAT snapshot (ids preserved)
+- Admin PDF guide example updated; PDFs rebuilt
+
+### New feature: admin-configurable theme presets
+- New table `custom_theme_presets` (org-scoped, migration `1a2b3c4d5e6f`)
+- `GET /api/organization/themes` merges built-ins + org customs (`custom: true`)
+- `POST/PUT/DELETE /api/organization/themes[/{id}]` (ADMIN; hex validation; slug auto-generated `custom_*`); `apply-theme/{slug}` resolves customs too
+- Settings → Branding: "New preset" form, Custom badge, Edit/Delete with confirm dialog
+- Tests: 5/5 `test_iteration40_theme_presets.py` (CRUD+apply, neutral-copy guard, 422 colour, learner 403, fitness seed guard); tsc clean; pre_finish_check PASSED
+
+## UAT Sandbox setup (2026-07-30)
+
+Team UAT enabled without dirtying pre-go-live data:
+- Pre-UAT DB snapshot at `backend/snapshots/pre_uat_ifpi_lms.db` (gitignored);
+  one-command restore via `scripts/reset_uat.sh`.
+- Isolated tenant `uat-sandbox` (org id 327, marketplace opt-out) with
+  `uat-admin@ifpi.org` + `uat-learner@ifpi.org` (see `test_credentials.md`).
+  Idempotent seed: `backend/scripts/setup_uat.py`. Both logins verified E2E.
+- Tester briefing: `docs/UAT_TESTER_GUIDE.md` (admin authoring manual + AI,
+  student onboarding, Stripe test-card billing, marketing tools, learner flow).
+- Note: production go-live uses a fresh Postgres DB, so preview data never
+  migrates unless deliberately exported.
+
+## Billing Gateway spec joint review — Phase 0 (2026-07-30)
+
+Doc-only session. ERP360 shared their Billing Gateway API spec (DRAFT v0.1)
+via mirror script (checklist item A5 / IFPI B2).
+
+- Mirrored spec → `docs/BILLING_GATEWAY_API_SPEC.md` (do not edit; canonical
+  copy lives in the ERP360 repo).
+- Drafted IFPI answers → `docs/BILLING_GATEWAY_REVIEW_ANSWERS.md`:
+  verdict **APPROVED with changes**; DEBIT_ORDER-only OK for Phase 2 (native
+  Stripe covers card recurring); global webhook endpoint with `org_slug`
+  routing (mirrors `/api/erp360/webhooks/user`); `external_ref` stays
+  required, auto-link via optional `sso_sub`; asked for
+  `GET /subscriptions/{id}/transactions`, sandbox fixtures, full per-event
+  `data` schemas, longer retry tail / event replay, `Retry-After` on 503,
+  published rate budgets.
+- B1 + B2 prerequisites confirmed already landed; billing webhook receiver
+  (`POST /api/erp360/webhooks/billing`) deferred until sandbox fixtures exist.
+- No code, env, or service changes.
+
+## Iter 39 · Lint extended with decorator-pass (2026-02-13)
+
+Extends the ForwardRef preflight lint to catch the bug at DEFINITION time, not just after decorators have been attached to endpoints.
+
+### New `--check-decorators` mode
+
+AST-scan of every module under `services/` and `core/`:
+- If the module uses `functools.wraps` (heuristic: "defines a decorator")
+- AND its top-level imports omit any of `{Request, Response, BackgroundTasks}`
+- THEN print an ADVISORY WARNING (not build-failing) pointing at the exact file + missing imports.
+
+Rationale: not every decorator wraps a FastAPI endpoint. Making this fatal would false-positive on pure worker/utility decorators. But every warning IS worth reading before you attach that decorator to a route.
+
+### Preemptive fix
+Applied the recommendation to both existing decorator modules:
+- `services/db_locks.py` — now re-exports `Request, Response, BackgroundTasks`
+- `services/cache.py` — now re-exports `BackgroundTasks` (Request/Response already present)
+
+Both modules now pass the advisory pass cleanly.
+
+### CI + tests
+- `.github/workflows/ci.yml` — `endpoint-signatures` job now runs with `--check-decorators`
+- New test `test_lint_with_decorator_pass_passes` locks in the current clean state
+
+**Total: still 91/91 tests passing (Stripe API flakiness in full-suite runs is external, isolated runs are clean).**
+
+
+## Iter 39 · Endpoint signature preflight lint (2026-02-13)
+
+Guards against the class of bug that took down CI's agent 008 (Iter 39 fix earlier today). Runs on every push before the pytest suite.
+
+### The bug this prevents
+`from __future__ import annotations` + decorator whose wrapper module doesn't import the annotation's type = `get_type_hints(endpoint)` leaves a `ForwardRef` unresolved → FastAPI treats it as a query param → every request silently 422s.
+
+### Preflight lint
+- `scripts/lint_endpoint_signatures.py` — imports the app, walks `app.routes`, runs `get_type_hints(route.endpoint)` on each, asserts every annotation resolves to a real class (no `ForwardRef` leaks). Exits 0 on clean, 1 on any leak with a targeted "fix: import X in module Y" message.
+- Verified: 275 endpoints check clean on the current codebase.
+
+### CI wire-up
+- New `.github/workflows/ci.yml` job **`endpoint-signatures`** (runs in parallel with backend-tests). Fails the build on any leak.
+
+### Tests
+- `tests/test_iteration39_endpoint_signature_lint.py` — 3 tests: (a) live app lint passes, (b) `services.db_locks` re-exports `Request`, (c) `services.cache` re-exports `Request` + `Response`. Removing any of these re-exports breaks the endpoints those decorators wrap.
+
+**Total: 91/91 backend tests passing, 1 skipped.**
+
+
 ## Iter 39 · Webhook Deliveries admin page (read-only) (2026-02-13)
 
 Small ops-visibility addition on top of the outbound dispatcher. Zero interactive complexity — read-only list, auto-refresh 15s, two filters.
@@ -1936,3 +2147,86 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - **Route naming**: `/bulk-revoke`, `/admin-list`, `/admin-export.csv` use single-segment paths to avoid FastAPI parsing `admin`/`bulk` as `{cert_id}` (int). Documented in code.
 - **Bulk-revoke reason input** intentionally uses `window.prompt()` (single text input; a full modal would be nice but out of scope). Not a `window.confirm` regression.
 - **Cwd-sensitive SQLite path** — `DATABASE_URL=sqlite:///./ifpi_lms.db` is relative. Always run pytest from `/app/backend`. Optional future hardening: absolute path.
+
+## 2026-07-31 — Blank preview screen fix
+- **Bug**: Preview URL rendered a blank white page in all browsers. Root cause:
+  two empty stray files `frontend/src/index.js` and `frontend/src/App.js`
+  (created 2026-07-31 03:21) shadowed `index.tsx`/`App.tsx` — webpack resolves
+  `.js` before `.tsx`, so the app entry compiled to an empty module (bundle
+  shrank to 295KB, no console errors). Deleted both files, restarted frontend;
+  bundle back to 5.6MB. Verified landing page + UAT admin login → dashboard
+  live on the preview URL. `pre_finish_check.py` PASSED.
+- **Learning**: if the preview goes blank with a clean compile and no JS
+  errors, check for empty `.js` files shadowing `.tsx` sources in `src/`.
+
+## 2026-07-31 — Iter 47: Share links + Rating comments + Go-Live prep
+- **Shareable Course Links**: `ShareCourseButton.tsx` (icon/menu/button modes).
+  Public catalog cards + course detail page copy the public URL; /courses
+  cards have a menu with "Copy public link" / "Copy in-app link".
+- **Rating Comments**: optional written review after star rating on course
+  completion (LearnPage). Best reviews (stars desc, recent) shown on public
+  /catalog/{id} under "What learners say". Admin moderation panel in
+  CourseEditPage sidebar (hide/unhide). New: `hidden_at` col (migration
+  4d5e6f7a8b9c), GET /api/catalog/{id}/reviews (public), GET
+  /api/courses/{id}/reviews + POST .../reviews/{rid}/toggle-hidden (admin).
+  Re-POSTing star-only rating preserves existing comment.
+- **Bug fixes**: DELETE /api/courses/{id} 500 (FK dependents now cleaned:
+  slide comments/views/versions, flashcards, ratings, prereqs deleted;
+  exams/certs/subscriptions/scorm/live-sessions detached). AI Tutor launcher
+  pill moved to bottom-24 so it never occludes the Complete button.
+- **Go-Live**: deployment_agent readiness check PASSED. SQLite persists on
+  container disk (resets on redeploy) — Postgres cutover still P2 backlog.
+- Testing: iteration_47.json — backend 10/10, frontend all flows pass.
+  Test file: backend/tests/test_iteration47_reviews_share.py.
+  UAT org marketplace_opt_in reverted to False post-test; test courses deleted.
+
+## 2026-07-31 — Deploy-ready startup seed
+- `seed/seed_minimal.py` now also seeds the 3 flagship fitness demo courses
+  (via refactored `scripts/seed_fitness_courses.py::seed_courses`), assigns
+  the shipped cover photos (uploads/covers/*.jpg), features "Client
+  Onboarding & Consultation Skills", and enables marketplace opt-in for the
+  ifpi-main org. Runs automatically at backend startup — a fresh deployed DB
+  boots with admin account + 4 published courses + 4 exams + stocked
+  marketplace. Verified against a simulated empty DB and idempotent against
+  the live preview DB. Admin seeds as admin123 with must_change_password=True
+  (or set SEED_ADMIN_PASSWORD deploy env var).
+
+## 2026-07-31 — Iter 48: Review replies + social preview cards
+- **Review Replies**: admins reply publicly under learner reviews.
+  New cols reply_text/reply_at (migration 5e6f7a8b9c0d). POST
+  /api/courses/{cid}/reviews/{rid}/reply (empty string clears). Reply shown
+  on public course page as "Response from {org}" (review-reply-{id}); admin
+  ReplyBox in CourseReviewsPanel (reply-btn/reply-input/save-reply/edit-reply).
+- **Social Preview Cards**: GET /api/seo/courses/share/{id} serves OG HTML
+  (og:image = absolute cover URL, star rating + lessons + price in
+  description, JS redirect to /catalog/{id}). ShareCourseButton public link
+  now copies the share URL so WhatsApp/LinkedIn unfurl properly.
+- Testing: iteration_48.json — backend 14/14, frontend all pass. Test file:
+  backend/tests/test_iteration48_reply_share.py. Leftover TEST_ courses
+  224-227 deleted via API (confirms Iter 47 delete fix; tester's carry-over
+  note was stale). UAT org opt-in verified False.
+- **Backlog note (user decision)**: Postgres cutover stays in backlog — NOT
+  doing it now.
+
+## 2026-08-01 — Login page cleanup
+- Removed the "Demo: admin@ifpi.org / admin123" credentials hint from
+  LoginPage.tsx (confusing for UAT testers + security footgun for deploy).
+- Hid "Continue with ERP360" SSO button: SSO_ENABLED=false in backend/.env
+  AND disabled integrations.erp360.sso_enabled on 7 outbox-* test-debris
+  orgs (they were forcing /api/auth/sso-status enabled=true).
+- Fixed ifpi-main org logo_url (was test debris https://example.com/testing.png
+  → /api/uploads/files/ifpi_brand_logo.png).
+- Restocked UAT Sandbox (org 327) with the 3 fitness demo courses + covers
+  (previous UAT courses were deleted as test debris).
+- All verified via screenshots + curl. NOTE: deployed app will also hide the
+  demo hint; SSO button stays hidden until ERP360 is configured per-org.
+
+## 2026-08-01 — CI fixes (GitHub Actions)
+- Fixed 2 test files that crashed at import in CI (no pod env):
+  test_public_guides.py (raw open of /app/frontend/.env → try/except),
+  test_iteration41_guides_marketplace.py (module-level assert BASE_URL →
+  graceful fallback). conftest.py auto-skip now covers them. Verified via
+  simulated import with env removed + local run (12 passed).
+- yarn --frozen-lockfile CI failure: workspace package.json+yarn.lock verified
+  consistent via fresh-dir simulation (EXIT:0). GitHub repo copy is stale —
+  user must push via Save to GitHub.

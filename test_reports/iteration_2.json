@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 2 testing complete. New pytest suite /app/backend/tests/test_iteration2.py — 11/11 PASS — covers Alembic schema verification (all 21 tables incl. persons, learning_paths*, course_prerequisites), Person auto-create on register, course publish/unpublish workflow (incl. 400 on empty course), PDF certificate download (owner=200, admin=200, other-user=403, %PDF header), and full Learning Path CRUD + items + publish + idempotent enroll + learner-visibility-of-published-only. Regression suite test_ifpi_api.py from iteration 1 still 27/27 PASS — no regressions. Frontend Playwright covered admin sidebar nav, /learning-paths flow (new path, edit page, add-course modal, item add, publish), course edit page status pill + publish/unpublish, learner sidebar nav, learner /learning-paths enrol, certificates PDF blob download (verified %PDF binary header). Total backend coverage 38/38 pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Course Edit page (/courses/{id}/edit)", "issues": ["The success toast (sonner) is positioned in the top-right corner directly overlapping the Publish/Unpublish button area. After clicking Unpublish, the toast briefly covers the now-shown Publish button. Rapid second click (within ~3s) may not register reliably. Suggest moving toasts to bottom-right or below the action bar."]},
+      {"screen": "All authenticated pages", "issues": ["Two 401s logged to console on every page load from refresh interceptor probing /api/auth/me before login state is hydrated (carried over from iteration 1)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/test_ifpi_api.py",
+    "/app/test_reports/pytest/iteration2_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional design polish: move sonner toast position so it does not overlap top-right action buttons on Course Edit / Path Edit pages.",
+    "Optional: suppress console 401 noise from /api/auth/me probe when user is unauthenticated (carry-over from it1)."
+  ],
+  "critical_code_review_comments": [
+    "alembic/env.py + versions/20260608_0950_baseline_schema.py: baseline migration is properly stamped and `alembic current` returns head. server.py still keeps Base.metadata.create_all as a dev safety net which is acceptable but should be removed once production deploy is via `alembic upgrade head`.",
+    "models/__init__.py: Person has unique user_id FK enforcing 1:1 with User. erp360_person_id is nullable — good for pre-SSO state and idempotent JIT upsert. lifecycle_stage defaults to LEARNER on register.",
+    "services/pdf_certificate_service.py uses ReportLab landscape A4 + QR pointing to /verify/{code}. Output is a real PDF (verified %PDF header in tests). Permission check in routers/misc.py correctly distinguishes owner vs admin vs other (403).",
+    "routers/learning_paths.py: duplicate course in path returns 400; publish empty path returns 400; learner GET filters by status==PUBLISHED (good); enroll endpoint is idempotent (returns already=true on second call).",
+    "Frontend axios responseType: 'blob' for /api/certificates/{id}/pdf works — confirmed via Playwright download event (binary %PDF header).",
+    "LearningPathEditPage.tsx: Add-Course modal uses radio (`sr-only`) so Playwright must click the label, not the input — keep this in mind for future tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2.py (new — 11 tests)"
+  ],
+  "success_rate": {"backend": "100% (38/38 — 11 new + 27 regression)", "frontend": "100% of critical iteration-2 flows verified"},
+  "test_credentials": "admin@ifpi.org / admin123 ; learner@ifpi.org / learner123 (from /app/memory/test_credentials.md). Test runs also self-register temporary users (TEST_/test_person_/intruder_ prefixes).",
+  "seed_data_creation": "No persistent seed data added. Tests create TEST_-prefixed courses and paths and clean them up via DELETE. Three transient test users (test_user_, test_person_, intruder_) left behind from prior runs — harmless, all LEARNER role.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression: `cd /app/backend && pytest tests/ -v` runs both test_ifpi_api.py (it1) and test_iteration2.py (it2). DB is sqlite at /app/backend/ifpi_lms.db. Alembic head: 9e33790c5d6e (baseline). For fresh-DB validation: rm ifpi_lms.db && alembic upgrade head && python -m seed.seed_minimal. Seeded course id=1 + exam id=1 are used as fixtures across both suites. The PDF endpoint uses ReportLab — ensure reportlab + qrcode + pillow are in requirements.txt.",
+  "rca of the issue": "No bugs — only the minor toast-overlap design polish noted above. All iteration 2 features (Alembic, Person model, publish workflow, PDF certs, learning paths) are functionally correct end-to-end."
+}

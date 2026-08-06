@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="7" time="3.195" timestamp="2026-07-04T03:59:00.014772+00:00" hostname="agent-env-5dae153e-be68-452c-9cf0-d868811c3d07"><testcase classname="backend.tests.test_iteration27_sprint" name="test_mark_attendance_issues_cert" time="1.217" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_mark_attendance_is_idempotent" time="0.325" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_verify_endpoint_shows_session_title" time="0.463" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_catalog_organizations_endpoint" time="0.153" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_catalog_org_filter_narrows_results" time="0.153" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_catalog_search_matches_org_name" time="0.231" /><testcase classname="backend.tests.test_iteration27_sprint" name="test_streak_nudge_worker_notification_lifecycle" time="0.359"><failure message="sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: users.totp_secret_enc&#10;[SQL: SELECT users.id AS users_id, users.organization_id AS users_organization_id, users.email AS users_email, users.password_hash AS users_password_hash, users.name AS users_name, users.is_active AS users_is_active, users.failed_login_attempts AS users_failed_login_attempts, users.last_login_at AS users_last_login_at, users.points AS users_points, users.cohort AS users_cohort, users.erp360_user_id AS users_erp360_user_id, users.totp_secret_enc AS users_totp_secret_enc, users.totp_enabled_at AS users_totp_enabled_at, users.totp_recovery_codes AS users_totp_recovery_codes, users.streak_nudge_last_sent_at AS users_streak_nudge_last_sent_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at &#10;FROM users &#10;WHERE users.id = ?&#10; LIMIT ? OFFSET ?]&#10;[parameters: (2, 1, 0)]&#10;(Background on this error at: https://sqlalche.me/e/20/e3q8)">/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py:941: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlite3.OperationalError: no such column: users.totp_secret_enc
+
+The above exception was the direct cause of the following exception:
+backend/tests/test_iteration27_sprint.py:180: in test_streak_nudge_worker_notification_lifecycle
+    u = db.query(User).filter(User.id == uid).first()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py:2728: in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py:2827: in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:2362: in execute
+    return self._execute_internal(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:2247: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py:305: in orm_execute_statement
+    result = conn.execute(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1418: in execute
+    return meth(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py:515: in _execute_on_connection
+    return connection._execute_clauseelement(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1640: in _execute_clauseelement
+    ret = self._execute_context(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1846: in _execute_context
+    return self._exec_single_context(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1986: in _exec_single_context
+    self._handle_dbapi_exception(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1967: in _exec_single_context
+    self.dialect.do_execute(
+/root/.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py:941: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: users.totp_secret_enc
+E   [SQL: SELECT users.id AS users_id, users.organization_id AS users_organization_id, users.email AS users_email, users.password_hash AS users_password_hash, users.name AS users_name, users.is_active AS users_is_active, users.failed_login_attempts AS users_failed_login_attempts, users.last_login_at AS users_last_login_at, users.points AS users_points, users.cohort AS users_cohort, users.erp360_user_id AS users_erp360_user_id, users.totp_secret_enc AS users_totp_secret_enc, users.totp_enabled_at AS users_totp_enabled_at, users.totp_recovery_codes AS users_totp_recovery_codes, users.streak_nudge_last_sent_at AS users_streak_nudge_last_sent_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+E   FROM users 
+E   WHERE users.id = ?
+E    LIMIT ? OFFSET ?]
+E   [parameters: (2, 1, 0)]
+E   (Background on this error at: https://sqlalche.me/e/20/e3q8)</failure></testcase></testsuite></testsuites>

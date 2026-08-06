@@ -14,6 +14,7 @@ from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import Organization, WebhookDelivery, WebhookSubscription
 from services import audit_service
+from services.webhook_service import emit_event
 
 router = APIRouter(prefix="/api/admin/webhooks", tags=["Webhooks"])
 
@@ -62,7 +63,7 @@ def _row_to_out(s: WebhookSubscription) -> dict:
 
 @router.get("")
 def list_subscriptions(db: Session = Depends(get_db),
-                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
+                       current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     rows = db.query(WebhookSubscription).filter(
         WebhookSubscription.organization_id == current.organization_id,
     ).order_by(WebhookSubscription.id.desc()).all()
@@ -71,7 +72,7 @@ def list_subscriptions(db: Session = Depends(get_db),
 
 @router.post("", status_code=201)
 def create_subscription(body: SubscriptionIn, db: Session = Depends(get_db),
-                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     org = db.query(Organization).filter(Organization.id == current.organization_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Organisation not found")
@@ -95,7 +96,7 @@ def create_subscription(body: SubscriptionIn, db: Session = Depends(get_db),
 @router.put("/{sub_id}")
 def update_subscription(sub_id: int, body: SubscriptionIn,
                         db: Session = Depends(get_db),
-                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     sub = db.query(WebhookSubscription).filter(
         WebhookSubscription.id == sub_id,
         WebhookSubscription.organization_id == current.organization_id,
@@ -118,7 +119,7 @@ def update_subscription(sub_id: int, body: SubscriptionIn,
 
 @router.delete("/{sub_id}", status_code=204)
 def delete_subscription(sub_id: int, db: Session = Depends(get_db),
-                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> None:
+                        current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     sub = db.query(WebhookSubscription).filter(
         WebhookSubscription.id == sub_id,
         WebhookSubscription.organization_id == current.organization_id,
@@ -134,7 +135,7 @@ def delete_subscription(sub_id: int, db: Session = Depends(get_db),
 
 @router.post("/{sub_id}/test")
 def test_subscription(sub_id: int, db: Session = Depends(get_db),
-                      current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
+                      current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     """Fires a `webhook.test` event with a tiny payload so admins can confirm
     the receiver's HMAC verification works before relying on real events."""
     sub = db.query(WebhookSubscription).filter(
@@ -186,7 +187,7 @@ def list_all_deliveries(
     limit: int = 50,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
-) -> dict:
+):
     """Recent WebhookDelivery rows across ALL subscriptions in the
     caller's org. Read-only — for ops visibility of the outbound
     stream (especially the ERP360-managed dry-run subscription).
@@ -231,7 +232,7 @@ def list_all_deliveries(
 @router.get("/{sub_id}/deliveries")
 def list_deliveries(sub_id: int, limit: int = 20,
                     db: Session = Depends(get_db),
-                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))) -> dict:
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     sub = db.query(WebhookSubscription).filter(
         WebhookSubscription.id == sub_id,
         WebhookSubscription.organization_id == current.organization_id,

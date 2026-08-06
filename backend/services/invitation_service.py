@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from core.role_registry import (
-    normalize_role_name,
+    ADMIN_ROLES, CANONICAL_ROLE_SET, normalize_role_name,
 )
 from core.security import get_password_hash
 from models import (
