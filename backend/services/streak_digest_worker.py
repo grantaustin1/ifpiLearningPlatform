@@ -12,10 +12,6 @@ restarts mid-window.
 from __future__ import annotations
 
 import logging
-<<<<<<< HEAD
-from datetime import datetime, timedelta, timezone
-=======
->>>>>>> origin/main
 
 from core.database import SessionLocal
 from models import Organization, User

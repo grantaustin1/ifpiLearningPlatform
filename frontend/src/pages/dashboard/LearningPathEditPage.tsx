@@ -1,22 +1,11 @@
-<<<<<<< HEAD
-import { useEffect, useState } from 'react'
-=======
 import { useCallback, useEffect, useState } from 'react'
->>>>>>> origin/main
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ArrowLeft, Save, Send, EyeOff, Trash2, Plus, X, Layers, BookOpen, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
-<<<<<<< HEAD
-import { useConfirm } from 'components/ConfirmDialog'
 
 export default function LearningPathEditPage() {
-  const confirm = useConfirm()
-=======
-
-export default function LearningPathEditPage() {
->>>>>>> origin/main
   const { id } = useParams()
   const nav = useNavigate()
   const [path, setPath] = useState<any>(null)
@@ -25,22 +14,14 @@ export default function LearningPathEditPage() {
   const [chosenCourse, setChosenCourse] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
-<<<<<<< HEAD
-  const load = async () => {
-=======
   const load = useCallback(async () => {
->>>>>>> origin/main
     const [p, c] = await Promise.all([
       api.get(`/learning-paths/${id}`),
       api.get('/courses'),
     ])
     setPath(p.data)
     setAllCourses(c.data)
-<<<<<<< HEAD
-  }
-=======
   }, [id])
->>>>>>> origin/main
 
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -86,15 +67,7 @@ export default function LearningPathEditPage() {
   }
 
   const deletePath = async () => {
-<<<<<<< HEAD
-    if (!(await confirm({
-      title: 'Delete learning path?',
-      description: 'This cannot be undone. Enrolments and progress will be lost.',
-      confirmLabel: 'Delete', variant: 'danger',
-    }))) return
-=======
     if (!window.confirm('Delete this learning path? This cannot be undone.')) return
->>>>>>> origin/main
     await api.delete(`/learning-paths/${id}`)
     toast.success('Deleted')
     nav('/learning-paths')

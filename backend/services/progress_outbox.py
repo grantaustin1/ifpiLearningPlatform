@@ -21,10 +21,6 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
-<<<<<<< HEAD
-from sqlalchemy import text
-=======
->>>>>>> origin/main
 from sqlalchemy.orm import Session
 
 from models import ProgressOutbox

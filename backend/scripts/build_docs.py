@@ -97,8 +97,6 @@ def _summarize_route(route) -> Tuple[str, str, str]:
     return verb, path, summary
 
 
-<<<<<<< HEAD
-=======
 def _collect_routes(router_or_app) -> List:
     """Recursively collect all route objects from a FastAPI app or router.
 
@@ -120,7 +118,6 @@ def _collect_routes(router_or_app) -> List:
     return collected
 
 
->>>>>>> origin/main
 def _gen_api_routes() -> str:
     app = _load_app()
     if app is None:
@@ -128,11 +125,7 @@ def _gen_api_routes() -> str:
                 "|---|---|---|\n"
                 "| _(unable to introspect — run locally with the backend importable)_ | | |")
     rows: List[Tuple[str, str, str]] = []
-<<<<<<< HEAD
-    for route in app.routes:
-=======
     for route in _collect_routes(app):
->>>>>>> origin/main
         path = getattr(route, "path", "") or ""
         if not path.startswith("/api"):
             continue

@@ -167,32 +167,6 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all,delete-orphan")
 
 
-<<<<<<< HEAD
-class CustomThemePreset(Base):
-    """Org-defined theme preset (admin console → Settings → Branding).
-
-    Built-in presets live in `services/theme_presets.py`; this table holds
-    per-academy custom presets. Both are merged by GET /api/organization/themes.
-    """
-    __tablename__ = "custom_theme_presets"
-    __table_args__ = (
-        UniqueConstraint("organization_id", "slug", name="uq_custom_theme_org_slug"),
-    )
-    id = Column(Integer, primary_key=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
-    slug = Column(String(80), nullable=False)
-    name = Column(String(100), nullable=False)
-    description = Column(String(300))
-    primary_color = Column(String(16), nullable=False, default="#6366f1")
-    cert_accent_color = Column(String(16), nullable=False, default="#6366f1")
-    cert_signature_text_suggestion = Column(String(200))
-    cert_footer_text_suggestion = Column(Text)
-    cover_color = Column(String(40), default="bg-indigo-500")
-    created_at = Column(DateTime, default=_utcnow)
-
-
-=======
->>>>>>> origin/main
 class UserRole(Base):
     __tablename__ = "user_roles"
     __table_args__ = (UniqueConstraint("user_id", "role", name="uq_user_role"),)

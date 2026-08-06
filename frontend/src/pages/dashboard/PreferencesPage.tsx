@@ -19,11 +19,7 @@ interface Prefs {
 
 export default function PreferencesPage() {
   const { user, logout } = useAuth()
-<<<<<<< HEAD
-  const confirm = useConfirm()
-=======
   const { confirm, ConfirmDialog } = useConfirm()
->>>>>>> origin/main
   const prompt = usePrompt()
   const [prefs, setPrefs] = useState<Prefs | null>(null)
   const [saving, setSaving] = useState(false)
@@ -246,10 +242,7 @@ export default function PreferencesPage() {
             </button>
           </div>
         </div>
-<<<<<<< HEAD
-=======
         <ConfirmDialog />
->>>>>>> origin/main
       </div>
     </div>
   )

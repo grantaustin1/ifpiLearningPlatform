@@ -167,11 +167,7 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-500" /> AI Quiz Generator</h2>
-<<<<<<< HEAD
-            <p className="text-xs text-slate-500 mt-0.5">Turn a course's slide content into multiple-choice questions you can review before saving.</p>
-=======
             <p className="text-xs text-slate-500 mt-0.5">Turn a course&apos;s slide content into multiple-choice questions you can review before saving.</p>
->>>>>>> origin/main
           </div>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4 text-slate-400" /></button>
         </div>
@@ -194,11 +190,7 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1.5">Question type</label>
-<<<<<<< HEAD
-                <select value={qType} onChange={e => setQType(e.target.value as any)} data-testid="ai-type"
-=======
                 <select value={qType} onChange={e => setQType(e.target.value as typeof qType)} data-testid="ai-type"
->>>>>>> origin/main
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
                   <option value="MULTIPLE_CHOICE">Multiple choice (4 options)</option>
                   <option value="TRUE_FALSE">True / False</option>
@@ -275,7 +267,3 @@ function AIQuizModal({ onClose, onDone }: { onClose: () => void, onDone: () => v
     </div>
   )
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main

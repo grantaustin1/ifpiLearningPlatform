@@ -30,13 +30,8 @@ from sqlalchemy.orm import Session
 from auth.dependencies import CurrentUser, get_current_user, requires_staff
 from core.database import get_db
 from models import (
-<<<<<<< HEAD
-    Course, CourseSlide, Enrollment, Flashcard, FlashcardReview,
-    SourceChunk, SourceDocument,
-=======
     Course, CourseSlide, Flashcard, FlashcardReview, SourceChunk,
     SourceDocument,
->>>>>>> origin/main
 )
 from services import ai_budget_service, flashcard_service
 
@@ -95,11 +90,7 @@ async def generate_flashcards(
     body: GenerateFlashcardsIn,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_staff()),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     """Preview AI-generated flashcards. Does NOT persist — the client shows a
     review table then calls `/bulk-save` with the edited list."""
     ai_budget_service.check_budget(db, current.organization_id,
@@ -172,11 +163,7 @@ def bulk_save_flashcards(
     body: BulkSaveIn,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_staff()),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     """Persist a reviewed batch. Overwrites nothing — creates fresh rows."""
     course = db.query(Course).filter(
         Course.id == body.course_id,
@@ -220,11 +207,7 @@ def list_by_course(
     course_id: int,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_staff()),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     course = db.query(Course).filter(
         Course.id == course_id,
         Course.organization_id == current.organization_id,
@@ -251,11 +234,7 @@ def update_card(
     card_id: int, body: CardUpdateIn,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_staff()),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     card = db.query(Flashcard).filter(
         Flashcard.id == card_id,
         Flashcard.organization_id == current.organization_id,
@@ -286,11 +265,7 @@ def delete_card(
     card_id: int,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_staff()),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     card = db.query(Flashcard).filter(
         Flashcard.id == card_id,
         Flashcard.organization_id == current.organization_id,
@@ -345,11 +320,7 @@ def due_flashcards(
     limit: int = 30,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     """Return the learner's due-today queue for a course. Mixes:
      - overdue/due cards ordered by earliest next_review_at first
      - up to `min(limit-due_count, new_cards)` never-seen cards to seed the deck
@@ -406,11 +377,7 @@ def review_flashcard(
     card_id: int, body: ReviewIn,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     card = db.query(Flashcard).filter(
         Flashcard.id == card_id,
         Flashcard.organization_id == current.organization_id,
@@ -482,11 +449,7 @@ def review_flashcard(
 def flashcard_streak(
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     """Learner's current + longest flashcard streak. Computed from
     FlashcardReview.last_reviewed_at (no schema/migration cost)."""
     from services.gamification_service import GamificationService
@@ -498,11 +461,7 @@ def flashcard_stats(
     course_id: int,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(get_current_user),
-<<<<<<< HEAD
-):
-=======
 ) -> dict:
->>>>>>> origin/main
     _ensure_learner_can_access(db, current.id, current.organization_id, course_id)
     all_cards = db.query(Flashcard).filter(
         Flashcard.course_id == course_id,

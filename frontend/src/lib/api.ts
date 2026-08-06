@@ -5,11 +5,7 @@
  * - Bearer token added if present in memory (dual-mode auth).
  * - 401 → tries one silent refresh; on failure redirects to /login.
  */
-<<<<<<< HEAD
-import axios, { AxiosError, AxiosRequestConfig } from 'axios'
-=======
 import axios, { AxiosError, AxiosRequestConfig, AxiosHeaders } from 'axios'
->>>>>>> origin/main
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || ''
 export const API_BASE = `${BACKEND_URL}/api`
@@ -26,58 +22,14 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (accessTokenMem) {
-<<<<<<< HEAD
-    (config.headers as any) = config.headers || {}
-    ;(config.headers as any).Authorization = `Bearer ${accessTokenMem}`
-  }
-  // CSRF double-submit (Iter 30h). Cookie-authed browser sessions must
-  // mirror the `ifpi_csrf` cookie into an `X-CSRF-Token` header on every
-  // mutating request. Safe when CSRF is disabled server-side (header is
-  // simply ignored) or when the caller uses Bearer auth (server exempts
-  // the Bearer path).
-  const method = (config.method || 'get').toUpperCase()
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS'
-      && typeof document !== 'undefined') {
-    const csrf = readCookie('ifpi_csrf')
-    if (csrf) {
-      ;(config.headers as any) = config.headers || {}
-      ;(config.headers as any)['X-CSRF-Token'] = csrf
-    }
-=======
     const h = new AxiosHeaders()
     if (config.headers) Object.assign(h, config.headers)
     h.set('Authorization', `Bearer ${accessTokenMem}`)
     config.headers = h
->>>>>>> origin/main
   }
   return config
 })
 
-<<<<<<< HEAD
-function readCookie(name: string): string | null {
-  const target = `${name}=`
-  const parts = (document.cookie || '').split(';')
-  for (const raw of parts) {
-    const c = raw.trim()
-    if (c.startsWith(target)) return decodeURIComponent(c.slice(target.length))
-  }
-  return null
-}
-
-let refreshing: Promise<'ok' | 'fail'> | null = null
-
-async function tryRefresh(): Promise<'ok' | 'fail'> {
-  try {
-    const r = await axios.post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true })
-    // In cookie-only mode (`AUTH_COOKIE_MODE=on`) the body has no
-    // access_token — the browser already stored the refreshed cookie.
-    // In dual/off mode we also cache the token in memory so Bearer
-    // header keeps working.
-    const token = r.data?.access_token || null
-    if (token) accessTokenMem = token
-    return 'ok'
-  } catch { return 'fail' }
-=======
 let refreshing: Promise<string | null> | null = null
 
 async function tryRefresh(): Promise<string | null> {
@@ -87,7 +39,6 @@ async function tryRefresh(): Promise<string | null> {
     if (token) accessTokenMem = token
     return token
   } catch { return null }
->>>>>>> origin/main
 }
 
 api.interceptors.response.use(
@@ -99,17 +50,6 @@ api.interceptors.response.use(
     if (status === 401 && !original._retried && !isAuthEndpoint) {
       original._retried = true
       refreshing = refreshing || tryRefresh()
-<<<<<<< HEAD
-      const outcome = await refreshing
-      refreshing = null
-      if (outcome === 'ok') {
-        // If we got a fresh in-memory token, stamp it. Otherwise the
-        // browser will attach the refreshed HttpOnly cookie automatically.
-        if (accessTokenMem) {
-          (original.headers as any) = original.headers || {}
-          ;(original.headers as any).Authorization = `Bearer ${accessTokenMem}`
-        }
-=======
       const newTok = await refreshing
       refreshing = null
       if (newTok) {
@@ -117,7 +57,6 @@ api.interceptors.response.use(
         if (original.headers) Object.assign(h, original.headers)
         h.set('Authorization', `Bearer ${newTok}`)
         original.headers = h
->>>>>>> origin/main
         return api.request(original)
       }
       // Hard fail — clear token, redirect. Iter 33d: don't bounce the
