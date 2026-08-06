@@ -46,8 +46,6 @@ def check(name: str):
     return _decorator
 
 
-<<<<<<< HEAD
-=======
 def _report_path(filename: str) -> Path:
     report_dir = os.environ.get("AGENT_REPORT_DIR")
     if report_dir:
@@ -63,7 +61,6 @@ def _report_path(filename: str) -> Path:
     return base / filename
 
 
->>>>>>> origin/main
 @check("C-1 backend http healthcheck")
 def c1():
     import requests
@@ -143,19 +140,7 @@ def c8():
 
 
 def main() -> int:
-<<<<<<< HEAD
-    env_dir = os.environ.get("QA_REPORT_DIR")
-    if env_dir:
-        out = Path(env_dir) / "agent_010.json"
-    else:
-        try:
-            Path("/app/test_reports").mkdir(parents=True, exist_ok=True)
-            out = Path("/app/test_reports/agent_010.json")
-        except (PermissionError, OSError):
-            out = Path(__file__).resolve().parents[3] / "test_reports" / "agent_010.json"
-=======
     out = _report_path("agent_010.json")
->>>>>>> origin/main
     out.parent.mkdir(parents=True, exist_ok=True)
     failed = [r for r in RESULTS if not r["ok"]]
     out.write_text(json.dumps({

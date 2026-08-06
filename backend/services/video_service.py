@@ -17,10 +17,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-<<<<<<< HEAD
-from typing import Optional
-=======
->>>>>>> origin/main
 
 from fastapi import HTTPException
 

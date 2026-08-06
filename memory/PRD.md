@@ -76,3 +76,11 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - `IFPI_WEBHOOK_EVENTS.md` — outgoing webhook payload reference (Iter 31)
 - `IFPI_VS_ERP360_ASSESSMENT.md` — original assessment
 - `docs/P2_BACKLOG_SPECS.md` — deep-dive specs for deferred items
+
+## 2026-08-06 — Pulled branch 20260731 into Emergent preview
+- Checked out `origin/20260731`. Branch tip commit 76521b06 had UNRESOLVED merge-conflict markers committed in 114 files (bad merge of the emergent-init scaffold with real history); restored all file contents from clean parent 6d926451.
+- Recreated missing .env files (backend: SQLite DATABASE_URL, JWT_SECRET; frontend: REACT_APP_BACKEND_URL).
+- Preview fixes (dev-env only): pinned webpack-dev-server resolution 5.x→4.x (CRA5 dev server incompatible with v5); removed brace-expansion@^5 resolution (crashed minimatch 3 / fork-ts-checker with "expand is not a function").
+- Code fix: AttendanceModal.tsx used `useConfirm()` return as callable — destructured `{ confirm, ConfirmDialog }` and rendered `<ConfirmDialog />` (was a TS2349 compile error).
+- Purged 93 test-debris courses (Stripe Test / Entitlement Test / Paid E2E / Ent Inspect) from ifpi_lms.db via test_debris_cleanup with extended patterns.
+- Verified: backend /api/health OK, admin login OK (forced change-password gate as designed), frontend compiles clean, backend smoke suite tests/test_ifpi_api.py 25 passed / 2 skipped.

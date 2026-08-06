@@ -48,11 +48,7 @@ class OrgSummary(BaseModel):
 def list_organizations(
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(requires_roles("SUPER_ADMIN")),
-<<<<<<< HEAD
-):
-=======
 ) -> List[OrgSummary]:
->>>>>>> origin/main
     """List every org in the deployment (super-admin only — regular
     admins are scoped to their own org)."""
     rows = db.query(Organization).order_by(Organization.id.asc()).all()
@@ -104,11 +100,7 @@ def get_erp360_integration(
     org_id: int,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
-):
-=======
 ) -> Erp360IntegrationOut:
->>>>>>> origin/main
     org = _load_org(db, current, org_id)
     s = org.erp360_settings
     return Erp360IntegrationOut(
@@ -139,11 +131,7 @@ def patch_erp360_integration(
     request: Request,
     db: Session = Depends(get_db),
     current: CurrentUser = Depends(requires_admin()),
-<<<<<<< HEAD
-):
-=======
 ) -> Erp360IntegrationOut:
->>>>>>> origin/main
     """Merge-update the org's ERP360 integration config. Only the
     fields present in the body are updated; anything else is
     preserved. Setting `org_slug=""` explicitly clears it.

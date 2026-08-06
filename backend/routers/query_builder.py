@@ -25,10 +25,6 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-<<<<<<< HEAD
-from typing import Optional
-=======
->>>>>>> origin/main
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -91,12 +87,8 @@ SYSTEM_PROMPT = (
     "1. SELECT statements only. Never INSERT/UPDATE/DELETE/DDL.\n"
     "2. Use only these tables: users, courses, enrollments, certificates, "
     "quizzes, quiz_attempts, organizations.\n"
-<<<<<<< HEAD
-    "3. Do NOT include organization_id filters — the server will add them.\n"
-=======
     "3. Always include organization_id = <your_org_id> filters on tables "
     "that have that column (users, courses, certificates).\n"
->>>>>>> origin/main
     "4. Cap results with LIMIT 500 if the query might return many rows.\n"
     "5. If the question can't be answered from the schema, respond:\n"
     "   SQL: SELECT NULL AS answer WHERE 1=0\n"
@@ -147,13 +139,10 @@ def _validate_sql(sql: str) -> None:
     if any(b in lowered for b in banned):
         raise HTTPException(status_code=400,
                             detail="Query contains disallowed keywords")
-<<<<<<< HEAD
-=======
     # Block UNION-based data exfiltration
     if re.search(r"\bunion\b", lowered):
         raise HTTPException(status_code=400,
                             detail="UNION queries are not allowed")
->>>>>>> origin/main
     tables = _extract_tables(s)
     forbidden = tables - ALLOWED_TABLES
     if forbidden:
@@ -164,24 +153,6 @@ def _validate_sql(sql: str) -> None:
 
 
 def _inject_org_scope(sql: str, org_id: int) -> str:
-<<<<<<< HEAD
-    """Auto-scope queries. For simplicity we always append/replace a WHERE
-    clause targeting `organization_id`. Because v1 asks the LLM to omit
-    the org filter, this is safe. If SQL already has an `organization_id`
-    literal, we don't double-filter."""
-    lowered = sql.lower()
-    if "organization_id" in lowered:
-        # Trust: LLM might have added one anyway. Force override to the
-        # current org via a substring replace of "organization_id = <n>".
-        return re.sub(r"organization_id\s*=\s*\d+", f"organization_id = {org_id}",
-                      sql, flags=re.IGNORECASE)
-    # No explicit filter — the current schema catalog says several tables
-    # HAVE organization_id. For safety, wrap: don't run unless we can
-    # confirm the query touches at least one table with org_id column,
-    # and add a filter on that table's alias.
-    # v1 pragmatic path: append LIMIT if missing, otherwise trust the LLM.
-    return sql
-=======
     """Enforce that every query touching org-scoped tables includes an
     organization_id filter. We replace any literal value with the caller's
     org_id — this prevents cross-org data leakage even if the LLM invents
@@ -198,7 +169,6 @@ def _inject_org_scope(sql: str, org_id: int) -> str:
     # Force every organization_id literal to the current admin's org
     return re.sub(r"organization_id\s*=\s*\d+", f"organization_id = {org_id}",
                   sql, flags=re.IGNORECASE)
->>>>>>> origin/main
 
 
 def _ensure_limit(sql: str, cap: int = 500) -> tuple[str, bool]:
@@ -256,14 +226,10 @@ async def build_query(body: BuildIn, request: Request,
     capped, was_capped = _ensure_limit(scoped)
 
     try:
-<<<<<<< HEAD
-        result = db.execute(text(capped))
-=======
         result = db.execute(
             text(capped),
             execution_options={"readonly": True}
         )
->>>>>>> origin/main
         rows = [dict(r._mapping) for r in result.fetchall()]
     except Exception as e:
         logger.exception("query-builder execution failed: %s", e)

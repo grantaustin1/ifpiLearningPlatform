@@ -4,10 +4,6 @@ import { api } from 'lib/api'
 import { Award, GripVertical, Plus, Trash2, X, Edit, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
-<<<<<<< HEAD
-import { useConfirm } from 'components/ConfirmDialog'
-=======
->>>>>>> origin/main
 
 interface Tier {
   id: number; slug: string; label: string; emoji: string
@@ -17,10 +13,6 @@ interface Tier {
 
 export default function BadgeTiersPage() {
   const qc = useQueryClient()
-<<<<<<< HEAD
-  const confirm = useConfirm()
-=======
->>>>>>> origin/main
   const [editing, setEditing] = useState<Tier | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -83,17 +75,7 @@ export default function BadgeTiersPage() {
                         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md">
                   <Edit className="h-4 w-4" />
                 </button>
-<<<<<<< HEAD
-                <button onClick={async () => {
-                  if (await confirm({
-                    title: `Delete tier "${t.label}"?`,
-                    description: 'Users currently at this tier will be re-ranked to the nearest remaining tier.',
-                    confirmLabel: 'Delete', variant: 'danger',
-                  })) delMut.mutate(t.id)
-                }} data-testid={`tier-delete-${t.id}`}
-=======
                 <button onClick={() => { if (window.confirm(`Delete "${t.label}"?`)) delMut.mutate(t.id) }} data-testid={`tier-delete-${t.id}`}
->>>>>>> origin/main
                         className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md">
                   <Trash2 className="h-4 w-4" />
                 </button>

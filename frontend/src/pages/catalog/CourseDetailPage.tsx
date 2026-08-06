@@ -4,16 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
-<<<<<<< HEAD
-  ArrowLeft, ArrowRight, BookOpen, CheckCircle, Clock, GraduationCap, Users, Building2, Star,
-} from 'lucide-react'
-import { formatCurrency } from 'lib/utils'
-import { ShareCourseButton } from 'components/ShareCourseButton'
-=======
   ArrowLeft, ArrowRight, BookOpen, CheckCircle, Clock, GraduationCap, Users, Building2,
 } from 'lucide-react'
 import { formatCurrency } from 'lib/utils'
->>>>>>> origin/main
 
 interface CourseDetail {
   id: number
@@ -26,28 +19,10 @@ interface CourseDetail {
   currency: string
   slide_count: number
   enrollment_count: number
-<<<<<<< HEAD
-  avg_rating?: number | null
-  rating_count?: number
-=======
->>>>>>> origin/main
   syllabus_preview: { title: string; order_index: number }[]
   organization?: { id: number; name: string; logo_url?: string | null } | null
 }
 
-<<<<<<< HEAD
-interface Review {
-  id: number
-  rating: number
-  comment: string
-  reviewer: string
-  reply_text?: string | null
-  reply_at?: string | null
-  created_at: string | null
-}
-
-=======
->>>>>>> origin/main
 export default function CourseDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
@@ -61,15 +36,6 @@ export default function CourseDetailPage() {
     enabled: !!id,
   })
 
-<<<<<<< HEAD
-  const { data: reviews = [] } = useQuery<Review[]>({
-    queryKey: ['catalog-reviews', id],
-    queryFn: async () => (await api.get(`/catalog/${id}/reviews`)).data,
-    enabled: !!id,
-  })
-
-=======
->>>>>>> origin/main
   // Iter 24 — Marketplace funnel: fire a view impression once per
   // detail-page mount. Backend dedups by (user_or_anon, course, day),
   // so refresh spamming doesn't inflate the funnel.
@@ -169,15 +135,6 @@ export default function CourseDetailPage() {
             {data.organization && (
               <span className="flex items-center gap-1.5"><Building2 className="h-4 w-4" /> {data.organization.name}</span>
             )}
-<<<<<<< HEAD
-            {data.avg_rating != null && (data.rating_count || 0) > 0 && (
-              <span className="flex items-center gap-1.5 font-semibold text-amber-300" data-testid="course-avg-rating">
-                <Star className="h-4 w-4 fill-current" /> {data.avg_rating}
-                <span className="text-white/70 font-normal">({data.rating_count} rating{(data.rating_count || 0) !== 1 ? 's' : ''})</span>
-              </span>
-            )}
-=======
->>>>>>> origin/main
             <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {data.slide_count} lessons</span>
             {data.duration_minutes && (
               <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {data.duration_minutes} min</span>
@@ -213,39 +170,6 @@ export default function CourseDetailPage() {
               )}
             </ul>
           )}
-<<<<<<< HEAD
-
-          {/* Iter 47 — Learner reviews */}
-          {reviews.length > 0 && (
-            <div className="mt-12" data-testid="course-reviews-section">
-              <h2 className="text-xl font-bold text-slate-900 mb-5">What learners say</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {reviews.map(r => (
-                  <div key={r.id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4" data-testid={`review-card-${r.id}`}>
-                    <div className="flex items-center gap-0.5 text-amber-400 mb-2">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <Star key={n} className={`h-3.5 w-3.5 ${r.rating >= n ? 'fill-current' : 'text-slate-200'}`} />
-                      ))}
-                    </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">&ldquo;{r.comment}&rdquo;</p>
-                    <p className="text-xs text-slate-400 mt-2 font-medium">
-                      {r.reviewer}{r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}` : ''}
-                    </p>
-                    {r.reply_text && (
-                      <div className="mt-3 border-l-2 border-indigo-200 bg-indigo-50/60 rounded-r-lg px-3 py-2" data-testid={`review-reply-${r.id}`}>
-                        <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide mb-0.5">
-                          Response from {data.organization?.name || 'the academy'}
-                        </p>
-                        <p className="text-xs text-slate-600 leading-relaxed">{r.reply_text}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-=======
->>>>>>> origin/main
         </div>
 
         {/* Right: CTA card */}
@@ -259,10 +183,6 @@ export default function CourseDetailPage() {
               className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-xl shadow-sm transition-colors">
               {user ? (isFree ? 'Enrol now' : 'Get access') : 'Get started'} <ArrowRight className="h-4 w-4" />
             </button>
-<<<<<<< HEAD
-            <ShareCourseButton courseId={data.id} mode="button" className="mt-3" />
-=======
->>>>>>> origin/main
             <ul className="mt-5 space-y-2.5 text-sm text-slate-600">
               <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /> Lifetime access</li>
               <li className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /> Certificate on completion</li>

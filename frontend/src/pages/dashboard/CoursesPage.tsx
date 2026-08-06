@@ -3,18 +3,9 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-<<<<<<< HEAD
-import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical, Star } from 'lucide-react'
-import { toast } from 'sonner'
-import { SortableList } from 'components/SortableList'
-import { ShareCourseButton } from 'components/ShareCourseButton'
-import { LearningStreakBadge } from 'components/LearningStreakBadge'
-import { StreakLeaderboardTrigger } from 'components/StreakLeaderboardModal'
-=======
 import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
->>>>>>> origin/main
 
 export default function CoursesPage() {
   const qc = useQueryClient()
@@ -48,18 +39,6 @@ export default function CoursesPage() {
     onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not duplicate'),
   })
 
-<<<<<<< HEAD
-  const featureMut = useMutation({
-    mutationFn: async (id: number) => (await api.post(`/courses/${id}/toggle-featured`)).data,
-    onSuccess: (d) => {
-      qc.invalidateQueries({ queryKey: ['courses'] })
-      toast.success(d.is_featured ? 'Added to the marketplace Featured row' : 'Removed from the Featured row')
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not update'),
-  })
-
-=======
->>>>>>> origin/main
   const handleNewCourse = async () => {
     const c = await createMut.mutateAsync({ title: 'Untitled Course', status: 'DRAFT' })
     window.location.href = `/courses/${c.id}/edit`
@@ -76,15 +55,7 @@ export default function CoursesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 font-display">{isAdmin ? 'Courses' : 'My Courses'}</h1>
-<<<<<<< HEAD
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-slate-500">{isLoading ? 'Loading…' : `${courses.length} courses available`}</p>
-            {!isAdmin && <LearningStreakBadge />}
-            {!isAdmin && <StreakLeaderboardTrigger />}
-          </div>
-=======
           <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${courses.length} courses available`}</p>
->>>>>>> origin/main
         </div>
         {isAdmin && (
           <div className="flex gap-2">
@@ -137,18 +108,7 @@ export default function CoursesPage() {
           {filtered.map(c => (
             <div key={c.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow" data-testid={`course-card-${c.id}`}>
               <div className={`h-32 ${c.cover_color} flex items-end p-4 relative overflow-hidden`}>
-<<<<<<< HEAD
-                {c.cover_image ? (
-                  <>
-                    <img src={c.cover_image} alt={c.title} loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                      data-testid={`course-cover-img-${c.id}`} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
-                  </>
-                ) : isAdmin && c.mindmap_thumbnail_svg && (
-=======
                 {isAdmin && c.mindmap_thumbnail_svg && (
->>>>>>> origin/main
                   <>
                     <img
                       alt="Mind map preview"
@@ -165,19 +125,6 @@ export default function CoursesPage() {
                 <span className={`relative z-10 text-[10px] font-medium px-2 py-0.5 rounded-full ${c.status === 'PUBLISHED' ? 'bg-white/20 text-white' : 'bg-black/20 text-white/80'}`}>
                   {c.status}
                 </span>
-<<<<<<< HEAD
-                {isAdmin && (
-                  <button
-                    onClick={() => featureMut.mutate(c.id)}
-                    disabled={featureMut.isPending}
-                    title={c.is_featured ? 'Remove from the marketplace Featured row' : 'Feature on the marketplace'}
-                    data-testid={`feature-toggle-${c.id}`}
-                    className={`absolute top-2 left-2 z-20 p-1.5 rounded-full transition-colors ${c.is_featured ? 'bg-amber-400 text-white shadow' : 'bg-black/25 text-white/70 hover:bg-black/40 hover:text-white'}`}>
-                    <Star className={`h-3.5 w-3.5 ${c.is_featured ? 'fill-current' : ''}`} />
-                  </button>
-                )}
-=======
->>>>>>> origin/main
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-slate-900 truncate">{c.title}</h3>
@@ -198,27 +145,14 @@ export default function CoursesPage() {
                         className="inline-flex items-center justify-center text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
-<<<<<<< HEAD
-                      <ShareCourseButton courseId={c.id} mode="menu" />
-=======
->>>>>>> origin/main
                       <Link to={`/learn/${c.id}`} className="inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium">
                         <Eye className="h-3.5 w-3.5" /> Preview
                       </Link>
                     </>
                   ) : (
-<<<<<<< HEAD
-                    <>
-                      <Link to={`/learn/${c.id}`} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-1.5 font-medium">
-                        <LogIn className="h-3.5 w-3.5" /> Start Course
-                      </Link>
-                      <ShareCourseButton courseId={c.id} mode="menu" />
-                    </>
-=======
                     <Link to={`/learn/${c.id}`} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-1.5 font-medium">
                       <LogIn className="h-3.5 w-3.5" /> Start Course
                     </Link>
->>>>>>> origin/main
                   )}
                 </div>
               </div>
@@ -307,11 +241,7 @@ function AIBuilderModal({ onClose, onApplied }: { onClose: () => void; onApplied
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Topic *</label>
               <input value={topic} onChange={e => setTopic(e.target.value)} data-testid="ai-topic"
-<<<<<<< HEAD
-                placeholder="e.g. Foundations of Exercise Science"
-=======
                 placeholder="e.g. Introduction to Music Copyright Law"
->>>>>>> origin/main
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>
