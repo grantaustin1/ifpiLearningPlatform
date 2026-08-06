@@ -85,3 +85,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - FULL REGRESSION: 843 passed / 6 skipped / 0 failed (was 101 failed + 48 errors at session start).
 - Frontend: tsc clean, full marketplace UI (hero, featured row, native course cover art) verified in browser; admin login + forced password-change gate working.
 - NOTE: .env files are gitignored — required env keys are documented above and in memory/DEPLOY_RUNBOOK.md.
+
+## 2026-08-06 (session 3) — README env guide + learner-journey smoke tour
+- Created /app/README.md with full env setup guide (backend/.env + frontend/.env key tables, quickstart, test-suite instructions, test accounts).
+- Testing-agent browser smoke tour (iteration_49.json): full learner journey GREEN — landing/catalog (covers, no debris), login, course detail, enrol, player, completion, certificate issuance, PDF download, public verify UI + API.
+- Fixed the one UI regression found: player sidebar progress stuck at 20% after Complete (LearnPage.tsx next() now marks all slides complete). Verified by testing agent (iteration_50.json, 100%).
+- Known minor items (not fixed, cosmetic/noise): anon pages log a 401 from /api/auth/me probe; learner cert history contains old TEST_iter27/28 debris certificates.
