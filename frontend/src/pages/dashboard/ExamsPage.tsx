@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw, RotateCcw } from 'lucide-react'
+import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw, RotateCcw, Pencil, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from 'components/ConfirmDialog'
 
@@ -102,6 +102,7 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
   const qc = useQueryClient()
   const confirm = useConfirm()
   const [tab, setTab] = useState<'learners' | 'insights'>('learners')
+  const [editingQ, setEditingQ] = useState<any>(null)
   const { data, isLoading } = useQuery<any>({
     queryKey: ['exam-attempts', exam.id],
     queryFn: async () => (await api.get(`/exams/${exam.id}/attempts`)).data,
@@ -159,9 +160,17 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
               <p className="text-center text-slate-400 py-12 text-sm">No questions on this exam.</p>
             ) : (
               <>
-                <p className="text-xs text-slate-500 mb-4">
-                  Based on {insights.total_attempts} attempt{insights.total_attempts !== 1 ? 's' : ''} — sorted by miss rate, most-missed first.
-                </p>
+                <div className="flex items-center justify-between mb-4 gap-4">
+                  <p className="text-xs text-slate-500">
+                    Based on {insights.total_attempts} attempt{insights.total_attempts !== 1 ? 's' : ''} — sorted by miss rate, most-missed first.
+                  </p>
+                  {insights.course_id && (
+                    <Link to={`/courses/${insights.course_id}/edit`} data-testid="insights-edit-course-link"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap">
+                      <BookOpen className="h-3.5 w-3.5" /> Edit course content
+                    </Link>
+                  )}
+                </div>
                 <div className="space-y-4">
                   {insights.questions.map((q: any, i: number) => {
                     const rate = q.miss_rate
@@ -170,9 +179,15 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
                       <div key={q.question_id} data-testid={`insight-row-${q.question_id}`}>
                         <div className="flex items-start justify-between gap-4 mb-1.5">
                           <p className="text-sm text-slate-800"><span className="text-slate-400 mr-1.5">{i + 1}.</span>{q.question_text}</p>
-                          <span className={`text-xs font-semibold whitespace-nowrap ${rate == null ? 'text-slate-400' : rate >= 50 ? 'text-red-600' : rate >= 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {rate == null ? 'No data' : `${rate}% missed`}
-                          </span>
+                          <div className="flex items-center gap-3 whitespace-nowrap">
+                            <span className={`text-xs font-semibold ${rate == null ? 'text-slate-400' : rate >= 50 ? 'text-red-600' : rate >= 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {rate == null ? 'No data' : `${rate}% missed`}
+                            </span>
+                            <button onClick={() => setEditingQ(q)} data-testid={`edit-question-btn-${q.question_id}`}
+                              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700">
+                              <Pencil className="h-3 w-3" /> Edit
+                            </button>
+                          </div>
                         </div>
                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div className={`h-full ${barColor}`} style={{ width: `${rate ?? 0}%` }} />
@@ -232,6 +247,112 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
           )}
         </div>
         )}
+        {editingQ && (
+          <EditQuestionModal examId={exam.id} question={editingQ}
+            onClose={() => setEditingQ(null)}
+            onSaved={() => {
+              setEditingQ(null)
+              qc.invalidateQueries({ queryKey: ['exam-insights', exam.id] })
+            }} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EditQuestionModal({ examId, question, onClose, onSaved }: {
+  examId: number, question: any, onClose: () => void, onSaved: () => void
+}) {
+  const [text, setText] = useState<string>(question.question_text || '')
+  const [options, setOptions] = useState<string[]>(question.options || [])
+  const [correct, setCorrect] = useState<string>(question.correct_answer ?? '')
+  const [explanation, setExplanation] = useState<string>(question.explanation || '')
+  const [points, setPoints] = useState<number>(question.points || 1)
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const body: any = { question_text: text, correct_answer: correct, explanation, points }
+      if (question.question_type === 'MULTIPLE_CHOICE') body.options = options
+      return (await api.patch(`/exams/${examId}/questions/${question.question_id}`, body)).data
+    },
+    onSuccess: () => { toast.success('Question updated'); onSaved() },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not save question'),
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" data-testid="edit-question-modal">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900">Edit question</h3>
+          <button onClick={onClose} data-testid="edit-question-close" className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Question</label>
+            <textarea value={text} onChange={e => setText(e.target.value)} rows={2}
+              data-testid="edit-question-text"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          {question.question_type === 'MULTIPLE_CHOICE' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Options <span className="text-slate-400">(select the correct one)</span></label>
+              <div className="space-y-2">
+                {options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="radio" name="correct-option" checked={correct === String(i)}
+                      onChange={() => setCorrect(String(i))} data-testid={`edit-correct-radio-${i}`}
+                      className="accent-indigo-600" />
+                    <input value={opt} data-testid={`edit-option-${i}`}
+                      onChange={e => setOptions(options.map((o, j) => j === i ? e.target.value : o))}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {question.question_type === 'TRUE_FALSE' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Correct answer</label>
+              <div className="flex gap-2">
+                {['true', 'false'].map(v => (
+                  <button key={v} onClick={() => setCorrect(v)} data-testid={`edit-tf-${v}`}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium border ${correct === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    {v === 'true' ? 'True' : 'False'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {question.question_type === 'SHORT_ANSWER' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Correct answer</label>
+              <input value={correct} onChange={e => setCorrect(e.target.value)} data-testid="edit-short-answer"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Points</label>
+              <input type="number" min={1} value={points} onChange={e => setPoints(Number(e.target.value) || 1)}
+                data-testid="edit-question-points"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Explanation <span className="text-slate-400">(shown after answering)</span></label>
+            <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}
+              data-testid="edit-question-explanation"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg">Cancel</button>
+          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !text.trim()}
+            data-testid="edit-question-save"
+            className="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50">
+            {saveMut.isPending ? 'Saving…' : 'Save question'}
+          </button>
+        </div>
       </div>
     </div>
   )

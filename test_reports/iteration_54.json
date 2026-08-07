@@ -1,0 +1,48 @@
+{
+  "summary": "Verified Iter-54 'Insight Actions' feature end-to-end. Insights header now has 'Edit course content' link (navigates to /courses/221/edit) and every insight row has an Edit button. EditQuestionModal opens prefilled for MULTIPLE_CHOICE (Q13) and TRUE_FALSE (Q17). Editing only the explanation and saving triggers success toast 'Question updated', closes the modal, persists in DB (verified via GET /api/exams/4), keeps question ids unchanged (in-place edit), and preserves attempt history/insight linkage. Regression on Learners tab OK. All checks PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verification_details": {
+    "insights_header_link": {
+      "status": "PASS",
+      "evidence": "data-testid='insights-edit-course-link' present with href='/courses/221/edit'. Clicking navigates to course editor route successfully."
+    },
+    "per_row_edit_buttons": {
+      "status": "PASS",
+      "evidence": "Found edit-question-btn-13..17 (all 5 questions)."
+    },
+    "edit_flow_multiple_choice_q13": {
+      "status": "PASS",
+      "evidence": "Modal opens with question text 'Which energy system dominates a maximal 8-second sprint?', 4 options (edit-option-0..3) with values ['Oxidative (aerobic)','Glycolytic','ATP-PC (phosphagen)','Lactate shuttle'], edit-correct-radio-2 is checked as expected. Only explanation edited (appended ' (updated)'). Save → modal detaches, toast 'Question updated' visible, insight row 13 still present."
+    },
+    "edit_flow_true_false_q17": {
+      "status": "PASS",
+      "evidence": "Modal shows edit-tf-true (class contains bg-indigo-600 → highlighted as correct) and edit-tf-false. Explanation appended ' (tf-check)'. Save → modal closes."
+    },
+    "persistence_api": {
+      "status": "PASS",
+      "evidence": "GET /api/exams/4 → q13.explanation=' (updated)', q17.explanation='Sleep drives recovery and adaptation. (tf-check)'. Question ids remain [13,14,15,16,17] (in-place edit, not replace)."
+    },
+    "history_preserved": {
+      "status": "PASS",
+      "evidence": "GET /api/exams/4/question-insights → total_attempts=2 with non-null miss rates (Q13-16 miss_rate=50 answered=2, Q17 miss_rate=0 answered=2). Attempt linkage intact after edits. Note: total_attempts is 2 (not 1 as stated in review) — this is pre-existing state drift, not a regression."
+    },
+    "regression_learners_tab": {
+      "status": "PASS",
+      "evidence": "Learners tab lists Test Learner with 2/3 attempts (100% Passed) and a Reset button (reset-attempts-btn present). No console errors during flows."
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TF button relies solely on CSS class (bg-indigo-600) to convey 'selected/correct' — consider adding aria-pressed='true' on edit-tf-true/edit-tf-false for a11y and more robust automation."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "qa-admin@ifpi.org / QaAdmin!2026",
+  "seed_data_creation": "None. Only appended ' (updated)' to Q13 explanation and ' (tf-check)' to Q17 explanation on exam 4, per instructions. No option/answer/id changes.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter-54 Insight Actions feature fully working. Exam 4 currently: Test Learner 2/3 attempts, 100% pass, total_attempts=2 in insights. Q13 explanation is now ' (updated)'; Q17 explanation is now 'Sleep drives recovery and adaptation. (tf-check)'. Correct answers and option texts untouched.",
+  "rca of the issue": "n/a — no issues found."
+}

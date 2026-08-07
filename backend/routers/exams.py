@@ -1,7 +1,7 @@
 """Exam routes: CRUD + question management + take + attempt submission."""
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as _BaseModel
@@ -271,6 +271,50 @@ def reset_exam_attempts(exam_id: int, body: ResetAttemptsBody, request: Request,
     return {"deleted": n, "user_id": target.id}
 
 
+# ── Iter 52 — In-place question edit (preserves id + attempt history) ─
+class QuestionPatch(_BaseModel):
+    question_text: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
+    explanation: Optional[str] = None
+    points: Optional[int] = None
+
+
+@router.patch("/{exam_id}/questions/{question_id}", response_model=QuestionOut)
+def update_question(exam_id: int, question_id: int, body: QuestionPatch,
+                    request: Request, db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Edit one question in place — unlike PUT /questions (replace), this
+    keeps the question id so past attempt answers and insights stay linked."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    q = db.query(ExamQuestion).filter(
+        ExamQuestion.id == question_id, ExamQuestion.exam_id == exam_id,
+    ).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    changes = body.model_dump(exclude_unset=True)
+    for k, v in changes.items():
+        setattr(q, k, v)
+    from services import audit_service
+    audit_service.record(db, current, "EXAM_QUESTION_EDITED",
+                         target_type="exam", target_id=exam_id,
+                         metadata={"question_id": question_id,
+                                   "fields": sorted(changes.keys())},
+                         request=request)
+    db.commit()
+    db.refresh(q)
+    return QuestionOut(
+        id=q.id, question_text=q.question_text,
+        question_type=q.question_type.value, options=q.options,
+        correct_answer=q.correct_answer, explanation=q.explanation,
+        points=q.points, order_index=q.order_index,
+    )
+
+
 # ── Iter 51 — Question insights (miss-rate analytics) ────────────────
 @router.get("/{exam_id}/question-insights")
 def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
@@ -302,6 +346,9 @@ def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
             "question_id": q.id,
             "question_text": q.question_text,
             "question_type": q.question_type.value if hasattr(q.question_type, "value") else q.question_type,
+            "options": q.options,
+            "correct_answer": q.correct_answer,
+            "explanation": q.explanation,
             "points": q.points,
             "answered": answered,
             "correct": correct,
@@ -309,7 +356,7 @@ def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
             "miss_rate": round(missed / answered * 100) if answered else None,
         })
     out_sorted = sorted(out, key=lambda r: (r["miss_rate"] is None, -(r["miss_rate"] or 0)))
-    return {"exam_id": e.id, "title": e.title,
+    return {"exam_id": e.id, "title": e.title, "course_id": e.course_id,
             "total_attempts": len(attempts), "questions": out_sorted}
 
 
