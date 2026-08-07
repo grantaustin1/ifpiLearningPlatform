@@ -50,3 +50,10 @@ short-lived JWT for the current user and POST it to `/api/auth/sso-exchange`.
 Subscribing to a paid course auto-activates without real payment (stub mode).
 Set `BILLING_LIVE_MODE=true` + `ERP360_BASE_URL` + `ERP360_BILLING_WEBHOOK_SECRET`
 to route through ERP360's lite-billing module.
+
+# QA Admin (no forced password change — for UI testing)
+- Email: `qa-admin@ifpi.org`
+- Password: `QaAdmin!2026`
+- Roles: ADMIN, org: ifpi-main. Created 2026-08-06 because the seeded
+  admin@ifpi.org intentionally has must_change_password=True (asserted
+  by test_iteration32_sprint) which blocks quick UI logins.

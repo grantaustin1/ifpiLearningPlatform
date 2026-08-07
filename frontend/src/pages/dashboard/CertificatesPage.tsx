@@ -135,10 +135,16 @@ export default function CertificatesPage() {
           <h1 className="text-2xl font-bold text-slate-900 font-display">Certificates</h1>
           <p className="text-slate-500 mt-1">{isLoading ? 'Loading…' : `${certs.length} certificates`}</p>
         </div>
-        <button onClick={downloadTranscript} data-testid="download-transcript-btn"
-          className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg">
-          <FileText className="h-4 w-4" /> Download transcript
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => window.location.assign('/transcript')} data-testid="view-transcript-btn"
+            className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg">
+            <FileText className="h-4 w-4" /> Printable transcript
+          </button>
+          <button onClick={downloadTranscript} data-testid="download-transcript-btn"
+            className="inline-flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg">
+            <Download className="h-4 w-4" /> Download PDF
+          </button>
+        </div>
       </div>
       {certs.length === 0 ? (
         <div className="text-center py-16 text-slate-400">

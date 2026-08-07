@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { safeHtml } from 'lib/sanitize'
-import { ChevronLeft, ChevronRight, CheckCircle, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
 import { AITutorPanel } from 'components/AITutorPanel'
@@ -96,6 +96,13 @@ export default function LearnPage() {
 
       <div className="flex-1 flex flex-col">
         <div className="bg-white border-b px-5 py-3 text-sm font-medium text-slate-700">{course.title} <span className="text-slate-400 ml-2">{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span></div>
+        {examGate && slide && (
+          <div data-testid="exam-gate-banner"
+            className="bg-amber-50 border-b border-amber-200 px-5 py-2.5 text-sm text-amber-800 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 flex-shrink-0" />
+            <span>This course ends with an exam — pass <strong>{course.exam_title || 'the course exam'}</strong> to earn your certificate.</span>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto">
           {slide ? (
             <div className="max-w-3xl mx-auto px-6 py-10" data-testid="learn-slide-content">

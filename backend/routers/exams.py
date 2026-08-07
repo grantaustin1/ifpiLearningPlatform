@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from typing import List, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel as _BaseModel
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import INSTRUCTOR_ROLES
-from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType
+from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType, User
 from schemas import (
     AttemptResult, AttemptSubmit, ExamCreate, ExamDetail, ExamSummary,
     ExamUpdate, QuestionIn, QuestionOut,
@@ -168,6 +169,71 @@ def submit_attempt(exam_id: int, body: AttemptSubmit, db: Session = Depends(get_
         organization_id=current.organization_id, answers=body.answers,
     )
     return AttemptResult(**result)
+
+
+# ── Iter 50 — Admin attempt management ───────────────────────────────
+@router.get("/{exam_id}/attempts")
+def list_exam_attempts(exam_id: int, db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Per-learner attempt summary for an exam (admin/instructor)."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    rows = (db.query(ExamAttempt, User)
+            .join(User, User.id == ExamAttempt.user_id)
+            .filter(ExamAttempt.exam_id == exam_id)
+            .order_by(ExamAttempt.completed_at.desc().nullslast())
+            .all())
+    per_user: dict[int, dict] = {}
+    for a, u in rows:
+        entry = per_user.setdefault(u.id, {
+            "user_id": u.id, "name": u.name, "email": u.email,
+            "attempts_used": 0, "best_score": None, "passed": False,
+            "last_attempt_at": None,
+        })
+        entry["attempts_used"] += 1
+        if a.score is not None and (entry["best_score"] is None or a.score > entry["best_score"]):
+            entry["best_score"] = a.score
+        entry["passed"] = entry["passed"] or bool(a.passed)
+        ts = a.completed_at or a.started_at
+        if ts and (entry["last_attempt_at"] is None or ts.isoformat() > entry["last_attempt_at"]):
+            entry["last_attempt_at"] = ts.isoformat()
+    return {"exam_id": e.id, "max_attempts": e.max_attempts,
+            "learners": list(per_user.values())}
+
+
+class ResetAttemptsBody(_BaseModel):
+    user_id: int
+
+
+@router.post("/{exam_id}/attempts/reset")
+def reset_exam_attempts(exam_id: int, body: ResetAttemptsBody, request: Request,
+                        db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Wipe a learner's attempts for one exam so they can retake it."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    target = db.query(User).filter(
+        User.id == body.user_id,
+        User.organization_id == current.organization_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Learner not found")
+    n = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id, ExamAttempt.user_id == target.id,
+    ).delete(synchronize_session=False)
+    from services import audit_service
+    audit_service.record(db, current, "EXAM_ATTEMPTS_RESET",
+                         target_type="exam", target_id=exam_id,
+                         metadata={"user_id": target.id, "deleted": n},
+                         request=request)
+    db.commit()
+    return {"deleted": n, "user_id": target.id}
 
 
 
