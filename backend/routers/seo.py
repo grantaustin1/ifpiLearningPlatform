@@ -221,8 +221,8 @@ def cert_share(code: str, request: Request, db: Session = Depends(get_db)):
 
     base = _base(request)
     share_url = f"{base}/api/seo/certificates/share/{code}"
-    # Pre-baked SVG OG image (light-weight, always renders)
-    og_image = f"{base}/api/certificates/verify/{code}/og-image.svg"
+    # Iter 50 — PNG OG image (LinkedIn does not render SVG og:images)
+    og_image = f"{base}/api/certificates/verify/{code}/og-image.png"
 
     # Iter 29 — Revoked certs get a different title/desc so LinkedIn's
     # link preview reflects the invalidation on next crawl.

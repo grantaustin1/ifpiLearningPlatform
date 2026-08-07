@@ -202,6 +202,68 @@ async def audit_digest(
 
 
 # ── Learner PDF transcript ───────────────────────────────────────────
+@router.get("/api/certificates/transcript.json")
+def my_transcript_json(db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(get_current_user)):
+    """Iter 50 — JSON payload behind the printable transcript page.
+    Same data as the PDF: completed courses (best exam score + date),
+    certificates, badges, XP."""
+    from models import Exam, LiveSession
+    user = db.query(User).filter(User.id == current.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+    enrolls = db.query(Enrollment).filter(
+        Enrollment.user_id == user.id,
+        Enrollment.status == EnrollmentStatus.COMPLETED,
+    ).all()
+    courses = {c.id: c for c in db.query(Course).filter(
+        Course.id.in_([e.course_id for e in enrolls])).all()}
+    attempt_rows = db.query(ExamAttempt, Exam.course_id).join(
+        Exam, Exam.id == ExamAttempt.exam_id).filter(
+        ExamAttempt.user_id == user.id, ExamAttempt.score.isnot(None),
+    ).all()
+    best_score: dict[int, float] = {}
+    for a, cid in attempt_rows:
+        if cid and (cid not in best_score or a.score > best_score[cid]):
+            best_score[cid] = a.score
+    certs = db.query(Certificate).filter(
+        Certificate.user_id == user.id,
+    ).order_by(Certificate.issued_at.desc()).all()
+    session_titles = {}
+    sess_ids = [c.live_session_id for c in certs if c.live_session_id]
+    if sess_ids:
+        session_titles = {s.id: s.title for s in db.query(LiveSession).filter(
+            LiveSession.id.in_(sess_ids)).all()}
+    badges = db.query(UserBadge).filter(UserBadge.user_id == user.id).order_by(
+        UserBadge.earned_at.asc()).all()
+    return {
+        "learner": {"name": user.name, "email": user.email,
+                    "cohort": user.cohort, "total_xp": user.points or 0},
+        "organization": {"name": org.name if org else "IFPI Learning",
+                         "primary_color": (org.primary_color if org else None) or "#6366f1",
+                         "logo_url": org.logo_url if org else None},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "courses": [{
+            "id": e.course_id,
+            "title": courses[e.course_id].title,
+            "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+            "best_score": best_score.get(e.course_id),
+        } for e in enrolls if e.course_id in courses],
+        "certificates": [{
+            "id": c.id, "code": c.code, "type": c.type,
+            "title": (c.course.title if c.course
+                      else session_titles.get(c.live_session_id, "Certificate")),
+            "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+            "revoked": c.revoked_at is not None,
+        } for c in certs],
+        "badges": [{
+            "badge": b.badge,
+            "earned_at": b.earned_at.isoformat() if b.earned_at else None,
+        } for b in badges],
+    }
+
+
 @router.get("/api/certificates/transcript")
 def my_transcript(db: Session = Depends(get_db),
                   current: CurrentUser = Depends(get_current_user)):

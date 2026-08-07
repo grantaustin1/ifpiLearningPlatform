@@ -479,22 +479,22 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 821 |
+| `routers/courses.py` | 836 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
-| `routers/exams.py` | 212 |
+| `routers/exams.py` | 278 |
 | `routers/extras.py` | 655 |
 | `routers/feedback.py` | 72 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
 | `routers/iter5.py` | 352 |
-| `routers/iter8.py` | 305 |
+| `routers/iter8.py` | 367 |
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1309 |
+| `routers/misc.py` | 1391 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13374** |
+| **Total** | **13599** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -743,7 +743,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/certificates/bulk-unrevoke` | POST | Iter 31 — Bulk lift-revocation. Skips currently-active certs |
 | `/api/certificates/bulk-zip` | POST | Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
+| `/api/certificates/transcript.json` | GET | Iter 50 — JSON payload behind the printable transcript page. |
 | `/api/certificates/verify/{code}` | GET |  |
+| `/api/certificates/verify/{code}/og-image.png` | GET | Iter 50 — PNG OG image for social share previews. LinkedIn does |
 | `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
 | `/api/certificates/{cert_id}/revocation-history` | GET | Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events |
@@ -787,7 +789,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}` | DELETE |  |
 | `/api/exams/{exam_id}` | GET |  |
 | `/api/exams/{exam_id}` | PATCH |  |
+| `/api/exams/{exam_id}/attempts` | GET | Per-learner attempt summary for an exam (admin/instructor). |
 | `/api/exams/{exam_id}/attempts` | POST |  |
+| `/api/exams/{exam_id}/attempts/reset` | POST | Wipe a learner's attempts for one exam so they can retake it. |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
 | `/api/feature-flags` | GET |  |
 | `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
@@ -882,7 +886,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **290** registered API endpoints._
+_Total: **294** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

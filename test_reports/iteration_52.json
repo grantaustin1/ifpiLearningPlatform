@@ -1,0 +1,36 @@
+{
+  "summary": "Verified all 4 new IFPI Learning Platform features end-to-end: (1) Attempt Reset flow via admin UI, (2) Exam Progress Banner (visible when un-passed, hidden after passing), (3) Certificate Share PNG og:image endpoint, (4) Printable Learner Transcript page. All features PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verification_details": {
+    "FEATURE_1_attempt_reset": {
+      "status": "PASS",
+      "evidence": "Logged in as qa-admin@ifpi.org (no forced pw change). /exams → clicked exam-attempts-btn-4 → attempts-modal listed 'Test Learner learner@ifpi.org 1/3 100% Passed' with reset-attempts-btn-2. Clicked Reset → confirm-dialog-title appeared → confirmed → success toast 'Reset 1 attempt — the learner can retake the exam'. Modal refreshed to 'No attempts yet.' (0 reset buttons remaining). Verified re-take path: as learner on /learn/221 last slide, next-slide-btn label became 'Take exam' again."
+    },
+    "FEATURE_2_exam_gate_banner": {
+      "status": "PASS",
+      "evidence": "While un-passed (post-reset): /learn/221 slide 1 shows data-testid=exam-gate-banner with text 'This course ends with an exam — pass Foundations of Exercise Science Assessment to earn your certificate.'. Clicking through slide-nav to the last slide the banner remains visible on every slide. After re-passing exam 4 with the provided answer key (Q1 opt-2 ATP-PC, Q2 opt-1 Gradually increasing, Q3 opt-1 During recovery, Q4 opt-2 Volume, Q5 tf-true) → 100%, 'Congratulations! You passed.', +150 XP, toast 'Course complete! Certificate issued.'. Reloaded /learn/221 → exam-gate-banner is GONE (query_selector returned None)."
+    },
+    "FEATURE_3_cert_share_png": {
+      "status": "PASS",
+      "evidence": "(a) GET /api/seo/certificates/share/8a484dc997994d4880e4a3890bd3803b returns HTML containing og:image meta ending in '/og-image.png' (not .svg). (b) GET /api/certificates/verify/{code}/og-image.png → HTTP 200, content-type=image/png, size=23823 bytes (>5KB). (c) GET /api/certificates/verify/JUNKCODE12345/og-image.png → HTTP 404. Note: HEAD returns 405 (Only GET allowed) which is standard FastAPI behaviour and not an issue."
+    },
+    "FEATURE_4_printable_transcript": {
+      "status": "PASS",
+      "evidence": "/certificates page shows both view-transcript-btn ('Printable transcript') and legacy download-transcript-btn. Clicking view-transcript-btn navigates to /transcript. transcript-page rendered with: transcript-learner-name='Test Learner', COMPLETED COURSES (2) table [IFPI Fundamentals 100%, Foundations of Exercise Science 100%] (transcript-courses-table), CERTIFICATES (4) table with verify codes and Valid status chips (transcript-certs-table), BADGES chips (FIRST_COURSE, EXAM_PASSER, PERFECT_SCORE, FIRST_ENROLLMENT, COURSE_MASTER), transcript-print-btn ('Print') and transcript-back-btn ('Back to certificates') both present. Clicking back returned to /certificates. download-transcript-btn (PDF) still present on /certificates."
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "og:image URL in seo/certificates/share HTML resolves to http://learning-hub-968.cluster-8.preview.emergentcf.cloud/... (internal cluster origin, http://) instead of the public https REACT_APP_BACKEND_URL. LinkedIn/OG scrapers can still fetch it (it 200s) but a public https URL is more robust — consider forcing scheme from PUBLIC_URL/APP_URL env var."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (3/3 curl checks)", "frontend": "100% (all 4 UI feature flows)"},
+  "test_credentials": "qa-admin@ifpi.org / QaAdmin!2026 ; learner@ifpi.org / learner123",
+  "seed_data_creation": "None. State restored: exam 4 attempts were reset for Test Learner (user_id=2), then re-passed with 100% (attempts used: 1/3 again). A new Foundations of Exercise Science certificate was issued (new code) — the previous cert c02bdd... also remains listed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 features verified. Only cosmetic note: og:image URL uses cluster origin (http) rather than public https REACT_APP_BACKEND_URL. Exam 4 attempts_used=1/3 after re-pass. Do NOT delete /app/backend/ifpi_lms.db.",
+  "rca of the issue": "n/a — no issues found."
+}

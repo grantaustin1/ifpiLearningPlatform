@@ -15,6 +15,7 @@ import CoursesPage from 'pages/dashboard/CoursesPage'
 import CourseEditPage from 'pages/dashboard/CourseEditPage'
 import ExamsPage from 'pages/dashboard/ExamsPage'
 import CertificatesPage from 'pages/dashboard/CertificatesPage'
+import TranscriptPage from 'pages/dashboard/TranscriptPage'
 import AdminCertificatesPage from 'pages/dashboard/AdminCertificatesPage'
 import UsersPage from 'pages/dashboard/UsersPage'
 import ReportsPage from 'pages/dashboard/ReportsPage'
@@ -138,6 +139,7 @@ export default function App() {
       <Route path="/verify" element={<PublicCatalogPage />} />
       <Route path="/billing/success" element={<Protected><BillingSuccessPage /></Protected>} />
       <Route path="/learn/:courseId" element={<Protected><LearnPage /></Protected>} />
+      <Route path="/transcript" element={<Protected><TranscriptPage /></Protected>} />
       <Route path="/learn/:courseId/flashcards" element={<Protected><LearnerFlashcardsPage /></Protected>} />
       <Route path="/take/:examId" element={<Protected><TakeExamPage /></Protected>} />
 
