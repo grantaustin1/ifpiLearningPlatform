@@ -98,6 +98,8 @@ class ExamQuestion(Base):
     explanation = Column(Text)
     points = Column(Integer, default=1)
     order_index = Column(Integer, default=0)
+    # Iter 53 — set when a miss-rate alert fired; cleared on question edit
+    miss_alerted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
     exam = relationship("Exam", back_populates="questions")

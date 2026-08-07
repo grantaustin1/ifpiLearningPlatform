@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw, RotateCcw, Pencil, BookOpen } from 'lucide-react'
+import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw, RotateCcw, Pencil, BookOpen, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from 'components/ConfirmDialog'
 
@@ -170,6 +170,21 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
                       <BookOpen className="h-3.5 w-3.5" /> Edit course content
                     </Link>
                   )}
+                  <button data-testid="insights-export-csv-btn"
+                    onClick={async () => {
+                      try {
+                        const r = await api.get(`/exams/${exam.id}/question-insights.csv`, { responseType: 'blob' })
+                        const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }))
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `question-insights-exam-${exam.id}.csv`
+                        document.body.appendChild(a); a.click(); a.remove()
+                        URL.revokeObjectURL(url)
+                        toast.success('Insights CSV downloaded')
+                      } catch { toast.error('Could not export CSV') }
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 whitespace-nowrap border border-slate-200 rounded-lg px-2.5 py-1 hover:bg-slate-50">
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
                 </div>
                 <div className="space-y-4">
                   {insights.questions.map((q: any, i: number) => {
@@ -192,7 +207,36 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div className={`h-full ${barColor}`} style={{ width: `${rate ?? 0}%` }} />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">{q.correct}/{q.answered} answered correctly · {q.question_type === 'TRUE_FALSE' ? 'True/False' : q.question_type === 'MULTIPLE_CHOICE' ? 'Multiple choice' : 'Short answer'} · {q.points} pt{q.points !== 1 ? 's' : ''}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          {q.correct}/{q.answered} answered correctly · {q.question_type === 'TRUE_FALSE' ? 'True/False' : q.question_type === 'MULTIPLE_CHOICE' ? 'Multiple choice' : 'Short answer'} · {q.points} pt{q.points !== 1 ? 's' : ''}
+                          {q.miss_alerted_at && <span className="ml-2 text-amber-600 font-medium">· author alerted</span>}
+                        </p>
+                        {q.answer_distribution?.length > 0 && (
+                          <div className="mt-2 space-y-1" data-testid={`distractor-stats-${q.question_id}`}>
+                            {q.answer_distribution.map((d: any, j: number) => {
+                              const pct = q.answered ? Math.round(d.count / q.answered * 100) : 0
+                              const isTopWrong = !d.is_correct && q.top_wrong && d.answer === q.top_wrong.answer
+                              return (
+                                <div key={j} className="flex items-center gap-2 text-[11px]">
+                                  <span className={`w-40 truncate ${d.is_correct ? 'text-emerald-700 font-medium' : 'text-slate-500'}`} title={d.label}>
+                                    {d.is_correct ? '✓ ' : ''}{d.label}
+                                  </span>
+                                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={`h-full ${d.is_correct ? 'bg-emerald-400' : isTopWrong ? 'bg-red-400' : 'bg-slate-300'}`}
+                                      style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="w-16 text-slate-400 text-right whitespace-nowrap">
+                                    {d.count} ({pct}%)
+                                  </span>
+                                  {isTopWrong && (
+                                    <span data-testid={`top-distractor-${q.question_id}`}
+                                      className="text-[10px] font-semibold text-red-500 uppercase whitespace-nowrap">top distractor</span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
