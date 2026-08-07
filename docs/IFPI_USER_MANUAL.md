@@ -483,7 +483,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
-| `routers/exams.py` | 278 |
+| `routers/exams.py` | 355 |
 | `routers/extras.py` | 655 |
 | `routers/feedback.py` | 72 |
 | `routers/flashcards.py` | 497 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13599** |
+| **Total** | **13676** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -792,6 +792,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}/attempts` | GET | Per-learner attempt summary for an exam (admin/instructor). |
 | `/api/exams/{exam_id}/attempts` | POST |  |
 | `/api/exams/{exam_id}/attempts/reset` | POST | Wipe a learner's attempts for one exam so they can retake it. |
+| `/api/exams/{exam_id}/question-insights` | GET | Per-question correct/miss rates across all attempts, so admins can |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
 | `/api/feature-flags` | GET |  |
 | `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
@@ -886,7 +887,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **294** registered API endpoints._
+_Total: **295** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

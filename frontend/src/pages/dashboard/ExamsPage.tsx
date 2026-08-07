@@ -101,9 +101,15 @@ export default function ExamsPage() {
 function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
   const qc = useQueryClient()
   const confirm = useConfirm()
+  const [tab, setTab] = useState<'learners' | 'insights'>('learners')
   const { data, isLoading } = useQuery<any>({
     queryKey: ['exam-attempts', exam.id],
     queryFn: async () => (await api.get(`/exams/${exam.id}/attempts`)).data,
+  })
+  const { data: insights, isLoading: insightsLoading } = useQuery<any>({
+    queryKey: ['exam-insights', exam.id],
+    queryFn: async () => (await api.get(`/exams/${exam.id}/question-insights`)).data,
+    enabled: tab === 'insights',
   })
 
   const resetMut = useMutation({
@@ -136,6 +142,50 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
           </div>
           <button onClick={onClose} data-testid="attempts-modal-close" className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
         </div>
+        <div className="px-6 pt-3 border-b flex gap-4">
+          {(['learners', 'insights'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              data-testid={`attempts-tab-${t}`}
+              className={`pb-2 text-sm font-medium border-b-2 -mb-px ${tab === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+              {t === 'learners' ? 'Learners' : 'Question insights'}
+            </button>
+          ))}
+        </div>
+        {tab === 'insights' ? (
+          <div className="flex-1 overflow-y-auto p-6" data-testid="question-insights-panel">
+            {insightsLoading ? (
+              <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+            ) : !insights?.questions?.length ? (
+              <p className="text-center text-slate-400 py-12 text-sm">No questions on this exam.</p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500 mb-4">
+                  Based on {insights.total_attempts} attempt{insights.total_attempts !== 1 ? 's' : ''} — sorted by miss rate, most-missed first.
+                </p>
+                <div className="space-y-4">
+                  {insights.questions.map((q: any, i: number) => {
+                    const rate = q.miss_rate
+                    const barColor = rate == null ? 'bg-slate-200' : rate >= 50 ? 'bg-red-500' : rate >= 25 ? 'bg-amber-500' : 'bg-emerald-500'
+                    return (
+                      <div key={q.question_id} data-testid={`insight-row-${q.question_id}`}>
+                        <div className="flex items-start justify-between gap-4 mb-1.5">
+                          <p className="text-sm text-slate-800"><span className="text-slate-400 mr-1.5">{i + 1}.</span>{q.question_text}</p>
+                          <span className={`text-xs font-semibold whitespace-nowrap ${rate == null ? 'text-slate-400' : rate >= 50 ? 'text-red-600' : rate >= 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {rate == null ? 'No data' : `${rate}% missed`}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${barColor}`} style={{ width: `${rate ?? 0}%` }} />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">{q.correct}/{q.answered} answered correctly · {q.question_type === 'TRUE_FALSE' ? 'True/False' : q.question_type === 'MULTIPLE_CHOICE' ? 'Multiple choice' : 'Short answer'} · {q.points} pt{q.points !== 1 ? 's' : ''}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
@@ -181,6 +231,7 @@ function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
             </table>
           )}
         </div>
+        )}
       </div>
     </div>
   )
