@@ -232,8 +232,85 @@ def reset_exam_attempts(exam_id: int, body: ResetAttemptsBody, request: Request,
                          target_type="exam", target_id=exam_id,
                          metadata={"user_id": target.id, "deleted": n},
                          request=request)
+    # Iter 51 — Tell the learner they can retake (email + in-app bell).
+    try:
+        from services.gamification_service import GamificationService
+        from services.mail_service import MailService
+        retake_path = f"/take/{e.id}"
+        GamificationService(db).notify(
+            target.id, "EXAM_ATTEMPTS_RESET",
+            "Your exam attempts were reset",
+            f'You can retake "{e.title}" — your previous attempts were cleared by an administrator.',
+            link=retake_path,
+        )
+        first_name = (target.name or "there").split()[0]
+        MailService(db).send_email(
+            to_email=target.email, to_name=target.name,
+            subject=f"You can retake: {e.title}",
+            body_html=(
+                f"<div style='font-family:system-ui,sans-serif;max-width:520px'>"
+                f"<h2 style='color:#4f46e5;margin:0 0 12px'>Good news, {first_name}!</h2>"
+                f"<p>An administrator reset your attempts for "
+                f"<strong>{e.title}</strong>, so you have a fresh set of "
+                f"{e.max_attempts} attempt{'s' if e.max_attempts != 1 else ''} to pass it.</p>"
+                f"<p style='margin:20px 0'><a href='{retake_path}' "
+                f"style='background:#4f46e5;color:#fff;padding:10px 20px;"
+                f"border-radius:8px;text-decoration:none;font-weight:600'>Retake the exam</a></p>"
+                f"<p style='color:#64748b;font-size:13px'>Pass mark: {e.passing_score}%. Good luck!</p>"
+                f"</div>"
+            ),
+            body_text=(f"An administrator reset your attempts for '{e.title}'. "
+                       f"You can retake it at {retake_path} (pass mark {e.passing_score}%)."),
+            template="exam_attempts_reset",
+            organization_id=current.organization_id, user_id=target.id,
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("Reset notification queue failed", exc_info=True)
     db.commit()
     return {"deleted": n, "user_id": target.id}
+
+
+# ── Iter 51 — Question insights (miss-rate analytics) ────────────────
+@router.get("/{exam_id}/question-insights")
+def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
+                           current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Per-question correct/miss rates across all attempts, so admins can
+    spot the questions (and course content) learners struggle with most."""
+    from services.exam_service import grade_question
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    attempts = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id, ExamAttempt.answers.isnot(None),
+    ).all()
+    questions = sorted(e.questions, key=lambda q: q.order_index)
+    out = []
+    for q in questions:
+        answered = correct = 0
+        for a in attempts:
+            ans = (a.answers or {}).get(str(q.id))
+            if ans is None or ans == "":
+                continue
+            answered += 1
+            if grade_question(q, ans):
+                correct += 1
+        missed = answered - correct
+        out.append({
+            "question_id": q.id,
+            "question_text": q.question_text,
+            "question_type": q.question_type.value if hasattr(q.question_type, "value") else q.question_type,
+            "points": q.points,
+            "answered": answered,
+            "correct": correct,
+            "missed": missed,
+            "miss_rate": round(missed / answered * 100) if answered else None,
+        })
+    out_sorted = sorted(out, key=lambda r: (r["miss_rate"] is None, -(r["miss_rate"] or 0)))
+    return {"exam_id": e.id, "title": e.title,
+            "total_attempts": len(attempts), "questions": out_sorted}
 
 
 
