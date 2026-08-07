@@ -412,7 +412,7 @@ def exam_question_insights_csv(exam_id: int, db: Session = Depends(get_db),
                     q["miss_rate"] if q["miss_rate"] is not None else "",
                     tw.get("label", ""), tw.get("count", ""), correct_label])
     filename = f"question-insights-exam-{exam_id}.csv"
-    return _Response(buf.getvalue(), media_type="text/csv", headers={
+    return _Response(buf.getvalue(), media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": f'attachment; filename="{filename}"',
     })
 
