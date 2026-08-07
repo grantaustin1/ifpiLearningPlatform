@@ -157,6 +157,11 @@ class CourseSummary(BaseModel):
 class CourseDetail(CourseSummary):
     passing_score: int
     slides: List[SlideOut] = []
+    # Iter 49 — Exam gate: the course's published exam (if any) and
+    # whether the current caller has already passed it.
+    exam_id: Optional[int] = None
+    exam_title: Optional[str] = None
+    exam_passed: bool = False
 
 
 # ── Exam ─────────────────────────────────────────────────────────────
