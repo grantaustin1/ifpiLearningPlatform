@@ -299,6 +299,8 @@ def update_question(exam_id: int, question_id: int, body: QuestionPatch,
     changes = body.model_dump(exclude_unset=True)
     for k, v in changes.items():
         setattr(q, k, v)
+    # Iter 53 — editing the question re-arms its miss-rate alert
+    q.miss_alerted_at = None
     from services import audit_service
     audit_service.record(db, current, "EXAM_QUESTION_EDITED",
                          target_type="exam", target_id=exam_id,
@@ -334,18 +336,38 @@ def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
     out = []
     for q in questions:
         answered = correct = 0
+        counts: dict[str, int] = {}
         for a in attempts:
             ans = (a.answers or {}).get(str(q.id))
             if ans is None or ans == "":
                 continue
             answered += 1
+            key = str(ans).strip()
+            counts[key] = counts.get(key, 0) + 1
             if grade_question(q, ans):
                 correct += 1
         missed = answered - correct
+        # Iter 53 — distractor stats: label each picked answer and flag
+        # the most-picked wrong one so weak distractors stand out.
+        qt = q.question_type.value if hasattr(q.question_type, "value") else q.question_type
+        def _label(raw: str) -> str:
+            if qt == "MULTIPLE_CHOICE" and q.options is not None and raw.isdigit() and int(raw) < len(q.options):
+                return q.options[int(raw)]
+            if qt == "TRUE_FALSE":
+                return "True" if raw.strip().lower() == "true" else "False"
+            return raw
+        distribution = sorted([{
+            "answer": raw,
+            "label": _label(raw),
+            "count": n,
+            "is_correct": grade_question(q, raw),
+        } for raw, n in counts.items()], key=lambda d: -d["count"])
+        wrong = [d for d in distribution if not d["is_correct"]]
+        top_wrong = wrong[0] if wrong else None
         out.append({
             "question_id": q.id,
             "question_text": q.question_text,
-            "question_type": q.question_type.value if hasattr(q.question_type, "value") else q.question_type,
+            "question_type": qt,
             "options": q.options,
             "correct_answer": q.correct_answer,
             "explanation": q.explanation,
@@ -354,10 +376,45 @@ def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
             "correct": correct,
             "missed": missed,
             "miss_rate": round(missed / answered * 100) if answered else None,
+            "answer_distribution": distribution,
+            "top_wrong": top_wrong,
+            "miss_alerted_at": q.miss_alerted_at.isoformat() if q.miss_alerted_at else None,
         })
     out_sorted = sorted(out, key=lambda r: (r["miss_rate"] is None, -(r["miss_rate"] or 0)))
     return {"exam_id": e.id, "title": e.title, "course_id": e.course_id,
             "total_attempts": len(attempts), "questions": out_sorted}
+
+
+# ── Iter 53 — CSV export of question insights ────────────────────────
+@router.get("/{exam_id}/question-insights.csv")
+def exam_question_insights_csv(exam_id: int, db: Session = Depends(get_db),
+                               current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Same data as /question-insights, as a CSV for curriculum reviews."""
+    import csv
+    import io as _io
+    from fastapi import Response as _Response
+    data = exam_question_insights(exam_id, db=db, current=current)
+    buf = _io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["#", "question", "type", "points", "answered", "correct",
+                "missed", "miss_rate_pct", "top_wrong_answer",
+                "top_wrong_count", "correct_answer"])
+    for i, q in enumerate(data["questions"], 1):
+        tw = q.get("top_wrong") or {}
+        qt = q["question_type"]
+        correct_label = q["correct_answer"]
+        if qt == "MULTIPLE_CHOICE" and q.get("options") and str(correct_label).isdigit():
+            idx = int(correct_label)
+            if idx < len(q["options"]):
+                correct_label = q["options"][idx]
+        w.writerow([i, q["question_text"], qt, q["points"], q["answered"],
+                    q["correct"], q["missed"],
+                    q["miss_rate"] if q["miss_rate"] is not None else "",
+                    tw.get("label", ""), tw.get("count", ""), correct_label])
+    filename = f"question-insights-exam-{exam_id}.csv"
+    return _Response(buf.getvalue(), media_type="text/csv", headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    })
 
 
 
