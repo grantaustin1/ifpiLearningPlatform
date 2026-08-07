@@ -106,3 +106,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Learner Transcript: GET /api/certificates/transcript.json + /transcript printable page (courses w/ best scores, certificates w/ verify codes + Valid/Revoked, badges, print & back buttons, print:hidden chrome). CertificatesPage now has 'Printable transcript' + 'Download PDF' buttons.
 - New QA admin account qa-admin@ifpi.org / QaAdmin!2026 (must_change_password=False) — seeded admin's forced-change flag is asserted by test_iteration32 and must stay. Recorded in memory/test_credentials.md.
 - Verified: testing agent iteration_52.json — all 4 features PASS (UI + curl). Docs regenerated; targeted backend tests green (docs drift, iter8/28/29: 43 passed).
+
+## 2026-08-06 (session 6) — Reset notifications + question insights (Iter 51)
+- Reset Notification: reset_exam_attempts now queues an outbox email (template exam_attempts_reset, branded HTML, retake CTA) via MailService AND an in-app bell notification (EXAM_ATTEMPTS_RESET, link /take/{examId}) via GamificationService.notify. Best-effort try/except so mail failures never block the reset. Email transport remains dev STUB (queued in outbox, not delivered) by design.
+- Attempt Insights: new GET /api/exams/{id}/question-insights (admin/instructor) — per-question answered/correct/missed + miss_rate using the canonical grade_question, sorted most-missed first. AttemptsModal now has 'Learners' / 'Question insights' tabs with colored miss-rate bars (red ≥50, amber ≥25, green else).
+- Docs regenerated for new route. Verified: testing agent iteration_53.json — both features PASS (UI + API + outbox + bell), learner state restored (exam 4 re-passed 100%). Targeted backend tests green (docs drift, iter4/15: 28 passed).
