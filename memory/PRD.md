@@ -118,3 +118,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Verified: testing agent iteration_54.json — all PASS (UI flows, persistence via API, ids unchanged, history preserved, regression clean). Docs regenerated.
 - INCIDENT NOTE: parallel search_replace calls on the same file (routers/exams.py) corrupted it mid-session; restored from auto-commit 7311c8a2 and re-applied edits sequentially. Rule: never batch multiple edits to one file in parallel.
 - Save to GitHub: user-side platform button; user reminded to click it.
+
+## 2026-08-07 (session 8) — Distractor stats, CSV export, miss-rate alerts (Iter 53)
+- Distractor Stats: question-insights now returns answer_distribution (per picked answer: label/count/is_correct) + top_wrong; UI shows per-option bars (green ✓ correct, red TOP DISTRACTOR badge on most-picked wrong option).
+- Insight Export: GET /api/exams/{id}/question-insights.csv (admin/instructor, text/csv; charset=utf-8, attachment) + 'Export CSV' button in the insights header (blob download).
+- Miss Rate Alerts: exam_service._check_miss_alerts runs after each attempt — questions with ≥50% miss rate over ≥3 answers fire in-app QUESTION_MISS_ALERT notifications + queued question_miss_alert emails to all org INSTRUCTOR/ADMIN/SUPER_ADMIN. Dedup via new exam_questions.miss_alerted_at column (alembic 6f7a8b9c0d1e); editing a question clears it (re-arms). Insights rows show '· author alerted' chip.
+- Verified: testing agent iteration_55.json — all PASS (UI + curl + outbox + re-arm; learner deliberate-fail path). State note: learner now 3/3 attempts on exam 4 (still Passed, best 100%) — use admin Reset if a fresh attempt is needed. Docs regenerated; targeted tests green.
