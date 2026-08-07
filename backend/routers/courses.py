@@ -105,7 +105,7 @@ def create_course(
     return _detail(course)
 
 
-def _detail(c: Course) -> CourseDetail:
+def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
     meta = c.metadata_json or {}
     return CourseDetail(
         id=c.id, title=c.title, description=c.description, category=c.category,
@@ -116,6 +116,9 @@ def _detail(c: Course) -> CourseDetail:
         slide_count=len(c.slides), enrollment_count=len(c.enrollments),
         created_at=c.created_at,
         mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
+        exam_id=exam.id if exam else None,
+        exam_title=exam.title if exam else None,
+        exam_passed=exam_passed,
         slides=[SlideOut(
             id=s.id, title=s.title, content=s.content or "",
             slide_type=s.slide_type.value, media_url=s.media_url,
@@ -135,7 +138,19 @@ def get_course(course_id: int, db: Session = Depends(get_db),
         raise HTTPException(status_code=404, detail="Course not found")
     if c.status != CourseStatus.PUBLISHED and not _can_manage(current):
         raise HTTPException(status_code=404, detail="Course not found")
-    return _detail(c)
+    # Iter 49 — Exam gate metadata for the course player
+    from models import Exam, ExamAttempt
+    exam = db.query(Exam).filter(
+        Exam.course_id == c.id, Exam.is_published.is_(True),
+    ).first()
+    exam_passed = False
+    if exam:
+        exam_passed = db.query(ExamAttempt).filter(
+            ExamAttempt.exam_id == exam.id,
+            ExamAttempt.user_id == current.id,
+            ExamAttempt.passed.is_(True),
+        ).first() is not None
+    return _detail(c, exam=exam, exam_passed=exam_passed)
 
 
 @router.patch("/{course_id}", response_model=CourseDetail)

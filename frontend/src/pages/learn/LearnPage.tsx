@@ -44,11 +44,19 @@ export default function LearnPage() {
 
   const progress = course.slides.length ? (completed.size / course.slides.length) * 100 : 0
   const isLast = current === course.slides.length - 1
+  // Iter 49 — Exam gate: courses with a published exam route the learner
+  // to the exam; the certificate is issued after they pass it.
+  const examGate = Boolean(course.exam_id) && !course.exam_passed
 
   const next = async () => {
     const newSet = new Set(completed); newSet.add(current); setCompleted(newSet)
     if (isLast) {
       setCompleted(new Set(course.slides.map((_: unknown, i: number) => i)))
+      if (examGate) {
+        toast.info(`Pass "${course.exam_title || 'the course exam'}" to earn your certificate.`)
+        nav(`/take/${course.exam_id}`)
+        return
+      }
       setFinishing(true)
       try {
         const r = await api.post(`/courses/${courseId}/complete`)
@@ -175,7 +183,11 @@ export default function LearnPage() {
               className="inline-flex items-center gap-2 border border-slate-200 rounded-lg px-4 py-2 text-sm disabled:opacity-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
             <button onClick={next} disabled={finishing} data-testid="next-slide-btn"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">
-              {finishing ? 'Finishing…' : (isLast ? <><CheckCircle className="h-4 w-4" /> Complete</> : <>Next <ChevronRight className="h-4 w-4" /></>)}
+              {finishing ? 'Finishing…' : (isLast
+                ? (examGate
+                  ? <><CheckCircle className="h-4 w-4" /> Take exam</>
+                  : <><CheckCircle className="h-4 w-4" /> Complete</>)
+                : <>Next <ChevronRight className="h-4 w-4" /></>)}
             </button>
           </div>
         )}

@@ -1,0 +1,42 @@
+{
+  "summary": "Verified all three IFPI Learning Platform fixes via browser automation as the learner (learner@ifpi.org). FIX 1 (cert history clean), FIX 2 (silent /auth/me probe), and FIX 3 (exam gate + already-passed shortcut) all PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verification_details": {
+    "FIX_1_cert_history": {
+      "status": "PASS",
+      "evidence": "GET /certificates lists 4 real certs (IFPI Fundamentals, Client Onboarding & Consultation, Gym Health & Safety Essentials, Foundations of Exercise Science). No 'TEST_iter27', 'TEST_iter28' or 'TEST_iter' debris strings on the page. Download PDF / Copy link / Add to LinkedIn / Verify buttons render for each."
+    },
+    "FIX_2_silent_auth_probe": {
+      "status": "PASS",
+      "evidence": "Anonymous session (cookies + localStorage cleared): /api/auth/me requests fired on / = 0; on /catalog = 0. Zero 401 console errors. After login as learner: localStorage 'ifpi_session_hint' = '1' set; page reload triggered /auth/me (2 calls, session restored, user stays logged in). After logout + storage clear + reload of /, no anonymous /auth/me requests fired and no 401 console noise (0 console 401 errors overall across the run)."
+    },
+    "FIX_3_exam_gate_main": {
+      "status": "PASS",
+      "evidence": "/learn/221 last-slide button label = 'Take exam' (via data-testid=next-slide-btn). Clicking navigated to /take/4. start-exam-btn started attempt. Answered Q1 option-2 (ATP-PC phosphagen), Q2 option-1 (Gradually increasing training demand), Q3 option-1 (During recovery between sessions), Q4 option-2 (Volume), Q5 tf-true. Submitted → result page shows 'Congratulations! You passed.' with 100% score, +150 XP, toast 'Course complete! Certificate issued.', and exam-view-certificate-btn visible. Clicking View Certificate navigated to /certificates where 'Foundations of Exercise Science' completion certificate is now listed."
+    },
+    "FIX_3b_already_passed_shortcut": {
+      "status": "PASS",
+      "evidence": "/learn/1 (IFPI Fundamentals — exam already passed) last-slide button label = 'Complete' (not 'Take exam'), confirming exam_passed=true short-circuits the gate."
+    },
+    "FIX_3c_failure_path": {
+      "status": "SKIPPED",
+      "evidence": "Not exercised to preserve remaining exam attempts (max_attempts=3), per reviewer's guidance."
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not tested)", "frontend": "100% (5/5 checks; 3c intentionally skipped)"},
+  "test_credentials": "learner@ifpi.org / learner123",
+  "seed_data_creation": "None. Did not touch DB. New real certificate for course 221 was issued organically through the exam-pass flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 3 requested fixes verified. Course 221 exam attempts consumed: 1 (passed). Do not re-run FIX 3 main-flow — it would need attempts remaining and the certificate is already issued. If retesting, use a fresh learner account or reset attempts. AuthContext session_hint gating works as designed: no /auth/me for anonymous visitors, one call after login-triggered reload, none after logout+clear.",
+  "rca of the issue": "n/a — no issues found."
+}

@@ -32,15 +32,30 @@ export type LoginOutcome =
 
 const Ctx = createContext<AuthCtx | undefined>(undefined)
 
+const SESSION_HINT_KEY = 'ifpi_session_hint'
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchMe = useCallback(async () => {
+  const fetchMe = useCallback(async (force = false) => {
+    // Skip the /auth/me probe entirely for anonymous visitors — the
+    // browser logs the 401 network error on every public page otherwise.
+    if (!force && !localStorage.getItem(SESSION_HINT_KEY)) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
     try {
       // Silence axios console noise on the initial unauth probe
       const r = await api.get('/auth/me', { validateStatus: (s) => s < 500 })
-      if (r.status === 200) setUser(r.data); else setUser(null)
+      if (r.status === 200) {
+        setUser(r.data)
+        localStorage.setItem(SESSION_HINT_KEY, '1')
+      } else {
+        setUser(null)
+        localStorage.removeItem(SESSION_HINT_KEY)
+      }
     } catch {
       setUser(null)
     } finally {
@@ -56,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { kind: 'requires_2fa', challengeId: r.data.challenge_id, expiresIn: r.data.expires_in }
     }
     if (r.data?.access_token) setAccessToken(r.data.access_token)
+    localStorage.setItem(SESSION_HINT_KEY, '1')
     setUser(r.data.user)
     return { kind: 'ok', user: r.data.user as User }
   }
@@ -63,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const challenge2FA = async (challengeId: string, code: string) => {
     const r = await api.post('/auth/2fa/challenge', { challenge_id: challengeId, code })
     if (r.data?.access_token) setAccessToken(r.data.access_token)
+    localStorage.setItem(SESSION_HINT_KEY, '1')
     setUser(r.data.user)
     return r.data.user as User
   }
@@ -70,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (email: string, password: string, name: string) => {
     const r = await api.post('/auth/register', { email, password, name })
     if (r.data?.access_token) setAccessToken(r.data.access_token)
+    localStorage.setItem(SESSION_HINT_KEY, '1')
     setUser(r.data.user)
     return r.data.user as User
   }
@@ -77,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const ssoExchange = async (erpToken: string) => {
     const r = await api.post('/auth/sso-exchange', { erp_token: erpToken })
     if (r.data?.access_token) setAccessToken(r.data.access_token)
+    localStorage.setItem(SESSION_HINT_KEY, '1')
     setUser(r.data.user)
     return r.data.user as User
   }
@@ -84,10 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try { await api.post('/auth/logout') } catch { /* swallow */ }
     setAccessToken(null)
+    localStorage.removeItem(SESSION_HINT_KEY)
     setUser(null)
   }
 
-  const refresh = async () => { await fetchMe() }
+  const refresh = async () => { await fetchMe(true) }
 
   const hasRole = (...allowed: string[]) =>
     !!user && allowed.some((r) => user.roles.includes(r))

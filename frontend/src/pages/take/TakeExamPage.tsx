@@ -13,6 +13,7 @@ export default function TakeExamPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [result, setResult] = useState<any>(null)
+  const [certIssued, setCertIssued] = useState(false)
 
   useEffect(() => {
     api.get(`/exams/${examId}`).then(r => setExam(r.data))
@@ -29,6 +30,15 @@ export default function TakeExamPage() {
     try {
       const r = await api.post(`/exams/${examId}/attempts`, { answers })
       setResult(r.data); setPhase('result')
+      // Iter 49 — Exam gate: passing a course-linked exam completes the
+      // course and issues the certificate.
+      if (r.data?.passed && exam.course_id) {
+        try {
+          await api.post(`/courses/${exam.course_id}/complete`)
+          setCertIssued(true)
+          toast.success('Course complete! Certificate issued.')
+        } catch { /* completion is best-effort here */ }
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Submission failed'); setPhase('taking')
     }
@@ -91,6 +101,14 @@ export default function TakeExamPage() {
           </svg>
           <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl font-bold">{result.score}%</span></div>
         </div>
+        {certIssued && (
+          <button onClick={() => nav('/certificates')} data-testid="exam-view-certificate-btn"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5 font-medium mb-3">View Certificate</button>
+        )}
+        {!result.passed && exam.course_id && (
+          <button onClick={() => nav(`/learn/${exam.course_id}`)} data-testid="exam-back-to-course-btn"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5 font-medium mb-3">Review the course</button>
+        )}
         <button onClick={() => nav('/exams')} className="w-full bg-slate-100 hover:bg-slate-200 rounded-lg py-2.5 font-medium" data-testid="exam-back-btn">Back to Exams</button>
       </div>
     </div>
