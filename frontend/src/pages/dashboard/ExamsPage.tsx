@@ -316,6 +316,7 @@ function EditQuestionModal({ examId, question, onClose, onSaved }: {
               <div className="flex gap-2">
                 {['true', 'false'].map(v => (
                   <button key={v} onClick={() => setCorrect(v)} data-testid={`edit-tf-${v}`}
+                    aria-pressed={correct === v}
                     className={`px-4 py-1.5 rounded-lg text-sm font-medium border ${correct === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                     {v === 'true' ? 'True' : 'False'}
                   </button>
