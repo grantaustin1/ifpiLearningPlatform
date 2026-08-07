@@ -138,6 +138,39 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
+    # Clean up FK dependents so delete does not fail when slide activity,
+    # comments, reviews, or other attached records exist.
+    from models import (
+        AITutorSession, Certificate, CoursePrerequisite, CourseRating,
+        CourseView, Exam, Flashcard, LearningPathItem, ScormPackage,
+        SlideComment, SlideVersion, SlideView, SourceDocument, Subscription,
+        LiveSession,
+    )
+    slide_ids = [s.id for s in c.slides]
+    if slide_ids:
+        for model in (SlideComment, SlideView, SlideVersion):
+            db.query(model).filter(model.slide_id.in_(slide_ids)).delete(
+                synchronize_session=False,
+            )
+        db.query(ScormPackage).filter(ScormPackage.slide_id.in_(slide_ids)).update(
+            {ScormPackage.slide_id: None},
+            synchronize_session=False,
+        )
+    for model in (Flashcard, CourseRating, CourseView, LearningPathItem,
+                  AITutorSession):
+        db.query(model).filter(model.course_id == course_id).delete(
+            synchronize_session=False,
+        )
+    db.query(CoursePrerequisite).filter(
+        (CoursePrerequisite.course_id == course_id)
+        | (CoursePrerequisite.prerequisite_course_id == course_id)
+    ).delete(synchronize_session=False)
+    for model in (Exam, Certificate, Subscription, SourceDocument,
+                  LiveSession, ScormPackage):
+        db.query(model).filter(model.course_id == course_id).update(
+            {model.course_id: None},
+            synchronize_session=False,
+        )
     db.delete(c)
     db.commit()
     return {"ok": True}
