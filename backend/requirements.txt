@@ -17,7 +17,7 @@ black==26.5.1
 bleach==6.4.0
 blinker==1.9.0
 boto3==1.43.59
-botocore==1.43.58
+botocore==1.43.59
 brotli==1.2.0
 certifi==2026.7.22
 cffi==2.1.0
@@ -47,7 +47,7 @@ frozenlist==1.8.0
 fsspec==2026.6.0
 gevent==25.9.1
 geventhttpclient==2.3.9
-google-ai-generativelanguage==0.12.0
+google-ai-generativelanguage==0.6.15
 google-api-core==2.31.0
 google-api-python-client==2.198.0
 google-auth==2.56.2
