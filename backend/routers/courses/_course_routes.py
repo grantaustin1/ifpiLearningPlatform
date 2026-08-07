@@ -7,7 +7,25 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
-from models import Course, CourseStatus
+from models import (
+    AITutorSession,
+    Certificate,
+    Course,
+    CoursePrerequisite,
+    CourseRating,
+    CourseStatus,
+    CourseView,
+    Exam,
+    Flashcard,
+    LearningPathItem,
+    LiveSession,
+    ScormPackage,
+    SlideComment,
+    SlideVersion,
+    SlideView,
+    SourceDocument,
+    Subscription,
+)
 from schemas import CourseCreate, CourseDetail, CourseSummary, CourseUpdate, SlideOut
 
 from . import router
@@ -138,6 +156,33 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
+    # Clean up FK dependents so delete does not fail when slide activity,
+    # comments, reviews, or other attached records exist.
+    slide_ids = [s.id for s in c.slides]
+    if slide_ids:
+        for model in (SlideComment, SlideView, SlideVersion):
+            db.query(model).filter(model.slide_id.in_(slide_ids)).delete(
+                synchronize_session=False,
+            )
+        db.query(ScormPackage).filter(ScormPackage.slide_id.in_(slide_ids)).update(
+            {ScormPackage.slide_id: None},
+            synchronize_session=False,
+        )
+    for model in (Flashcard, CourseRating, CourseView, LearningPathItem,
+                  AITutorSession):
+        db.query(model).filter(model.course_id == course_id).delete(
+            synchronize_session=False,
+        )
+    db.query(CoursePrerequisite).filter(
+        (CoursePrerequisite.course_id == course_id)
+        | (CoursePrerequisite.prerequisite_course_id == course_id)
+    ).delete(synchronize_session=False)
+    for model in (Exam, Certificate, Subscription, SourceDocument,
+                  LiveSession, ScormPackage):
+        db.query(model).filter(model.course_id == course_id).update(
+            {model.course_id: None},
+            synchronize_session=False,
+        )
     db.delete(c)
     db.commit()
     return {"ok": True}
