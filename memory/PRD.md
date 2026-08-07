@@ -98,3 +98,11 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Exam gate (Iter 49): CourseDetail now returns exam_id/exam_title/exam_passed (published exam + caller's passed state). LearnPage last-slide button becomes 'Take exam' and routes to /take/{exam_id} when unpassed; TakeExamPage completes the linked course + issues the certificate on pass ('View Certificate' btn), failed attempts get 'Review the course'. Backend POST /complete unchanged (UI-level gate) so existing API tests remain valid.
 - Verified: testing agent iteration_51.json — all fixes PASS (cert history clean, zero anonymous /auth/me calls, gate flow passes exam 4 at 100% and issues cert, already-passed shortcut OK). Targeted backend regression: 78 passed.
 - NOTE: 'Save to GitHub' is a user-side platform button — user directed to use it.
+
+## 2026-08-06 (session 5) — Attempt reset, exam banner, share PNG, transcript page
+- Attempt Reset (Iter 50): GET /api/exams/{id}/attempts (per-learner summary) + POST /api/exams/{id}/attempts/reset (admin/instructor, audited as EXAM_ATTEMPTS_RESET). ExamsPage 'Attempts' button opens AttemptsModal with per-learner reset + confirm dialog.
+- Exam Progress Banner: LearnPage shows amber exam-gate-banner on every slide of gated (un-passed) courses; disappears once the exam is passed.
+- Cert Share Images: new GET /api/certificates/verify/{code}/og-image.png (Pillow 1200×630 branded card, revoked band supported; reportlab Vera fonts). seo.py share page og:image switched from .svg to .png (LinkedIn doesn't render SVG). PUBLIC_BASE_URL set in backend/.env so og:image URLs are public https.
+- Learner Transcript: GET /api/certificates/transcript.json + /transcript printable page (courses w/ best scores, certificates w/ verify codes + Valid/Revoked, badges, print & back buttons, print:hidden chrome). CertificatesPage now has 'Printable transcript' + 'Download PDF' buttons.
+- New QA admin account qa-admin@ifpi.org / QaAdmin!2026 (must_change_password=False) — seeded admin's forced-change flag is asserted by test_iteration32 and must stay. Recorded in memory/test_credentials.md.
+- Verified: testing agent iteration_52.json — all 4 features PASS (UI + curl). Docs regenerated; targeted backend tests green (docs drift, iter8/28/29: 43 passed).
