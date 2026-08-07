@@ -91,3 +91,10 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Testing-agent browser smoke tour (iteration_49.json): full learner journey GREEN — landing/catalog (covers, no debris), login, course detail, enrol, player, completion, certificate issuance, PDF download, public verify UI + API.
 - Fixed the one UI regression found: player sidebar progress stuck at 20% after Complete (LearnPage.tsx next() now marks all slides complete). Verified by testing agent (iteration_50.json, 100%).
 - Known minor items (not fixed, cosmetic/noise): anon pages log a 401 from /api/auth/me probe; learner cert history contains old TEST_iter27/28 debris certificates.
+
+## 2026-08-06 (session 4) — Cert cleanup, silent auth probe, exam gate
+- Debris cleanup service: added `TEST_%` live-session pattern + new `_delete_stale_certificates` step (pattern-matched & orphaned live-session certs, incl. revocation events); runs before session purge; idempotent. Purged 103 debris certs + 93 TEST_iter27/28 sessions from the DB. tick() stats dict now includes "certificates" (test updated).
+- AuthContext: /auth/me probe now gated by localStorage 'ifpi_session_hint' (set on login/register/2FA/SSO, cleared on logout/401) — anonymous pages no longer fire the probe, killing the 401 console error.
+- Exam gate (Iter 49): CourseDetail now returns exam_id/exam_title/exam_passed (published exam + caller's passed state). LearnPage last-slide button becomes 'Take exam' and routes to /take/{exam_id} when unpassed; TakeExamPage completes the linked course + issues the certificate on pass ('View Certificate' btn), failed attempts get 'Review the course'. Backend POST /complete unchanged (UI-level gate) so existing API tests remain valid.
+- Verified: testing agent iteration_51.json — all fixes PASS (cert history clean, zero anonymous /auth/me calls, gate flow passes exam 4 at 100% and issues cert, already-passed shortcut OK). Targeted backend regression: 78 passed.
+- NOTE: 'Save to GitHub' is a user-side platform button — user directed to use it.
