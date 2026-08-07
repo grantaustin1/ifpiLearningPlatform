@@ -111,3 +111,10 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Reset Notification: reset_exam_attempts now queues an outbox email (template exam_attempts_reset, branded HTML, retake CTA) via MailService AND an in-app bell notification (EXAM_ATTEMPTS_RESET, link /take/{examId}) via GamificationService.notify. Best-effort try/except so mail failures never block the reset. Email transport remains dev STUB (queued in outbox, not delivered) by design.
 - Attempt Insights: new GET /api/exams/{id}/question-insights (admin/instructor) — per-question answered/correct/missed + miss_rate using the canonical grade_question, sorted most-missed first. AttemptsModal now has 'Learners' / 'Question insights' tabs with colored miss-rate bars (red ≥50, amber ≥25, green else).
 - Docs regenerated for new route. Verified: testing agent iteration_53.json — both features PASS (UI + API + outbox + bell), learner state restored (exam 4 re-passed 100%). Targeted backend tests green (docs drift, iter4/15: 28 passed).
+
+## 2026-08-06 (session 7) — Insight Actions (Iter 52)
+- New PATCH /api/exams/{exam_id}/questions/{question_id}: in-place single-question edit (question_text, options, correct_answer, explanation, points) — preserves question id so attempt history and insights stay linked (unlike PUT /questions replace). Audited as EXAM_QUESTION_EDITED. Insights response now also returns options/correct_answer/explanation/course_id.
+- ExamsPage insights tab: 'Edit course content' header link → /courses/{course_id}/edit; per-row 'Edit' button opens EditQuestionModal (MC radio for correct option, TF toggle w/ aria-pressed, short-answer input, points, explanation).
+- Verified: testing agent iteration_54.json — all PASS (UI flows, persistence via API, ids unchanged, history preserved, regression clean). Docs regenerated.
+- INCIDENT NOTE: parallel search_replace calls on the same file (routers/exams.py) corrupted it mid-session; restored from auto-commit 7311c8a2 and re-applied edits sequentially. Rule: never batch multiple edits to one file in parallel.
+- Save to GitHub: user-side platform button; user reminded to click it.
