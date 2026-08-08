@@ -138,7 +138,7 @@ pytokens==0.4.1
 pytz==2026.2
 PyYAML==6.0.3
 pyzmq==27.1.0
-qrcode==8.0
+qrcode==8.2
 redis==8.0.1
 referencing==0.37.0
 regex==2026.7.19
