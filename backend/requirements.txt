@@ -80,7 +80,7 @@ limits==5.8.0
 locust==2.46.2
 lxml==6.1.1
 Mako==1.3.12
-Markdown==3.10.2
+Markdown==3.10.3
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mccabe==0.7.0
