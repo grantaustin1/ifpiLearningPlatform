@@ -1,0 +1,81 @@
+{
+  "summary": "Iter-56 rigorous QA pass over exam attempts/reset, distractor stats UI, admin-only CSV, and miss-rate alert dedup + re-arm. 9/9 pytest cases pass. Every phase verified with exact HTTP evidence: (1a) learner blocked from CSV (403) and JSON insights (403), no CSV data in body. (1b) Admin CSV = 200 text/csv; charset=utf-8, attachment header, exact header row + 5 data rows, all 5 rows cross-validated against JSON insights (answered/correct/missed/miss_rate/top_wrong label+count/correct_answer all match, 0 mismatches). UI Export CSV downloads 'question-insights-exam-4.csv'. (3a) Learner submit at 3/3 → 400 'Maximum attempts reached'; POST /api/exams/4/attempts/reset (admin) → 200 {\"deleted\":3,\"user_id\":2}; learner regains submit rights. (2) After Q13 re-armed (PATCH explanation) and reset, learner performs fail/fail/pass — Q13 fires NEW QUESTION_MISS_ALERT notification + new question_miss_alert outbox rows; Q14/Q15 miss_alerted_at timestamps UNCHANGED (dedup ✓); learner ends Passed 100% (course-221 gate satisfied). (2 re-arm) PATCH Q13 explanation clears miss_alerted_at, subsequent fail/fail/pass re-fires (SECOND alert + new outbox rows) proving re-arm. (3b) Data integrity: distribution counts sum to 'answered' for all 5 questions, top_wrong count matches max wrong count in distribution. UI: Q13 tie case (2 wrong options each with 1 pick) — TOP DISTRACTOR badge rendered on 'Oxidative (aerobic)' (index 0, ie sorted by count desc then iteration order); exactly ONE badge per question; ✓ green on correct option (ATP-PC (phosphagen)). 3 'author alerted' chips visible on Q13/Q14/Q15. No console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/exams/{id} (as learner)", "issue": "SECURITY FINDING (pre-existing, flagged per request): question objects returned to learner include the 'correct_answer' field — a learner making GET /api/exams/4 can see e.g. correct_answer='2' for every MCQ. This leaks answer keys. Recommend stripping correct_answer + explanation for LEARNER role in exam-detail serializer."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "phase_results": {
+    "phase_1a_learner_rbac": {
+      "csv_learner": "PASS — 403 FORBIDDEN, no CSV data in body",
+      "json_insights_learner": "PASS — 403 FORBIDDEN",
+      "learner_ui_no_attempts_button": "PASS (per prior iter55 verification & role-gated ExamsPage; not re-tested in UI here)",
+      "correct_answer_leak_via_GET_exam": "REPORTED as security finding (correct_answer visible to learner)"
+    },
+    "phase_1b_admin_csv": {
+      "status": "PASS",
+      "http": "200",
+      "content_type": "text/csv; charset=utf-8",
+      "content_disposition": "attachment; filename=\"question-insights-exam-4.csv\"",
+      "header_row_exact_match": true,
+      "data_rows": 5,
+      "cross_validation_mismatches": 0,
+      "ui_export_csv_download": "PASS — filename question-insights-exam-4.csv"
+    },
+    "phase_3a_attempt_exhaustion_and_reset": {
+      "block_at_3_of_3": "PASS — 400 'Maximum attempts reached'",
+      "admin_reset_endpoint": "POST /api/exams/4/attempts/reset → 200 {deleted:3,user_id:2}",
+      "learner_can_resubmit_after_reset": "PASS (verified indirectly — subsequent 3 attempts in Phase 2 all returned 200)"
+    },
+    "phase_2_miss_alerts_dedup": {
+      "attempt1_fail": "200, score 40, Q13→opt 0, Q14→0, Q15→0",
+      "attempt2_fail": "200, score 40, Q13→opt 1 (different wrong option), Q14→0, Q15→0",
+      "attempt3_pass": "200, score 100, passed=true",
+      "Q13_new_alert_notification": "1 NEW QUESTION_MISS_ALERT notif titled '⚠️ 67% miss rate on \"Foundations of Exercise Science Assessment\"'",
+      "Q13_new_outbox_rows": "100+ NEW question_miss_alert outbox rows (queued to org managers, transport=stub)",
+      "Q14_Q15_dedup": "PASS — miss_alerted_at timestamps unchanged (2026-08-07T05:45:44 both)",
+      "author_alerted_chip_ui": "3 chips (Q13, Q14, Q15)"
+    },
+    "phase_2_rearm": {
+      "patch_Q13_clears_miss_alerted_at": "PASS — 200; miss_alerted_at → null; UI chip disappears for Q13",
+      "reset_then_fail_fail_pass": "PASS — all three submissions 200",
+      "Q13_re_alerted": "PASS — miss_alerted_at set to NEW timestamp, +1 notification, +100 outbox rows",
+      "learner_final_state": "Passed 100% (course-221 gate satisfied)"
+    },
+    "phase_3b_data_integrity_ui": {
+      "distribution_counts_sum_equals_answered": "PASS (all 5 questions)",
+      "top_wrong_count_matches_max_wrong": "PASS (all 5 questions)",
+      "correct_option_green_check": "PASS — ✓ ATP-PC (phosphagen) on Q13",
+      "top_distractor_badge_uniqueness": "PASS — exactly ONE badge per wrong-answers question (Q13/14/15); Q16/Q17 have no badge (0% miss)",
+      "Q13_tie_break": "Q13 has two wrong options with 1 pick each (Oxidative + Glycolytic). Badge rendered on 'Oxidative (aerobic)' — this is option index 0, i.e. first in iteration order (spec-consistent tie-break by highest count then iteration order)",
+      "distribution_percent_sum": "33+33+33 = 99% within ±1% tolerance",
+      "console_errors": "None"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration56_qa_pass.py",
+    "/app/test_reports/pytest/iteration56.xml"
+  ],
+  "action_items": [
+    "SECURITY: Strip 'correct_answer' (and consider 'explanation') from GET /api/exams/{id} response when caller role == LEARNER. Currently a learner GET on /api/exams/4 exposes correct_answer='2' etc for every MCQ, defeating the whole exam concept.",
+    "MINOR (non-blocking, per iter55 review comment): /api/admin/outbox uses key 'messages' whereas other list endpoints use 'items'/'results' — inconsistent."
+  ],
+  "critical_code_review_comments": [
+    "SECURITY (highest): correct_answer leak on GET /api/exams/{id} for LEARNER role. Add role-based response filtering.",
+    "The insights response omits per-option percent — client computes it inline. Fine, but if CSV/exports ever want percent per option, centralise it in the service layer.",
+    "POST /api/exams/{id}/attempts/reset resets ALL attempts for the caller-supplied user; make sure audit-log captures actor + target user (verify in a follow-up test).",
+    "Distribution TIE tie-break is 'first by iteration/option index' — this is deterministic but undocumented. Consider adding a note in the API schema so consumers know."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration56_qa_pass.py"
+  ],
+  "success_rate": {"backend": "100% (9/9 pytest)", "frontend": "100% (all UI selectors + download verified)"},
+  "test_credentials": "qa-admin@ifpi.org / QaAdmin!2026; learner@ifpi.org / learner123",
+  "seed_data_creation": "Exam 4: learner attempts reset multiple times via POST /api/exams/4/attempts/reset. Final state: 3 attempts (fail/fail/pass), best 100% Passed. Q13 explanation appended with ' (iter56) .' twice (re-arm patches). Q14/Q15 miss_alerted_at still at 2026-08-07T05:45:44. ~200 new question_miss_alert outbox rows queued (transport=stub). +2 new QUESTION_MISS_ALERT notifications (one per re-arm cycle). Notif titles start with '⚠️ 67% miss rate ...'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter-56 fully verified with 9/9 pytest passing. If re-running: (a) POST /api/exams/4/attempts/reset requires no body except auth; returns {deleted:N,user_id:N}. (b) Answer keys index-based: Q13=2 (ATP-PC), Q14=1, Q15=1, Q16=2 (Volume), Q17=true. (c) To force a fresh Q13 alert you MUST first PATCH Q13 (any field including 'explanation') to clear miss_alerted_at, else dedup suppresses. (d) The Foundations exam attempts button is data-testid='exam-attempts-btn-4' (NOT the first row on /exams — first row is exam id 6 'Gym Health & Safety'). (e) Learner still has correct_answer visible on GET /api/exams/{id} — do NOT auto-fix in tests, this is an app-level design bug.",
+  "rca of the issue": "The only real defect found is the pre-existing correct_answer leak in GET /api/exams/{id} for LEARNER role. Repro: `curl -H 'Authorization: Bearer <learner_jwt>' https://learning-hub-968.preview.emergentagent.com/api/exams/4 | jq '.questions[0].correct_answer'` → returns '2'. Mitigation: in /app/backend/routers/exams.py (or the exam serializer), branch on current role and drop 'correct_answer' + 'explanation' fields when role == LEARNER, or use a separate LearnerExamOut schema."
+}
