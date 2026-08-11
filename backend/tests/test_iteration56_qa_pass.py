@@ -13,7 +13,10 @@ import datetime as dt
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+if not BASE_URL:
+    pytest.skip("REACT_APP_BACKEND_URL not set", allow_module_level=True)
+
 EXAM_ID = 4
 
 ADMIN_EMAIL = "qa-admin@ifpi.org"
