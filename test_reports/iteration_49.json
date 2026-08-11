@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend smoke tour of learner journey (enrol → player → completion → certificate → verify) on IFPI Learning Platform preview. All target checkpoints passed. Landing, catalog, login, course detail, player, completion/certificate issuance, PDF download, and public verify (both UI /verify/{code} and API /api/public/certificates/verify/{code}) work end-to-end. No compile overlays, no blank pages, no blocking console errors, no broken images, no debris in public catalog.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Course player sidebar (/learn/1)", "issues": ["After clicking Complete on last slide (certificate is successfully issued), sidebar progress bar still shows '20% complete' with only the last slide checkmarked. Sidebar progress does not reflect full course completion. Cosmetic only — certificate is issued and appears in /certificates."]}
+    ]
+  },
+  "verified_flow": {
+    "public_landing": "OK — hero + Featured courses (landing-course-1/222/223); real JPEG covers load; no broken images.",
+    "public_catalog": "OK — 7 catalog-card testids for real seeded courses (Client Onboarding, IFPI Fundamentals, Gym Health & Safety, Foundations of Exercise Science). No 'Stripe Test' / 'Entitlement Test' debris in public catalog.",
+    "course_detail": "OK — /catalog/1 shows hero, syllabus preview, price (Free), Enrol now CTA.",
+    "login": "OK — learner@ifpi.org / learner123 → /courses; no forced password change.",
+    "player": "OK — /learn/1 renders 5 slides, prev/next work, slide-nav-0..4 testids present, Ask AI Tutor toggle visible.",
+    "completion_and_certificate": "OK — Complete button on last slide → toast 'Course complete! Certificate issued.' Cert id 308 (IFPI Fundamentals COURSE_COMPLETION, code 61a2a7102b184988be226005ddccc86b) appears at top of /certificates.",
+    "pdf_download": "OK — GET /api/certificates/308/pdf → 200 application/pdf, 5210 bytes, magic bytes %PDF valid.",
+    "public_verify": "OK — GET /api/public/certificates/verify/{code} → verified:true; UI /verify/{code} shows 'Certificate is valid' with recipient, course, type, code and issued date."
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Cosmetic) Fix course-player sidebar progress bar to reflect completion once Complete is clicked."
+  ],
+  "critical_code_review_comments": [
+    "IFPI Fundamentals course flow issues the certificate directly via the 'Complete' button on the final slide with no exam gate surfaced in the player UI. Review request implied an exam step. If an exam exists for this course, the player is not routing learners to it. Backend cert issuance itself is fine.",
+    "/certificates listing shows 107 certificates including many TEST_iter27_*, TEST_iter28_* entries from prior automated runs — stale test debris in the learner's history. Consider a cleanup script.",
+    "Anonymous public pages (/, /catalog, /login) call /api/auth/me which returns 401 and produces console errors on every anonymous load. Consider suppressing 401 for the anon-probe call."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not retested per request)", "frontend": "100% of requested smoke-tour checkpoints passed"},
+  "test_credentials": "learner@ifpi.org / learner123 (used as-is, no password change required)",
+  "seed_data_creation": "One new certificate (id 308, code 61a2a7102b184988be226005ddccc86b) was issued to learner@ifpi.org for IFPI Fundamentals as part of the completion flow. No other data written; no debris courses created.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Learner journey UI is fully wired. If course-completion-via-exam is a required product flow (not the direct Complete button used here), inspect course #1's exam configuration and whether the player should route to an exam page when an exam gate exists. Otherwise the smoke tour is green."
+}

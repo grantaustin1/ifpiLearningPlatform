@@ -168,6 +168,6 @@ def test_cleanup_is_idempotent():
         tick(db)  # ensure clean
     with SessionLocal() as db:
         stats = tick(db)
-    assert stats == {"courses": 0, "live_sessions": 0,
+    assert stats == {"courses": 0, "live_sessions": 0, "certificates": 0,
                      "terms_versions": 0, "outbox_messages": 0,
-                     "course_views": 0}
+                     "course_views": 0, "marketplace_optouts": 0}

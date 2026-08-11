@@ -101,6 +101,7 @@ LIVE_SESSION_TITLE_PATTERNS = [
     "iter24-cancelled-%",
     "iter24-cleanup-%",
     "SmokeTest%",
+    "TEST_%",                # Iter 49 — iter27/28 attendance harness residue
 ]
 
 TERMS_VERSION_PATTERNS = [
@@ -172,20 +173,80 @@ def _delete_stale_courses(db: Session) -> int:
     return n
 
 
-def _delete_stale_live_sessions(db: Session) -> int:
+def _stale_live_session_ids(db: Session) -> set[int]:
     ids: set[int] = set()
     for pat in LIVE_SESSION_TITLE_PATTERNS:
         rows = db.query(LiveSession.id).filter(LiveSession.title.like(pat)).all()
         for (sid,) in rows:
             ids.add(sid)
+    return ids
+
+
+def _delete_stale_certificates(db: Session) -> int:
+    """Iter 49 — Purge certificates left behind by test harnesses.
+
+    A cert is debris when its `live_session_id` points at a session that
+    matches a debris title pattern, or at a session that no longer exists.
+    Course-linked certs are already handled by the course cascade in
+    `_delete_stale_courses`."""
+    from models import Certificate, CertificateRevocationEvent
+    stale_ids = _stale_live_session_ids(db)
+    orphan_ids = {cid for (cid,) in db.execute(text(
+        "SELECT id FROM certificates WHERE live_session_id IS NOT NULL "
+        "AND live_session_id NOT IN (SELECT id FROM live_sessions)"
+    )).fetchall()}
+    if stale_ids:
+        orphan_ids |= {cid for (cid,) in db.query(Certificate.id).filter(
+            Certificate.live_session_id.in_(list(stale_ids))).all()}
+    if not orphan_ids:
+        return 0
+    id_list = list(orphan_ids)
+    db.query(CertificateRevocationEvent).filter(
+        CertificateRevocationEvent.certificate_id.in_(id_list)
+    ).delete(synchronize_session=False)
+    n = db.query(Certificate).filter(
+        Certificate.id.in_(id_list)
+    ).delete(synchronize_session=False)
+    return n
+
+
+def _delete_stale_live_sessions(db: Session) -> int:
+    ids = _stale_live_session_ids(db)
     if not ids:
         return 0
     id_list = list(ids)
     db.query(LiveSessionRsvp).filter(
         LiveSessionRsvp.session_id.in_(id_list)
     ).delete(synchronize_session=False)
+    # Clear self-referencing recurrence links before deleting
+    db.query(LiveSession).filter(
+        LiveSession.parent_series_id.in_(id_list)
+    ).update({"parent_series_id": None}, synchronize_session=False)
     n = db.query(LiveSession).filter(
         LiveSession.id.in_(id_list)
+    ).delete(synchronize_session=False)
+    return n
+
+
+def _delete_stale_certificates(db: Session) -> int:
+    """Iter 49 — Purge certificates left behind by test harnesses.
+
+    A cert is debris when its `live_session_id` points at a session that
+    no longer exists (the session itself was purged as debris — this pass
+    runs right after `_delete_stale_live_sessions`). Course-linked certs
+    are already handled by the course cascade in `_delete_stale_courses`."""
+    from models import Certificate, CertificateRevocationEvent
+    orphan_ids = [cid for (cid,) in db.execute(text(
+        "SELECT id FROM certificates WHERE live_session_id IS NOT NULL "
+        "AND live_session_id NOT IN (SELECT id FROM live_sessions)"
+    )).fetchall()]
+    if not orphan_ids:
+        return 0
+    db.query(CertificateRevocationEvent).filter(
+        CertificateRevocationEvent.certificate_id.in_(orphan_ids)
+    ).delete(synchronize_session=False)
+    n = db.query(Certificate).filter(
+        Certificate.id.in_(orphan_ids)
     ).delete(synchronize_session=False)
     return n
 
@@ -263,6 +324,7 @@ def tick(db: Session, dry_run: bool = False) -> dict:
     testing the counts without mutating state)."""
     stats = {
         "courses": _delete_stale_courses(db),
+        "certificates": _delete_stale_certificates(db),
         "live_sessions": _delete_stale_live_sessions(db),
         "terms_versions": _delete_stale_terms_versions(db),
         "outbox_messages": _delete_stale_outbox(db),

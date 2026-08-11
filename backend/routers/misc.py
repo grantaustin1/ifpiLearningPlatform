@@ -655,6 +655,88 @@ def certificate_og_image(code: str, db: Session = Depends(get_db)):
     })
 
 
+@cert_router.get("/verify/{code}/og-image.png", response_class=Response)
+def certificate_og_image_png(code: str, db: Session = Depends(get_db)):
+    """Iter 50 — PNG OG image for social share previews. LinkedIn does
+    not render SVG og:images, so share links point here. 1200×630,
+    branded card matching the SVG version."""
+    from models import LiveSession, Organization
+    from PIL import Image, ImageDraw, ImageFont
+    import io
+    import os as _os
+    import reportlab as _rl
+
+    c = db.query(Certificate).filter(Certificate.code == code).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
+        sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
+        title = f"Attended · {sess.title}" if sess else "Live Session Attendance"
+    else:
+        title = c.course.title if c.course else "IFPI Certificate"
+    recipient = (c.user.name if c.user and c.user.name else "A learner")
+    org_name = "IFPI Learning"
+    if c.user and c.user.organization_id:
+        org = db.query(Organization).filter(Organization.id == c.user.organization_id).first()
+        if org:
+            org_name = org.name
+
+    def _fit(s: str, n: int) -> str:
+        return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+    title, recipient, org_name = _fit(title, 52), _fit(recipient, 36), _fit(org_name, 40)
+
+    fonts_dir = _os.path.join(_os.path.dirname(_rl.__file__), "fonts")
+    def _font(name: str, size: int):
+        try:
+            return ImageFont.truetype(_os.path.join(fonts_dir, name), size)
+        except Exception:
+            return ImageFont.load_default()
+
+    W, H = 1200, 630
+    img = Image.new("RGB", (W, H))
+    d = ImageDraw.Draw(img)
+    # Vertical gradient #eef2ff → #ede9fe
+    top, bot = (238, 242, 255), (237, 233, 254)
+    for y in range(H):
+        t = y / H
+        d.line([(0, y), (W, y)], fill=tuple(
+            round(top[i] + (bot[i] - top[i]) * t) for i in range(3)))
+    # White card
+    d.rounded_rectangle([60, 80, 1140, 550], radius=24, fill=(255, 255, 255))
+    # Ribbon gradient #6366f1 → #8b5cf6
+    r1, r2 = (99, 102, 241), (139, 92, 246)
+    for x in range(60, 1140):
+        t = (x - 60) / 1080
+        d.line([(x, 80), (x, 88)], fill=tuple(
+            round(r1[i] + (r2[i] - r1[i]) * t) for i in range(3)))
+
+    def _center(text, y, font, fill):
+        w = d.textlength(text, font=font)
+        d.text(((W - w) / 2, y), text, font=font, fill=fill)
+
+    _center("CERTIFICATE OF ACHIEVEMENT", 172, _font("VeraBd.ttf", 26), (99, 102, 241))
+    _center(recipient, 240, _font("VeraBd.ttf", 52), (30, 41, 59))
+    _center("has successfully completed", 335, _font("Vera.ttf", 21), (100, 116, 139))
+    _center(title, 385, _font("VeraBd.ttf", 32), (67, 56, 202))
+    _center(f"Awarded by {org_name}", 460, _font("Vera.ttf", 18), (148, 163, 184))
+    _center(f"verify: {code}", 505, _font("Vera.ttf", 14), (203, 213, 225))
+
+    if c.revoked_at:
+        band = Image.new("RGBA", (W, 120), (220, 38, 38, 235))
+        img.paste(band, (0, 200), band)
+        f = _font("VeraBd.ttf", 68)
+        w = d.textlength("REVOKED", font=f)
+        d.text(((W - w) / 2, 225), "REVOKED", font=f, fill=(255, 255, 255))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return Response(buf.getvalue(), media_type="image/png", headers={
+        "Cache-Control": "public, max-age=300" if c.revoked_at
+                         else "public, max-age=86400",
+    })
+
+
 @cert_router.get("/{cert_id}/pdf")
 def download_certificate_pdf(
     cert_id: int, request: Request, db: Session = Depends(get_db),

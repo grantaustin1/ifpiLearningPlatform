@@ -3,14 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw } from 'lucide-react'
+import { Plus, ClipboardList, Clock, Users, CheckCircle, Eye, Sparkles, X, RefreshCw, RotateCcw, Pencil, BookOpen, Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from 'components/ConfirmDialog'
 
 export default function ExamsPage() {
   const { hasRole } = useAuth()
   const qc = useQueryClient()
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
   const [aiOpen, setAiOpen] = useState(false)
+  const [attemptsExam, setAttemptsExam] = useState<any>(null)
 
   const { data: exams = [], isLoading } = useQuery<any[]>({
     queryKey: ['exams'], queryFn: async () => (await api.get('/exams')).data,
@@ -45,6 +47,7 @@ export default function ExamsPage() {
       </div>
 
       {aiOpen && <AIQuizModal onClose={() => setAiOpen(false)} onDone={() => { setAiOpen(false); qc.invalidateQueries({ queryKey: ['exams'] }) }} />}
+      {attemptsExam && <AttemptsModal exam={attemptsExam} onClose={() => setAttemptsExam(null)} />}
 
       {isLoading ? <div className="flex items-center justify-center py-16"><div className="w-7 h-7 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div> :
        exams.length === 0 ? (
@@ -75,6 +78,12 @@ export default function ExamsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
+                    {isAdmin && (
+                      <button onClick={() => setAttemptsExam(e)} data-testid={`exam-attempts-btn-${e.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 mr-4">
+                        <Users className="h-3.5 w-3.5" /> Attempts
+                      </button>
+                    )}
                     <Link to={`/take/${e.id}`} className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700">
                       <Eye className="h-3.5 w-3.5" /> {isAdmin ? 'Preview' : 'Take'}
                     </Link>
@@ -85,6 +94,311 @@ export default function ExamsPage() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function AttemptsModal({ exam, onClose }: { exam: any, onClose: () => void }) {
+  const qc = useQueryClient()
+  const confirm = useConfirm()
+  const [tab, setTab] = useState<'learners' | 'insights'>('learners')
+  const [editingQ, setEditingQ] = useState<any>(null)
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ['exam-attempts', exam.id],
+    queryFn: async () => (await api.get(`/exams/${exam.id}/attempts`)).data,
+  })
+  const { data: insights, isLoading: insightsLoading } = useQuery<any>({
+    queryKey: ['exam-insights', exam.id],
+    queryFn: async () => (await api.get(`/exams/${exam.id}/question-insights`)).data,
+    enabled: tab === 'insights',
+  })
+
+  const resetMut = useMutation({
+    mutationFn: async (userId: number) =>
+      (await api.post(`/exams/${exam.id}/attempts/reset`, { user_id: userId })).data,
+    onSuccess: (d) => {
+      toast.success(`Reset ${d.deleted} attempt${d.deleted !== 1 ? 's' : ''} — the learner can retake the exam`)
+      qc.invalidateQueries({ queryKey: ['exam-attempts', exam.id] })
+      qc.invalidateQueries({ queryKey: ['exams'] })
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not reset attempts'),
+  })
+
+  const reset = async (l: any) => {
+    if (!(await confirm({
+      title: 'Reset exam attempts?',
+      description: `${l.name || l.email} has used ${l.attempts_used} of ${data?.max_attempts} attempts. Resetting deletes their attempt history for "${exam.title}" so they can start fresh.`,
+      confirmLabel: 'Reset attempts',
+    }))) return
+    resetMut.mutate(l.user_id)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" data-testid="attempts-modal">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">Attempts · {exam.title}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Max {data?.max_attempts ?? exam.max_attempts ?? '—'} attempts per learner</p>
+          </div>
+          <button onClick={onClose} data-testid="attempts-modal-close" className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="px-6 pt-3 border-b flex gap-4">
+          {(['learners', 'insights'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              data-testid={`attempts-tab-${t}`}
+              className={`pb-2 text-sm font-medium border-b-2 -mb-px ${tab === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+              {t === 'learners' ? 'Learners' : 'Question insights'}
+            </button>
+          ))}
+        </div>
+        {tab === 'insights' ? (
+          <div className="flex-1 overflow-y-auto p-6" data-testid="question-insights-panel">
+            {insightsLoading ? (
+              <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+            ) : !insights?.questions?.length ? (
+              <p className="text-center text-slate-400 py-12 text-sm">No questions on this exam.</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4 gap-4">
+                  <p className="text-xs text-slate-500">
+                    Based on {insights.total_attempts} attempt{insights.total_attempts !== 1 ? 's' : ''} — sorted by miss rate, most-missed first.
+                  </p>
+                  {insights.course_id && (
+                    <Link to={`/courses/${insights.course_id}/edit`} data-testid="insights-edit-course-link"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap">
+                      <BookOpen className="h-3.5 w-3.5" /> Edit course content
+                    </Link>
+                  )}
+                  <button data-testid="insights-export-csv-btn"
+                    onClick={async () => {
+                      try {
+                        const r = await api.get(`/exams/${exam.id}/question-insights.csv`, { responseType: 'blob' })
+                        const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }))
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `question-insights-exam-${exam.id}.csv`
+                        document.body.appendChild(a); a.click(); a.remove()
+                        URL.revokeObjectURL(url)
+                        toast.success('Insights CSV downloaded')
+                      } catch { toast.error('Could not export CSV') }
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 whitespace-nowrap border border-slate-200 rounded-lg px-2.5 py-1 hover:bg-slate-50">
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {insights.questions.map((q: any, i: number) => {
+                    const rate = q.miss_rate
+                    const barColor = rate == null ? 'bg-slate-200' : rate >= 50 ? 'bg-red-500' : rate >= 25 ? 'bg-amber-500' : 'bg-emerald-500'
+                    return (
+                      <div key={q.question_id} data-testid={`insight-row-${q.question_id}`}>
+                        <div className="flex items-start justify-between gap-4 mb-1.5">
+                          <p className="text-sm text-slate-800"><span className="text-slate-400 mr-1.5">{i + 1}.</span>{q.question_text}</p>
+                          <div className="flex items-center gap-3 whitespace-nowrap">
+                            <span className={`text-xs font-semibold ${rate == null ? 'text-slate-400' : rate >= 50 ? 'text-red-600' : rate >= 25 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {rate == null ? 'No data' : `${rate}% missed`}
+                            </span>
+                            <button onClick={() => setEditingQ(q)} data-testid={`edit-question-btn-${q.question_id}`}
+                              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700">
+                              <Pencil className="h-3 w-3" /> Edit
+                            </button>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${barColor}`} style={{ width: `${rate ?? 0}%` }} />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          {q.correct}/{q.answered} answered correctly · {q.question_type === 'TRUE_FALSE' ? 'True/False' : q.question_type === 'MULTIPLE_CHOICE' ? 'Multiple choice' : 'Short answer'} · {q.points} pt{q.points !== 1 ? 's' : ''}
+                          {q.miss_alerted_at && <span className="ml-2 text-amber-600 font-medium">· author alerted</span>}
+                        </p>
+                        {q.answer_distribution?.length > 0 && (
+                          <div className="mt-2 space-y-1" data-testid={`distractor-stats-${q.question_id}`}>
+                            {q.answer_distribution.map((d: any, j: number) => {
+                              const pct = q.answered ? Math.round(d.count / q.answered * 100) : 0
+                              const isTopWrong = !d.is_correct && q.top_wrong && d.answer === q.top_wrong.answer
+                              return (
+                                <div key={j} className="flex items-center gap-2 text-[11px]">
+                                  <span className={`w-40 truncate ${d.is_correct ? 'text-emerald-700 font-medium' : 'text-slate-500'}`} title={d.label}>
+                                    {d.is_correct ? '✓ ' : ''}{d.label}
+                                  </span>
+                                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={`h-full ${d.is_correct ? 'bg-emerald-400' : isTopWrong ? 'bg-red-400' : 'bg-slate-300'}`}
+                                      style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="w-16 text-slate-400 text-right whitespace-nowrap">
+                                    {d.count} ({pct}%)
+                                  </span>
+                                  {isTopWrong && (
+                                    <span data-testid={`top-distractor-${q.question_id}`}
+                                      className="text-[10px] font-semibold text-red-500 uppercase whitespace-nowrap">top distractor</span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+          ) : !data?.learners?.length ? (
+            <p className="text-center text-slate-400 py-12 text-sm">No attempts yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b sticky top-0">
+                <tr>
+                  <th className="text-left px-6 py-2.5 font-medium text-slate-500">Learner</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-slate-500">Used</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-slate-500">Best</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {data.learners.map((l: any) => (
+                  <tr key={l.user_id} data-testid={`attempt-row-${l.user_id}`}>
+                    <td className="px-6 py-3">
+                      <p className="font-medium text-slate-800">{l.name || '—'}</p>
+                      <p className="text-xs text-slate-400">{l.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{l.attempts_used} / {data.max_attempts}</td>
+                    <td className="px-4 py-3 text-slate-600">{l.best_score != null ? `${Math.round(l.best_score)}%` : '—'}</td>
+                    <td className="px-4 py-3">
+                      {l.passed
+                        ? <span className="text-xs font-medium text-emerald-600">Passed</span>
+                        : l.attempts_used >= (data.max_attempts || 0)
+                          ? <span className="text-xs font-medium text-red-600">Locked out</span>
+                          : <span className="text-xs text-slate-400">In progress</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => reset(l)} disabled={resetMut.isPending}
+                        data-testid={`reset-attempts-btn-${l.user_id}`}
+                        className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50">
+                        <RotateCcw className="h-3.5 w-3.5" /> Reset
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        )}
+        {editingQ && (
+          <EditQuestionModal examId={exam.id} question={editingQ}
+            onClose={() => setEditingQ(null)}
+            onSaved={() => {
+              setEditingQ(null)
+              qc.invalidateQueries({ queryKey: ['exam-insights', exam.id] })
+            }} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EditQuestionModal({ examId, question, onClose, onSaved }: {
+  examId: number, question: any, onClose: () => void, onSaved: () => void
+}) {
+  const [text, setText] = useState<string>(question.question_text || '')
+  const [options, setOptions] = useState<string[]>(question.options || [])
+  const [correct, setCorrect] = useState<string>(question.correct_answer ?? '')
+  const [explanation, setExplanation] = useState<string>(question.explanation || '')
+  const [points, setPoints] = useState<number>(question.points || 1)
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const body: any = { question_text: text, correct_answer: correct, explanation, points }
+      if (question.question_type === 'MULTIPLE_CHOICE') body.options = options
+      return (await api.patch(`/exams/${examId}/questions/${question.question_id}`, body)).data
+    },
+    onSuccess: () => { toast.success('Question updated'); onSaved() },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not save question'),
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" data-testid="edit-question-modal">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900">Edit question</h3>
+          <button onClick={onClose} data-testid="edit-question-close" className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Question</label>
+            <textarea value={text} onChange={e => setText(e.target.value)} rows={2}
+              data-testid="edit-question-text"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          {question.question_type === 'MULTIPLE_CHOICE' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Options <span className="text-slate-400">(select the correct one)</span></label>
+              <div className="space-y-2">
+                {options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="radio" name="correct-option" checked={correct === String(i)}
+                      onChange={() => setCorrect(String(i))} data-testid={`edit-correct-radio-${i}`}
+                      className="accent-indigo-600" />
+                    <input value={opt} data-testid={`edit-option-${i}`}
+                      onChange={e => setOptions(options.map((o, j) => j === i ? e.target.value : o))}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {question.question_type === 'TRUE_FALSE' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Correct answer</label>
+              <div className="flex gap-2">
+                {['true', 'false'].map(v => (
+                  <button key={v} onClick={() => setCorrect(v)} data-testid={`edit-tf-${v}`}
+                    aria-pressed={correct === v}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium border ${correct === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    {v === 'true' ? 'True' : 'False'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {question.question_type === 'SHORT_ANSWER' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Correct answer</label>
+              <input value={correct} onChange={e => setCorrect(e.target.value)} data-testid="edit-short-answer"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Points</label>
+              <input type="number" min={1} value={points} onChange={e => setPoints(Number(e.target.value) || 1)}
+                data-testid="edit-question-points"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Explanation <span className="text-slate-400">(shown after answering)</span></label>
+            <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}
+              data-testid="edit-question-explanation"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg">Cancel</button>
+          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !text.trim()}
+            data-testid="edit-question-save"
+            className="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50">
+            {saveMut.isPending ? 'Saving…' : 'Save question'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

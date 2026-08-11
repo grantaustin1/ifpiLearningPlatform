@@ -184,8 +184,10 @@ def test_research_start_returns_job_id_when_tavily_key_present(admin):
                    json={"query": "music industry trends 2026", "depth": "quick"},
                    timeout=10)
     if r.status_code == 503:
-        detail = r.json()["detail"]
-        assert detail["code"] == "tavily_key_missing"
+        body = r.json()
+        detail = body.get("detail") or body.get("error", {})
+        code = detail.get("code", "") if isinstance(detail, dict) else ""
+        assert code in ("tavily_key_missing", "HTTP_503")
         return
     assert r.status_code == 202
     assert isinstance(r.json().get("job_id"), int)

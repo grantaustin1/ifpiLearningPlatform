@@ -41,6 +41,3 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
-backend/uploads/
-frontend/build/
-frontend/node_modules/.cache/

@@ -479,22 +479,22 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 821 |
+| `routers/courses.py` | 836 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
-| `routers/exams.py` | 212 |
+| `routers/exams.py` | 459 |
 | `routers/extras.py` | 655 |
 | `routers/feedback.py` | 72 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
 | `routers/iter5.py` | 352 |
-| `routers/iter8.py` | 305 |
+| `routers/iter8.py` | 367 |
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
-| `routers/misc.py` | 1309 |
+| `routers/misc.py` | 1391 |
 | `routers/narration.py` | 204 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13374** |
+| **Total** | **13780** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -601,6 +601,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
 | `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
 | `/api/admin/analytics` | GET |  |
+| `/api/admin/analytics/enrollments-weekly` | GET | Enrolments or completions per ISO week (Iter 43/44 dashboard chart). |
 | `/api/admin/api-tokens` | GET |  |
 | `/api/admin/api-tokens` | POST |  |
 | `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
@@ -731,6 +732,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/catalog` | GET |  |
 | `/api/catalog/organizations` | GET | Iter 27 — Cross-tenant marketplace search: list opted-in |
 | `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
+| `/api/catalog/{course_id}/reviews` | GET | Best written reviews for a public course — highest stars first, |
 | `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
@@ -741,7 +743,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/certificates/bulk-unrevoke` | POST | Iter 31 — Bulk lift-revocation. Skips currently-active certs |
 | `/api/certificates/bulk-zip` | POST | Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for |
 | `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
+| `/api/certificates/transcript.json` | GET | Iter 50 — JSON payload behind the printable transcript page. |
 | `/api/certificates/verify/{code}` | GET |  |
+| `/api/certificates/verify/{code}/og-image.png` | GET | Iter 50 — PNG OG image for social share previews. LinkedIn does |
 | `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
 | `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
 | `/api/certificates/{cert_id}/revocation-history` | GET | Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events |
@@ -760,6 +764,11 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
 | `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
+| `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
+| `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
+| `/api/courses/{course_id}/reviews` | GET | All written reviews for a course (incl. hidden) — admin moderation view. Iter 47. |
+| `/api/courses/{course_id}/reviews/{rating_id}/reply` | POST | Post/update a public academy reply under a learner review. |
+| `/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden` | POST | Hide/unhide a written review from the public course page. Iter 47. |
 | `/api/courses/{course_id}/slides` | POST |  |
 | `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
 | `/api/courses/{course_id}/slides/{slide_id}` | DELETE |  |
@@ -767,7 +776,9 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
+| `/api/courses/{course_id}/toggle-featured` | POST | Flip the marketplace 'Featured' flag on a course (Iter 42). |
 | `/api/courses/{course_id}/unpublish` | POST |  |
+| `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
 | `/api/erp360/sync/status` | GET | Public probe. Returns whether IFPI is ready to receive ERP360 |
 | `/api/erp360/sync/test-ping` | POST | Round-trip verification. Currently a stub — synthetic outbound |
@@ -778,8 +789,13 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}` | DELETE |  |
 | `/api/exams/{exam_id}` | GET |  |
 | `/api/exams/{exam_id}` | PATCH |  |
+| `/api/exams/{exam_id}/attempts` | GET | Per-learner attempt summary for an exam (admin/instructor). |
 | `/api/exams/{exam_id}/attempts` | POST |  |
+| `/api/exams/{exam_id}/attempts/reset` | POST | Wipe a learner's attempts for one exam so they can retake it. |
+| `/api/exams/{exam_id}/question-insights` | GET | Per-question correct/miss rates across all attempts, so admins can |
+| `/api/exams/{exam_id}/question-insights.csv` | GET | Same data as /question-insights, as a CSV for curriculum reviews. |
 | `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
+| `/api/exams/{exam_id}/questions/{question_id}` | PATCH | Edit one question in place — unlike PUT /questions (replace), this |
 | `/api/feature-flags` | GET |  |
 | `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
 | `/api/gamification/leaderboard` | GET |  |
@@ -811,7 +827,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/learning-paths/{path_id}/publish` | POST |  |
 | `/api/live-sessions` | GET |  |
 | `/api/live-sessions` | POST |  |
-| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. |
+| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
 | `/api/live-sessions/subscribe-url/qr` | GET | Iter 25 — Return an SVG QR code encoding the current user's |
 | `/api/live-sessions/subscribe-url/rotate` | POST | Iter 25 — Bump the org's subscription_secret_version. Every |
 | `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
@@ -826,6 +842,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/live-sessions/{session_id}/uncancel` | POST |  |
 | `/api/notifications` | GET |  |
 | `/api/notifications/read-all` | PATCH |  |
+| `/api/openapi.json` | GET |  |
 | `/api/organization` | GET |  |
 | `/api/organization` | PATCH |  |
 | `/api/organization/apply-theme/{slug}` | POST | Copy a preset's branding values onto the caller's organization. |
@@ -835,7 +852,10 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/organization/smtp` | GET | Returns the SMTP config minus the password. Password is write-only. |
 | `/api/organization/smtp` | PUT |  |
 | `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
-| `/api/organization/themes` | GET | Read-only list of curated theme presets an ADMIN can apply in one click. |
+| `/api/organization/themes` | GET | Built-in presets + this org's custom presets (marked `custom: true`). |
+| `/api/organization/themes` | POST | Create a custom theme preset for the caller's organization. |
+| `/api/organization/themes/{preset_id}` | DELETE | Delete a custom theme preset. Orgs currently using it keep their |
+| `/api/organization/themes/{preset_id}` | PUT | Update a custom theme preset (org-scoped). |
 | `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
 | `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
 | `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
@@ -861,6 +881,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/tutor/sessions/{session_id}` | GET |  |
 | `/api/tutor/sessions/{session_id}/archive` | POST |  |
 | `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
+| `/api/uploads/cover-library` | GET | Curated course-cover photo gallery (Iter 43). Files are placed by |
 | `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
 | `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
@@ -868,7 +889,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **276** registered API endpoints._
+_Total: **297** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

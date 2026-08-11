@@ -1,0 +1,30 @@
+{
+  "summary": "Iter-55 fully verified: (1) Distractor stats — insights modal shows per-option distribution bars with TOP DISTRACTOR badge on the most-picked wrong option and green ✓ on the correct option (e.g. Q13: ✓ ATP-PC (phosphagen) correct, Glycolytic flagged TOP DISTRACTOR). (2) CSV export — /api/exams/4/question-insights.csv returns 200 text/csv with the exact header and 5 data rows for admin, 403 for learner; UI 'Export CSV' button downloads file 'question-insights-exam-4.csv'. (3) Miss-rate alert — deliberate learner fail (Q1-Q3 wrong, Q4-Q5 correct) submitted with score 40% pushed Q13-Q15 to 67% miss (≥50% & 3 answers). Backend fired QUESTION_MISS_ALERT notifications ('⚠️ 67% miss rate on \"Foundations of Exercise Science Assessment\"') and queued question_miss_alert emails to org managers in /api/admin/outbox (subject '⚠️ Question needs attention on Foundations of Exercise Science Assessment', template=question_miss_alert, transport=stub, status=QUEUED). Insights UI shows 'author alerted' chip on alerted questions. Re-arm confirmed: PATCH q13 explanation clears miss_alerted_at (chip disappears). All 5 pytest tests PASS, no console errors, Learners tab regression OK.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verification_details": {
+    "distractor_stats_ui": {"status": "PASS", "evidence": "distractor-stats-13 renders 3 rows: Glycolytic 1(33%) TOP DISTRACTOR, ✓ ATP-PC (phosphagen) 1(33%), Oxidative (aerobic) 1(33%). top-distractor-13 badge text='TOP DISTRACTOR'. Q2 shows 'Training to failure every session' TOP DISTRACTOR; Q3 'During the workout'; Q4 'Frequency'."},
+    "csv_export_backend": {"status": "PASS", "evidence": "GET /api/exams/4/question-insights.csv (admin) → 200, content-type text/csv, header exactly ['#','question','type','points','answered','correct','missed','miss_rate_pct','top_wrong_answer','top_wrong_count','correct_answer'], 5 data rows. Sample row: [1, 'Which energy system dominates a maximal 8-second sprint?', MULTIPLE_CHOICE, 1, 3, 1, 2, 67, Glycolytic, 1, ATP-PC (phosphagen)]. Learner token → 403."},
+    "csv_export_ui": {"status": "PASS", "evidence": "insights-export-csv-btn triggers browser download of 'question-insights-exam-4.csv'."},
+    "miss_alert_notifications": {"status": "PASS", "evidence": "GET /api/notifications returns 3 QUESTION_MISS_ALERT notifs titled '⚠️ 67% miss rate on \"Foundations of Exercise Science Assessment\"'."},
+    "miss_alert_outbox": {"status": "PASS", "evidence": "GET /api/admin/outbox → newest messages are template=question_miss_alert, subject='⚠️ Question needs attention on Foundations of Exercise Science Assessment', status=QUEUED, transport=stub. Sent to multiple org managers (qa-admin, admin, several instructors)."},
+    "author_alerted_chip": {"status": "PASS", "evidence": "'author alerted' chip renders on Q14 and Q15 insight rows (Q13's cleared after re-arm PATCH). 2 occurrences visible on screen."},
+    "re_arm_on_edit": {"status": "PASS", "evidence": "PATCH /api/exams/4/questions/13 with explanation change → 200. Subsequent GET question-insights shows Q13 miss_alerted_at=null while Q14/Q15 remain '2026-08-07T05:45:44...'. UI 'author alerted' chip on Q13 gone."},
+    "regression_learners_tab": {"status": "PASS", "evidence": "Test Learner shown as 3/3 attempts, best 100%, Status Passed (deliberate fail did not lock out — learner already had a passing attempt). Reset button present."},
+    "console_errors": {"status": "PASS", "evidence": "No page errors during login → exams → attempts → insights → CSV download flow."}
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration55_miss_alerts.py", "/app/test_reports/pytest/iteration55.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "In routers/exams.py the CSV endpoint reuses exam_question_insights() and writes bytes with default csv writer — non-ASCII correct_answer/question_text values will still work, but consider adding response encoding=utf-8 in Content-Type for clarity (currently 'text/csv' without charset).",
+    "GET /api/admin/outbox returns 'messages' key while other list endpoints in the codebase use 'items'/'results' — inconsistency slightly complicates client generalisation."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration55_miss_alerts.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "qa-admin@ifpi.org / QaAdmin!2026; learner@ifpi.org / learner123",
+  "seed_data_creation": "Consumed learner's 3rd attempt on exam 4 (score 40, failed) which fired miss alerts for Q13-Q15. Then edited Q13 explanation (appended ' (reviewed)') which re-armed Q13 (miss_alerted_at cleared). Exam 4 total_attempts now = 3, learner best still 100% Passed (from earlier passing attempt). 3 QUESTION_MISS_ALERT notifications and ~20 question_miss_alert outbox rows persisted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter-55 fully verified. State: exam 4 has 3 attempts, learner at 3/3 (best 100%, Passed). Q13 explanation was extended with ' (reviewed)' twice (now '(reviewed) (reviewed) (reviewed)' — from repeated re-arm tests). Q14 & Q15 still have miss_alerted_at set (not re-armed). Q17 still has ' (tf-check)' explanation appended from iter-54. Learner can NO LONGER submit new attempts on exam 4 (max=3 reached) — if a future test needs a fresh fail, use the admin Reset button first. Outbox contains 20+ question_miss_alert messages (QUEUED, stub transport).",
+  "rca of the issue": "n/a — no defects found."
+}

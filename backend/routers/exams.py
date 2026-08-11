@@ -1,15 +1,16 @@
 """Exam routes: CRUD + question management + take + attempt submission."""
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel as _BaseModel
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import INSTRUCTOR_ROLES
-from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType
+from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType, User
 from schemas import (
     AttemptResult, AttemptSubmit, ExamCreate, ExamDetail, ExamSummary,
     ExamUpdate, QuestionIn, QuestionOut,
@@ -168,6 +169,252 @@ def submit_attempt(exam_id: int, body: AttemptSubmit, db: Session = Depends(get_
         organization_id=current.organization_id, answers=body.answers,
     )
     return AttemptResult(**result)
+
+
+# ── Iter 50 — Admin attempt management ───────────────────────────────
+@router.get("/{exam_id}/attempts")
+def list_exam_attempts(exam_id: int, db: Session = Depends(get_db),
+                       current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Per-learner attempt summary for an exam (admin/instructor)."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    rows = (db.query(ExamAttempt, User)
+            .join(User, User.id == ExamAttempt.user_id)
+            .filter(ExamAttempt.exam_id == exam_id)
+            .order_by(ExamAttempt.completed_at.desc().nullslast())
+            .all())
+    per_user: dict[int, dict] = {}
+    for a, u in rows:
+        entry = per_user.setdefault(u.id, {
+            "user_id": u.id, "name": u.name, "email": u.email,
+            "attempts_used": 0, "best_score": None, "passed": False,
+            "last_attempt_at": None,
+        })
+        entry["attempts_used"] += 1
+        if a.score is not None and (entry["best_score"] is None or a.score > entry["best_score"]):
+            entry["best_score"] = a.score
+        entry["passed"] = entry["passed"] or bool(a.passed)
+        ts = a.completed_at or a.started_at
+        if ts and (entry["last_attempt_at"] is None or ts.isoformat() > entry["last_attempt_at"]):
+            entry["last_attempt_at"] = ts.isoformat()
+    return {"exam_id": e.id, "max_attempts": e.max_attempts,
+            "learners": list(per_user.values())}
+
+
+class ResetAttemptsBody(_BaseModel):
+    user_id: int
+
+
+@router.post("/{exam_id}/attempts/reset")
+def reset_exam_attempts(exam_id: int, body: ResetAttemptsBody, request: Request,
+                        db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Wipe a learner's attempts for one exam so they can retake it."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    target = db.query(User).filter(
+        User.id == body.user_id,
+        User.organization_id == current.organization_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Learner not found")
+    n = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id, ExamAttempt.user_id == target.id,
+    ).delete(synchronize_session=False)
+    from services import audit_service
+    audit_service.record(db, current, "EXAM_ATTEMPTS_RESET",
+                         target_type="exam", target_id=exam_id,
+                         metadata={"user_id": target.id, "deleted": n},
+                         request=request)
+    # Iter 51 — Tell the learner they can retake (email + in-app bell).
+    try:
+        from services.gamification_service import GamificationService
+        from services.mail_service import MailService
+        retake_path = f"/take/{e.id}"
+        GamificationService(db).notify(
+            target.id, "EXAM_ATTEMPTS_RESET",
+            "Your exam attempts were reset",
+            f'You can retake "{e.title}" — your previous attempts were cleared by an administrator.',
+            link=retake_path,
+        )
+        first_name = (target.name or "there").split()[0]
+        MailService(db).send_email(
+            to_email=target.email, to_name=target.name,
+            subject=f"You can retake: {e.title}",
+            body_html=(
+                f"<div style='font-family:system-ui,sans-serif;max-width:520px'>"
+                f"<h2 style='color:#4f46e5;margin:0 0 12px'>Good news, {first_name}!</h2>"
+                f"<p>An administrator reset your attempts for "
+                f"<strong>{e.title}</strong>, so you have a fresh set of "
+                f"{e.max_attempts} attempt{'s' if e.max_attempts != 1 else ''} to pass it.</p>"
+                f"<p style='margin:20px 0'><a href='{retake_path}' "
+                f"style='background:#4f46e5;color:#fff;padding:10px 20px;"
+                f"border-radius:8px;text-decoration:none;font-weight:600'>Retake the exam</a></p>"
+                f"<p style='color:#64748b;font-size:13px'>Pass mark: {e.passing_score}%. Good luck!</p>"
+                f"</div>"
+            ),
+            body_text=(f"An administrator reset your attempts for '{e.title}'. "
+                       f"You can retake it at {retake_path} (pass mark {e.passing_score}%)."),
+            template="exam_attempts_reset",
+            organization_id=current.organization_id, user_id=target.id,
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("Reset notification queue failed", exc_info=True)
+    db.commit()
+    return {"deleted": n, "user_id": target.id}
+
+
+# ── Iter 52 — In-place question edit (preserves id + attempt history) ─
+class QuestionPatch(_BaseModel):
+    question_text: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
+    explanation: Optional[str] = None
+    points: Optional[int] = None
+
+
+@router.patch("/{exam_id}/questions/{question_id}", response_model=QuestionOut)
+def update_question(exam_id: int, question_id: int, body: QuestionPatch,
+                    request: Request, db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Edit one question in place — unlike PUT /questions (replace), this
+    keeps the question id so past attempt answers and insights stay linked."""
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    q = db.query(ExamQuestion).filter(
+        ExamQuestion.id == question_id, ExamQuestion.exam_id == exam_id,
+    ).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    changes = body.model_dump(exclude_unset=True)
+    for k, v in changes.items():
+        setattr(q, k, v)
+    # Iter 53 — editing the question re-arms its miss-rate alert
+    q.miss_alerted_at = None
+    from services import audit_service
+    audit_service.record(db, current, "EXAM_QUESTION_EDITED",
+                         target_type="exam", target_id=exam_id,
+                         metadata={"question_id": question_id,
+                                   "fields": sorted(changes.keys())},
+                         request=request)
+    db.commit()
+    db.refresh(q)
+    return QuestionOut(
+        id=q.id, question_text=q.question_text,
+        question_type=q.question_type.value, options=q.options,
+        correct_answer=q.correct_answer, explanation=q.explanation,
+        points=q.points, order_index=q.order_index,
+    )
+
+
+# ── Iter 51 — Question insights (miss-rate analytics) ────────────────
+@router.get("/{exam_id}/question-insights")
+def exam_question_insights(exam_id: int, db: Session = Depends(get_db),
+                           current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Per-question correct/miss rates across all attempts, so admins can
+    spot the questions (and course content) learners struggle with most."""
+    from services.exam_service import grade_question
+    e = db.query(Exam).filter(
+        Exam.id == exam_id, Exam.organization_id == current.organization_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    attempts = db.query(ExamAttempt).filter(
+        ExamAttempt.exam_id == exam_id, ExamAttempt.answers.isnot(None),
+    ).all()
+    questions = sorted(e.questions, key=lambda q: q.order_index)
+    out = []
+    for q in questions:
+        answered = correct = 0
+        counts: dict[str, int] = {}
+        for a in attempts:
+            ans = (a.answers or {}).get(str(q.id))
+            if ans is None or ans == "":
+                continue
+            answered += 1
+            key = str(ans).strip()
+            counts[key] = counts.get(key, 0) + 1
+            if grade_question(q, ans):
+                correct += 1
+        missed = answered - correct
+        # Iter 53 — distractor stats: label each picked answer and flag
+        # the most-picked wrong one so weak distractors stand out.
+        qt = q.question_type.value if hasattr(q.question_type, "value") else q.question_type
+        def _label(raw: str) -> str:
+            if qt == "MULTIPLE_CHOICE" and q.options is not None and raw.isdigit() and int(raw) < len(q.options):
+                return q.options[int(raw)]
+            if qt == "TRUE_FALSE":
+                return "True" if raw.strip().lower() == "true" else "False"
+            return raw
+        distribution = sorted([{
+            "answer": raw,
+            "label": _label(raw),
+            "count": n,
+            "is_correct": grade_question(q, raw),
+        } for raw, n in counts.items()], key=lambda d: -d["count"])
+        wrong = [d for d in distribution if not d["is_correct"]]
+        top_wrong = wrong[0] if wrong else None
+        out.append({
+            "question_id": q.id,
+            "question_text": q.question_text,
+            "question_type": qt,
+            "options": q.options,
+            "correct_answer": q.correct_answer,
+            "explanation": q.explanation,
+            "points": q.points,
+            "answered": answered,
+            "correct": correct,
+            "missed": missed,
+            "miss_rate": round(missed / answered * 100) if answered else None,
+            "answer_distribution": distribution,
+            "top_wrong": top_wrong,
+            "miss_alerted_at": q.miss_alerted_at.isoformat() if q.miss_alerted_at else None,
+        })
+    out_sorted = sorted(out, key=lambda r: (r["miss_rate"] is None, -(r["miss_rate"] or 0)))
+    return {"exam_id": e.id, "title": e.title, "course_id": e.course_id,
+            "total_attempts": len(attempts), "questions": out_sorted}
+
+
+# ── Iter 53 — CSV export of question insights ────────────────────────
+@router.get("/{exam_id}/question-insights.csv")
+def exam_question_insights_csv(exam_id: int, db: Session = Depends(get_db),
+                               current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):
+    """Same data as /question-insights, as a CSV for curriculum reviews."""
+    import csv
+    import io as _io
+    from fastapi import Response as _Response
+    data = exam_question_insights(exam_id, db=db, current=current)
+    buf = _io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["#", "question", "type", "points", "answered", "correct",
+                "missed", "miss_rate_pct", "top_wrong_answer",
+                "top_wrong_count", "correct_answer"])
+    for i, q in enumerate(data["questions"], 1):
+        tw = q.get("top_wrong") or {}
+        qt = q["question_type"]
+        correct_label = q["correct_answer"]
+        if qt == "MULTIPLE_CHOICE" and q.get("options") and str(correct_label).isdigit():
+            idx = int(correct_label)
+            if idx < len(q["options"]):
+                correct_label = q["options"][idx]
+        w.writerow([i, q["question_text"], qt, q["points"], q["answered"],
+                    q["correct"], q["missed"],
+                    q["miss_rate"] if q["miss_rate"] is not None else "",
+                    tw.get("label", ""), tw.get("count", ""), correct_label])
+    filename = f"question-insights-exam-{exam_id}.csv"
+    return _Response(buf.getvalue(), media_type="text/csv; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    })
 
 
 

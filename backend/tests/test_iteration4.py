@@ -84,9 +84,9 @@ def test_outbox_pagination_page_2_differs(admin):
 
 
 def test_outbox_pagination_out_of_range(admin):
-    r = admin.get(f"{BASE_URL}/api/admin/outbox?page=999&page_size=5").json()
+    r = admin.get(f"{BASE_URL}/api/admin/outbox?page=999999&page_size=5").json()
     assert r["messages"] == []
-    assert r["page"] == 999
+    assert r["page"] == 999999
     assert "total" in r
 
 

@@ -205,10 +205,12 @@ def test_subscription_bad_token_rejected():
 def test_subscription_tampered_token_rejected(admin):
     d = admin.post(f"{BASE_URL}/api/live-sessions/subscribe-url?kind=admin", timeout=10).json()
     token = d["token"]
-    # Flip a single character in the signature
+    # Flip a character in the middle of the signature (the final char's
+    # low bits are base64 padding spare bits — flipping them is a no-op)
     payload_b64, sig_b64 = token.split(".")
-    tampered_sig = sig_b64[:-1] + ("A" if sig_b64[-1] != "A" else "B")
-    tampered = f"{payload_b64}.{tampered_sig}"
+    mid = len(sig_b64) // 2
+    flipped = "A" if sig_b64[mid] != "A" else "B"
+    tampered = f"{payload_b64}.{sig_b64[:mid]}{flipped}{sig_b64[mid + 1:]}"
     r = requests.get(f"{BASE_URL}/api/live-sessions/subscribe/{tampered}.ics", timeout=10)
     assert r.status_code == 401
 

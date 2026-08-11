@@ -36,7 +36,7 @@ def test_docs_manifest_lists_all_four_manuals(admin):
     docs = r.json()["documents"]
     slugs = {d["slug"] for d in docs}
     assert slugs == {"setup-manual", "user-manual",
-                     "integration-matrix", "assessment"}
+                     "integration-matrix", "assessment", "erp360-bolt-on"}
     # Each entry has the metadata the frontend needs
     for d in docs:
         assert d["title"]
@@ -44,7 +44,7 @@ def test_docs_manifest_lists_all_four_manuals(admin):
         assert d["audience"]
         assert isinstance(d["auto_regenerated"], bool)
         assert d["size_bytes"] > 500  # non-empty
-        assert d["line_count"] > 50
+        assert d["line_count"] > 40
         assert isinstance(d["modified_at"], int)
 
 

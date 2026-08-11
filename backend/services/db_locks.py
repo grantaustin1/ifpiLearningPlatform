@@ -129,6 +129,5 @@ def retry_on_deadlock(max_retries: int = 1,
                 and isinstance(fn_globals[_annotation], type)
             ):
                 _wrapped.__globals__.setdefault(_annotation, fn_globals[_annotation])
-
         return _wrapped
     return _decorator

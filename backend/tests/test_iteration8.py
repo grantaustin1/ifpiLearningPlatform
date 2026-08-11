@@ -96,16 +96,16 @@ class TestBulkInviteAudit:
 # ── Theme apply writes audit ──────────────────────────────────────────
 class TestThemeAudit:
     def test_theme_apply_audit(self, admin_client):
-        r = admin_client.post(f"{BASE_URL}/api/organization/apply-theme/conservatoire")
+        r = admin_client.post(f"{BASE_URL}/api/organization/apply-theme/crimson_gold")
         assert r.status_code == 200, r.text
         time.sleep(0.3)
         r2 = admin_client.get(f"{BASE_URL}/api/admin/audit-log",
                               params={"action": "THEME_APPLIED", "limit": 5})
         items = r2.json()["items"]
         assert items, "no THEME_APPLIED audit row found"
-        # latest entry should be conservatoire
+        # latest entry should be crimson_gold
         latest = items[0]
-        assert latest["metadata"].get("preset") == "conservatoire"
+        assert latest["metadata"].get("preset") == "crimson_gold"
 
 
 # ── Badge tier mutations write audit ──────────────────────────────────
