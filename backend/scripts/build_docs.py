@@ -26,6 +26,7 @@ Design notes:
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -72,73 +73,104 @@ def _gen_role_aliases() -> str:
     return "\n".join(lines)
 
 
-def _load_app():
-    """Import the FastAPI app for route introspection. May fail in CI
-    without a DB — we return None and the caller falls back to a stub."""
-    try:
-        from server import app  # type: ignore
-        return app
-    except Exception as exc:  # noqa: BLE001
-        print(f"[build_docs] app import failed ({exc!r}); "
-              "route table will be a stub", file=sys.stderr)
-        return None
+def _first_docstring_line(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    doc = ast.get_docstring(node)
+    if not doc:
+        return ""
+    return doc.strip().splitlines()[0].strip()
 
 
-def _summarize_route(route) -> Tuple[str, str, str]:
-    path = getattr(route, "path", "")
-    methods = sorted(getattr(route, "methods", set()) - {"HEAD", "OPTIONS"})
-    verb = "/".join(methods) if methods else ""
-    summary = (getattr(route, "summary", "") or "").strip()
-    if not summary:
-        # Fallback: first docstring line
-        endpoint = getattr(route, "endpoint", None)
-        if endpoint is not None and endpoint.__doc__:
-            summary = endpoint.__doc__.strip().splitlines()[0].strip()
-    return verb, path, summary
+def _literal_str(node: ast.AST | None) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
 
 
-def _collect_routes(router_or_app) -> List:
-    """Recursively collect all route objects from a FastAPI app or router.
+def _static_api_routes() -> List[Tuple[str, str, str]]:
+    verbs = {"get", "post", "put", "patch", "delete"}
+    rows: List[Tuple[str, str, str]] = []
 
-    FastAPI ≥ 0.139 stores included routers as ``_IncludedRouter``
-    wrappers rather than immediately flattening them into the parent's
-    ``routes`` list.  We unwrap those transparently so route introspection
-    works correctly regardless of FastAPI version.
-    """
-    from fastapi.routing import APIRoute
-    collected = []
-    for r in getattr(router_or_app, "routes", []):
-        if isinstance(r, APIRoute):
-            collected.append(r)
-        elif hasattr(r, "original_router"):
-            # FastAPI 0.139+ _IncludedRouter
-            collected.extend(_collect_routes(r.original_router))
-        elif hasattr(r, "routes"):
-            collected.extend(_collect_routes(r))
-    return collected
+    for source in sorted((BACKEND_DIR / "routers").glob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        prefixes: Dict[str, str] = {}
+
+        for node in tree.body:
+            if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+                continue
+            if not isinstance(node.value.func, ast.Name) or node.value.func.id != "APIRouter":
+                continue
+            prefix = ""
+            for kw in node.value.keywords:
+                if kw.arg == "prefix":
+                    prefix = _literal_str(kw.value) or ""
+                    break
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    prefixes[target.id] = prefix
+
+        for node in tree.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            summary = _first_docstring_line(node).replace("|", "\\|")
+            for dec in node.decorator_list:
+                if not isinstance(dec, ast.Call) or not isinstance(dec.func, ast.Attribute):
+                    continue
+                verb = dec.func.attr.lower()
+                if verb not in verbs or not isinstance(dec.func.value, ast.Name):
+                    continue
+                prefix = prefixes.get(dec.func.value.id)
+                if prefix is None or not dec.args:
+                    continue
+                suffix = _literal_str(dec.args[0])
+                if suffix is None:
+                    continue
+                path = f"{prefix}{suffix}"
+                if not path.startswith("/api"):
+                    continue
+                rows.append((path, verb.upper(), summary))
+
+    server_tree = ast.parse((BACKEND_DIR / "server.py").read_text(encoding="utf-8"))
+    docs_url = "/api/docs"
+    openapi_url = "/api/openapi.json"
+    for node in server_tree.body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+            continue
+        if not isinstance(node.value.func, ast.Name) or node.value.func.id != "FastAPI":
+            continue
+        for kw in node.value.keywords:
+            if kw.arg == "docs_url":
+                docs_url = _literal_str(kw.value) or docs_url
+            elif kw.arg == "openapi_url":
+                openapi_url = _literal_str(kw.value) or openapi_url
+        break
+
+    for node in server_tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        summary = _first_docstring_line(node).replace("|", "\\|")
+        for dec in node.decorator_list:
+            if not isinstance(dec, ast.Call) or not isinstance(dec.func, ast.Attribute):
+                continue
+            if not isinstance(dec.func.value, ast.Name) or dec.func.value.id != "app":
+                continue
+            verb = dec.func.attr.lower()
+            if verb not in verbs or not dec.args:
+                continue
+            path = _literal_str(dec.args[0])
+            if path and path.startswith("/api"):
+                rows.append((path, verb.upper(), summary))
+
+    rows.append((docs_url, "GET", ""))
+    rows.append((openapi_url, "GET", ""))
+    rows.sort()
+    return rows
 
 
 def _gen_api_routes() -> str:
-    app = _load_app()
-    if app is None:
-        return ("| Endpoint | Verb | Purpose |\n"
-                "|---|---|---|\n"
-                "| _(unable to introspect — run locally with the backend importable)_ | | |")
-    rows: List[Tuple[str, str, str]] = []
-    for route in _collect_routes(app):
-        path = getattr(route, "path", "") or ""
-        if not path.startswith("/api"):
-            continue
-        verb, p, summary = _summarize_route(route)
-        if not verb:  # websocket, mount, etc.
-            continue
-        rows.append((p, verb, summary or ""))
-    rows.sort()
     lines = ["| Endpoint | Verb | Purpose |", "|---|---|---|"]
+    rows = _static_api_routes()
     for p, v, s in rows:
-        # Escape pipes in summary
-        s_esc = s.replace("|", "\\|")
-        lines.append(f"| `{p}` | {v} | {s_esc} |")
+        lines.append(f"| `{p}` | {v} | {s} |")
     lines.append(f"\n_Total: **{len(rows)}** registered API endpoints._")
     return "\n".join(lines)
 
@@ -158,24 +190,31 @@ def _gen_router_index() -> str:
 
 
 def _gen_model_index() -> str:
-    """List distinct SQLAlchemy models. Prefer the aggregated file."""
     lines = ["| Model | Table |", "|---|---|"]
-    try:
-        import importlib
-        mod = importlib.import_module("models")
-        from sqlalchemy.orm import DeclarativeBase
-
-        pairs = []
-        for name in dir(mod):
-            cls = getattr(mod, name)
-            if isinstance(cls, type) and hasattr(cls, "__tablename__"):
-                pairs.append((name, cls.__tablename__))
-        pairs.sort()
-        for name, table in pairs:
-            lines.append(f"| `{name}` | `{table}` |")
-        lines.append(f"\n_Total: **{len(pairs)}** ORM models._")
-    except Exception as exc:  # noqa: BLE001
-        lines.append(f"| _(introspection failed: {exc!r})_ | |")
+    pairs: List[Tuple[str, str]] = []
+    for source in sorted((BACKEND_DIR / "models").glob("*.py")):
+        if source.name in {"__init__.py", "_common.py"}:
+            continue
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            table = None
+            for stmt in node.body:
+                if not isinstance(stmt, ast.Assign):
+                    continue
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name) and target.id == "__tablename__":
+                        table = _literal_str(stmt.value)
+                        break
+                if table is not None:
+                    break
+            if table is not None:
+                pairs.append((node.name, table))
+    pairs.sort()
+    for name, table in pairs:
+        lines.append(f"| `{name}` | `{table}` |")
+    lines.append(f"\n_Total: **{len(pairs)}** ORM models._")
     return "\n".join(lines)
 
 
