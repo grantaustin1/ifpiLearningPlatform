@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { safeHtml } from 'lib/sanitize'
-import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
 import { AITutorPanel } from 'components/AITutorPanel'
+import { useAuth } from 'contexts/AuthContext'
 
 export default function LearnPage() {
   const { courseId } = useParams()
   const nav = useNavigate()
+  const { hasRole } = useAuth()
+  const isStaff = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
   const [course, setCourse] = useState<any>(null)
   const [current, setCurrent] = useState(0)
   const [completed, setCompleted] = useState<Set<number>>(new Set())
@@ -119,7 +122,16 @@ export default function LearnPage() {
       </aside>
 
       <div className="flex-1 flex flex-col">
-        <div className="bg-white border-b px-5 py-3 text-sm font-medium text-slate-700">{course.title} <span className="text-slate-400 ml-2">{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span></div>
+        <div className="bg-white border-b px-5 py-3 text-sm font-medium text-slate-700 flex items-center">
+          <span>{course.title} <span className="text-slate-400 ml-2">{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span></span>
+          {isStaff && (
+            <button onClick={() => nav(`/courses/${courseId}/edit`)} data-testid="learn-edit-course-btn"
+              title="Open this course in the editor to change slides, pictures and layout"
+              className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 text-slate-500 rounded-lg px-3 py-1.5 transition-colors">
+              <Pencil className="h-3.5 w-3.5" /> Edit course
+            </button>
+          )}
+        </div>
         {examGate && slide && (
           <div data-testid="exam-gate-banner"
             className="bg-amber-50 border-b border-amber-200 px-5 py-2.5 text-sm text-amber-800 flex items-center gap-2">

@@ -191,3 +191,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - User console log (prod): /learn/243 → GET/enroll 404s → LearnPage uncaught AxiosError (course was draft/deleted). CORS app.emergent.sh redirect on streak call = platform edge during redeploy, not app bug.
 - LearnPage: loadError state → friendly 'This course isn't available' screen (course-unavailable testid) with Back to My Courses button, instead of infinite spinner + uncaught error.
 - Verified: screenshot /learn/9999 shows friendly screen, back button navs to /courses, valid course 224 still loads. tsc clean.
+
+## 2026-08-12 (session 10k) — Imported course + 'Edit course' shortcut
+- User re-imported 'Utilizing the Fitness Facility (US 254459)' (course 243, 118 slides: 68 TEXT / 44 IMAGE / 6 VIDEO) into PREVIEW via Content imports Upload .zip — now part of committed snapshot, survives redeploys. COURSE 243 = REAL USER DATA — never save/delete/modify in tests.
+- 'Bug': user in learner view expecting picture tools — tools were fine in editor. Fix: staff-only 'Edit course' button (learn-edit-course-btn) in LearnPage header → /courses/{id}/edit.
+- Verified: iteration_59.json — 4/4 pass (button admin-only, editor tools work on imported IMAGE slides, learner hidden, friendly-404 regression). Prior context: prod data loss RCA (redeploy replaces prod disk/DB; workspace = source of truth; user OK, demo data only; persistent DB is go-live requirement).
