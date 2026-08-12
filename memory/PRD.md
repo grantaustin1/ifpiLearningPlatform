@@ -210,3 +210,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - CourseEditPage save(): when opened via ?slide= (from 'Edit slide'), after save navs back to /learn/{id}?slide={activeId} with toast 'Saved — taking you back to the slide'. Normal editor opens (no param) keep stay+Saved toast.
 - LearnPage: supports ?slide= deep link — jumps current index to that slide on load.
 - Verified via screenshot e2e round trip: learn slide 4 → Edit slide → Save → back on learn at 4/118 with toast.
+
+## 2026-08-12 (session 10o) — Course progress memory (resume across devices)
+- Enrollment.last_slide_index (migration 9c0d1e2f3a4b). POST /api/courses/{id}/progress {slide_index} clamps to slide count, stores index, bumps enrollment.progress = max(existing, (idx+1)/total*100) unless COMPLETED. /enroll responses now include last_slide_index.
+- LearnPage: enroll response resume → setCurrent + 'Resumed where you left off' toast (skipped when ?slide= deep link present); slide changes saved with 600ms debounce (fire-and-forget).
+- Note: BaseModel import needed adding to routers/courses.py (was missing → startup NameError, fixed).
+- Verified: two fresh browser contexts e2e — device 1 navigates to slide 8, device 2 logs in and resumes at 8/118. Backend healthy, tsc clean.
