@@ -197,3 +197,7 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - 'Bug': user in learner view expecting picture tools — tools were fine in editor. Fix: staff-only 'Edit course' button (learn-edit-course-btn) in LearnPage header → /courses/{id}/edit.
 - Verified: iteration_59.json — 4/4 pass (button admin-only, editor tools work on imported IMAGE slides, learner hidden, friendly-404 regression). Prior context: prod data loss RCA (redeploy replaces prod disk/DB; workspace = source of truth; user OK, demo data only; persistent DB is go-live requirement).
 - 10k addendum: Edit course button restyled bold solid indigo (user found tools; wanted bolder button). Screenshot verified.
+
+## 2026-08-12 (session 10l) — Video autoplay on slide landing
+- LearnPage: direct video files (mp4/webm/ogg/mov or /api/uploads paths) now render via AutoPlayVideo component (native <video> controls) — tries unmuted play(), falls back to muted if browser blocks; embeds keep iframe with allow=autoplay. serve_upload (iter5.py) mime map extended (mp4/webm/mov/m4v/ogg/mp3/wav/m4a/pdf/gif — was images-only, webm previously served as octet-stream).
+- Verified: screenshot e2e — webm slide (58B Jogging) autoplays UNMUTED at t=3.76s. mp4 didn't decode in headless chromium (missing H.264 codec, test-env only — real Chrome fine, muted fallback engaged correctly).

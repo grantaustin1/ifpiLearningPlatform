@@ -131,7 +131,11 @@ def serve_upload(path: str):
         raise HTTPException(status_code=404, detail=str(e))
     suffix = Path(path).suffix.lower()
     mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-            ".webp": "image/webp", ".svg": "image/svg+xml"}.get(suffix, "application/octet-stream")
+            ".webp": "image/webp", ".svg": "image/svg+xml", ".gif": "image/gif",
+            ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+            ".m4v": "video/x-m4v", ".ogg": "video/ogg",
+            ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4",
+            ".pdf": "application/pdf"}.get(suffix, "application/octet-stream")
     return Response(
         content=content, media_type=mime,
         headers={"Cache-Control": "public, max-age=3600"},
