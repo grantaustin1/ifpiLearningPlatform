@@ -201,3 +201,7 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 ## 2026-08-12 (session 10l) — Video autoplay on slide landing
 - LearnPage: direct video files (mp4/webm/ogg/mov or /api/uploads paths) now render via AutoPlayVideo component (native <video> controls) — tries unmuted play(), falls back to muted if browser blocks; embeds keep iframe with allow=autoplay. serve_upload (iter5.py) mime map extended (mp4/webm/mov/m4v/ogg/mp3/wav/m4a/pdf/gif — was images-only, webm previously served as octet-stream).
 - Verified: screenshot e2e — webm slide (58B Jogging) autoplays UNMUTED at t=3.76s. mp4 didn't decode in headless chromium (missing H.264 codec, test-env only — real Chrome fine, muted fallback engaged correctly).
+
+## 2026-08-12 (session 10m) — Per-slide Edit shortcut
+- LearnPage: staff-only 'Edit slide' button (learn-edit-slide-btn) next to slide title → /courses/{id}/edit?slide={slideId}. CourseEditPage reads ?slide= param, selects that slide and scrolls its rail row into view.
+- Verified via screenshot e2e: slide 100 of course 243 → editor opens with '100. 58B Jogging' active + in view. Note: user has PUBLISHED course 243 themselves.

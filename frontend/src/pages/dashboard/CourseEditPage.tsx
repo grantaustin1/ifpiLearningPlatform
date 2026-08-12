@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 export default function CourseEditPage() {
   const { id } = useParams()
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const [course, setCourse] = useState<any>(null)
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
@@ -45,7 +46,10 @@ export default function CourseEditPage() {
     ])
     setCourse(r.data)
     setSlides(r.data.slides || [])
-    setActive(r.data.slides?.[0]?.id ?? null)
+    const wanted = Number(searchParams.get('slide'))
+    const found = wanted && r.data.slides?.some((s: any) => s.id === wanted)
+    setActive(found ? wanted : (r.data.slides?.[0]?.id ?? null))
+    if (found) setTimeout(() => document.querySelector(`[data-testid="slide-row-${wanted}"]`)?.scrollIntoView({ block: 'center' }), 300)
     setPrereqs(p.data)
     setAllCourses(all.data)
   }

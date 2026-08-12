@@ -142,7 +142,16 @@ export default function LearnPage() {
         <div className="flex-1 overflow-y-auto">
           {slide ? (
             <div className="max-w-3xl mx-auto px-6 py-10" data-testid="learn-slide-content">
-              <h1 className="text-2xl font-bold text-slate-900 mb-6 font-display">{slide.title}</h1>
+              <div className="flex items-start gap-3 mb-6">
+                <h1 className="text-2xl font-bold text-slate-900 font-display flex-1">{slide.title}</h1>
+                {isStaff && (
+                  <button onClick={() => nav(`/courses/${courseId}/edit?slide=${slide.id}`)} data-testid="learn-edit-slide-btn"
+                    title="Edit this slide — change its text, picture or layout"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg px-3 py-1.5 flex-shrink-0 transition-colors">
+                    <Pencil className="h-3.5 w-3.5" /> Edit slide
+                  </button>
+                )}
+              </div>
               {slide.slide_type === 'VIDEO' && slide.media_url && (
                 /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(slide.media_url) || slide.media_url.startsWith('/api/uploads')
                   ? <AutoPlayVideo src={slide.media_url} />
