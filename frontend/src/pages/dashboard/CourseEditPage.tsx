@@ -80,7 +80,16 @@ export default function CourseEditPage() {
         })
         setSlides(prev => prev.map(x => x.id === s.id ? created.data : x))
       }
-      setSavedAt(new Date()); toast.success('Saved')
+      setSavedAt(new Date())
+      if (searchParams.get('slide')) {
+        // Came from the course view via "Edit slide" — jump straight back
+        // to the same slide so the change is visible immediately.
+        toast.success('Saved — taking you back to the slide')
+        const backSlide = active && active > 0 ? `?slide=${active}` : ''
+        nav(`/learn/${id}${backSlide}`)
+      } else {
+        toast.success('Saved')
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Save failed')
     } finally { setSaving(false) }
