@@ -179,3 +179,10 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - CourseEditPage: Upload button (slide-image-upload-btn) next to Media URL on IMAGE slides → POST /api/uploads/image (5MB cap, client-checked) fills media_url; live preview (slide-image-preview) below. data-testid slide-media-url added to URL input.
 - Admin manual §5.2 step 3 documents slide pictures (URL / Upload / AI visual, swap, remove).
 - Verified: UI screenshot flow — IMAGE chip reveals Upload, file upload sets URL + toast + preview; tsc clean. Course 224 left unchanged (not saved).
+
+## 2026-08-12 (session 10i) — Slide image position + bulk photo upload
+- CourseSlide.image_position (above|beside|behind, default above; migration 8b9c0d1e2f3a). SlideIn/SlideOut + all 3 SlideOut constructions + add/update_slide persist it (invalid values → keep/above).
+- Editor: 'Picture position' chips under image preview (image-position-{above,beside,behind}); save() sends field. 'Add Photo Slides' bulk button (add-photo-slides-btn/input, multi-file) — uploads each, creates local IMAGE slide titled from filename, Save persists.
+- Learner: LearnPage ImageSlideLayout renders 3 layouts (image-layout-above/beside/behind; behind = cover img + slate-900/60 overlay + prose-invert).
+- BONUS FIX from testing-agent finding: POST /courses/{id}/enroll 500 (UNIQUE constraint) on concurrent double-enroll — now idempotent (IntegrityError → rollback → already:true). Verified with parallel curl.
+- Tested: iteration_58.json — backend 5/5 pytest + full Playwright e2e 100% (picker persistence, bulk 3-photo, all 3 learner layouts, regression /learn/224, cleanup). Admin manual §5.2 updated (steps 4-5).

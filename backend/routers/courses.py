@@ -125,6 +125,7 @@ def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
             slide_type=s.slide_type.value, media_url=s.media_url,
             order_index=s.order_index, is_required=s.is_required,
             narration_url=s.narration_url, narration_voice=s.narration_voice,
+            image_position=s.image_position or "above",
         ) for s in c.slides],
     )
 
@@ -494,6 +495,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         slide_type=SlideType(body.slide_type) if body.slide_type in SlideType.__members__ else SlideType.TEXT,
         media_url=body.media_url, order_index=body.order_index or next_order,
         is_required=body.is_required,
+        image_position=body.image_position if body.image_position in ("above", "beside", "behind") else "above",
     )
     db.add(s)
     db.commit()
@@ -503,6 +505,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
+        image_position=s.image_position or "above",
     )
 
 
@@ -553,6 +556,8 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
     s.title = body.title
     s.content = body.content or ""
     s.media_url = body.media_url
+    if body.image_position in ("above", "beside", "behind"):
+        s.image_position = body.image_position
     if body.slide_type in SlideType.__members__:
         s.slide_type = SlideType(body.slide_type)
     if body.order_index is not None:
@@ -565,6 +570,7 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
+        image_position=s.image_position or "above",
     )
 
 
@@ -699,9 +705,18 @@ def enroll(course_id: int, db: Session = Depends(get_db),
     ).first()
     if existing:
         return {"ok": True, "enrollment_id": existing.id, "already": True}
+    from sqlalchemy.exc import IntegrityError
     e = Enrollment(user_id=current.id, course_id=course_id)
     db.add(e)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Race: a concurrent request enrolled first — behave idempotently.
+        db.rollback()
+        existing = db.query(Enrollment).filter(
+            Enrollment.user_id == current.id, Enrollment.course_id == course_id,
+        ).first()
+        return {"ok": True, "enrollment_id": existing.id if existing else None, "already": True}
     gam = GamificationService(db)
     gam.award_xp(current.id, XP_FIRST_ENROLLMENT)
     enroll_count = db.query(Enrollment).filter(Enrollment.user_id == current.id).count()

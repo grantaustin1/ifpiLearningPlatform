@@ -147,7 +147,15 @@ disappears at 100%.
    appears below. To **swap** a picture, upload/paste a new one; to
    **remove** it, clear the Media URL box. You can also type a description
    into the AI visual box on any slide to generate and attach an image.
-4. Drag slides in the left rail to reorder. Click **Save** often — every
+4. **Picture position:** once an image slide has a picture, a **Picture
+   position** picker appears under the preview — choose **Above text**
+   (classic), **Beside text** (photo and text side by side) or **Behind
+   text** (full-width photo with your text overlaid on a dark tint).
+5. **Add many photos at once:** click **Add Photo Slides** at the bottom of
+   the slide rail and select several photos together — each becomes its own
+   image slide, titled after its filename (e.g. `gym-floor.jpg` → "gym
+   floor"). Retitle or reorder them as usual, then **Save**.
+6. Drag slides in the left rail to reorder. Click **Save** often — every
    save creates a version snapshot.
 
 <img src="/app/docs/screenshots/guide/a_course_edit.jpg" width="440">
