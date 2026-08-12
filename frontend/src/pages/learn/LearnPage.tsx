@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { safeHtml } from 'lib/sanitize'
@@ -143,7 +143,11 @@ export default function LearnPage() {
           {slide ? (
             <div className="max-w-3xl mx-auto px-6 py-10" data-testid="learn-slide-content">
               <h1 className="text-2xl font-bold text-slate-900 mb-6 font-display">{slide.title}</h1>
-              {slide.slide_type === 'VIDEO' && slide.media_url && <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allowFullScreen title="video" /></div>}
+              {slide.slide_type === 'VIDEO' && slide.media_url && (
+                /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(slide.media_url) || slide.media_url.startsWith('/api/uploads')
+                  ? <AutoPlayVideo src={slide.media_url} />
+                  : <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title="video" /></div>
+              )}
               {slide.slide_type === 'IMAGE' && slide.media_url ? (
                 <ImageSlideLayout slide={slide} html={slide.content ? safeHtml(slide.content) : ''} />
               ) : (
@@ -271,6 +275,26 @@ function ImageSlideLayout({ slide, html }: { slide: any; html: string }) {
     <div className="mb-6" data-testid="image-layout-above">
       <img src={slide.media_url} alt="" className="rounded-xl w-full" data-testid="learn-slide-image" />
       {body && <div className="mt-6">{body}</div>}
+    </div>
+  )
+}
+
+function AutoPlayVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const v = ref.current
+    if (!v) return
+    v.muted = false
+    v.play().catch(() => {
+      // Browser blocked unmuted autoplay — start muted so it still plays.
+      v.muted = true
+      v.play().catch(() => { /* user can press play */ })
+    })
+  }, [src])
+  return (
+    <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video">
+      <video ref={ref} src={src} controls playsInline preload="auto"
+        className="w-full h-full" data-testid="learn-slide-video" />
     </div>
   )
 }
