@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { safeHtml } from 'lib/sanitize'
 import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star, Pencil } from 'lucide-react'
@@ -11,6 +11,7 @@ import { useAuth } from 'contexts/AuthContext'
 export default function LearnPage() {
   const { courseId } = useParams()
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const { hasRole } = useAuth()
   const isStaff = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
   const [course, setCourse] = useState<any>(null)
@@ -32,6 +33,11 @@ export default function LearnPage() {
       try {
         const r = await api.get(`/courses/${courseId}`)
         setCourse(r.data)
+        const wanted = Number(searchParams.get('slide'))
+        if (wanted) {
+          const idx = (r.data.slides || []).findIndex((s: any) => s.id === wanted)
+          if (idx >= 0) setCurrent(idx)
+        }
       } catch {
         setLoadError(true)
       }

@@ -205,3 +205,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 ## 2026-08-12 (session 10m) — Per-slide Edit shortcut
 - LearnPage: staff-only 'Edit slide' button (learn-edit-slide-btn) next to slide title → /courses/{id}/edit?slide={slideId}. CourseEditPage reads ?slide= param, selects that slide and scrolls its rail row into view.
 - Verified via screenshot e2e: slide 100 of course 243 → editor opens with '100. 58B Jogging' active + in view. Note: user has PUBLISHED course 243 themselves.
+
+## 2026-08-12 (session 10n) — Return-to-slide after save
+- CourseEditPage save(): when opened via ?slide= (from 'Edit slide'), after save navs back to /learn/{id}?slide={activeId} with toast 'Saved — taking you back to the slide'. Normal editor opens (no param) keep stay+Saved toast.
+- LearnPage: supports ?slide= deep link — jumps current index to that slide on load.
+- Verified via screenshot e2e round trip: learn slide 4 → Edit slide → Save → back on learn at 4/118 with toast.
