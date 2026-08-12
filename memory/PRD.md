@@ -174,3 +174,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Cleaned TEST_Iter47/48 course debris from UAT org (scripts/cleanup_test_debris.py); restored 225/226 to PUBLISHED.
 - Admin manual: new §5.6 Archiving (delete renumbered 5.7) + troubleshooting row.
 - Verified: curl (409 busy w/ message, archive/unarchive/republish 200s, learner list hides archived), UI screenshots (busy toast, archive→hidden, show-archived, restore toast), tsc + webpack clean.
+
+## 2026-08-12 (session 10h) — Slide image upload
+- CourseEditPage: Upload button (slide-image-upload-btn) next to Media URL on IMAGE slides → POST /api/uploads/image (5MB cap, client-checked) fills media_url; live preview (slide-image-preview) below. data-testid slide-media-url added to URL input.
+- Admin manual §5.2 step 3 documents slide pictures (URL / Upload / AI visual, swap, remove).
+- Verified: UI screenshot flow — IMAGE chip reveals Upload, file upload sets URL + toast + preview; tsc clean. Course 224 left unchanged (not saved).

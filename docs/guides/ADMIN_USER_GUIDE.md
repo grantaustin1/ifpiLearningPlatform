@@ -141,7 +141,13 @@ disappears at 100%.
 2. Click **Add slide**, give it a title, write rich-text content. Repeat.
    Slides can also carry **video**, **image**, **audio**, **PDF** or
    **SCORM** media.
-3. Drag slides in the left rail to reorder. Click **Save** often — every
+3. **Pictures on slides:** click the **IMAGE** type chip on a slide and
+   either paste an image URL into the **Media URL** box or click **Upload**
+   next to it to use a photo from your computer (max 5MB) — a preview
+   appears below. To **swap** a picture, upload/paste a new one; to
+   **remove** it, clear the Media URL box. You can also type a description
+   into the AI visual box on any slide to generate and attach an image.
+4. Drag slides in the left rail to reorder. Click **Save** often — every
    save creates a version snapshot.
 
 <img src="/app/docs/screenshots/guide/a_course_edit.jpg" width="440">

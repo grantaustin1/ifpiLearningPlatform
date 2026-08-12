@@ -18,9 +18,11 @@ export default function CourseEditPage() {
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingSlideImg, setUploadingSlideImg] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [gallery, setGallery] = useState<any[]>([])
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const slideImgInputRef = useRef<HTMLInputElement>(null)
 
   const openGallery = async () => {
     setShowGallery(true)
@@ -236,9 +238,40 @@ export default function CourseEditPage() {
                 placeholder={activeSlide.slide_type === 'TEXT' ? 'HTML content (e.g. <h2>Title</h2><p>Body…</p>)' : 'Description text'}
                 className="w-full border border-slate-200 rounded-xl p-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               {activeSlide.slide_type !== 'TEXT' && (
-                <input value={activeSlide.media_url || ''} onChange={e => update(activeSlide.id, { media_url: e.target.value })}
-                  placeholder="Media URL (video, audio, image, PDF)"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                <div className="flex gap-2">
+                  <input value={activeSlide.media_url || ''} onChange={e => update(activeSlide.id, { media_url: e.target.value })}
+                    placeholder="Media URL (video, audio, image, PDF)" data-testid="slide-media-url"
+                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  {activeSlide.slide_type === 'IMAGE' && (
+                    <>
+                      <button onClick={() => slideImgInputRef.current?.click()} disabled={uploadingSlideImg}
+                        data-testid="slide-image-upload-btn" title="Upload a picture from your computer (max 5MB)"
+                        className="inline-flex items-center gap-1.5 text-sm border border-slate-200 hover:border-slate-300 rounded-xl px-4 py-2.5 font-medium disabled:opacity-50">
+                        <Upload className="h-4 w-4" /> {uploadingSlideImg ? 'Uploading…' : 'Upload'}
+                      </button>
+                      <input ref={slideImgInputRef} type="file" accept="image/*" className="hidden"
+                        data-testid="slide-image-upload-input"
+                        onChange={async e => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          if (f.size > 5 * 1024 * 1024) { toast.error('Image too large (max 5MB)'); e.target.value = ''; return }
+                          setUploadingSlideImg(true)
+                          try {
+                            const fd = new FormData()
+                            fd.append('file', f)
+                            const r = await api.post('/uploads/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                            update(activeSlide.id, { media_url: r.data.url })
+                            toast.success('Picture uploaded — remember to Save')
+                          } catch (err: any) { toast.error(err?.response?.data?.error?.message || err?.response?.data?.detail || 'Upload failed') }
+                          finally { setUploadingSlideImg(false); e.target.value = '' }
+                        }} />
+                    </>
+                  )}
+                </div>
+              )}
+              {activeSlide.slide_type === 'IMAGE' && activeSlide.media_url && (
+                <img src={activeSlide.media_url} alt="Slide preview" data-testid="slide-image-preview"
+                  className="max-h-48 rounded-xl border border-slate-200 object-contain" />
               )}
               <NarrationEditor slide={activeSlide} onUpdated={load} />
               <VisualEditor slide={activeSlide} onUpdated={load} />
