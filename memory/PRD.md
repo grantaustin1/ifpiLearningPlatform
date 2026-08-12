@@ -149,3 +149,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - defusedxml added to requirements.txt (pip freeze). Docs regenerated (build_docs.py) for /api/feedback/screenshot route.
 - SKIPPED by user-approved plan: 275/86/106 complexity-long-function refactors, 72 hook deps, 18 index-keys, TS coverage, file splitting (cosmetic, high regression risk pre staff-deploy).
 - Verified: pytest 47 passed (debris cleanup, docs library, feedback, iter22 auth, docs completeness), backend healthy, XXE functional test pass.
+
+## 2026-08-12 (session 10d) — User manuals v4.0 (comprehensive rewrite)
+- Rewrote /app/docs/guides/ADMIN_USER_GUIDE.md + STUDENT_USER_GUIDE.md to v4.0: added Welcome Tour, exam gate, Attempts left + admin Reset attempts flow (w/ email), Question insights (miss-rate bars, distractor stats, TOP DISTRACTOR, author-alerted chip, re-arm on edit, Export CSV, in-place question edit), learner transcript PDF (My Certificates → Download PDF / Printable transcript), feedback screenshots (attach/paste, admin thumbnails), certificate share preview images; expanded troubleshooting tables. All button names verified against actual frontend code.
+- PDFs auto-rebuilt via services/guide_builder ensure_fresh on download. Verified: both endpoints 200 (admin 12pp/42KB, student 7pp/22KB), pypdf text checks confirm all v4 content, test_public_guides.py 5/5 pass.
+- Download URLs (anonymous): {BASE}/api/public/guides/IFPI_Admin_User_Guide.pdf and /IFPI_Student_User_Guide.pdf; also via sidebar Help & guides.
