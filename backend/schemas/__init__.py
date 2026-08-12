@@ -152,6 +152,7 @@ class CourseSummary(BaseModel):
     enrollment_count: int = 0
     created_at: datetime
     mindmap_thumbnail_svg: Optional[str] = None  # Iter 30b
+    created_by_id: Optional[int] = None
 
 
 class CourseDetail(CourseSummary):

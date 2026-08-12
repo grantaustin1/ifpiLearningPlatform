@@ -173,6 +173,24 @@ regenerate. Learners get a play button on the slide.
 - Click **Publish** when ready; **Unpublish** hides it again without losing
   learner progress. **PPTX download** exports the course as PowerPoint.
 
+### 5.6 Deleting a course permanently
+On the **Courses** screen every course card has a small **bin button** next
+to Duplicate. Deleting is deliberately strict:
+
+1. **Unpublish first.** A published course cannot be deleted — the bin is
+   greyed out and clicking it reminds you to open **Edit → Unpublish**.
+   (Prefer Unpublish alone whenever you might want the course back: it hides
+   the course without destroying anything.)
+2. Click the **bin button** on the now-draft course. A confirmation dialog
+   warns that deletion is **permanent**: all slides, flashcards, ratings and
+   learner progress for the course are removed. Certificates already earned
+   **stay valid**.
+3. Click **Delete permanently** to confirm, or **Cancel**.
+
+> ⚠️ Only the **course owner** (the account that created it) or a **super
+> admin** can delete a course — other admins won't see the bin button on
+> that card. Every deletion is recorded in the Audit log.
+
 ---
 
 ## 6. Creating a Course with the AI Builder
@@ -523,6 +541,7 @@ Upload reference documents; the dashboard tile tracks engagement.
 |---|---|
 | Invitation email never arrived | 1) Email diagnostics → transport (STUB?) 2) spam folder 3) copy the invite link from Users |
 | Learner can't see a course | 1) PUBLISHED? 2) Entitlements lookup 3) prerequisite incomplete? |
+| Can't delete a course / no bin button | 1) Unpublish it first (Edit → Unpublish) 2) only the course owner or a super admin sees the bin button |
 | Learner can't start the exam | The exam gate: every slide must be completed first — check their progress in Reports |
 | Learner ran out of exam attempts | Exams → open the exam → Learners tab → **Reset attempts** (they're emailed automatically) |
 | Learner can't log in | 1) correct URL? 2) Forgot password 3) account active in Users? |
