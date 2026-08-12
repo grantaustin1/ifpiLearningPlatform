@@ -83,7 +83,6 @@ class Settings(BaseSettings):
         """Test-only affordances (X-Return-Token, X-Test-Client-Ip,
         /_test endpoints). Requires the explicit opt-in env var AND a
         non-production environment — double-locked for deploys."""
-        import os
         return (os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() == "true"
                 and not self.is_production)
 

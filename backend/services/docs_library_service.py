@@ -23,6 +23,7 @@ import hashlib
 import io
 import logging
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -30,7 +31,7 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger("ifpi.docs_library")
 
 DOCS_ROOT = Path("/app/docs")
-CACHE_DIR = Path("/tmp/ifpi_docs_cache")
+CACHE_DIR = Path(tempfile.gettempdir()) / "ifpi_docs_cache"
 CACHE_TTL_SECS = 3600  # 1 hour
 
 

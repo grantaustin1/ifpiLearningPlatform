@@ -85,7 +85,6 @@ def embed_widget(organization: Optional[str] = None,
       <script src="https://learn.ifpi.org/api/leads/embed.js?organization=ifpi-main"
               data-redirect="https://yoursite.com/thanks"></script>
     """
-    api_base = "/api/leads"
     js = f"""
 (function() {{
   if (window.__IFPILeadEmbed) return;
