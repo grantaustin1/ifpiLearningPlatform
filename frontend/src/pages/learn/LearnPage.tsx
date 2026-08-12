@@ -108,11 +108,16 @@ export default function LearnPage() {
             <div className="max-w-3xl mx-auto px-6 py-10" data-testid="learn-slide-content">
               <h1 className="text-2xl font-bold text-slate-900 mb-6 font-display">{slide.title}</h1>
               {slide.slide_type === 'VIDEO' && slide.media_url && <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allowFullScreen title="video" /></div>}
-              {slide.slide_type === 'IMAGE' && slide.media_url && <img src={slide.media_url} alt="" className="mb-6 rounded-xl w-full" />}
-              {slide.slide_type === 'AUDIO' && slide.media_url && <audio src={slide.media_url} controls className="w-full mb-6" />}
-              {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
-              {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
-              {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: safeHtml(slide.content) }} />}
+              {slide.slide_type === 'IMAGE' && slide.media_url ? (
+                <ImageSlideLayout slide={slide} html={slide.content ? safeHtml(slide.content) : ''} />
+              ) : (
+                <>
+                  {slide.slide_type === 'AUDIO' && slide.media_url && <audio src={slide.media_url} controls className="w-full mb-6" />}
+                  {slide.slide_type === 'PDF' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200" title="pdf" />}
+                  {slide.slide_type === 'SCORM' && slide.media_url && <iframe src={slide.media_url} className="w-full h-[80vh] mb-6 rounded-xl border border-slate-200 bg-white" title="scorm" allow="autoplay; fullscreen" data-testid="scorm-iframe" />}
+                  {slide.content && <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: safeHtml(slide.content) }} />}
+                </>
+              )}
               {slide.narration_url && (
                 <div className="mt-6 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center gap-3" data-testid="learn-slide-narration">
                   <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
@@ -200,6 +205,36 @@ export default function LearnPage() {
         )}
       </div>
       <AITutorPanel courseId={course.id} />
+    </div>
+  )
+}
+
+function ImageSlideLayout({ slide, html }: { slide: any; html: string }) {
+  const pos = slide.image_position || 'above'
+  const body = html
+    ? <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
+    : null
+  if (pos === 'beside') return (
+    <div className="grid md:grid-cols-2 gap-6 items-start mb-6" data-testid="image-layout-beside">
+      <img src={slide.media_url} alt="" className="rounded-xl w-full" data-testid="learn-slide-image" />
+      {body}
+    </div>
+  )
+  if (pos === 'behind') return (
+    <div className="relative rounded-xl overflow-hidden mb-6" data-testid="image-layout-behind">
+      <img src={slide.media_url} alt="" className="absolute inset-0 w-full h-full object-cover" data-testid="learn-slide-image" />
+      <div className="absolute inset-0 bg-slate-900/60" />
+      <div className="relative p-8 min-h-[320px] flex items-center">
+        {html
+          ? <div className="prose prose-invert max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
+          : <span />}
+      </div>
+    </div>
+  )
+  return (
+    <div className="mb-6" data-testid="image-layout-above">
+      <img src={slide.media_url} alt="" className="rounded-xl w-full" data-testid="learn-slide-image" />
+      {body && <div className="mt-6">{body}</div>}
     </div>
   )
 }

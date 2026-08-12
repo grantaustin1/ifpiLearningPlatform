@@ -100,6 +100,7 @@ class SlideIn(BaseModel):
     content: Optional[str] = ""
     slide_type: str = "TEXT"
     media_url: Optional[str] = None
+    image_position: Optional[str] = "above"  # above | beside | behind
     order_index: Optional[int] = None
     is_required: bool = True
 
