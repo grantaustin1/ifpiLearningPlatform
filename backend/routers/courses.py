@@ -378,6 +378,55 @@ def publish_course(course_id: int, db: Session = Depends(get_db),
     return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
 
 
+@router.post("/{course_id}/archive")
+def archive_course(course_id: int, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Safe alternative to deletion — hides the course from learners and the
+    catalog, keeps everything restorable. Blocked while learners are busy."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if c.status == CourseStatus.ARCHIVED:
+        return {"ok": True, "status": c.status.value, "course_id": c.id}
+    busy = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.status == EnrollmentStatus.IN_PROGRESS,
+    ).count()
+    if busy:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{busy} learner{'s are' if busy != 1 else ' is'} still busy with this course")
+    c.status = CourseStatus.ARCHIVED
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_ARCHIVED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
+    db.commit()
+    return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
+
+
+@router.post("/{course_id}/unarchive")
+def unarchive_course(course_id: int, db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Restore an archived course back to DRAFT (re-publish separately)."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if c.status != CourseStatus.ARCHIVED:
+        raise HTTPException(status_code=409, detail="Course is not archived")
+    c.status = CourseStatus.DRAFT
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_UNARCHIVED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
+    db.commit()
+    return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
+
+
 @router.post("/{course_id}/unpublish")
 def unpublish_course(course_id: int, db: Session = Depends(get_db),
                      current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "ADMIN", "SUPER_ADMIN"))):

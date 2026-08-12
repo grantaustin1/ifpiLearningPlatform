@@ -173,7 +173,23 @@ regenerate. Learners get a play button on the slide.
 - Click **Publish** when ready; **Unpublish** hides it again without losing
   learner progress. **PPTX download** exports the course as PowerPoint.
 
-### 5.6 Deleting a course permanently
+### 5.6 Archiving a course (the safe way to retire it)
+When a course has run its last intake, **archive it** instead of deleting:
+
+1. On the **Courses** screen click the **archive button** (box icon) on the
+   course card. No confirmation needed — archiving destroys nothing.
+2. The course disappears from learners, the catalog and your default course
+   grid. All slides, ratings and learner history are kept.
+3. To see archived courses again, click **Show archived** next to the search
+   box. Each archived card has a **restore button** that returns the course
+   to DRAFT — publish it again whenever you like.
+
+> ⚠️ **You cannot archive a course learners are still working through.**
+> If anyone has an in-progress enrolment you'll see a message like
+> *"3 learners are still busy with this course"* — wait for them to finish
+> (or check **Reports** to see who they are) and try again.
+
+### 5.7 Deleting a course permanently
 On the **Courses** screen every course card has a small **bin button** next
 to Duplicate. Deleting is deliberately strict:
 
@@ -541,7 +557,8 @@ Upload reference documents; the dashboard tile tracks engagement.
 |---|---|
 | Invitation email never arrived | 1) Email diagnostics → transport (STUB?) 2) spam folder 3) copy the invite link from Users |
 | Learner can't see a course | 1) PUBLISHED? 2) Entitlements lookup 3) prerequisite incomplete? |
-| Can't delete a course / no bin button | 1) Unpublish it first (Edit → Unpublish) 2) only the course owner or a super admin sees the bin button |
+| Can't delete a course / no bin button | 1) Unpublish it first (Edit → Unpublish) 2) only the course owner or a super admin sees the bin button 3) prefer Archive — it's reversible |
+| Can't archive — "learners are still busy" | learners have in-progress enrolments; check Reports for who, let them finish, then archive |
 | Learner can't start the exam | The exam gate: every slide must be completed first — check their progress in Reports |
 | Learner ran out of exam attempts | Exams → open the exam → Learners tab → **Reset attempts** (they're emailed automatically) |
 | Learner can't log in | 1) correct URL? 2) Forgot password 3) account active in Users? |
