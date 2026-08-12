@@ -129,3 +129,11 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - deployment_agent run 1: BLOCKER — .gitignore blocked .env files required for deployment. FIXED: removed '.env', '.env.*', '*.env' from /app/.gitignore (backend/.env + frontend/.env now committable); added memory/test_credentials.md to .gitignore (note: file already tracked in earlier history).
 - deployment_agent run 2: PASS with one WARN (unused [program:mongodb] in supervisord.conf — platform-managed infra, intentionally untouched, non-blocking).
 - Pre-deploy switches for the user (documented, not changed): backend/.env ALLOW_TEST_TOKEN_HEADER=true is a TEST bypass → set false for production; PUBLIC_BASE_URL points at the preview URL → update to the deployed URL after deploy (affects cert share links/og-images); SQLite + ./uploads rely on persistent disk (Emergent deploy persists data per support).
+
+## 2026-08-12 (session 10) — Pre-deploy safety pass (staff-testing deploy prep)
+- User goal clarified: deploy a stable copy for a staff member to test, keep iterating in Emergent chat, push fixes via Update Deployment.
+- backend/.env: ALLOW_TEST_TOKEN_HEADER=false (test bypass OFF everywhere, incl. future deploy); added AUTH_COOKIE_SECURE=true (auth cookies HTTPS-only). AUTH_COOKIE_MODE stays dual so login body still returns tokens (testing agent + legacy pytest unaffected).
+- Code: settings.test_bypass_enabled (core/config.py) double-lock — env var AND non-production ENVIRONMENT — applied at all 5 bypass sites (routers/auth.py x2, core/middleware.py, routers/marketplace_analytics.py, routers/public_catalog.py).
+- Verified: curl login OK (token in body, Secure/HttpOnly cookies), /_test/reset-rate-limit → 404, browser login → learner dashboard OK, pytest test_iteration22 + test_iteration32_sprint: 30 passed.
+- README: new 'Deploying a staff-testing copy' section; env table updated. Details/runbook: /app/memory/deploy_notes.md.
+- PENDING (post-deploy): user clicks Deploy → pastes live URL → set PUBLIC_BASE_URL to it → Update Deployment. To run legacy rate-limit pytest files, temporarily flip ALLOW_TEST_TOKEN_HEADER=true + restart backend.

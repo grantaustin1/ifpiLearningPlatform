@@ -66,8 +66,8 @@ def _client_ip(request: Request) -> str:
     production), an explicit `X-Test-Client-Ip` header overrides the
     resolved IP so parallel CI workers can pin their own rate-limit
     buckets and stop sharing the K8s ingress's single upstream IP."""
-    import os as _os
-    if _os.environ.get("ALLOW_TEST_TOKEN_HEADER") == "true":
+    from core.config import settings as _settings
+    if _settings.test_bypass_enabled:
         test_ip = request.headers.get("x-test-client-ip") or ""
         if test_ip.strip():
             return test_ip.strip()

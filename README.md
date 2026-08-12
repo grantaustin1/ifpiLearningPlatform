@@ -44,7 +44,8 @@ All API routes are prefixed with `/api`.
 | `SSO_ENABLED` | `true` | Enables the ERP360 SSO exchange endpoint. |
 | `ERP360_SSO_SHARED_SECRET` | shared HS256 secret | Verifies ERP360-minted SSO JWTs (same value on both sides). |
 | `IFPI_WEBHOOK_OUTBOUND_SECRET` | any random string | Signs outbound ERP360 webhooks / inbound sync verification. |
-| `ALLOW_TEST_TOKEN_HEADER` | `true` (dev/test **only**) | Enables `X-Return-Token` + `X-Test-Client-Ip` test bypasses used by the pytest suite. **Must be absent/false in production.** |
+| `ALLOW_TEST_TOKEN_HEADER` | `false` | Enables `X-Return-Token` + `X-Test-Client-Ip` test bypasses used by the legacy pytest suite. Double-locked in code: also requires `ENVIRONMENT != production`. Ships `false` — flip to `true` only when running the rate-limit pytest files locally. |
+| `AUTH_COOKIE_SECURE` | `true` | `Secure` flag on auth cookies (HTTPS-only). Preview and deploys are HTTPS, keep `true`. |
 
 Optional: `TAVILY_API_KEY` (deep research), `REDIS_URL` (shared rate limiting),
 `PUBLIC_BASE_URL` (links in emails/cert verify), `SENTRY_DSN`, `DB_POOL_SIZE` etc.
@@ -73,6 +74,22 @@ export IFPI_WEBHOOK_OUTBOUND_SECRET=<same as backend/.env>
 export ERP360_SSO_SHARED_SECRET=<same as backend/.env>
 python -m pytest tests/ -q
 ```
+
+## Deploying a staff-testing copy (Emergent)
+
+1. Click **Deploy** in the Emergent chat — you get a stable live URL
+   (`https://<app>.emergent.host`) after ~10-15 min.
+2. Give staff the live URL + the UAT logins from `memory/test_credentials.md`.
+3. After the first deploy, update `PUBLIC_BASE_URL` in `backend/.env` to the
+   live URL (fixes OG share images / sitemap / email links) and click
+   **Update Deployment**.
+4. Iterate: make changes in the Emergent chat, verify in preview, then
+   **Update Deployment** to push fixes to the same live link.
+
+Note: the deployed copy ships with the committed SQLite snapshot — data staff
+enter on the live copy is reset on each redeploy (fine for testing). Before
+real learners: Postgres, S3 storage, real SMTP, `AUTH_COOKIE_MODE=on`, rotated
+secrets — run `python backend/scripts/deploy_precheck.py` for the checklist.
 
 ## Docs
 
