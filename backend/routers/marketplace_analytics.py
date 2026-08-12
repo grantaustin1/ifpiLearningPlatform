@@ -55,8 +55,8 @@ def _viewer_key(request: Request, user_id: Optional[int]) -> str:
     # between requests. Trust `X-Forwarded-For` (first entry = real
     # client) when present; fall back to direct socket IP otherwise.
     # Iter 26 — Same test-only IP pin as the login/verify limiters.
-    import os as _os
-    if _os.environ.get("ALLOW_TEST_TOKEN_HEADER") == "true":
+    from core.config import settings as _settings
+    if _settings.test_bypass_enabled:
         test_ip = request.headers.get("x-test-client-ip") or ""
         if test_ip.strip():
             ua = request.headers.get("user-agent", "")
