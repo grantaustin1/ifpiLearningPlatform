@@ -137,3 +137,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Verified: curl login OK (token in body, Secure/HttpOnly cookies), /_test/reset-rate-limit → 404, browser login → learner dashboard OK, pytest test_iteration22 + test_iteration32_sprint: 30 passed.
 - README: new 'Deploying a staff-testing copy' section; env table updated. Details/runbook: /app/memory/deploy_notes.md.
 - PENDING (post-deploy): user clicks Deploy → pastes live URL → set PUBLIC_BASE_URL to it → Update Deployment. To run legacy rate-limit pytest files, temporarily flip ALLOW_TEST_TOKEN_HEADER=true + restart backend.
+
+## 2026-08-12 (session 10b) — Feedback screenshots + Welcome Tour
+- Feedback widget renamed 'Report an issue': attach screenshot (file picker or paste, png/jpeg/webp ≤5MB) with preview/remove. New POST /api/feedback/screenshot (any authed, stores uploads/feedback/<uuid>) + screenshot_url on POST /api/feedback (validated '/feedback/' path). tester_feedback.screenshot_url column (alembic 7a8b9c0d1e2f). Admin /feedback-admin shows clickable thumbnails.
+- WelcomeTour.tsx (components/): first-login spotlight walkthrough, once per user (localStorage ifpi_tour_done_v1_<userId>), 5 learner steps / 6 admin steps, skip/next/finish, targets scrollIntoView'd before highlight. Rendered in DashboardLayout.
+- Verified: testing agent iteration_57.json — backend 8/8, frontend 100% (tour flows both roles, persistence, widget upload, admin thumbnails, validation 400/422/401). Post-test fixes: memoized tour steps (flakiness), scrollIntoView for off-screen nav targets (verified via screenshots). Backend tests: tests/test_feedback_screenshot.py.

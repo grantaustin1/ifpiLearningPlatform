@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 import { FeedbackWidget } from 'components/FeedbackWidget'
+import { WelcomeTour } from 'components/WelcomeTour'
 
 const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
@@ -161,6 +162,7 @@ export default function DashboardLayout() {
       <main className="flex-1 overflow-y-auto bg-slate-50">
         <Outlet />
         <FeedbackWidget />
+        <WelcomeTour />
       </main>
     </div>
   )
