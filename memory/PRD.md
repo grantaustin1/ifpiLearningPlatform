@@ -154,3 +154,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Rewrote /app/docs/guides/ADMIN_USER_GUIDE.md + STUDENT_USER_GUIDE.md to v4.0: added Welcome Tour, exam gate, Attempts left + admin Reset attempts flow (w/ email), Question insights (miss-rate bars, distractor stats, TOP DISTRACTOR, author-alerted chip, re-arm on edit, Export CSV, in-place question edit), learner transcript PDF (My Certificates → Download PDF / Printable transcript), feedback screenshots (attach/paste, admin thumbnails), certificate share preview images; expanded troubleshooting tables. All button names verified against actual frontend code.
 - PDFs auto-rebuilt via services/guide_builder ensure_fresh on download. Verified: both endpoints 200 (admin 12pp/42KB, student 7pp/22KB), pypdf text checks confirm all v4 content, test_public_guides.py 5/5 pass.
 - Download URLs (anonymous): {BASE}/api/public/guides/IFPI_Admin_User_Guide.pdf and /IFPI_Student_User_Guide.pdf; also via sidebar Help & guides.
+
+## 2026-08-12 (session 10e) — Guide screenshots embedded in manuals
+- Captured 17 fresh screenshots (playwright, /tmp/capture_guide_shots.py) into /app/docs/screenshots/guide/*.jpg (1200w JPEG): login, admin dashboard/courses/editor/exams/attempts-modal/question-insights(with distractor stats + author-alerted)/users/settings/reports/feedback-inbox(with thumbnail)/admin tour, learner tour/courses/player(exam-gate banner)/certificates(transcript buttons)/feedback panel(attach screenshot).
+- guide_builder.py: img + .fig caption CSS, link_callback for absolute local image paths. Figures embedded in both guides with numbered captions (Admin 12 figs, Student 6 figs).
+- Verified: PDFs rebuild on download — Admin 17pp/778KB w/ 12 images, Student 9pp/424KB w/ 6 images; pymupdf page render confirms clean layout; test_public_guides 5/5 pass.
+- Reminder for user: click Update Deployment to push v4.0 manuals + screenshots to the live URL.
