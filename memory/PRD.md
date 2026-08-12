@@ -166,3 +166,11 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Backend delete_course guards: 403 unless SUPER_ADMIN or created_by_id==current.id; 409 if status PUBLISHED; audit_service COURSE_DELETED entry added.
 - Admin manual §5.6 'Deleting a course permanently' + troubleshooting row added (PDF auto-rebuilds).
 - Verified: curl (409 published / 200 owner draft / 403 non-owner / created_by_id in list), UI screenshot (toast + modal + card removed), audit row present, regression 48 passed (iter2/3/47/48 incl. course-delete tests).
+
+## 2026-08-12 (session 10g) — Course Archive feature
+- POST /api/courses/{id}/archive (ADMIN/SUPER_ADMIN): 409 '{n} learner(s) are still busy with this course' when IN_PROGRESS enrollments exist; else status→ARCHIVED + COURSE_ARCHIVED audit. POST /{id}/unarchive restores to DRAFT (+audit). ARCHIVED enum value pre-existed; learners/catalog auto-hide (PUBLISHED-only filters).
+- CoursesPage: archive button (box icon) on every admin card; archived cards show ARCHIVED chip + amber restore button; 'Show archived (n)' toggle next to search (archived hidden by default). Error toasts now read backend envelope error.message (was detail-only, busy message was invisible).
+- INCIDENT (repeat of session-7 lesson): batched parallel search_replace on CoursesPage.tsx corrupted it (duplicated tail + reverted line). Fixed by removing orphan block + re-applying filter edit. RULE: never parallel-edit the same file.
+- Cleaned TEST_Iter47/48 course debris from UAT org (scripts/cleanup_test_debris.py); restored 225/226 to PUBLISHED.
+- Admin manual: new §5.6 Archiving (delete renumbered 5.7) + troubleshooting row.
+- Verified: curl (409 busy w/ message, archive/unarchive/republish 200s, learner list hides archived), UI screenshots (busy toast, archive→hidden, show-archived, restore toast), tsc + webpack clean.
