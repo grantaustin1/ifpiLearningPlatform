@@ -28,8 +28,12 @@ export default function LearnPage() {
 
   useEffect(() => {
     (async () => {
+      let resumeAt = 0
       // Make sure the user is enrolled (idempotent)
-      try { await api.post(`/courses/${courseId}/enroll`) } catch { /* may already be enrolled */ }
+      try {
+        const er = await api.post(`/courses/${courseId}/enroll`)
+        resumeAt = er.data?.last_slide_index || 0
+      } catch { /* may already be enrolled */ }
       try {
         const r = await api.get(`/courses/${courseId}`)
         setCourse(r.data)
@@ -37,12 +41,25 @@ export default function LearnPage() {
         if (wanted) {
           const idx = (r.data.slides || []).findIndex((s: any) => s.id === wanted)
           if (idx >= 0) setCurrent(idx)
+        } else if (resumeAt > 0 && resumeAt < (r.data.slides || []).length) {
+          setCurrent(resumeAt)
+          toast.info('Resumed where you left off', { duration: 2500 })
         }
       } catch {
         setLoadError(true)
       }
     })()
   }, [courseId])
+
+  const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!course) return
+    if (progressTimer.current) clearTimeout(progressTimer.current)
+    progressTimer.current = setTimeout(() => {
+      api.post(`/courses/${courseId}/progress`, { slide_index: current }).catch(() => {})
+    }, 600)
+    return () => { if (progressTimer.current) clearTimeout(progressTimer.current) }
+  }, [current, course, courseId])
 
   const slide = course?.slides?.[current]
 

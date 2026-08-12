@@ -704,7 +704,8 @@ def enroll(course_id: int, db: Session = Depends(get_db),
         Enrollment.user_id == current.id, Enrollment.course_id == course_id,
     ).first()
     if existing:
-        return {"ok": True, "enrollment_id": existing.id, "already": True}
+        return {"ok": True, "enrollment_id": existing.id, "already": True,
+                "last_slide_index": existing.last_slide_index or 0}
     from sqlalchemy.exc import IntegrityError
     e = Enrollment(user_id=current.id, course_id=course_id)
     db.add(e)
@@ -716,14 +717,41 @@ def enroll(course_id: int, db: Session = Depends(get_db),
         existing = db.query(Enrollment).filter(
             Enrollment.user_id == current.id, Enrollment.course_id == course_id,
         ).first()
-        return {"ok": True, "enrollment_id": existing.id if existing else None, "already": True}
+        return {"ok": True, "enrollment_id": existing.id if existing else None, "already": True,
+                "last_slide_index": (existing.last_slide_index if existing else 0) or 0}
     gam = GamificationService(db)
     gam.award_xp(current.id, XP_FIRST_ENROLLMENT)
     enroll_count = db.query(Enrollment).filter(Enrollment.user_id == current.id).count()
     if enroll_count == 1:
         gam.award_badge(current.id, "FIRST_ENROLLMENT")
     db.commit()
-    return {"ok": True, "enrollment_id": e.id, "already": False}
+    return {"ok": True, "enrollment_id": e.id, "already": False, "last_slide_index": 0}
+
+
+from pydantic import BaseModel
+
+
+class SlideProgressIn(BaseModel):
+    slide_index: int
+
+
+@router.post("/{course_id}/progress")
+def save_slide_progress(course_id: int, body: SlideProgressIn,
+                        db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(get_current_user)):
+    """Remember the learner's position so they resume across devices."""
+    e = db.query(Enrollment).filter(
+        Enrollment.user_id == current.id, Enrollment.course_id == course_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not enrolled")
+    total = db.query(CourseSlide).filter(CourseSlide.course_id == course_id).count()
+    idx = max(0, min(body.slide_index, max(total - 1, 0)))
+    e.last_slide_index = idx
+    if total and e.status != EnrollmentStatus.COMPLETED:
+        e.progress = max(e.progress or 0.0, round((idx + 1) / total * 100, 1))
+    db.commit()
+    return {"ok": True, "last_slide_index": idx, "progress": e.progress}
 
 
 @router.post("/{course_id}/complete")
