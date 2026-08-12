@@ -70,10 +70,10 @@ def _digest_body(org_name: str, top: list, total: int) -> tuple[str, str]:
     html = (
         f"<h2 style='margin-top:0'>{org_name} — Top learning streaks this week</h2>"
         f"<p>{total} learners are on active streaks. Here are your leaders:</p>"
-        f"<table style='border-collapse:collapse;font-family:system-ui,sans-serif;'>"
+        "<table style='border-collapse:collapse;font-family:system-ui,sans-serif;'>"
         + "".join(rows_html) +
         "</table>"
-        f"<p style='margin-top:20px;color:#64748b;font-size:13px;'>Sent by the IFPI Learning weekly digest.</p>"
+        "<p style='margin-top:20px;color:#64748b;font-size:13px;'>Sent by the IFPI Learning weekly digest.</p>"
     )
     text = f"{org_name} — Top learning streaks this week ({total} active):\n" + "\n".join(rows_text)
     return html, text

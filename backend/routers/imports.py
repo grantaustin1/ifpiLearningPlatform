@@ -365,7 +365,7 @@ import zipfile
 MAX_ZIP_SIZE = 200 * 1024 * 1024  # 200 MB
 # Staging root for extracted content. Lives outside the storage backend
 # on purpose — these are transient working dirs the importer consumes.
-STAGING_ROOT = Path("/tmp/ifpi_import_staging")
+STAGING_ROOT = Path(tempfile.gettempdir()) / "ifpi_import_staging"
 
 
 def _safe_extract_zip(zf: zipfile.ZipFile, dest: Path) -> int:

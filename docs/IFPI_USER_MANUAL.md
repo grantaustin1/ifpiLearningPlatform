@@ -473,7 +473,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 487 |
+| `routers/auth.py` | 486 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
@@ -484,8 +484,8 @@ Core entities (see `backend/models/` for the full list):
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
 | `routers/exams.py` | 459 |
-| `routers/extras.py` | 655 |
-| `routers/feedback.py` | 72 |
+| `routers/extras.py` | 654 |
+| `routers/feedback.py` | 106 |
 | `routers/flashcards.py` | 497 |
 | `routers/imports.py` | 502 |
 | `routers/invitations.py` | 206 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13780** |
+| **Total** | **13812** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -798,6 +798,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}/questions/{question_id}` | PATCH | Edit one question in place — unlike PUT /questions (replace), this |
 | `/api/feature-flags` | GET |  |
 | `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
+| `/api/feedback/screenshot` | POST | Store a feedback screenshot; returns the URL to attach on submit. |
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
@@ -889,7 +890,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **297** registered API endpoints._
+_Total: **298** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):

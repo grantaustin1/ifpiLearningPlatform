@@ -1,6 +1,6 @@
 """SCORM 1.2 / 2004 package parser.
 
-Pure stdlib (zipfile + xml.etree). No external dependencies.
+Pure stdlib (zipfile + xml.etree; parsing hardened via defusedxml).
 
 Given an uploaded SCORM ZIP, we:
 1. Validate it contains `imsmanifest.xml` at the archive root.
@@ -22,6 +22,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 from xml.etree import ElementTree as ET
+
+from defusedxml import DefusedXmlException
+from defusedxml.ElementTree import parse as _safe_xml_parse
 
 logger = logging.getLogger("ifpi.scorm")
 
@@ -66,8 +69,8 @@ def _detect_version(manifest_root: ET.Element) -> str:
 def parse_manifest(manifest_path: Path) -> tuple[str, str, str]:
     """Return (title, launch_href, scorm_version) from imsmanifest.xml."""
     try:
-        tree = ET.parse(manifest_path)
-    except ET.ParseError as e:
+        tree = _safe_xml_parse(manifest_path)
+    except (ET.ParseError, DefusedXmlException) as e:
         raise ScormParseError(f"Invalid imsmanifest.xml: {e}") from e
 
     root = tree.getroot()
