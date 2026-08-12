@@ -160,3 +160,9 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - guide_builder.py: img + .fig caption CSS, link_callback for absolute local image paths. Figures embedded in both guides with numbered captions (Admin 12 figs, Student 6 figs).
 - Verified: PDFs rebuild on download — Admin 17pp/778KB w/ 12 images, Student 9pp/424KB w/ 6 images; pymupdf page render confirms clean layout; test_public_guides 5/5 pass.
 - Reminder for user: click Update Deployment to push v4.0 manuals + screenshots to the live URL.
+
+## 2026-08-12 (session 10f) — Course delete flow
+- CoursesPage: bin button on each card (visible only to course owner or SUPER_ADMIN via new created_by_id in CourseSummary). Published course → greyed bin + info toast 'Unpublish first'; draft → confirm modal (delete-confirm-modal) warning permanent, then DELETE /api/courses/{id}.
+- Backend delete_course guards: 403 unless SUPER_ADMIN or created_by_id==current.id; 409 if status PUBLISHED; audit_service COURSE_DELETED entry added.
+- Admin manual §5.6 'Deleting a course permanently' + troubleshooting row added (PDF auto-rebuilds).
+- Verified: curl (409 published / 200 owner draft / 403 non-owner / created_by_id in list), UI screenshot (toast + modal + card removed), audit row present, regression 48 passed (iter2/3/47/48 incl. course-delete tests).

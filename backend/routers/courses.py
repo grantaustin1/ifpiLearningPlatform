@@ -36,6 +36,7 @@ def _summary(c: Course) -> CourseSummary:
         currency=c.currency, slide_count=len(c.slides),
         enrollment_count=len(c.enrollments), created_at=c.created_at,
         mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
+        created_by_id=c.created_by_id,
     )
 
 
@@ -315,6 +316,14 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
+    if "SUPER_ADMIN" not in current.roles and c.created_by_id != current.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the course owner or a super admin can delete this course")
+    if c.status == CourseStatus.PUBLISHED:
+        raise HTTPException(
+            status_code=409,
+            detail="Unpublish the course first, then delete it")
     # Iter 47 — clean up FK dependents so the delete never 500s.
     from models import (
         AITutorSession, Certificate, CoursePrerequisite, CourseRating,
@@ -344,6 +353,10 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
         db.query(model).filter(model.course_id == course_id) \
             .update({model.course_id: None}, synchronize_session=False)
     db.delete(c)  # slides + enrollments cascade via ORM relationships
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_DELETED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
     db.commit()
     return {"ok": True}
 
