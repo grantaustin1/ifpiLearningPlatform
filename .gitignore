@@ -4,3 +4,6 @@ credentials.json
 .credentials
 memory/test_credentials.md
 backend/snapshots/
+.env
+.env.*
+*.env
