@@ -45,6 +45,9 @@ whenever you need it.
    enabled two-factor authentication).
 2. **Forgot your password?** Use **Forgot password** on the login page.
 
+<img src="/app/docs/screenshots/guide/login.jpg" width="440">
+<p class="fig">Figure 1 — The login page.</p>
+
 > ⚠️ If a full-screen **Terms & Conditions** page appears, read and click
 > **Accept** — the platform stays locked until you do.
 
@@ -60,6 +63,9 @@ welcome card with a **Show me around** button.
   the round **Report an issue** button in the bottom-right corner.
 - Prefer to explore alone? Click **Skip tour**.
 - Either way, the tour shows **only once** — it won't nag you again.
+
+<img src="/app/docs/screenshots/guide/l_tour.jpg" width="440">
+<p class="fig">Figure 2 — The Welcome Tour spotlighting My Courses on your first login.</p>
 
 ---
 
@@ -83,6 +89,9 @@ welcome card with a **Show me around** button.
 2. Use the **search box**, **category/academy filters** and **sort** menu.
    The **Featured** row highlights courses the academy recommends.
 3. Click a card for the detail page and the Enrol button.
+
+<img src="/app/docs/screenshots/guide/l_courses.jpg" width="440">
+<p class="fig">Figure 3 — My Courses: cover photos, slide counts, durations and Start Course buttons.</p>
 
 **Learning Paths:** if courses are arranged in a path (Foundation →
 Intermediate → Advanced), finish one step to unlock the next.
@@ -121,6 +130,9 @@ certificate."*
   skipping ahead.
 - On the last slide the button changes to **Take exam** and leads you
   straight in.
+
+<img src="/app/docs/screenshots/guide/l_learn.jpg" width="440">
+<p class="fig">Figure 4 — The course player: slide list on the left, the amber exam banner at the top, Previous/Next below.</p>
 
 ### 7.3 Finishing — and rating the course
 On the final slide you reach the **completion card**: 🎉 congratulations,
@@ -198,6 +210,9 @@ your own records? At the top of **My Certificates**:
 - **Printable transcript** — the same record as a clean on-screen page with
   a **Print** button.
 
+<img src="/app/docs/screenshots/guide/l_certificates.jpg" width="440">
+<p class="fig">Figure 5 — My Certificates with the Printable transcript and Download PDF buttons at the top.</p>
+
 > ⚠️ If a certificate ever shows **REVOKED**, contact your academy
 > administrator.
 
@@ -229,6 +244,9 @@ bottom-right corner of any page:
    feedback inbox.
 
 This is the fastest way to be heard — no emails needed.
+
+<img src="/app/docs/screenshots/guide/l_feedback.jpg" width="440">
+<p class="fig">Figure 6 — The Report an issue panel with a message and the Attach screenshot button.</p>
 
 ---
 

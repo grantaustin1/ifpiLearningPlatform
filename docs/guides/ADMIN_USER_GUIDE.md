@@ -54,6 +54,12 @@ as a PDF at any time.
 6. **Forgot your password?** Click **Forgot password** on the login page and
    follow the reset link that is emailed to you.
 
+<img src="/app/docs/screenshots/guide/login.jpg" width="440">
+<p class="fig">Figure 1 — The login page: email, password and the Forgot-password link.</p>
+
+<img src="/app/docs/screenshots/guide/a_tour.jpg" width="440">
+<p class="fig">Figure 2 — The one-time Welcome Tour spotlighting the sidebar on first login.</p>
+
 > ⚠️ If a full-screen **Terms & Conditions** dialog appears, read and click
 > **Accept** — you cannot use the platform until you do. (You control this
 > gate yourself; see Section 19.3.)
@@ -113,6 +119,9 @@ disappears at 100%.
 - **Recent Activity** — the latest enrolments as they happen.
 - **Docs engagement tile** and the **onboarding board** (until complete).
 
+<img src="/app/docs/screenshots/guide/a_dashboard.jpg" width="440">
+<p class="fig">Figure 3 — The admin dashboard: metric cards, launch checklist and members needing action.</p>
+
 ---
 
 ## 5. Creating a Course Manually
@@ -123,6 +132,9 @@ disappears at 100%.
    **passing score** (e.g. 70), and **price** (0 = free).
 3. Save. The course is created in **DRAFT** — invisible to learners.
 
+<img src="/app/docs/screenshots/guide/a_courses.jpg" width="440">
+<p class="fig">Figure 4 — The Courses screen: cover photos, status chips, star (feature) buttons.</p>
+
 ### 5.2 Add and edit slides
 1. Open the course editor. The left rail lists slides; the main pane edits
    the selected slide.
@@ -131,6 +143,9 @@ disappears at 100%.
    **SCORM** media.
 3. Drag slides in the left rail to reorder. Click **Save** often — every
    save creates a version snapshot.
+
+<img src="/app/docs/screenshots/guide/a_course_edit.jpg" width="440">
+<p class="fig">Figure 5 — The course editor: slide rail on the left, slide content in the middle, publishing and cover controls on the right.</p>
 
 ### 5.3 Give it a cover photo (recommended)
 Courses look far better in the catalog with a real photo:
@@ -183,6 +198,9 @@ regenerate. Learners get a play button on the slide.
 attempts. Add multiple-choice and true/false questions with points, then set
 the exam to **published**.
 
+<img src="/app/docs/screenshots/guide/a_exams.jpg" width="440">
+<p class="fig">Figure 6 — The Exams screen: status, Attempts and Preview per exam, plus the AI quiz and New Exam buttons.</p>
+
 ### 7.2 Create an exam with AI
 **Exams → AI Quiz**: pick the course, number of questions and question type;
 **Generate**; edit any question inline; save as a **New exam** or **Append**
@@ -203,6 +221,9 @@ No attempts). Click into an exam's attempts view — it has two tabs:
 
 - **Learners** — every learner's attempts, scores, pass/fail and dates.
 - **Question insights** — see Section 8.
+
+<img src="/app/docs/screenshots/guide/a_attempts.jpg" width="440">
+<p class="fig">Figure 7 — The Attempts view with its two tabs: Learners and Question insights.</p>
 
 ### 7.5 Resetting a learner's attempts
 A learner who used every attempt is blocked from retrying — but you can give
@@ -242,6 +263,9 @@ option showing exactly how many learners picked it:
 If most learners pick the same wrong answer, the question wording (or your
 course content) probably needs attention — that is exactly what this view is
 for.
+
+<img src="/app/docs/screenshots/guide/a_insights.jpg" width="440">
+<p class="fig">Figure 8 — Question insights in action: miss-rate bars, per-option distributions, TOP DISTRACTOR badges, "author alerted" chips, Edit buttons and Export CSV.</p>
 
 ### 8.3 Miss-rate alerts (automatic)
 You don't have to keep checking. When a question's miss rate reaches **50%
@@ -324,6 +348,9 @@ This is the fastest way to run UAT or collect learner suggestions without
 leaving the platform: your testers' notes and screenshots all collect in one
 place.
 
+<img src="/app/docs/screenshots/guide/a_feedback.jpg" width="440">
+<p class="fig">Figure 9 — The Feedback inbox: category chips, sender details and a clickable screenshot thumbnail.</p>
+
 ---
 
 ## 12. Managing Learners
@@ -331,6 +358,9 @@ place.
 ### 12.1 Users
 **Users** lists everyone with role, cohort, activity and streak.
 Self-registered accounts are always learners; admin elevation is invite-only.
+
+<img src="/app/docs/screenshots/guide/a_users.jpg" width="440">
+<p class="fig">Figure 10 — The Users screen: roles, cohorts, activity and the invite buttons.</p>
 
 ### 12.2 Invite one person
 **Users → Invite user**: email, name, role → **Send invite**. If email is
@@ -446,6 +476,9 @@ unlocks the next.
 - **Audit log** — searchable trail of every significant admin action
   (including question edits and attempt resets).
 
+<img src="/app/docs/screenshots/guide/a_reports.jpg" width="440">
+<p class="fig">Figure 11 — Reports: enrolment/completion analytics with CSV export.</p>
+
 ---
 
 ## 20. Settings Reference
@@ -454,6 +487,9 @@ unlocks the next.
 Branding, certificate identity, theme presets (built-in + your own custom
 ones), SMTP, cohort celebration threshold/webhook, digest toggles,
 marketplace opt-in, monthly AI budget.
+
+<img src="/app/docs/screenshots/guide/a_settings.jpg" width="440">
+<p class="fig">Figure 12 — Settings → Branding &amp; Certificates: academy identity, certificate theme and SMTP.</p>
 
 ### 20.2 Security
 Change password; enable TOTP two-factor (scan QR → confirm code → **save
