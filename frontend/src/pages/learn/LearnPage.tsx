@@ -20,13 +20,18 @@ export default function LearnPage() {
   const [reviewText, setReviewText] = useState('')
   const [reviewSaved, setReviewSaved] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     (async () => {
       // Make sure the user is enrolled (idempotent)
       try { await api.post(`/courses/${courseId}/enroll`) } catch { /* may already be enrolled */ }
-      const r = await api.get(`/courses/${courseId}`)
-      setCourse(r.data)
+      try {
+        const r = await api.get(`/courses/${courseId}`)
+        setCourse(r.data)
+      } catch {
+        setLoadError(true)
+      }
     })()
   }, [courseId])
 
@@ -39,6 +44,25 @@ export default function LearnPage() {
     if (!slide?.id || !courseId) return
     api.post(`/catalog/${courseId}/slides/${slide.id}/track-view`).catch(() => { /* silent */ })
   }, [slide?.id, courseId])
+
+  if (loadError) return (
+    <div className="flex items-center justify-center h-screen bg-slate-50" data-testid="course-unavailable">
+      <div className="text-center max-w-md px-6">
+        <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+          <ClipboardList className="h-7 w-7 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">This course isn't available</h2>
+        <p className="text-sm text-slate-500 mt-2">
+          It may have been unpublished, archived or removed. If you think this is a
+          mistake, ask your academy administrator.
+        </p>
+        <button onClick={() => nav('/courses')} data-testid="back-to-courses-btn"
+          className="mt-6 inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg px-5 py-2.5">
+          <ChevronLeft className="h-4 w-4" /> Back to My Courses
+        </button>
+      </div>
+    </div>
+  )
 
   if (!course) return <div className="flex items-center justify-center h-screen"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
 

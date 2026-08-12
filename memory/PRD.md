@@ -186,3 +186,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Learner: LearnPage ImageSlideLayout renders 3 layouts (image-layout-above/beside/behind; behind = cover img + slate-900/60 overlay + prose-invert).
 - BONUS FIX from testing-agent finding: POST /courses/{id}/enroll 500 (UNIQUE constraint) on concurrent double-enroll — now idempotent (IntegrityError → rollback → already:true). Verified with parallel curl.
 - Tested: iteration_58.json — backend 5/5 pytest + full Playwright e2e 100% (picker persistence, bulk 3-photo, all 3 learner layouts, regression /learn/224, cleanup). Admin manual §5.2 updated (steps 4-5).
+
+## 2026-08-12 (session 10j) — Learn page graceful 404
+- User console log (prod): /learn/243 → GET/enroll 404s → LearnPage uncaught AxiosError (course was draft/deleted). CORS app.emergent.sh redirect on streak call = platform edge during redeploy, not app bug.
+- LearnPage: loadError state → friendly 'This course isn't available' screen (course-unavailable testid) with Back to My Courses button, instead of infinite spinner + uncaught error.
+- Verified: screenshot /learn/9999 shows friendly screen, back button navs to /courses, valid course 224 still loads. tsc clean.
