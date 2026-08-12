@@ -9,6 +9,8 @@ const CAT_STYLE: Record<string, string> = {
   OTHER: 'bg-slate-50 text-slate-600 border-slate-200',
 }
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || ''
+
 export default function FeedbackAdminPage() {
   const qc = useQueryClient()
   const { data: items = [], isLoading } = useQuery({
@@ -43,6 +45,16 @@ export default function FeedbackAdminPage() {
                 <span className={`self-start text-[10px] font-semibold px-2 py-0.5 rounded-full border ${CAT_STYLE[f.category] || CAT_STYLE.OTHER}`}>{f.category}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-slate-800 whitespace-pre-wrap">{f.message}</p>
+                  {f.screenshot_url && (
+                    <a href={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND}${f.screenshot_url}`}
+                      target="_blank" rel="noopener noreferrer"
+                      data-testid={`feedback-screenshot-${f.id}`}
+                      className="inline-block mt-2 rounded-lg border border-slate-200 overflow-hidden hover:border-indigo-300 transition-colors">
+                      <img
+                        src={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND}${f.screenshot_url}`}
+                        alt="Attached screenshot" className="h-24 object-cover" loading="lazy" />
+                    </a>
+                  )}
                   <p className="text-[11px] text-slate-400 mt-1.5">
                     {f.user_name} ({f.user_email}) · {f.page || '—'} · {f.created_at ? new Date(f.created_at + 'Z').toLocaleString() : ''}
                   </p>
