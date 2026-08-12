@@ -127,8 +127,8 @@ export default function LearnPage() {
           {isStaff && (
             <button onClick={() => nav(`/courses/${courseId}/edit`)} data-testid="learn-edit-course-btn"
               title="Open this course in the editor to change slides, pictures and layout"
-              className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 text-slate-500 rounded-lg px-3 py-1.5 transition-colors">
-              <Pencil className="h-3.5 w-3.5" /> Edit course
+              className="ml-auto inline-flex items-center gap-1.5 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 shadow-sm shadow-indigo-200 transition-colors">
+              <Pencil className="h-4 w-4" /> Edit course
             </button>
           )}
         </div>
