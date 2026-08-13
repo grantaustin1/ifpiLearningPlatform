@@ -177,7 +177,8 @@ export default function LearnPage() {
               </div>
               {slide.slide_type === 'VIDEO' && slide.media_url && (
                 /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(slide.media_url) || slide.media_url.startsWith('/api/uploads')
-                  ? <AutoPlayVideo src={slide.media_url} opacity={(slide.media_opacity ?? 100) / 100} />
+                  ? <AutoPlayVideo src={slide.media_url} opacity={(slide.media_opacity ?? 100) / 100}
+                      onEnded={isLast ? undefined : () => { toast.info('Video finished — moving to the next slide'); next() }} />
                   : <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} style={{ opacity: (slide.media_opacity ?? 100) / 100 }} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title="video" /></div>
               )}
               {slide.slide_type === 'IMAGE' && slide.media_url ? (
@@ -312,7 +313,7 @@ function ImageSlideLayout({ slide, html }: { slide: any; html: string }) {
   )
 }
 
-function AutoPlayVideo({ src, opacity = 1 }: { src: string; opacity?: number }) {
+function AutoPlayVideo({ src, opacity = 1, onEnded }: { src: string; opacity?: number; onEnded?: () => void }) {
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     const v = ref.current
@@ -327,7 +328,7 @@ function AutoPlayVideo({ src, opacity = 1 }: { src: string; opacity?: number }) 
   return (
     <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video">
       <video ref={ref} src={src} controls playsInline preload="auto"
-        style={{ opacity }}
+        style={{ opacity }} onEnded={onEnded}
         className="w-full h-full" data-testid="learn-slide-video" />
     </div>
   )

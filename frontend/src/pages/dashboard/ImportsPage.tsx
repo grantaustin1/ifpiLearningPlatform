@@ -60,6 +60,19 @@ export default function ImportsPage() {
     }
   }
 
+  const [retrying, setRetrying] = useState<number | null>(null)
+
+  const retry = async (jobId: number) => {
+    setRetrying(jobId)
+    try {
+      await api.post(`/admin/imports/${jobId}/retry`)
+      toast.success('Retrying import — watch progress below')
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Could not retry import')
+    } finally { setRetrying(null) }
+  }
+
   useEffect(() => { load() }, [])
 
   // Poll while any job is running
@@ -136,6 +149,14 @@ export default function ImportsPage() {
                     className="text-xs border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
                     {expandedJob === j.id ? 'Hide details' : 'Show details'}
                   </button>
+                  {(j.status === 'FAILED' || j.status === 'PARTIAL') && j.source_path && (
+                    <button onClick={() => retry(j.id)} disabled={retrying === j.id}
+                      data-testid={`import-retry-${j.id}`}
+                      title="Re-run this import using the files already on the server — no re-upload needed"
+                      className="inline-flex items-center gap-1 text-xs border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                      <RefreshCw className={`h-3.5 w-3.5 ${retrying === j.id ? 'animate-spin' : ''}`} /> Retry
+                    </button>
+                  )}
                   {(j.status === 'COMPLETED' || j.status === 'PARTIAL') &&
                     ((j.results?.courses?.length || 0) + (j.results?.paths?.length || 0)) > 0 && (
                     <button onClick={() => rollback(j.id)}
