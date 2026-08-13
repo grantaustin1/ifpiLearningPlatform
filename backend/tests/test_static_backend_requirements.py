@@ -26,6 +26,16 @@ def _requirements_by_name():
     return requirements_by_name
 
 
+def test_no_emergentintegrations():
+    """emergentintegrations is not published on PyPI and causes pip install to fail.
+    It must never appear in requirements.txt."""
+    requirements_by_name = _requirements_by_name()
+    assert "emergentintegrations" not in requirements_by_name, (
+        "emergentintegrations must not be listed in requirements.txt — it is unavailable on PyPI "
+        "and breaks pip install in CI."
+    )
+
+
 def test_google_genai_websockets_pin_compatibility():
     requirements_by_name = _requirements_by_name()
 
