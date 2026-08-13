@@ -41,6 +41,12 @@ def test_google_genai_websockets_pin_compatibility():
     assert Version(pinned_version) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
 
 
+def test_requirements_exclude_optional_emergent_integrations():
+    requirements_by_name = _requirements_by_name()
+
+    assert "emergentintegrations" not in requirements_by_name
+
+
 def test_reportlab_pin_compatibility():
     requirements_by_name = _requirements_by_name()
 
