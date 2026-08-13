@@ -282,6 +282,51 @@ def rollback_import(job_id: int, db: Session = Depends(get_db),
 
 
 
+@jobs_router.post("/{job_id}/retry", status_code=202)
+def retry_import(job_id: int, background_tasks: BackgroundTasks,
+                 db: Session = Depends(get_db),
+                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Re-run a FAILED / PARTIAL import against the same staging directory —
+    no need to re-upload the ZIP as long as the extracted tree is still on disk."""
+    j = db.query(ImportJob).filter(
+        ImportJob.id == job_id,
+        ImportJob.organization_id == current.organization_id,
+    ).first()
+    if not j:
+        raise HTTPException(status_code=404, detail="Import job not found")
+    if j.status not in ("FAILED", "PARTIAL"):
+        raise HTTPException(status_code=400,
+            detail=f"Only failed or partial imports can be retried (this one is {j.status})")
+    src = Path(j.source_path or "")
+    if not src.exists() or not src.is_dir():
+        raise HTTPException(status_code=410,
+            detail="The uploaded files are no longer on the server — please upload the ZIP again")
+
+    new_job = ImportJob(
+        organization_id=current.organization_id,
+        created_by_id=current.id,
+        job_type=j.job_type or "FULL_MIGRATION",
+        source_path=str(src),
+        status="PENDING",
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+
+    from services import audit_service
+    audit_service.record(
+        db, current, "IMPORT_JOB_RETRIED",
+        target_type="import_job", target_id=str(new_job.id),
+        metadata={"retried_from_job_id": j.id, "source_path": str(src)},
+    )
+    db.commit()
+
+    background_tasks.add_task(
+        _run_import_in_bg, new_job.id, current.organization_id, str(src), False,
+    )
+    return _job_to_dict(new_job)
+
+
 def _run_import_in_bg(job_id: int, org_id: int, source_path: str,
                       publish_on_import: bool) -> None:
     """Background task — opens its own DB session so it doesn't borrow
