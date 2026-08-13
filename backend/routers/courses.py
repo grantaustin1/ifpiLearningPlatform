@@ -318,10 +318,6 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
-    if "SUPER_ADMIN" not in current.roles and c.created_by_id != current.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the course owner or a super admin can delete this course")
     if c.status == CourseStatus.PUBLISHED:
         raise HTTPException(
             status_code=409,
