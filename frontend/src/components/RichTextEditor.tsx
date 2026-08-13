@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bold, Italic, Underline, List, ListOrdered, RemoveFormatting, Code, Palette } from 'lucide-react'
+import { Bold, Italic, Underline, List, ListOrdered, RemoveFormatting, Code, Palette, Type, ChevronDown } from 'lucide-react'
+
+const SIZES: [string, string, string][] = [
+  ['small', 'Small', '0.85em'],
+  ['normal', 'Normal', '1em'],
+  ['large', 'Large', '1.4em'],
+  ['heading', 'Heading', ''],
+]
 
 const COLORS = [
   ['#0f172a', 'Black'], ['#dc2626', 'Red'], ['#ea580c', 'Orange'],
@@ -15,6 +22,7 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
   const savedRange = useRef<Range | null>(null)
   const [htmlMode, setHtmlMode] = useState(false)
   const [showColors, setShowColors] = useState(false)
+  const [showSizes, setShowSizes] = useState(false)
 
   useEffect(() => {
     if (!htmlMode && ref.current) ref.current.innerHTML = latest.current || ''
@@ -52,6 +60,26 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
     setShowColors(false)
   }
 
+  const applySize = (key: string, em: string) => {
+    ref.current?.focus()
+    const sel = window.getSelection()
+    if (savedRange.current && sel) {
+      sel.removeAllRanges()
+      sel.addRange(savedRange.current)
+    }
+    document.execCommand('formatBlock', false, key === 'heading' ? 'h3' : 'p')
+    // execCommand can't set px/em sizes; use fontSize=7 as a marker then swap to styled spans
+    document.execCommand('fontSize', false, '7')
+    ref.current?.querySelectorAll('font[size="7"]').forEach(font => {
+      const span = document.createElement('span')
+      if (key === 'small' || key === 'large') span.style.fontSize = em
+      span.innerHTML = font.innerHTML
+      font.replaceWith(span)
+    })
+    emit()
+    setShowSizes(false)
+  }
+
   const keepSel = (e: React.MouseEvent) => e.preventDefault()
   const btn = 'inline-flex items-center justify-center h-8 w-8 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors'
 
@@ -62,7 +90,25 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
         <button type="button" onMouseDown={keepSel} onClick={() => exec('italic')} title="Italic" data-testid="rte-italic" className={btn}><Italic className="h-4 w-4" /></button>
         <button type="button" onMouseDown={keepSel} onClick={() => exec('underline')} title="Underline" data-testid="rte-underline" className={btn}><Underline className="h-4 w-4" /></button>
         <span className="w-px h-5 bg-slate-200 mx-1" />
-        <button type="button" onMouseDown={e => { e.preventDefault(); saveSelection() }} onClick={() => setShowColors(s => !s)}
+        <button type="button" onMouseDown={e => { e.preventDefault(); saveSelection() }} onClick={() => { setShowSizes(s => !s); setShowColors(false) }}
+          title="Font size" data-testid="rte-size-btn"
+          className="inline-flex items-center gap-0.5 h-8 px-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors">
+          <Type className="h-4 w-4" /><ChevronDown className="h-3 w-3" />
+        </button>
+        {showSizes && (
+          <div className="absolute top-10 left-16 z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1 w-32" data-testid="rte-size-menu">
+            {SIZES.map(([key, label, em]) => (
+              <button key={key} type="button" data-testid={`rte-size-${key}`}
+                onMouseDown={e => { e.preventDefault(); applySize(key, em) }}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-100 transition-colors"
+                style={{ fontSize: key === 'heading' ? '1.1em' : em || '1em', fontWeight: key === 'heading' ? 700 : 400 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        <span className="w-px h-5 bg-slate-200 mx-1" />
+        <button type="button" onMouseDown={e => { e.preventDefault(); saveSelection() }} onClick={() => { setShowColors(s => !s); setShowSizes(false) }}
           title="Font colour" data-testid="rte-color-btn" className={btn}><Palette className="h-4 w-4" /></button>
         {showColors && (
           <div className="absolute top-10 left-24 z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-2 flex gap-1.5" data-testid="rte-color-palette">
