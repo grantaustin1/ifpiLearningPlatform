@@ -41,6 +41,19 @@ def test_google_genai_websockets_pin_compatibility():
     assert Version(pinned_version) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
 
 
+def test_emergentintegrations_absent():
+    """emergentintegrations is not on PyPI and causes pip resolution failures.
+
+    It must never appear in requirements.txt.  Any code that needs it must
+    guard the import at runtime (see services/ai_builder_service.py).
+    """
+    requirements_by_name = _requirements_by_name()
+    assert "emergentintegrations" not in requirements_by_name, (
+        "emergentintegrations must not be listed in requirements.txt — "
+        "it is unavailable on PyPI and breaks pip dependency resolution."
+    )
+
+
 def test_reportlab_pin_compatibility():
     requirements_by_name = _requirements_by_name()
 
