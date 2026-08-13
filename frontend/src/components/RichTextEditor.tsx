@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bold, Italic, Underline, List, ListOrdered, RemoveFormatting, Code, Palette, Type, ChevronDown } from 'lucide-react'
+import { Bold, Italic, Underline, List, ListOrdered, RemoveFormatting, Code, Palette, Type, ChevronDown, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
 
 const SIZES: [string, string, string][] = [
   ['small', 'Small', '0.85em'],
@@ -120,6 +120,10 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
             ))}
           </div>
         )}
+        <span className="w-px h-5 bg-slate-200 mx-1" />
+        <button type="button" onMouseDown={keepSel} onClick={() => exec('justifyLeft')} title="Align left" data-testid="rte-align-left" className={btn}><AlignLeft className="h-4 w-4" /></button>
+        <button type="button" onMouseDown={keepSel} onClick={() => exec('justifyCenter')} title="Align centre" data-testid="rte-align-center" className={btn}><AlignCenter className="h-4 w-4" /></button>
+        <button type="button" onMouseDown={keepSel} onClick={() => exec('justifyRight')} title="Align right" data-testid="rte-align-right" className={btn}><AlignRight className="h-4 w-4" /></button>
         <span className="w-px h-5 bg-slate-200 mx-1" />
         <button type="button" onMouseDown={keepSel} onClick={() => exec('insertUnorderedList')} title="Bullet list" data-testid="rte-ul" className={btn}><List className="h-4 w-4" /></button>
         <button type="button" onMouseDown={keepSel} onClick={() => exec('insertOrderedList')} title="Numbered list" data-testid="rte-ol" className={btn}><ListOrdered className="h-4 w-4" /></button>
