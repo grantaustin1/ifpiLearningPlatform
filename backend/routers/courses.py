@@ -126,6 +126,7 @@ def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
             order_index=s.order_index, is_required=s.is_required,
             narration_url=s.narration_url, narration_voice=s.narration_voice,
             image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
         ) for s in c.slides],
     )
 
@@ -496,6 +497,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         media_url=body.media_url, order_index=body.order_index or next_order,
         is_required=body.is_required,
         image_position=body.image_position if body.image_position in ("above", "beside", "behind") else "above",
+        media_opacity=max(20, min(int(body.media_opacity), 100)) if body.media_opacity is not None else 100,
     )
     db.add(s)
     db.commit()
@@ -506,6 +508,7 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
         image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
     )
 
 
@@ -558,6 +561,8 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
     s.media_url = body.media_url
     if body.image_position in ("above", "beside", "behind"):
         s.image_position = body.image_position
+    if body.media_opacity is not None:
+        s.media_opacity = max(20, min(int(body.media_opacity), 100))
     if body.slide_type in SlideType.__members__:
         s.slide_type = SlideType(body.slide_type)
     if body.order_index is not None:
@@ -571,6 +576,7 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
         image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
     )
 
 

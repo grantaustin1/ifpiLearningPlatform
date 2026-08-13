@@ -57,6 +57,7 @@ class CourseSlide(Base):
     slide_type = Column(SQLEnum(SlideType), default=SlideType.TEXT)
     media_url = Column(String(500))
     image_position = Column(String(10), default="above")  # above | beside | behind
+    media_opacity = Column(Integer, default=100)  # 20-100 (%) for image/video media
     narration_url = Column(String(500))       # cached TTS narration (Iter 26)
     narration_voice = Column(String(30))       # last-used voice — for re-runs
     order_index = Column(Integer, default=0)

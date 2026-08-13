@@ -1,0 +1,58 @@
+{
+  "summary": "Iter 60 review of Rich Text Editor + Media Transparency features. Backend clamping/persistence for media_opacity is 100% working (4/4 pytest pass). Media transparency in editor + learner works end-to-end (slider 40%, preview opacity 0.4, persists across reload, learner img style opacity 0.4). CRITICAL: RichTextEditor has a data-binding bug that reverses characters as the user types (typed 'abcdef' → stored 'fedcba') and swallows foreColor, so red text never survives to the learner. Root cause is uncontrolled use of dangerouslySetInnerHTML on the contentEditable while echoing every keystroke back into value, which wipes the caret/selection on every re-render. Bold DID survive when applied via Ctrl+A on pre-set HTML (rendered as <b> on learner). Test course 245 was created and fully cleaned up (unpublish + delete = 200/200). Existing course 224 still loads for learners (regression pass).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "RichTextEditor (frontend/src/components/RichTextEditor.tsx)",
+        "issue": "Typing produces reversed text. Sequentially typing 'abcdef' in [data-testid=rte-visual] stores '<b>fedcba</b>'-style reversed content. Caused by dangerouslySetInnerHTML={{__html: value}} on the contentEditable — every onInput calls onChange(html) → parent state update → React re-sets innerHTML → caret returns to position 0 → next keystroke inserts at start. Reproduced with 50ms per-key delay. Users cannot author normal text.",
+        "selector": "[data-testid=rte-visual]",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "RichTextEditor foreColor / palette",
+        "issue": "Font colour palette does not apply. Sequence: type text → Ctrl+A → click rte-bold → click rte-color-btn → click rte-color-red. Bold applies (b tag) but colour never appears in HTML (no <font color> / no <span style=color:>). Same underlying re-render cycle destroys the selection between Bold applying and the palette exec running, so foreColor has no range to style. Learner therefore never sees red text — the review requirement of ‘colour markup survives sanitisation’ cannot even be exercised.",
+        "selector": "[data-testid=rte-color-red]",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Rich text authoring → learner rendering",
+        "issue": "Because typing is broken and colour never applies, the authoring flow described in the review request cannot produce the expected output. Learner still renders whatever is stored (bold + reversed text) — sanitisation itself is fine; the corruption is upstream in the editor.",
+        "affected_selectors": ["[data-testid=rte-visual]", "[data-testid=rte-color-red]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_media_opacity.py",
+    "/app/test_reports/pytest/iter60_opacity.xml"
+  ],
+  "action_items": [
+    "Fix RichTextEditor typing reversal: don’t re-set innerHTML on every parent value change. Options: (a) make the editor uncontrolled — apply value only on mount / when key changes, expose onChange via ref/onInput without feeding value back; (b) use a ref-based diff so React never reassigns innerHTML while the element is focused; (c) switch to a proven RTE lib (Tiptap/ProseMirror/Slate). Also stop mounting via dangerouslySetInnerHTML on a contentEditable that’s being controlled.",
+    "Fix palette foreColor loss: same root fix will restore selection so document.execCommand('foreColor', hex) applies. As a stopgap, save the Range on rte-color-btn mousedown, and restore it right before exec('foreColor').",
+    "After the fix, re-verify: (i) type ‘Hello world’, Ctrl+A, Bold, red — expect <b>/<strong> and color in stored HTML; (ii) DOMPurify keeps colour markup on learner (<b>/<strong>, color style / <font color>)."
+  ],
+  "critical_code_review_comments": [
+    "RichTextEditor.tsx L55-59: `<div contentEditable ... dangerouslySetInnerHTML={{__html: value}}>` combined with `onInput={emit}` (emit calls parent onChange, which flows back into `value`) is an anti-pattern for contentEditable — parent-driven re-renders reset the DOM and blow away selection/caret each keystroke.",
+    "Palette exec relies on the browser selection surviving between two React renders. It won’t. Persist/restore a Range object across the palette open/close cycle.",
+    "Backend clamping (routers/courses.py lines 500, 564) is correct and covered by tests. media_opacity is included in all SlideOut sites (GET course + POST/PATCH slide)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_media_opacity.py"
+  ],
+  "success_rate": {
+    "backend": "100% (4/4 media_opacity pytest cases pass; clamps 5→20, 150→100; PATCH clamps; GET returns per-slide)",
+    "frontend": "50% — Media transparency admin + learner pass; RTE typing + colour fail"
+  },
+  "test_credentials": "Admin uat-admin@ifpi.org / UatAdmin!2026; Learner uat-learner@ifpi.org / UatLearner!2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created and fully removed test courses 244 and 245 (both DELETE returned 200). No modifications to courses 224/225/226/243.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "After fix, re-test in this order: 1) type multi-character text into rte-visual and confirm order is preserved (typing 'abcdef' produces 'abcdef'); 2) Ctrl+A + Bold + palette red → HTML has <b>/<strong> AND color markup; 3) publish → open /learn/{id} as learner → confirm <strong>/<b> AND colour styles present in DOM; 4) media transparency already fully working — keep as regression only. Cookie/CSRF-based auth: use fetch with credentials:'include' and mirror ifpi_csrf cookie into X-CSRF-Token header for mutating calls (localStorage token is empty in cookie-mode).",
+  "rca of the issue": "RichTextEditor.tsx uses a controlled contentEditable pattern where the parent’s `value` prop is fed back via dangerouslySetInnerHTML on every render. Each keystroke → onInput → onChange(html) → parent setState → new value → React re-writes innerHTML → DOM caret + selection are destroyed → next keystroke inserts at position 0. Cumulatively, characters appear in reverse order. The same destruction of selection between Bold-apply and Palette-exec is why foreColor never marks the range. Fix: make the editor uncontrolled after mount (set innerHTML only once on mount / when a key/reset prop changes) or use a real RTE library. Reproduced deterministically with page.keyboard.type('abcdef', delay=50) → stored HTML = 'fedcba'."
+}

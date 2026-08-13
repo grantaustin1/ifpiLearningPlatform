@@ -101,6 +101,7 @@ class SlideIn(BaseModel):
     slide_type: str = "TEXT"
     media_url: Optional[str] = None
     image_position: Optional[str] = "above"  # above | beside | behind
+    media_opacity: Optional[int] = 100  # 20-100 (%)
     order_index: Optional[int] = None
     is_required: bool = True
 
