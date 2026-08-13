@@ -671,6 +671,13 @@ def delete_slide(course_id: int, slide_id: int, db: Session = Depends(get_db),
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Slide not found")
+    from models.ai import Flashcard
+    from models.engagement import SlideView
+    from models.learning import ScormPackage, SlideComment
+    db.query(SlideView).filter(SlideView.slide_id == slide_id).delete(synchronize_session=False)
+    db.query(SlideComment).filter(SlideComment.slide_id == slide_id).delete(synchronize_session=False)
+    db.query(Flashcard).filter(Flashcard.slide_id == slide_id).update({"slide_id": None}, synchronize_session=False)
+    db.query(ScormPackage).filter(ScormPackage.slide_id == slide_id).update({"slide_id": None}, synchronize_session=False)
     db.delete(s)
     db.commit()
     return {"ok": True}

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload, LayoutTemplate } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { RichTextEditor } from 'components/RichTextEditor'
+import { SlideTemplatePicker, SlideTemplate } from 'components/SlideTemplates'
 import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
 import { CourseReviewsPanel } from './CourseReviewsPanel'
@@ -101,6 +102,18 @@ export default function CourseEditPage() {
   const addSlide = () => {
     const s = { id: -Date.now(), title: `Slide ${slides.length + 1}`, slide_type: 'TEXT', content: '', media_url: '', order_index: slides.length + 1, is_required: true, _local: true }
     setSlides([...slides, s]); setActive(s.id)
+  }
+
+  const [showTemplates, setShowTemplates] = useState(false)
+
+  const addFromTemplate = (t: SlideTemplate) => {
+    const s = {
+      id: -Date.now(), title: t.name, slide_type: t.slide_type, content: t.content,
+      media_url: '', order_index: slides.length + 1, is_required: true,
+      image_position: t.image_position || 'above', _local: true,
+    }
+    setSlides([...slides, s]); setActive(s.id); setShowTemplates(false)
+    toast.success(`"${t.name}" slide added — make it yours`)
   }
 
   const [bulkUploading, setBulkUploading] = useState(false)
@@ -212,6 +225,11 @@ export default function CourseEditPage() {
           <button onClick={addSlide} data-testid="add-slide-btn"
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600">
             <Plus className="h-3.5 w-3.5" /> Add Slide
+          </button>
+          <button onClick={() => setShowTemplates(true)} data-testid="add-template-slide-btn"
+            title="Start from a ready-made layout"
+            className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600">
+            <LayoutTemplate className="h-3.5 w-3.5" /> From Template
           </button>
           <button onClick={() => bulkPhotoRef.current?.click()} disabled={bulkUploading} data-testid="add-photo-slides-btn"
             title="Pick several photos — each becomes its own slide"
@@ -458,6 +476,7 @@ export default function CourseEditPage() {
         {course?.id && <CourseReviewsPanel courseId={course.id} />}
       </aside>
 
+      {showTemplates && <SlideTemplatePicker onPick={addFromTemplate} onClose={() => setShowTemplates(false)} />}
       {showGallery && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="cover-gallery-modal">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
