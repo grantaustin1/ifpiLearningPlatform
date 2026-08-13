@@ -177,8 +177,8 @@ export default function LearnPage() {
               </div>
               {slide.slide_type === 'VIDEO' && slide.media_url && (
                 /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(slide.media_url) || slide.media_url.startsWith('/api/uploads')
-                  ? <AutoPlayVideo src={slide.media_url} />
-                  : <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title="video" /></div>
+                  ? <AutoPlayVideo src={slide.media_url} opacity={(slide.media_opacity ?? 100) / 100} />
+                  : <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video"><iframe src={slide.media_url} style={{ opacity: (slide.media_opacity ?? 100) / 100 }} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title="video" /></div>
               )}
               {slide.slide_type === 'IMAGE' && slide.media_url ? (
                 <ImageSlideLayout slide={slide} html={slide.content ? safeHtml(slide.content) : ''} />
@@ -283,18 +283,19 @@ export default function LearnPage() {
 
 function ImageSlideLayout({ slide, html }: { slide: any; html: string }) {
   const pos = slide.image_position || 'above'
+  const opacity = (slide.media_opacity ?? 100) / 100
   const body = html
     ? <div className="prose prose-indigo max-w-none text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
     : null
   if (pos === 'beside') return (
     <div className="grid md:grid-cols-2 gap-6 items-start mb-6" data-testid="image-layout-beside">
-      <img src={slide.media_url} alt="" className="rounded-xl w-full" data-testid="learn-slide-image" />
+      <img src={slide.media_url} alt="" style={{ opacity }} className="rounded-xl w-full" data-testid="learn-slide-image" />
       {body}
     </div>
   )
   if (pos === 'behind') return (
-    <div className="relative rounded-xl overflow-hidden mb-6" data-testid="image-layout-behind">
-      <img src={slide.media_url} alt="" className="absolute inset-0 w-full h-full object-cover" data-testid="learn-slide-image" />
+    <div className="relative rounded-xl overflow-hidden mb-6 bg-slate-900" data-testid="image-layout-behind">
+      <img src={slide.media_url} alt="" style={{ opacity }} className="absolute inset-0 w-full h-full object-cover" data-testid="learn-slide-image" />
       <div className="absolute inset-0 bg-slate-900/60" />
       <div className="relative p-8 min-h-[320px] flex items-center">
         {html
@@ -305,13 +306,13 @@ function ImageSlideLayout({ slide, html }: { slide: any; html: string }) {
   )
   return (
     <div className="mb-6" data-testid="image-layout-above">
-      <img src={slide.media_url} alt="" className="rounded-xl w-full" data-testid="learn-slide-image" />
+      <img src={slide.media_url} alt="" style={{ opacity }} className="rounded-xl w-full" data-testid="learn-slide-image" />
       {body && <div className="mt-6">{body}</div>}
     </div>
   )
 }
 
-function AutoPlayVideo({ src }: { src: string }) {
+function AutoPlayVideo({ src, opacity = 1 }: { src: string; opacity?: number }) {
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     const v = ref.current
@@ -326,6 +327,7 @@ function AutoPlayVideo({ src }: { src: string }) {
   return (
     <div className="mb-6 rounded-xl overflow-hidden bg-black aspect-video">
       <video ref={ref} src={src} controls playsInline preload="auto"
+        style={{ opacity }}
         className="w-full h-full" data-testid="learn-slide-video" />
     </div>
   )

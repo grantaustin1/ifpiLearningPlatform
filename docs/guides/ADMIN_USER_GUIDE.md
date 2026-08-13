@@ -138,9 +138,11 @@ disappears at 100%.
 ### 5.2 Add and edit slides
 1. Open the course editor. The left rail lists slides; the main pane edits
    the selected slide.
-2. Click **Add slide**, give it a title, write rich-text content. Repeat.
-   Slides can also carry **video**, **image**, **audio**, **PDF** or
-   **SCORM** media.
+2. Click **Add slide**, give it a title, write rich-text content. The
+   content box has a **formatting toolbar** — Bold, Italic, Underline,
+   **font colour** swatches, bullet/numbered lists, clear-formatting and a
+   `</>` toggle for raw HTML if you ever need it. Slides can also carry
+   **video**, **image**, **audio**, **PDF** or **SCORM** media.
 3. **Pictures on slides:** click the **IMAGE** type chip on a slide and
    either paste an image URL into the **Media URL** box or click **Upload**
    next to it to use a photo from your computer (max 5MB) — a preview
@@ -151,6 +153,8 @@ disappears at 100%.
    position** picker appears under the preview — choose **Above text**
    (classic), **Beside text** (photo and text side by side) or **Behind
    text** (full-width photo with your text overlaid on a dark tint).
+   A **Media transparency** slider (20–100%) lets you fade a picture or
+   video so overlaid or nearby text stands out.
 5. **Add many photos at once:** click **Add Photo Slides** at the bottom of
    the slide rail and select several photos together — each becomes its own
    image slide, titled after its filename (e.g. `gym-floor.jpg` → "gym

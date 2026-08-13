@@ -216,3 +216,8 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - LearnPage: enroll response resume → setCurrent + 'Resumed where you left off' toast (skipped when ?slide= deep link present); slide changes saved with 600ms debounce (fire-and-forget).
 - Note: BaseModel import needed adding to routers/courses.py (was missing → startup NameError, fixed).
 - Verified: two fresh browser contexts e2e — device 1 navigates to slide 8, device 2 logs in and resumes at 8/118. Backend healthy, tsc clean.
+
+## 2026-08-13 (session 10p) — Rich text editor + media transparency
+- RichTextEditor.tsx (uncontrolled contentEditable): Bold/Italic/Underline, 9-colour foreColor palette (Range save/restore on mousedown), bullet/numbered lists, clear formatting, raw-HTML toggle. Replaces plain HTML textarea in CourseEditPage (keyed per slide). NOTE: initial controlled version reversed typing (caret reset per render) — fixed by uncontrolled pattern (iter60 CRITICAL → iter61 100% pass).
+- CourseSlide.media_opacity (20-100, migration a0d1e2f3a4b5), clamped in add/update_slide, in all SlideOut sites. Editor: Media transparency slider for IMAGE/VIDEO slides + live preview dim. Learner: opacity applied in ImageSlideLayout (3 layouts), AutoPlayVideo, video iframe.
+- Tested: iteration_60 (backend 4/4 media_opacity incl clamps; transparency e2e pass; RTE critical bugs found) → fix → iteration_61 (4/4: typing order, bold+red markup, learner render survives DOMPurify, cleanup). tests/test_media_opacity.py added by testing agent. Manual §5.2 updated (toolbar + transparency).

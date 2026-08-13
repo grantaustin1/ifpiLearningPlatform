@@ -1,0 +1,25 @@
+{
+  "summary": "RETEST of iteration_60 critical RichTextEditor fix — ALL PASS. Created draft course 247, added slide, typed 'Hello world' at 50ms/key: text order preserved (no reversal). Ctrl+A + Bold + Red palette applied correctly → stored HTML = '<b><font color=\"#dc2626\">Hello world</font></b>'. Saved + published (course-status-pill = PUBLISHED). Logged in as learner, enrolled, opened /learn/247: DOM contains '<b><font color=\"#dc2626\">Hello world</font></b>' inside [data-testid=learn-slide-content] — bold + red survived sanitisation. Cleanup: unpublish=200, delete=200. Uncontrolled editor pattern (innerHTML set only on mount / htmlMode toggle, onMouseDown preventDefault + saved Range restore) fully resolves both iter60 CRITICAL bugs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RichTextEditor.tsx now uncontrolled — innerHTML written only on mount and on htmlMode toggle. Parent onChange no longer feeds back into value, so caret/selection are preserved. Good.",
+    "Colour palette saves Range on mousedown (preventDefault stops focus loss) and restores it before execCommand('foreColor') — matches recommended pattern for contentEditable.",
+    "CourseEditPage.tsx keys RichTextEditor per slide so switching slides remounts and reloads content — clean approach.",
+    "Note: document.execCommand is technically deprecated but still works in all evergreen browsers; long-term consider Tiptap/ProseMirror but current implementation is production-adequate."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (4/4 critical retest cases pass)"},
+  "test_credentials": "Admin uat-admin@ifpi.org / UatAdmin!2026; Learner uat-learner@ifpi.org / UatLearner!2026",
+  "seed_data_creation": "Created test course 247 (RTE_TEST_iter61_1786592385), fully cleaned up (unpublish 200 + delete 200). Untouched: courses 224/225/226/243.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "RichTextEditor typing + Bold + Red palette + learner rendering is now GREEN. Uncontrolled editor pattern is the correct fix and confirmed on live preview. Media transparency (iter60) still fine — not re-run per instructions. If regressions appear, verify: 1) typing 'Hello world' in [data-testid=rte-visual] preserves order; 2) after Bold+Red the innerHTML contains '<b>' and '<font color=' or 'color:'; 3) learner /learn/{id} DOM inside [data-testid=learn-slide-content] contains the same markup.",
+  "rca of the issue": "Prior iter60 root cause (controlled contentEditable resetting DOM on every keystroke) has been eliminated: RichTextEditor.tsx now only writes innerHTML in useEffect keyed on htmlMode (i.e. once per mount), and toolbar buttons use onMouseDown preventDefault to preserve selection. Palette uses saveSelection() on mousedown + sel.addRange(savedRange) before execCommand('foreColor'). End-to-end verified against BE persistence + learner render."
+}

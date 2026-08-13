@@ -4,6 +4,7 @@ import { api } from 'lib/api'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { RichTextEditor } from 'components/RichTextEditor'
 import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
 import { CourseReviewsPanel } from './CourseReviewsPanel'
@@ -70,6 +71,7 @@ export default function CourseEditPage() {
           title: s.title, content: s.content, slide_type: s.slide_type,
           media_url: s.media_url, order_index: s.order_index, is_required: s.is_required,
           image_position: s.image_position || 'above',
+          media_opacity: s.media_opacity ?? 100,
         })
       }
       for (const s of slides.filter(x => x._local)) {
@@ -77,6 +79,7 @@ export default function CourseEditPage() {
           title: s.title, content: s.content, slide_type: s.slide_type,
           media_url: s.media_url, is_required: true,
           image_position: s.image_position || 'above',
+          media_opacity: s.media_opacity ?? 100,
         })
         setSlides(prev => prev.map(x => x.id === s.id ? created.data : x))
       }
@@ -290,10 +293,8 @@ export default function CourseEditPage() {
                   </button>
                 )}
               </div>
-              <textarea value={activeSlide.content || ''} onChange={e => update(activeSlide.id, { content: e.target.value })}
-                rows={14} data-testid="slide-content"
-                placeholder={activeSlide.slide_type === 'TEXT' ? 'HTML content (e.g. <h2>Title</h2><p>Body…</p>)' : 'Description text'}
-                className="w-full border border-slate-200 rounded-xl p-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <RichTextEditor key={activeSlide.id} value={activeSlide.content || ''}
+                onChange={html => update(activeSlide.id, { content: html })} />
               {activeSlide.slide_type !== 'TEXT' && (
                 <div className="flex gap-2">
                   <input value={activeSlide.media_url || ''} onChange={e => update(activeSlide.id, { media_url: e.target.value })}
@@ -326,9 +327,23 @@ export default function CourseEditPage() {
                   )}
                 </div>
               )}
+              {['IMAGE', 'VIDEO'].includes(activeSlide.slide_type) && activeSlide.media_url && (
+                <div className="flex items-center gap-3" data-testid="media-opacity-control">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Media transparency:</span>
+                  <input type="range" min={20} max={100} step={5}
+                    value={activeSlide.media_opacity ?? 100}
+                    onChange={e => update(activeSlide.id, { media_opacity: Number(e.target.value) })}
+                    data-testid="media-opacity-slider"
+                    className="flex-1 accent-indigo-600" />
+                  <span className="text-xs font-medium text-slate-600 w-12 text-right" data-testid="media-opacity-value">
+                    {activeSlide.media_opacity ?? 100}%
+                  </span>
+                </div>
+              )}
               {activeSlide.slide_type === 'IMAGE' && activeSlide.media_url && (
                 <>
                   <img src={activeSlide.media_url} alt="Slide preview" data-testid="slide-image-preview"
+                    style={{ opacity: (activeSlide.media_opacity ?? 100) / 100 }}
                     className="max-h-48 rounded-xl border border-slate-200 object-contain" />
                   <div className="flex items-center gap-2" data-testid="image-position-picker">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Picture position:</span>
