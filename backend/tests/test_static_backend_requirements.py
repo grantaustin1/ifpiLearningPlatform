@@ -41,6 +41,20 @@ def test_google_genai_websockets_pin_compatibility():
     assert Version(pinned_version) in SpecifierSet(GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC)
 
 
+def test_no_emergentintegrations():
+    """emergentintegrations is not available on PyPI and its bundled litellm
+    pin conflicts with the separately-listed litellm URL in requirements.txt.
+    This guard prevents it from being re-introduced (regression from CI run
+    on branch 20260610 where emergentintegrations==0.2.0 caused pip install
+    to fail with ResolutionImpossible)."""
+    requirements_by_name = _requirements_by_name()
+    assert "emergentintegrations" not in requirements_by_name, (
+        "emergentintegrations must NOT appear in backend/requirements.txt — "
+        "it is unavailable on PyPI and its bundled litellm pin conflicts with "
+        "the separately-listed litellm wheel."
+    )
+
+
 def test_reportlab_pin_compatibility():
     requirements_by_name = _requirements_by_name()
 
