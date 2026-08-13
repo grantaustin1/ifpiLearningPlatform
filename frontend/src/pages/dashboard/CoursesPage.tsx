@@ -33,6 +33,7 @@ export default function CoursesPage() {
   const createMut = useMutation({
     mutationFn: async (body: any) => (await api.post('/courses', body)).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['courses'] }); toast.success('Course created') },
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not create course'),
   })
 
   const dupMut = useMutation({
@@ -92,8 +93,13 @@ export default function CoursesPage() {
   }
 
   const handleNewCourse = async () => {
-    const c = await createMut.mutateAsync({ title: 'Untitled Course', status: 'DRAFT' })
-    window.location.href = `/courses/${c.id}/edit`
+    const taken = new Set(courses.map((c: any) => c.title))
+    let title = 'Untitled Course'
+    for (let n = 2; taken.has(title); n++) title = `Untitled Course ${n}`
+    try {
+      const c = await createMut.mutateAsync({ title, status: 'DRAFT' })
+      window.location.href = `/courses/${c.id}/edit`
+    } catch { /* toast shown by onError */ }
   }
 
   const archivedCount = courses.filter(c => c.status === 'ARCHIVED').length
