@@ -12,7 +12,7 @@ import { StreakLeaderboardTrigger } from 'components/StreakLeaderboardModal'
 
 export default function CoursesPage() {
   const qc = useQueryClient()
-  const { user, hasRole } = useAuth()
+  const { hasRole } = useAuth()
   const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN', 'INSTRUCTOR')
   const [search, setSearch] = useState('')
   const [showAI, setShowAI] = useState(false)
@@ -61,10 +61,18 @@ export default function CoursesPage() {
       setConfirmDelete(null)
       toast.success('Course permanently deleted')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not delete'),
+    onError: (e: any) => {
+      if (e?.response?.status === 404) {
+        qc.invalidateQueries({ queryKey: ['courses'] })
+        setConfirmDelete(null)
+        toast.info('That course no longer exists — the list was out of date and has been refreshed')
+        return
+      }
+      toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not delete')
+    },
   })
 
-  const canDelete = (c: any) => hasRole('SUPER_ADMIN') || c.created_by_id === user?.id
+  const canDelete = (_c: any) => hasRole('SUPER_ADMIN') || hasRole('ADMIN')
 
   const archiveMut = useMutation({
     mutationFn: async (id: number) => (await api.post(`/courses/${id}/archive`)).data,
