@@ -10,6 +10,7 @@ GOOGLE_GENAI_1_2_0_WEBSOCKETS_SPEC = ">=13.0,<15.0dev"
 SVGLIB_2_0_2_REPORTLAB_SPEC = ">=4.4.3"
 # Mirrors the currently published xhtml2pdf==0.2.17 package metadata requirement.
 XHTML2PDF_0_2_17_REPORTLAB_SPEC = ">=4.0.4,<5"
+DEFUSEDXML_REQUIRED_PIN = "0.7.1"
 
 
 def _requirements_by_name():
@@ -66,4 +67,24 @@ def test_emergentintegrations_not_in_requirements():
     assert "emergentintegrations" not in requirements_by_name, (
         "emergentintegrations must not be in requirements.txt — "
         "it breaks CI (see PR #249 and related fixes)"
+    )
+
+
+def test_defusedxml_is_present_and_pinned():
+    """build_docs imports server, which imports scorm_service on startup."""
+    requirements_by_name = _requirements_by_name()
+
+    assert "defusedxml" in requirements_by_name, (
+        "defusedxml must stay in requirements.txt because app startup imports "
+        "backend/services/scorm_service.py"
+    )
+
+    defusedxml_req = requirements_by_name["defusedxml"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in defusedxml_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version == DEFUSEDXML_REQUIRED_PIN, (
+        f"defusedxml must be pinned to {DEFUSEDXML_REQUIRED_PIN} so docs/build-time "
+        "imports remain reproducible in CI"
     )
