@@ -93,11 +93,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ifpi")
 
+
 # Schema is managed by Alembic (`alembic upgrade head`). We also auto-create
 # any missing tables on fresh checkouts; in production Alembic has already
 # created everything so this is a no-op.
-import models  # noqa: F401  â€” ensures all models register on metadata
-Base.metadata.create_all(bind=engine, checkfirst=True)
+#
+# GUARDED by SKIP_AUTO_CREATE_TABLES — never call create_all() unprotected.
+# (A previous unguarded duplicate was removed in PR #249; the guarded call
+# below is the ONLY remaining auto-create path.)
+import models  # noqa: F401  — ensures all models register on metadata
+if not os.environ.get("SKIP_AUTO_CREATE_TABLES"):
+    Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(
     title="IFPI Learning Platform API",
