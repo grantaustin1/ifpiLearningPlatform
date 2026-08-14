@@ -470,8 +470,12 @@ async def upload_zip_and_run(
     # If the ZIP wraps the content under a single top-level dir (the common
     # case when you right-click → "Compress" on macOS / Finder), unwrap it
     # so the importer sees the expected `courses/` / `paths/` structure.
+    # Never unwrap when that single dir IS the content root (`courses`/`paths`).
     entries = [p for p in extract_dir.iterdir() if not p.name.startswith(".")]
-    root_dir = entries[0] if len(entries) == 1 and entries[0].is_dir() else extract_dir
+    root_dir = (entries[0]
+                if len(entries) == 1 and entries[0].is_dir()
+                and entries[0].name not in ("courses", "paths")
+                else extract_dir)
 
     org = db.query(Organization).filter(
         Organization.id == current.organization_id,

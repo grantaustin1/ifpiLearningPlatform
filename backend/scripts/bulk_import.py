@@ -448,11 +448,30 @@ def _count_planned_items(content_dir: Path) -> int:
     return n
 
 
+def _resolve_content_root(p: Path) -> Path:
+    """Be forgiving about where the `courses/` / `paths/` tree actually sits.
+    Handles ZIPs whose single top dir IS `courses`, admins pointing straight
+    at the courses folder, and one extra wrapper directory level."""
+    if (p / "courses").is_dir() or (p / "paths").is_dir():
+        return p
+    if p.name in ("courses", "paths") and p.is_dir():
+        return p.parent
+    subdirs = [d for d in p.iterdir()
+               if d.is_dir() and not d.name.startswith(".")] if p.is_dir() else []
+    if len(subdirs) == 1:
+        inner = subdirs[0]
+        if (inner / "courses").is_dir() or (inner / "paths").is_dir():
+            return inner
+        if inner.name in ("courses", "paths"):
+            return p
+    return p
+
+
 def run_import_for_job(db: Session, *,
                        job_id: int, org_id: int, source_path: str,
                        publish_on_import: bool = False) -> Dict:
     """Background entry — updates the ImportJob row as it goes."""
-    content_path = Path(source_path)
+    content_path = _resolve_content_root(Path(source_path))
     job = db.query(ImportJob).filter(ImportJob.id == job_id).first()
     if not job:
         raise RuntimeError(f"ImportJob {job_id} not found")
@@ -530,7 +549,14 @@ def run_import_for_job(db: Session, *,
 
     job.completed_at = _utcnow()
     job.results = results
-    if job.failed_items == 0 and (job.processed_items > 0 or job.total_items == 0):
+    if job.total_items == 0:
+        job.status = "FAILED"
+        job.error_log = (
+            "No content found to import. The importer expects a 'courses/' folder "
+            "(one sub-folder per course) and/or a 'paths/' folder with .json files. "
+            f"Looked in: {content_path}"
+        )
+    elif job.failed_items == 0 and job.processed_items > 0:
         job.status = "COMPLETED"
     elif job.processed_items > job.failed_items:
         job.status = "PARTIAL"
