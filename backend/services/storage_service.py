@@ -51,6 +51,11 @@ class StorageBackend(ABC):
     def exists(self, path: str) -> bool:
         """Whether `path` exists in this backend."""
 
+    def local_path(self, path: str) -> Optional[Path]:
+        """If the backend can expose the file on local disk (directly or via
+        cache), return that Path for efficient FileResponse serving."""
+        return None
+
 
 class LocalStorage(StorageBackend):
     """Disk-backed storage. Files live under `base_path`. URLs are returned
@@ -95,6 +100,13 @@ class LocalStorage(StorageBackend):
             return self._full(path).exists()
         except StorageError:
             return False
+
+    def local_path(self, path: str) -> Optional[Path]:
+        try:
+            f = self._full(path)
+        except StorageError:
+            return None
+        return f if f.exists() else None
 
 
 class S3Storage(StorageBackend):
@@ -203,6 +215,113 @@ class GCSStorage(StorageBackend):
         return self.bucket.blob(path).exists()
 
 
+class EmergentStorage(StorageBackend):
+    """Emergent platform object storage (persistent across redeploys).
+    All access is proxied through the integrations API using the
+    EMERGENT_LLM_KEY. A local write-through disk cache keeps serving fast
+    and doubles as the pre-existing uploads tree on the preview pod."""
+
+    APP_PREFIX = "ifpi-lms"
+
+    def __init__(self, cache_dir: str):
+        import requests  # local import — stdlib-only module otherwise
+        self._requests = requests
+        base = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() \
+            or "https://integrations.emergentagent.com"
+        self.api = base.rstrip("/") + "/objstore/api/v1/storage"
+        self.emergent_key = os.environ.get("EMERGENT_LLM_KEY")
+        self._storage_key: Optional[str] = None
+        self.cache = Path(cache_dir).resolve()
+        self.cache.mkdir(parents=True, exist_ok=True)
+        logger.info("EmergentStorage initialized (cache at %s)", self.cache)
+
+    def _key(self, force: bool = False) -> str:
+        if self._storage_key and not force:
+            return self._storage_key
+        resp = self._requests.post(f"{self.api}/init",
+                                   json={"emergent_key": self.emergent_key},
+                                   timeout=30)
+        resp.raise_for_status()
+        self._storage_key = resp.json()["storage_key"]
+        return self._storage_key
+
+    def _remote(self, path: str) -> str:
+        return f"{self.APP_PREFIX}/{path.lstrip('/')}"
+
+    def _cache_file(self, path: str) -> Path:
+        target = (self.cache / path).resolve()
+        if not str(target).startswith(str(self.cache)):
+            raise StorageError(f"Invalid path: {path}")
+        return target
+
+    def _request(self, method: str, path: str, **kw):
+        resp = self._requests.request(
+            method, f"{self.api}/objects/{self._remote(path)}",
+            headers={"X-Storage-Key": self._key(), **kw.pop("headers", {})}, **kw)
+        if resp.status_code == 404:
+            # Could be a dead storage_key — re-init once, then retry
+            resp = self._requests.request(
+                method, f"{self.api}/objects/{self._remote(path)}",
+                headers={"X-Storage-Key": self._key(force=True),
+                         **kw.pop("headers", {})}, **kw)
+        return resp
+
+    def save(self, file, path, content_type=None):
+        data = file if isinstance(file, (bytes, bytearray)) else file.read()
+        ct = content_type or mimetypes.guess_type(path)[0] or "application/octet-stream"
+        resp = self._request("PUT", path, headers={"Content-Type": ct},
+                             data=data, timeout=300)
+        if resp.status_code >= 400:
+            raise StorageError(f"Object storage upload failed "
+                               f"({resp.status_code}) for {path}")
+        cache_file = self._cache_file(path)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_bytes(bytes(data))
+        logger.info("EmergentStorage: wrote %s bytes → %s", len(data), path)
+        return f"/api/uploads/files/{path}"
+
+    def _fetch_to_cache(self, path: str) -> Optional[Path]:
+        cache_file = self._cache_file(path)
+        if cache_file.exists():
+            return cache_file
+        resp = self._request("GET", path, timeout=300)
+        if resp.status_code == 404:
+            return None
+        if resp.status_code >= 400:
+            raise StorageError(f"Object storage read failed "
+                               f"({resp.status_code}) for {path}")
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_bytes(resp.content)
+        return cache_file
+
+    def load(self, path):
+        f = self._fetch_to_cache(path)
+        if f is None:
+            raise StorageError(f"File not found: {path}")
+        return f.read_bytes()
+
+    def local_path(self, path: str) -> Optional[Path]:
+        try:
+            return self._fetch_to_cache(path)
+        except StorageError:
+            return None
+
+    def delete(self, path):
+        # Object storage has no delete API — drop the cache copy and
+        # rely on DB references being removed (soft delete).
+        try:
+            self._cache_file(path).unlink(missing_ok=True)
+        except StorageError:
+            return False
+        return True
+
+    def exists(self, path):
+        try:
+            return self._fetch_to_cache(path) is not None
+        except StorageError:
+            return False
+
+
 _instance: Optional[StorageBackend] = None
 
 
@@ -213,7 +332,12 @@ def get_storage() -> StorageBackend:
         return _instance
 
     backend = (settings.storage_backend or "local").lower()
-    if backend == "s3":
+    if backend == "emergent":
+        base = settings.storage_path
+        if not os.path.isabs(base):
+            base = str((Path(__file__).parent.parent / base).resolve())
+        _instance = EmergentStorage(cache_dir=base)
+    elif backend == "s3":
         if not settings.s3_bucket:
             raise StorageError("S3_BUCKET env var required when STORAGE_BACKEND=s3")
         _instance = S3Storage(bucket=settings.s3_bucket, region=settings.s3_region)

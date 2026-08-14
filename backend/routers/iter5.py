@@ -14,6 +14,7 @@ from typing import List, Optional
 from fastapi import (
     APIRouter, Depends, File, HTTPException, Request, Response, UploadFile,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.orm import Session
 
@@ -120,15 +121,8 @@ def cover_library(current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "A
 
 @uploads_router.get("/files/{path:path}")
 def serve_upload(path: str):
-    """Serve a previously-uploaded file. ONLY meaningful for the `local`
-    backend — S3/GCS URLs are public/CDN and bypass this route."""
+    """Serve a previously-uploaded file (local disk or object-store cache)."""
     storage = get_storage()
-    if not storage.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-    try:
-        content = storage.load(path)
-    except StorageError as e:
-        raise HTTPException(status_code=404, detail=str(e))
     suffix = Path(path).suffix.lower()
     mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".webp": "image/webp", ".svg": "image/svg+xml", ".gif": "image/gif",
@@ -136,6 +130,14 @@ def serve_upload(path: str):
             ".m4v": "video/x-m4v", ".ogg": "video/ogg",
             ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4",
             ".pdf": "application/pdf"}.get(suffix, "application/octet-stream")
+    local = storage.local_path(path)
+    if local is not None:
+        return FileResponse(local, media_type=mime,
+                            headers={"Cache-Control": "public, max-age=3600"})
+    try:
+        content = storage.load(path)
+    except StorageError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return Response(
         content=content, media_type=mime,
         headers={"Cache-Control": "public, max-age=3600"},
