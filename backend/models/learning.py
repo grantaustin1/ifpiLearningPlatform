@@ -56,6 +56,8 @@ class CourseSlide(Base):
     content = Column(Text)
     slide_type = Column(SQLEnum(SlideType), default=SlideType.TEXT)
     media_url = Column(String(500))
+    image_position = Column(String(10), default="above")  # above | beside | behind
+    media_opacity = Column(Integer, default=100)  # 20-100 (%) for image/video media
     narration_url = Column(String(500))       # cached TTS narration (Iter 26)
     narration_voice = Column(String(30))       # last-used voice — for re-runs
     order_index = Column(Integer, default=0)
@@ -129,6 +131,7 @@ class Enrollment(Base):
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.IN_PROGRESS)
     progress = Column(Float, default=0.0)
+    last_slide_index = Column(Integer, default=0)
     enrolled_at = Column(DateTime, default=_utcnow)
     completed_at = Column(DateTime, nullable=True)
 

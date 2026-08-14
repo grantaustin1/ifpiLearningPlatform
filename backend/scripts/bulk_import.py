@@ -202,8 +202,20 @@ def import_course_from_directory(
     ).first()
     if existing:
         logger.info("Updating existing course '%s' (id=%s)", title, existing.id)
-        # Wipe slides — they get rebuilt below
-        db.query(CourseSlide).filter(CourseSlide.course_id == existing.id).delete()
+        # Wipe slides — they get rebuilt below. First detach/remove rows that
+        # reference the old slides (learner view history, comments, flashcards,
+        # SCORM links) or SQLite raises a FOREIGN KEY IntegrityError.
+        from models.ai import Flashcard
+        from models.engagement import SlideView
+        from models.learning import ScormPackage, SlideComment
+        old_slide_ids = [sid for (sid,) in db.query(CourseSlide.id).filter(
+            CourseSlide.course_id == existing.id)]
+        if old_slide_ids:
+            db.query(SlideView).filter(SlideView.slide_id.in_(old_slide_ids)).delete(synchronize_session=False)
+            db.query(SlideComment).filter(SlideComment.slide_id.in_(old_slide_ids)).delete(synchronize_session=False)
+            db.query(Flashcard).filter(Flashcard.slide_id.in_(old_slide_ids)).update({"slide_id": None}, synchronize_session=False)
+            db.query(ScormPackage).filter(ScormPackage.slide_id.in_(old_slide_ids)).update({"slide_id": None}, synchronize_session=False)
+        db.query(CourseSlide).filter(CourseSlide.course_id == existing.id).delete(synchronize_session=False)
         course = existing
         course.description = description
         course.category = category

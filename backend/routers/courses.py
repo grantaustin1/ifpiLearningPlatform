@@ -36,6 +36,7 @@ def _summary(c: Course) -> CourseSummary:
         currency=c.currency, slide_count=len(c.slides),
         enrollment_count=len(c.enrollments), created_at=c.created_at,
         mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
+        created_by_id=c.created_by_id,
     )
 
 
@@ -124,6 +125,8 @@ def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
             slide_type=s.slide_type.value, media_url=s.media_url,
             order_index=s.order_index, is_required=s.is_required,
             narration_url=s.narration_url, narration_voice=s.narration_voice,
+            image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
         ) for s in c.slides],
     )
 
@@ -315,6 +318,10 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
     ).first()
     if not c:
         raise HTTPException(status_code=404, detail="Course not found")
+    if c.status == CourseStatus.PUBLISHED:
+        raise HTTPException(
+            status_code=409,
+            detail="Unpublish the course first, then delete it")
     # Iter 47 — clean up FK dependents so the delete never 500s.
     from models import (
         AITutorSession, Certificate, CoursePrerequisite, CourseRating,
@@ -344,6 +351,10 @@ def delete_course(course_id: int, db: Session = Depends(get_db),
         db.query(model).filter(model.course_id == course_id) \
             .update({model.course_id: None}, synchronize_session=False)
     db.delete(c)  # slides + enrollments cascade via ORM relationships
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_DELETED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
     db.commit()
     return {"ok": True}
 
@@ -361,6 +372,55 @@ def publish_course(course_id: int, db: Session = Depends(get_db),
     if len(c.slides) == 0:
         raise HTTPException(status_code=400, detail="Add at least one slide before publishing")
     c.status = CourseStatus.PUBLISHED
+    db.commit()
+    return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
+
+
+@router.post("/{course_id}/archive")
+def archive_course(course_id: int, db: Session = Depends(get_db),
+                   current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Safe alternative to deletion — hides the course from learners and the
+    catalog, keeps everything restorable. Blocked while learners are busy."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if c.status == CourseStatus.ARCHIVED:
+        return {"ok": True, "status": c.status.value, "course_id": c.id}
+    busy = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.status == EnrollmentStatus.IN_PROGRESS,
+    ).count()
+    if busy:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{busy} learner{'s are' if busy != 1 else ' is'} still busy with this course")
+    c.status = CourseStatus.ARCHIVED
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_ARCHIVED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
+    db.commit()
+    return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
+
+
+@router.post("/{course_id}/unarchive")
+def unarchive_course(course_id: int, db: Session = Depends(get_db),
+                     current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Restore an archived course back to DRAFT (re-publish separately)."""
+    c = db.query(Course).filter(
+        Course.id == course_id, Course.organization_id == current.organization_id,
+    ).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if c.status != CourseStatus.ARCHIVED:
+        raise HTTPException(status_code=409, detail="Course is not archived")
+    c.status = CourseStatus.DRAFT
+    from services import audit_service
+    audit_service.record(db, current, "COURSE_UNARCHIVED",
+                         target_type="course", target_id=course_id,
+                         metadata={"title": c.title})
     db.commit()
     return {"ok": True, "status": c.status.value, "course_id": c.id, "title": c.title}
 
@@ -432,6 +492,8 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         slide_type=SlideType(body.slide_type) if body.slide_type in SlideType.__members__ else SlideType.TEXT,
         media_url=body.media_url, order_index=body.order_index or next_order,
         is_required=body.is_required,
+        image_position=body.image_position if body.image_position in ("above", "beside", "behind") else "above",
+        media_opacity=max(20, min(int(body.media_opacity), 100)) if body.media_opacity is not None else 100,
     )
     db.add(s)
     db.commit()
@@ -441,6 +503,8 @@ def add_slide(course_id: int, body: SlideIn, db: Session = Depends(get_db),
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
+        image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
     )
 
 
@@ -491,6 +555,10 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
     s.title = body.title
     s.content = body.content or ""
     s.media_url = body.media_url
+    if body.image_position in ("above", "beside", "behind"):
+        s.image_position = body.image_position
+    if body.media_opacity is not None:
+        s.media_opacity = max(20, min(int(body.media_opacity), 100))
     if body.slide_type in SlideType.__members__:
         s.slide_type = SlideType(body.slide_type)
     if body.order_index is not None:
@@ -503,6 +571,8 @@ def update_slide(course_id: int, slide_id: int, body: SlideIn, db: Session = Dep
         slide_type=s.slide_type.value, media_url=s.media_url,
         order_index=s.order_index, is_required=s.is_required,
         narration_url=s.narration_url, narration_voice=s.narration_voice,
+        image_position=s.image_position or "above",
+        media_opacity=s.media_opacity if s.media_opacity is not None else 100,
     )
 
 
@@ -597,6 +667,13 @@ def delete_slide(course_id: int, slide_id: int, db: Session = Depends(get_db),
     ).first()
     if not s:
         raise HTTPException(status_code=404, detail="Slide not found")
+    from models.ai import Flashcard
+    from models.engagement import SlideView
+    from models.learning import ScormPackage, SlideComment
+    db.query(SlideView).filter(SlideView.slide_id == slide_id).delete(synchronize_session=False)
+    db.query(SlideComment).filter(SlideComment.slide_id == slide_id).delete(synchronize_session=False)
+    db.query(Flashcard).filter(Flashcard.slide_id == slide_id).update({"slide_id": None}, synchronize_session=False)
+    db.query(ScormPackage).filter(ScormPackage.slide_id == slide_id).update({"slide_id": None}, synchronize_session=False)
     db.delete(s)
     db.commit()
     return {"ok": True}
@@ -636,17 +713,54 @@ def enroll(course_id: int, db: Session = Depends(get_db),
         Enrollment.user_id == current.id, Enrollment.course_id == course_id,
     ).first()
     if existing:
-        return {"ok": True, "enrollment_id": existing.id, "already": True}
+        return {"ok": True, "enrollment_id": existing.id, "already": True,
+                "last_slide_index": existing.last_slide_index or 0}
+    from sqlalchemy.exc import IntegrityError
     e = Enrollment(user_id=current.id, course_id=course_id)
     db.add(e)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Race: a concurrent request enrolled first — behave idempotently.
+        db.rollback()
+        existing = db.query(Enrollment).filter(
+            Enrollment.user_id == current.id, Enrollment.course_id == course_id,
+        ).first()
+        return {"ok": True, "enrollment_id": existing.id if existing else None, "already": True,
+                "last_slide_index": (existing.last_slide_index if existing else 0) or 0}
     gam = GamificationService(db)
     gam.award_xp(current.id, XP_FIRST_ENROLLMENT)
     enroll_count = db.query(Enrollment).filter(Enrollment.user_id == current.id).count()
     if enroll_count == 1:
         gam.award_badge(current.id, "FIRST_ENROLLMENT")
     db.commit()
-    return {"ok": True, "enrollment_id": e.id, "already": False}
+    return {"ok": True, "enrollment_id": e.id, "already": False, "last_slide_index": 0}
+
+
+from pydantic import BaseModel
+
+
+class SlideProgressIn(BaseModel):
+    slide_index: int
+
+
+@router.post("/{course_id}/progress")
+def save_slide_progress(course_id: int, body: SlideProgressIn,
+                        db: Session = Depends(get_db),
+                        current: CurrentUser = Depends(get_current_user)):
+    """Remember the learner's position so they resume across devices."""
+    e = db.query(Enrollment).filter(
+        Enrollment.user_id == current.id, Enrollment.course_id == course_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not enrolled")
+    total = db.query(CourseSlide).filter(CourseSlide.course_id == course_id).count()
+    idx = max(0, min(body.slide_index, max(total - 1, 0)))
+    e.last_slide_index = idx
+    if total and e.status != EnrollmentStatus.COMPLETED:
+        e.progress = max(e.progress or 0.0, round((idx + 1) / total * 100, 1))
+    db.commit()
+    return {"ok": True, "last_slide_index": idx, "progress": e.progress}
 
 
 @router.post("/{course_id}/complete")

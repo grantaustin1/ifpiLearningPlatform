@@ -79,6 +79,14 @@ class Settings(BaseSettings):
         return self.environment.lower() == "production"
 
     @property
+    def test_bypass_enabled(self) -> bool:
+        """Test-only affordances (X-Return-Token, X-Test-Client-Ip,
+        /_test endpoints). Requires the explicit opt-in env var AND a
+        non-production environment — double-locked for deploys."""
+        return (os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() == "true"
+                and not self.is_production)
+
+    @property
     def cors_origins(self) -> list[str]:
         # Deployment secret CORS_ORIGINS wins if set (per Emergent deploy
         # support). Falls back to legacy ALLOWED_ORIGINS for preview.

@@ -100,6 +100,8 @@ class SlideIn(BaseModel):
     content: Optional[str] = ""
     slide_type: str = "TEXT"
     media_url: Optional[str] = None
+    image_position: Optional[str] = "above"  # above | beside | behind
+    media_opacity: Optional[int] = 100  # 20-100 (%)
     order_index: Optional[int] = None
     is_required: bool = True
 
@@ -152,6 +154,7 @@ class CourseSummary(BaseModel):
     enrollment_count: int = 0
     created_at: datetime
     mindmap_thumbnail_svg: Optional[str] = None  # Iter 30b
+    created_by_id: Optional[int] = None
 
 
 class CourseDetail(CourseSummary):

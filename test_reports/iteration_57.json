@@ -1,0 +1,30 @@
+{
+  "summary": "Tested Feedback screenshot attach/upload + Welcome Tour features (iter 57). Backend: 8/8 pytest cases pass (auth, upload validation, screenshot serving, feedback create with/without screenshot, screenshot_url path validation, admin list returns screenshot_url, admin status toggle). Frontend: Learner tour appears on first login, walks all 5 steps ('Welcome...', My Courses, Certificates, Help & guides, Feedback), final button reads 'Got it, let's go!' and finish() persists localStorage key ifpi_tour_done_v1_<userId>; reload does NOT re-show tour. Skip button on step 2 also persists the flag. Admin tour appears with 6 admin-specific steps (Welcome, Dashboard, Courses, Exams & insights, Tester feedback, Report an issue). Feedback widget: opens with title 'Report an issue', message + screenshot upload (via hidden file input) shows preview, remove works, re-attach works, submit closes panel and shows 'Feedback sent - thank you!' toast. Admin /feedback-admin renders screenshot thumbnails, image src fetch returns HTTP 200 from /api/uploads/files/feedback/. All primary happy paths pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_feedback_screenshot.py",
+    "/app/test_reports/pytest/iter57.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "WelcomeTour.tsx: `steps` array is recomputed on every render using live document.querySelector, which means if a step's target element disappears mid-tour the visible step could shift under the user; consider computing steps once on mount and memoizing. Not observed as a real bug in this run but is a latent flakiness source (may explain a single flaky iteration observed then not reproduced).",
+    "WelcomeTour tooltip positioning uses window.innerWidth/2 heuristic — on narrow viewports the card can clip; consider clamping within viewport bounds for both axes.",
+    "feedback.py: uploaded screenshots are stored with a per-org URL but the /screenshot endpoint does not scope key by organization_id — any authed user across orgs could theoretically request an image URL if they guess the uuid. Low risk given uuid4 unpredictability.",
+    "FeedbackWidget.tsx sets Content-Type: multipart/form-data manually — axios normally sets this with boundary automatically; forcing it may in some axios versions strip the boundary. Currently works, but safer to omit the header override."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_feedback_screenshot.py (created)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% on primary flows"},
+  "test_credentials": "Learner uat-learner@ifpi.org/UatLearner!2026 (id=836), Admin uat-admin@ifpi.org/UatAdmin!2026 - both work with body access_token (AUTH_COOKIE_MODE=dual).",
+  "seed_data_creation": "Several TEST_ prefixed feedback rows created via backend & frontend tests; screenshot files under /app/backend/uploads/feedback/.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both new features (feedback screenshot + welcome tour) are functional end-to-end. Tour done-key is ifpi_tour_done_v1_<userId>. For non-tour tests, either pre-set the flag after login and reload, or dismiss the tour by clicking skip. Backend tests are in /app/backend/tests/test_feedback_screenshot.py.",
+  "rca of the issue": "N/A - no bugs found. One flaky iteration in first frontend run where final tour click seemingly did not persist was not reproducible in a re-run with slightly higher wait (600ms). Attributed to a transient re-render/timing edge; see code review comment about steps recomputation."
+}

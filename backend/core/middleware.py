@@ -314,8 +314,8 @@ class LoginBruteForceMiddleware(BaseHTTPMiddleware):
         # from parallel workers sharing the K8s ingress upstream IP.
         # Gated behind `ALLOW_TEST_TOKEN_HEADER=true`; never active in
         # production because the env var is off there.
-        import os as _os
-        if _os.environ.get("ALLOW_TEST_TOKEN_HEADER") == "true":
+        from core.config import settings as _settings
+        if _settings.test_bypass_enabled:
             test_ip = request.headers.get("x-test-client-ip") or ""
             if test_ip.strip():
                 return test_ip.strip()

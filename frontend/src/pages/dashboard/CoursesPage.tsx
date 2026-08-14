@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
 import { useAuth } from 'contexts/AuthContext'
-import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical, Star } from 'lucide-react'
+import { Plus, Search, BookOpen, Clock, Users, Sparkles, Eye, Edit, LogIn, X, Loader2, Copy, ArrowUpDown, GripVertical, Star, Trash2, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
 import { ShareCourseButton } from 'components/ShareCourseButton'
@@ -17,6 +17,8 @@ export default function CoursesPage() {
   const [search, setSearch] = useState('')
   const [showAI, setShowAI] = useState(false)
   const [reordering, setReordering] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<any | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const { data: courses = [], isLoading } = useQuery<any[]>({
     queryKey: ['courses'], queryFn: async () => (await api.get('/courses')).data,
@@ -25,12 +27,13 @@ export default function CoursesPage() {
   const reorderMut = useMutation({
     mutationFn: async (ids: number[]) => (await api.patch('/courses/reorder', { course_ids: ids })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['courses'] }),
-    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Reorder failed'),
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Reorder failed'),
   })
 
   const createMut = useMutation({
     mutationFn: async (body: any) => (await api.post('/courses', body)).data,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['courses'] }); toast.success('Course created') },
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not create course'),
   })
 
   const dupMut = useMutation({
@@ -39,7 +42,7 @@ export default function CoursesPage() {
       qc.invalidateQueries({ queryKey: ['courses'] })
       toast.success(`Duplicated with ${d.slides_copied} slide${d.slides_copied !== 1 ? 's' : ''}`)
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not duplicate'),
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not duplicate'),
   })
 
   const featureMut = useMutation({
@@ -48,21 +51,105 @@ export default function CoursesPage() {
       qc.invalidateQueries({ queryKey: ['courses'] })
       toast.success(d.is_featured ? 'Added to the marketplace Featured row' : 'Removed from the Featured row')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Could not update'),
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not update'),
   })
 
-  const handleNewCourse = async () => {
-    const c = await createMut.mutateAsync({ title: 'Untitled Course', status: 'DRAFT' })
-    window.location.href = `/courses/${c.id}/edit`
+  const deleteMut = useMutation({
+    mutationFn: async (id: number) => (await api.delete(`/courses/${id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courses'] })
+      setConfirmDelete(null)
+      toast.success('Course permanently deleted')
+    },
+    onError: (e: any) => {
+      if (e?.response?.status === 404) {
+        qc.invalidateQueries({ queryKey: ['courses'] })
+        setConfirmDelete(null)
+        toast.info('That course no longer exists — the list was out of date and has been refreshed')
+        return
+      }
+      toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not delete')
+    },
+  })
+
+  const canDelete = (_c: any) => hasRole('SUPER_ADMIN') || hasRole('ADMIN')
+
+  const archiveMut = useMutation({
+    mutationFn: async (id: number) => (await api.post(`/courses/${id}/archive`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courses'] })
+      toast.success('Course archived — restore it anytime from "Show archived"')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not archive'),
+  })
+
+  const unarchiveMut = useMutation({
+    mutationFn: async (id: number) => (await api.post(`/courses/${id}/unarchive`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courses'] })
+      toast.success('Course restored to drafts — publish it when ready')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || 'Could not restore'),
+  })
+
+  const handleDeleteClick = (c: any) => {
+    if (c.status === 'PUBLISHED') {
+      toast.info('Unpublish the course first (open Edit → Unpublish), then delete it.')
+      return
+    }
+    setConfirmDelete(c)
   }
 
-  const filtered = courses.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()))
+  const handleNewCourse = async () => {
+    const taken = new Set(courses.map((c: any) => c.title))
+    let title = 'Untitled Course'
+    for (let n = 2; taken.has(title); n++) title = `Untitled Course ${n}`
+    try {
+      const c = await createMut.mutateAsync({ title, status: 'DRAFT' })
+      window.location.href = `/courses/${c.id}/edit`
+    } catch { /* toast shown by onError */ }
+  }
+
+  const archivedCount = courses.filter(c => c.status === 'ARCHIVED').length
+  const filtered = courses.filter(c =>
+    (!search || c.title.toLowerCase().includes(search.toLowerCase()))
+    && (showArchived || c.status !== 'ARCHIVED'))
 
   return (
     <div className="p-8" data-testid="courses-page">
       {showAI && <AIBuilderModal onClose={() => setShowAI(false)} onApplied={() => {
         qc.invalidateQueries({ queryKey: ['courses'] }); setShowAI(false)
       }} />}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" data-testid="delete-confirm-modal">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Delete "{confirmDelete.title}"?</h3>
+                <p className="text-sm text-slate-500 mt-1.5">
+                  This is <strong>permanent</strong>. All slides, flashcards, ratings and learner
+                  progress for this course will be removed. Certificates already earned stay valid.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setConfirmDelete(null)} data-testid="delete-cancel-btn"
+                className="text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg px-4 py-2">
+                Cancel
+              </button>
+              <button onClick={() => deleteMut.mutate(confirmDelete.id)} disabled={deleteMut.isPending}
+                data-testid="delete-confirm-btn"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">
+                <Trash2 className="h-3.5 w-3.5" /> {deleteMut.isPending ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -91,10 +178,18 @@ export default function CoursesPage() {
         )}
       </div>
 
-      <div className="relative mb-6 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..." data-testid="courses-search"
-          className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <div className="flex items-center gap-3 mb-6">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..." data-testid="courses-search"
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        {isAdmin && archivedCount > 0 && (
+          <button onClick={() => setShowArchived(s => !s)} data-testid="show-archived-toggle"
+            className={`inline-flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-2 transition-colors ${showArchived ? 'border-slate-400 bg-slate-100 text-slate-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+            <Archive className="h-3.5 w-3.5" /> {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          </button>
+        )}
       </div>
 
       {isLoading ? <Spinner /> : filtered.length === 0 ? (
@@ -178,6 +273,26 @@ export default function CoursesPage() {
                         className="inline-flex items-center justify-center text-xs border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
+                      {c.status === 'ARCHIVED' ? (
+                        <button onClick={() => unarchiveMut.mutate(c.id)} disabled={unarchiveMut.isPending} data-testid={`unarchive-btn-${c.id}`}
+                          title="Restore this course from the archive"
+                          className="inline-flex items-center justify-center text-xs border border-amber-200 text-amber-600 hover:bg-amber-50 hover:border-amber-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
+                          <ArchiveRestore className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <button onClick={() => archiveMut.mutate(c.id)} disabled={archiveMut.isPending} data-testid={`archive-btn-${c.id}`}
+                          title="Archive this course (safe — hides it from learners, restore anytime)"
+                          className="inline-flex items-center justify-center text-xs border border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300 rounded-lg px-2.5 py-1.5 font-medium disabled:opacity-50">
+                          <Archive className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canDelete(c) && (
+                        <button onClick={() => handleDeleteClick(c)} data-testid={`delete-course-btn-${c.id}`}
+                          title={c.status === 'PUBLISHED' ? 'Unpublish first, then delete' : 'Delete this course permanently'}
+                          className={`inline-flex items-center justify-center text-xs border rounded-lg px-2.5 py-1.5 font-medium transition-colors ${c.status === 'PUBLISHED' ? 'border-slate-200 text-slate-300 hover:border-slate-300' : 'border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300'}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <ShareCourseButton courseId={c.id} mode="menu" />
                       <Link to={`/learn/${c.id}`} className="inline-flex items-center justify-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium">
                         <Eye className="h-3.5 w-3.5" /> Preview
@@ -334,3 +449,4 @@ function AIBuilderModal({ onClose, onApplied }: { onClose: () => void; onApplied
     </div>
   )
 }
+

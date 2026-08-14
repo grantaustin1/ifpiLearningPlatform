@@ -1,0 +1,22 @@
+{
+  "summary": "Verified the 'Edit course' button fix on LearnPage. All 4 scenarios in the review request pass. Admin viewing /learn/243 sees learn-edit-course-btn in the header; clicking it navigates to /courses/243/edit where the imported IMAGE slide '01A Gym Floor' exposes all picture tools (slide-media-url, slide-image-upload-btn, slide-image-preview, image-position-picker with above/beside/behind chips, slide-image-upload-input). Uploading a 1x1 test PNG via slide-image-upload-input successfully updated the Media URL from /api/uploads/files/imports/327/utilizing-the-fitness-facility/01a-gym-floor.jpg to /api/uploads/files/branding/<uuid>.png (upload endpoint working). Save was intentionally NOT clicked to preserve user data. Learner uat-learner on /learn/224 does NOT see the edit button (count=0). /learn/9999 renders the friendly course-unavailable screen without crashing.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix is minimal and scoped correctly: staff-gated Edit course button added to learn player header, non-destructive (navigation only). No changes needed to CourseEditPage — picture tools were already present and functional for IMAGE slides."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (4/4 scenarios)"},
+  "test_credentials": "Admin uat-admin@ifpi.org / UatAdmin!2026, Learner uat-learner@ifpi.org / UatLearner!2026 (from /app/memory/test_credentials.md conventions and review request)",
+  "seed_data_creation": "None. Uploaded a 1x1 test PNG to change the image slide's media URL in the editor form state, but did NOT click Save, so course 243 remains untouched in the DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug-fix verification only. Course 243 is REAL user-imported data (118-slide 'Utilizing the Fitness Facility (US 254459)') — never click Save while editing it. Course 224 is a published course usable by uat-learner. Welcome tour appears ~1s after fresh login; dismiss via [data-testid=welcome-tour-skip]. Backend cookies-based auth works; test token header remains disabled by design.",
+  "rca of the issue": "Original bug was a UX misconception: user was in LEARNER player (/learn/243) expecting editing tools. Editor at /courses/243/edit already had full image tooling. Fix: added staff-only 'Edit course' shortcut in the learner header. Verified working."
+}

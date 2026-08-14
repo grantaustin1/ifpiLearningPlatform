@@ -1,6 +1,6 @@
 # IFPI Learning Platform — Student User Guide
 
-**Version 3.0 · July 2026 — Complete first-time walkthrough**
+**Version 4.0 · August 2026 — Complete first-time walkthrough**
 
 This is a step-by-step manual for learners on the International Fitness
 Professionals Institute learning platform. It assumes you have never used
@@ -17,10 +17,10 @@ you will see.
 - Either an **invitation email** from your academy, or the platform URL to
   register yourself.
 
-**Your sidebar.** Once logged in you'll see: *Dashboard, My Courses,
-Learning Paths, My Certificates, Live sessions, Leaderboard, Subscriptions,
-Preferences* — plus a **Help & guides** link at the bottom that opens this
-manual as a PDF whenever you need it.
+**Your sidebar.** Once logged in you'll see: *My Courses, Learning Paths,
+My Certificates, Live sessions, Leaderboard, Subscriptions, Preferences* —
+plus a **Help & guides** link at the bottom that opens this manual as a PDF
+whenever you need it.
 
 ---
 
@@ -45,12 +45,31 @@ manual as a PDF whenever you need it.
    enabled two-factor authentication).
 2. **Forgot your password?** Use **Forgot password** on the login page.
 
+<img src="/app/docs/screenshots/guide/login.jpg" width="440">
+<p class="fig">Figure 1 — The login page.</p>
+
 > ⚠️ If a full-screen **Terms & Conditions** page appears, read and click
 > **Accept** — the platform stays locked until you do.
 
 ---
 
-## 3. Your Dashboard
+## 3. Your First Login — the Welcome Tour
+
+A moment after your very first login, a short **guided tour** pops up: a
+welcome card with a **Show me around** button.
+
+- Click it and the tour spotlights the five places that matter most: **My
+  Courses** (where you start), **My Certificates**, **Help & guides**, and
+  the round **Report an issue** button in the bottom-right corner.
+- Prefer to explore alone? Click **Skip tour**.
+- Either way, the tour shows **only once** — it won't nag you again.
+
+<img src="/app/docs/screenshots/guide/l_tour.jpg" width="440">
+<p class="fig">Figure 2 — The Welcome Tour spotlighting My Courses on your first login.</p>
+
+---
+
+## 4. Your Dashboard
 
 - **Your courses** with progress bars — click any card to continue exactly
   where you left off.
@@ -61,15 +80,18 @@ manual as a PDF whenever you need it.
 
 ---
 
-## 4. Finding a Course
+## 5. Finding a Course
 
-1. Open the **catalog**. Courses now show **cover photos**, category tags,
+1. Open the **catalog**. Courses show **cover photos**, category tags,
    duration — and an **amber star rating** (e.g. ★ 4.5 (12)) when other
    learners have rated them. Ratings come only from people who actually
    finished the course, so they're worth trusting.
 2. Use the **search box**, **category/academy filters** and **sort** menu.
    The **Featured** row highlights courses the academy recommends.
 3. Click a card for the detail page and the Enrol button.
+
+<img src="/app/docs/screenshots/guide/l_courses.jpg" width="440">
+<p class="fig">Figure 3 — My Courses: cover photos, slide counts, durations and Start Course buttons.</p>
 
 **Learning Paths:** if courses are arranged in a path (Foundation →
 Intermediate → Advanced), finish one step to unlock the next.
@@ -79,7 +101,7 @@ tells you which.
 
 ---
 
-## 5. Enrolling
+## 6. Enrolling
 
 - **Free courses** — click **Enrol**; the course opens immediately.
 - **Paid courses** — click **Enrol** → secure checkout → access activates on
@@ -90,24 +112,37 @@ tells you which.
 
 ---
 
-## 6. Taking a Course
+## 7. Taking a Course
 
-### 6.1 The course player
-1. Open the course from **My Courses**.
-2. Read each **slide**, then click **Next** (or the → arrow key). Progress
-   **saves automatically** — leave any time, resume exactly where you were.
-3. Some slides have **audio narration** — press play to listen.
+### 7.1 The course player
+1. Open the course from **My Courses** and press **Start Course**.
+2. Read each **slide**, then click **Next**. Progress **saves
+   automatically** — leave any time, resume exactly where you were.
+3. Slides can contain text, **video**, **images**, **audio narration**
+   (press play to listen) and **PDF** documents.
 
-### 6.2 Finishing — and rating the course
+### 7.2 Courses that end with an exam
+If the course has an exam you'll see an **amber banner** at the top of the
+player: *"This course ends with an exam — pass [exam name] to earn your
+certificate."*
+
+- The exam stays **locked until you have completed every slide** — no
+  skipping ahead.
+- On the last slide the button changes to **Take exam** and leads you
+  straight in.
+
+<img src="/app/docs/screenshots/guide/l_learn.jpg" width="440">
+<p class="fig">Figure 4 — The course player: slide list on the left, the amber exam banner at the top, Previous/Next below.</p>
+
+### 7.3 Finishing — and rating the course
 On the final slide you reach the **completion card**: 🎉 congratulations,
 any XP you earned, and a **"How was this course?"** star row.
 
 - Click 1–5 stars to rate it — your rating helps other learners choose and
   gives your academy honest feedback. You can rate only after finishing,
   and clicking again later simply updates your rating.
-- If the course has an exam, the button to start it is right there too.
 
-### 6.3 The AI Tutor
+### 7.4 The AI Tutor
 Stuck on a concept? Click **Ask AI Tutor** inside any course, type your
 question, and get an answer built from your academy's own materials with
 **citations**. Save a useful answer as a flashcard with one click.
@@ -115,14 +150,14 @@ question, and get an answer built from your academy's own materials with
 > Privacy: tutor chats are private to you, and any personal information in
 > your questions is automatically removed before AI processing.
 
-### 6.4 Flashcards
+### 7.5 Flashcards
 If your course has flashcards, the review scheduler shows each card just
 before you'd forget it (spaced repetition). A few minutes a day beats
 cramming.
 
 ---
 
-## 7. Live Sessions
+## 8. Live Sessions
 
 1. Click **Live sessions** (or find them on the course page) and **RSVP**.
    For a repeating series, RSVP to one date or the whole series. RSVPing to
@@ -134,33 +169,56 @@ cramming.
 
 ---
 
-## 8. Taking an Exam
+## 9. Taking an Exam
 
-1. Finish the slides, then click **Start exam** on the completion card.
-2. Before starting you see the **time limit**, **passing score** and your
-   **remaining attempts** — the timer runs continuously once started.
+1. Finish every slide, then click **Take exam** on the final slide (or
+   **Start exam** on the completion card).
+2. Before starting you see the **time limit**, the **passing score** and an
+   **Attempts left** counter — the timer runs continuously once started.
 3. Answer the questions and **Submit**; your score appears instantly.
-4. **Passed?** Certificate issued immediately. **Failed?** Review the slides
-   and flashcards and use another attempt.
+4. **Passed?** Your certificate is issued immediately. **Failed?** Review
+   the slides and flashcards and use another attempt.
+
+### 9.1 What if I run out of attempts?
+Attempts are limited (the counter tells you how many you have). If you use
+them all:
+
+1. Contact your administrator or instructor and ask for a reset.
+2. When they reset your attempts you receive an **email confirming you can
+   try again**, and your Attempts-left counter starts fresh.
+3. Certificates you already earned are never taken away by a reset.
 
 ---
 
-## 9. Your Certificates
+## 10. Your Certificates & Transcript
 
-From **My Certificates** you can, for each one:
+From **My Certificates** you can, for each certificate:
 
 - **Download the PDF** — branded by your academy, QR code included.
 - **Verify** — the QR/link opens a public page proving it's genuine;
   employers can check without an account.
-- **Share** — a rich preview card, perfect for LinkedIn: *"I just
-  completed…"*.
+- **Share** — every certificate has a public share link with a rich preview
+  image. Paste it into LinkedIn, Twitter or WhatsApp and it appears as a
+  smart card with your name and the course title: *"I just completed…"*.
+
+### 10.1 Your academic transcript
+Need proof of everything you've studied — for an employer, a college, or
+your own records? At the top of **My Certificates**:
+
+- **Download PDF** — a formal **transcript PDF** listing every course,
+  your progress, exam results and certificates, generated on the spot.
+- **Printable transcript** — the same record as a clean on-screen page with
+  a **Print** button.
+
+<img src="/app/docs/screenshots/guide/l_certificates.jpg" width="440">
+<p class="fig">Figure 5 — My Certificates with the Printable transcript and Download PDF buttons at the top.</p>
 
 > ⚠️ If a certificate ever shows **REVOKED**, contact your academy
 > administrator.
 
 ---
 
-## 10. Streaks, Points, Badges & the Leaderboard
+## 11. Streaks, Points, Badges & the Leaderboard
 
 - **Streak 🔥** — one meaningful activity a day keeps it alive; we email a
   nudge if it's about to break.
@@ -170,21 +228,29 @@ From **My Certificates** you can, for each one:
 
 ---
 
-## 11. Sending Feedback
+## 12. Reporting an Issue (with Screenshots!)
 
-See a bug? Have an idea? Click the round **feedback button** in the
+See a bug? Have an idea? Click the round **Report an issue** button in the
 bottom-right corner of any page:
 
 1. Pick 🐞 **Bug**, 💡 **Idea** or 💬 **Other**.
 2. Describe what happened (and what you expected).
-3. **Send** — the page you were on is attached automatically, and your
-   academy's admins see it in their feedback inbox.
+3. **Attach a screenshot** if it helps — click **Attach screenshot** and
+   choose an image, or simply **paste** one straight from your clipboard
+   (PNG/JPG, up to 5MB). A preview appears; the ✕ removes it if you change
+   your mind.
+4. **Send** — the page you were on is attached automatically, and your
+   academy's admins see your message *and* your screenshot in their
+   feedback inbox.
 
-No screenshots or emails needed — this is the fastest way to be heard.
+This is the fastest way to be heard — no emails needed.
+
+<img src="/app/docs/screenshots/guide/l_feedback.jpg" width="440">
+<p class="fig">Figure 6 — The Report an issue panel with a message and the Attach screenshot button.</p>
 
 ---
 
-## 12. Your Account & Settings
+## 13. Your Account & Settings
 
 - **Change password** anytime in security settings; **two-factor
   authentication** is optional but recommended (store your recovery codes!).
@@ -195,22 +261,28 @@ No screenshots or emails needed — this is the fastest way to be heard.
 
 ---
 
-## 13. FAQ & Troubleshooting
+## 14. FAQ & Troubleshooting
 
 **My progress didn't save.**
 Progress saves per slide automatically. Check your connection and reopen the
 course — you'll be on the last slide you completed.
 
-**I can't find the star rating.**
-Ratings unlock on the completion card, after you finish every slide. If you
-want to change your rating later, finish-card stars update it in place.
+**The exam button is locked / missing.**
+The exam unlocks only after you complete **every** slide — the amber banner
+at the top of the course reminds you. Go back and finish any slide you
+skipped.
 
 **I ran out of exam attempts.**
-Attempts are limited by your academy — ask your administrator or instructor.
+Ask your administrator or instructor for a reset — you'll get an email when
+your attempts are restored (Section 9.1).
 
 **The exam timer ran out.**
 The attempt submits with the answers you gave. If you have attempts left,
 prepare and retry.
+
+**I can't find the star rating.**
+Ratings unlock on the completion card, after you finish every slide. If you
+want to change your rating later, the finish-card stars update it in place.
 
 **I paid but the course won't open.**
 Wait a few seconds and refresh — activation follows payment confirmation.
@@ -221,17 +293,29 @@ the payment time.
 Check spam, use the resend option, then ask your administrator — they can
 send your link manually.
 
+**How do I get proof of my studies?**
+**My Certificates → Download PDF** gives you a formal transcript of every
+course and result (Section 10.1).
+
+**My screenshot won't attach to my feedback.**
+It must be an image (PNG/JPG/WebP) under 5MB. Pasting from the clipboard
+also works.
+
+**The welcome tour disappeared — can I see it again?**
+It shows once per account. The quick version: start in **My Courses**, and
+use **Help & guides** (this manual) whenever you're unsure.
+
 **The AI Tutor gave a strange answer.**
 It only knows your academy's materials. Rephrase, or read the citations.
 
 **Who can see my AI Tutor chats, ratings or feedback?**
 Tutor chats: only you. Ratings: shown only as anonymous averages on the
-catalog. Feedback: your academy's admins (with your name, so they can follow
-up).
+catalog. Feedback (and screenshots): your academy's admins — with your name,
+so they can follow up.
 
 **My streak reset and I'm sad about it.**
 Fair. Even one flashcard review counts — start a new one today.
 
 ---
 
-*IFPI Learning Platform — Student User Guide v3.0*
+*IFPI Learning Platform — Student User Guide v4.0*

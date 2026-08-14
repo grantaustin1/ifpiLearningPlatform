@@ -47,7 +47,7 @@ def _login_response(response: Response, user, access: str, refresh: str,
     # jar. It is now gated behind `ALLOW_TEST_TOKEN_HEADER=true`, which
     # is set ONLY in development/test environments. Production deploys
     # do not set the env var, so the header is inert.
-    test_bypass_allowed = os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() == "true"
+    test_bypass_allowed = settings.test_bypass_enabled
     return_token = should_include_token_in_body() or (
         test_bypass_allowed and request is not None and
         request.headers.get("x-return-token", "").lower() == "true"
@@ -479,8 +479,7 @@ def confirm_account_deletion(body: AccountDeletionConfirmRequest,
 # tests aren't affected by earlier tests' 429-generating requests.
 @router.post("/_test/reset-rate-limit")
 def test_reset_rate_limit():
-    import os as _os
-    if _os.environ.get("ALLOW_TEST_TOKEN_HEADER", "").lower() != "true":
+    if not settings.test_bypass_enabled:
         raise HTTPException(status_code=404, detail="Not found")
     from services import rate_limit_service
     rate_limit_service.reset()

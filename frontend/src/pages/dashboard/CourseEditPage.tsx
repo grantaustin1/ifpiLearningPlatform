@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
-import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload, LayoutTemplate } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
+import { RichTextEditor } from 'components/RichTextEditor'
+import { SlideTemplatePicker, SlideTemplate } from 'components/SlideTemplates'
 import { useConfirm } from 'components/ConfirmDialog'
 import { CourseFunnelPanel } from './CourseFunnelPanel'
 import { CourseReviewsPanel } from './CourseReviewsPanel'
@@ -13,14 +15,17 @@ const SLIDE_TYPES = ['TEXT', 'VIDEO', 'AUDIO', 'IMAGE', 'PDF', 'SCORM']
 export default function CourseEditPage() {
   const { id } = useParams()
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const [course, setCourse] = useState<any>(null)
   const [slides, setSlides] = useState<any[]>([])
   const [active, setActive] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingSlideImg, setUploadingSlideImg] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [gallery, setGallery] = useState<any[]>([])
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const slideImgInputRef = useRef<HTMLInputElement>(null)
 
   const openGallery = async () => {
     setShowGallery(true)
@@ -43,7 +48,10 @@ export default function CourseEditPage() {
     ])
     setCourse(r.data)
     setSlides(r.data.slides || [])
-    setActive(r.data.slides?.[0]?.id ?? null)
+    const wanted = Number(searchParams.get('slide'))
+    const found = wanted && r.data.slides?.some((s: any) => s.id === wanted)
+    setActive(found ? wanted : (r.data.slides?.[0]?.id ?? null))
+    if (found) setTimeout(() => document.querySelector(`[data-testid="slide-row-${wanted}"]`)?.scrollIntoView({ block: 'center' }), 300)
     setPrereqs(p.data)
     setAllCourses(all.data)
   }
@@ -63,16 +71,29 @@ export default function CourseEditPage() {
         await api.patch(`/courses/${id}/slides/${s.id}`, {
           title: s.title, content: s.content, slide_type: s.slide_type,
           media_url: s.media_url, order_index: s.order_index, is_required: s.is_required,
+          image_position: s.image_position || 'above',
+          media_opacity: s.media_opacity ?? 100,
         })
       }
       for (const s of slides.filter(x => x._local)) {
         const created = await api.post(`/courses/${id}/slides`, {
           title: s.title, content: s.content, slide_type: s.slide_type,
           media_url: s.media_url, is_required: true,
+          image_position: s.image_position || 'above',
+          media_opacity: s.media_opacity ?? 100,
         })
         setSlides(prev => prev.map(x => x.id === s.id ? created.data : x))
       }
-      setSavedAt(new Date()); toast.success('Saved')
+      setSavedAt(new Date())
+      if (searchParams.get('slide')) {
+        // Came from the course view via "Edit slide" — jump straight back
+        // to the same slide so the change is visible immediately.
+        toast.success('Saved — taking you back to the slide')
+        const backSlide = active && active > 0 ? `?slide=${active}` : ''
+        nav(`/learn/${id}${backSlide}`)
+      } else {
+        toast.success('Saved')
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Save failed')
     } finally { setSaving(false) }
@@ -81,6 +102,52 @@ export default function CourseEditPage() {
   const addSlide = () => {
     const s = { id: -Date.now(), title: `Slide ${slides.length + 1}`, slide_type: 'TEXT', content: '', media_url: '', order_index: slides.length + 1, is_required: true, _local: true }
     setSlides([...slides, s]); setActive(s.id)
+  }
+
+  const [showTemplates, setShowTemplates] = useState(false)
+
+  const addFromTemplate = (t: SlideTemplate) => {
+    const s = {
+      id: -Date.now(), title: t.name, slide_type: t.slide_type, content: t.content,
+      media_url: '', order_index: slides.length + 1, is_required: true,
+      image_position: t.image_position || 'above', _local: true,
+    }
+    setSlides([...slides, s]); setActive(s.id); setShowTemplates(false)
+    toast.success(`"${t.name}" slide added — make it yours`)
+  }
+
+  const [bulkUploading, setBulkUploading] = useState(false)
+  const bulkPhotoRef = useRef<HTMLInputElement>(null)
+
+  const addPhotoSlides = async (files: FileList | null) => {
+    if (!files || !files.length) return
+    const list = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (!list.length) { toast.error('Please choose image files'); return }
+    const oversize = list.find(f => f.size > 5 * 1024 * 1024)
+    if (oversize) { toast.error(`"${oversize.name}" is over 5MB — please shrink it first`); return }
+    setBulkUploading(true)
+    let added = 0
+    try {
+      for (const f of list) {
+        const fd = new FormData()
+        fd.append('file', f)
+        const r = await api.post('/uploads/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+        const title = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim() || `Photo ${added + 1}`
+        const s = {
+          id: -Date.now() - added, title, slide_type: 'IMAGE', content: '',
+          media_url: r.data.url, image_position: 'above',
+          order_index: slides.length + added + 1, is_required: true, _local: true,
+        }
+        setSlides(prev => [...prev, s])
+        added += 1
+      }
+      toast.success(`${added} photo slide${added === 1 ? '' : 's'} added — remember to Save`)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error?.message || e?.response?.data?.detail || `Upload failed after ${added} photo${added === 1 ? '' : 's'}`)
+    } finally {
+      setBulkUploading(false)
+      if (bulkPhotoRef.current) bulkPhotoRef.current.value = ''
+    }
   }
 
   const removeSlide = async (sid: number) => {
@@ -159,6 +226,19 @@ export default function CourseEditPage() {
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600">
             <Plus className="h-3.5 w-3.5" /> Add Slide
           </button>
+          <button onClick={() => setShowTemplates(true)} data-testid="add-template-slide-btn"
+            title="Start from a ready-made layout"
+            className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600">
+            <LayoutTemplate className="h-3.5 w-3.5" /> From Template
+          </button>
+          <button onClick={() => bulkPhotoRef.current?.click()} disabled={bulkUploading} data-testid="add-photo-slides-btn"
+            title="Pick several photos — each becomes its own slide"
+            className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50">
+            <Upload className="h-3.5 w-3.5" /> {bulkUploading ? 'Uploading photos…' : 'Add Photo Slides'}
+          </button>
+          <input ref={bulkPhotoRef} type="file" accept="image/*" multiple className="hidden"
+            data-testid="add-photo-slides-input"
+            onChange={e => addPhotoSlides(e.target.files)} />
         </div>
       </aside>
 
@@ -231,14 +311,69 @@ export default function CourseEditPage() {
                   </button>
                 )}
               </div>
-              <textarea value={activeSlide.content || ''} onChange={e => update(activeSlide.id, { content: e.target.value })}
-                rows={14} data-testid="slide-content"
-                placeholder={activeSlide.slide_type === 'TEXT' ? 'HTML content (e.g. <h2>Title</h2><p>Body…</p>)' : 'Description text'}
-                className="w-full border border-slate-200 rounded-xl p-4 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <RichTextEditor key={activeSlide.id} value={activeSlide.content || ''}
+                onChange={html => update(activeSlide.id, { content: html })} />
               {activeSlide.slide_type !== 'TEXT' && (
-                <input value={activeSlide.media_url || ''} onChange={e => update(activeSlide.id, { media_url: e.target.value })}
-                  placeholder="Media URL (video, audio, image, PDF)"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                <div className="flex gap-2">
+                  <input value={activeSlide.media_url || ''} onChange={e => update(activeSlide.id, { media_url: e.target.value })}
+                    placeholder="Media URL (video, audio, image, PDF)" data-testid="slide-media-url"
+                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+                  {activeSlide.slide_type === 'IMAGE' && (
+                    <>
+                      <button onClick={() => slideImgInputRef.current?.click()} disabled={uploadingSlideImg}
+                        data-testid="slide-image-upload-btn" title="Upload a picture from your computer (max 5MB)"
+                        className="inline-flex items-center gap-1.5 text-sm border border-slate-200 hover:border-slate-300 rounded-xl px-4 py-2.5 font-medium disabled:opacity-50">
+                        <Upload className="h-4 w-4" /> {uploadingSlideImg ? 'Uploading…' : 'Upload'}
+                      </button>
+                      <input ref={slideImgInputRef} type="file" accept="image/*" className="hidden"
+                        data-testid="slide-image-upload-input"
+                        onChange={async e => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          if (f.size > 5 * 1024 * 1024) { toast.error('Image too large (max 5MB)'); e.target.value = ''; return }
+                          setUploadingSlideImg(true)
+                          try {
+                            const fd = new FormData()
+                            fd.append('file', f)
+                            const r = await api.post('/uploads/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                            update(activeSlide.id, { media_url: r.data.url })
+                            toast.success('Picture uploaded — remember to Save')
+                          } catch (err: any) { toast.error(err?.response?.data?.error?.message || err?.response?.data?.detail || 'Upload failed') }
+                          finally { setUploadingSlideImg(false); e.target.value = '' }
+                        }} />
+                    </>
+                  )}
+                </div>
+              )}
+              {['IMAGE', 'VIDEO'].includes(activeSlide.slide_type) && activeSlide.media_url && (
+                <div className="flex items-center gap-3" data-testid="media-opacity-control">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Media transparency:</span>
+                  <input type="range" min={20} max={100} step={5}
+                    value={activeSlide.media_opacity ?? 100}
+                    onChange={e => update(activeSlide.id, { media_opacity: Number(e.target.value) })}
+                    data-testid="media-opacity-slider"
+                    className="flex-1 accent-indigo-600" />
+                  <span className="text-xs font-medium text-slate-600 w-12 text-right" data-testid="media-opacity-value">
+                    {activeSlide.media_opacity ?? 100}%
+                  </span>
+                </div>
+              )}
+              {activeSlide.slide_type === 'IMAGE' && activeSlide.media_url && (
+                <>
+                  <img src={activeSlide.media_url} alt="Slide preview" data-testid="slide-image-preview"
+                    style={{ opacity: (activeSlide.media_opacity ?? 100) / 100 }}
+                    className="max-h-48 rounded-xl border border-slate-200 object-contain" />
+                  <div className="flex items-center gap-2" data-testid="image-position-picker">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Picture position:</span>
+                    {[['above', 'Above text'], ['beside', 'Beside text'], ['behind', 'Behind text']].map(([val, label]) => (
+                      <button key={val} onClick={() => update(activeSlide.id, { image_position: val })}
+                        data-testid={`image-position-${val}`}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${(activeSlide.image_position || 'above') === val ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
               <NarrationEditor slide={activeSlide} onUpdated={load} />
               <VisualEditor slide={activeSlide} onUpdated={load} />
@@ -341,6 +476,7 @@ export default function CourseEditPage() {
         {course?.id && <CourseReviewsPanel courseId={course.id} />}
       </aside>
 
+      {showTemplates && <SlideTemplatePicker onPick={addFromTemplate} onClose={() => setShowTemplates(false)} />}
       {showGallery && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="cover-gallery-modal">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">

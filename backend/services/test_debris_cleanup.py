@@ -129,7 +129,7 @@ def _delete_stale_courses(db: Session) -> int:
     if not course_ids:
         return 0
 
-    id_csv = ",".join(str(i) for i in course_ids)
+    id_csv = ",".join(str(int(i)) for i in course_ids)
     bind = db.get_bind()
     from sqlalchemy import inspect as sa_inspect
     insp = sa_inspect(bind)
@@ -180,34 +180,6 @@ def _stale_live_session_ids(db: Session) -> set[int]:
         for (sid,) in rows:
             ids.add(sid)
     return ids
-
-
-def _delete_stale_certificates(db: Session) -> int:
-    """Iter 49 — Purge certificates left behind by test harnesses.
-
-    A cert is debris when its `live_session_id` points at a session that
-    matches a debris title pattern, or at a session that no longer exists.
-    Course-linked certs are already handled by the course cascade in
-    `_delete_stale_courses`."""
-    from models import Certificate, CertificateRevocationEvent
-    stale_ids = _stale_live_session_ids(db)
-    orphan_ids = {cid for (cid,) in db.execute(text(
-        "SELECT id FROM certificates WHERE live_session_id IS NOT NULL "
-        "AND live_session_id NOT IN (SELECT id FROM live_sessions)"
-    )).fetchall()}
-    if stale_ids:
-        orphan_ids |= {cid for (cid,) in db.query(Certificate.id).filter(
-            Certificate.live_session_id.in_(list(stale_ids))).all()}
-    if not orphan_ids:
-        return 0
-    id_list = list(orphan_ids)
-    db.query(CertificateRevocationEvent).filter(
-        CertificateRevocationEvent.certificate_id.in_(id_list)
-    ).delete(synchronize_session=False)
-    n = db.query(Certificate).filter(
-        Certificate.id.in_(id_list)
-    ).delete(synchronize_session=False)
-    return n
 
 
 def _delete_stale_live_sessions(db: Session) -> int:

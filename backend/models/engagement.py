@@ -38,6 +38,7 @@ class TesterFeedback(Base):
     category = Column(String(30), default="BUG")  # BUG | IDEA | OTHER
     message = Column(Text, nullable=False)
     status = Column(String(20), default="NEW", nullable=False)  # NEW | REVIEWED
+    screenshot_url = Column(String(500))
     created_at = Column(DateTime, default=_utcnow)
 
 

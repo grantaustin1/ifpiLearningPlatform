@@ -57,3 +57,13 @@ def test_reportlab_pin_compatibility():
     version = Version(pinned_version)
     assert version in SpecifierSet(SVGLIB_2_0_2_REPORTLAB_SPEC)
     assert version in SpecifierSet(XHTML2PDF_0_2_17_REPORTLAB_SPEC)
+
+
+def test_emergentintegrations_not_in_requirements():
+    """emergentintegrations caused CI failures (missing from PyPI, external wheel).
+    It must never re-enter requirements.txt."""
+    requirements_by_name = _requirements_by_name()
+    assert "emergentintegrations" not in requirements_by_name, (
+        "emergentintegrations must not be in requirements.txt — "
+        "it breaks CI (see PR #249 and related fixes)"
+    )

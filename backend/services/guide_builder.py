@@ -49,6 +49,8 @@ table { width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 9.5pt;
 th { background-color: #4f46e5; color: #ffffff; padding: 5pt 7pt; text-align: left; }
 td { border-bottom: 0.7pt solid #e2e8f0; padding: 5pt 7pt; }
 hr { border: 0.5pt solid #e2e8f0; margin: 12pt 0; }
+img { margin: 8pt 0 2pt 0; }
+.fig { color: #64748b; font-size: 8.5pt; margin: 0 0 10pt 0; }
 .cover-band { background-color: #4f46e5; color: #ffffff; padding: 16pt 18pt; margin-bottom: 16pt; }
 .cover-band h1 { color: #ffffff; margin: 0; border: none; }
 .cover-sub { color: #e0e7ff; font-size: 11pt; margin-top: 4pt; }
@@ -79,7 +81,12 @@ def build(pdf_name: str) -> Path:
     </body></html>"""
     out = GUIDES_DIR / pdf_name
     buf = io.BytesIO()
-    status = pisa.CreatePDF(io.StringIO(html), dest=buf, encoding="utf-8")
+
+    def _link_cb(uri: str, rel: str) -> str:
+        return uri  # absolute local paths (screenshots) pass straight through
+
+    status = pisa.CreatePDF(io.StringIO(html), dest=buf, encoding="utf-8",
+                            link_callback=_link_cb)
     if status.err:
         raise RuntimeError(f"PDF build failed for {pdf_name}: {status.err} errors")
     out.write_bytes(buf.getvalue())

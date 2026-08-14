@@ -124,3 +124,106 @@ Assess the ERP360 and IFPI Next.js codebase and build the IFPI learning app as a
 - Insight Export: GET /api/exams/{id}/question-insights.csv (admin/instructor, text/csv; charset=utf-8, attachment) + 'Export CSV' button in the insights header (blob download).
 - Miss Rate Alerts: exam_service._check_miss_alerts runs after each attempt — questions with ≥50% miss rate over ≥3 answers fire in-app QUESTION_MISS_ALERT notifications + queued question_miss_alert emails to all org INSTRUCTOR/ADMIN/SUPER_ADMIN. Dedup via new exam_questions.miss_alerted_at column (alembic 6f7a8b9c0d1e); editing a question clears it (re-arms). Insights rows show '· author alerted' chip.
 - Verified: testing agent iteration_55.json — all PASS (UI + curl + outbox + re-arm; learner deliberate-fail path). State note: learner now 3/3 attempts on exam 4 (still Passed, best 100%) — use admin Reset if a fresh attempt is needed. Docs regenerated; targeted tests green.
+
+## 2026-08-11 (session 9) — Deployment readiness check
+- deployment_agent run 1: BLOCKER — .gitignore blocked .env files required for deployment. FIXED: removed '.env', '.env.*', '*.env' from /app/.gitignore (backend/.env + frontend/.env now committable); added memory/test_credentials.md to .gitignore (note: file already tracked in earlier history).
+- deployment_agent run 2: PASS with one WARN (unused [program:mongodb] in supervisord.conf — platform-managed infra, intentionally untouched, non-blocking).
+- Pre-deploy switches for the user (documented, not changed): backend/.env ALLOW_TEST_TOKEN_HEADER=true is a TEST bypass → set false for production; PUBLIC_BASE_URL points at the preview URL → update to the deployed URL after deploy (affects cert share links/og-images); SQLite + ./uploads rely on persistent disk (Emergent deploy persists data per support).
+
+## 2026-08-12 (session 10) — Pre-deploy safety pass (staff-testing deploy prep)
+- User goal clarified: deploy a stable copy for a staff member to test, keep iterating in Emergent chat, push fixes via Update Deployment.
+- backend/.env: ALLOW_TEST_TOKEN_HEADER=false (test bypass OFF everywhere, incl. future deploy); added AUTH_COOKIE_SECURE=true (auth cookies HTTPS-only). AUTH_COOKIE_MODE stays dual so login body still returns tokens (testing agent + legacy pytest unaffected).
+- Code: settings.test_bypass_enabled (core/config.py) double-lock — env var AND non-production ENVIRONMENT — applied at all 5 bypass sites (routers/auth.py x2, core/middleware.py, routers/marketplace_analytics.py, routers/public_catalog.py).
+- Verified: curl login OK (token in body, Secure/HttpOnly cookies), /_test/reset-rate-limit → 404, browser login → learner dashboard OK, pytest test_iteration22 + test_iteration32_sprint: 30 passed.
+- README: new 'Deploying a staff-testing copy' section; env table updated. Details/runbook: /app/memory/deploy_notes.md.
+- PENDING (post-deploy): user clicks Deploy → pastes live URL → set PUBLIC_BASE_URL to it → Update Deployment. To run legacy rate-limit pytest files, temporarily flip ALLOW_TEST_TOKEN_HEADER=true + restart backend.
+
+## 2026-08-12 (session 10b) — Feedback screenshots + Welcome Tour
+- Feedback widget renamed 'Report an issue': attach screenshot (file picker or paste, png/jpeg/webp ≤5MB) with preview/remove. New POST /api/feedback/screenshot (any authed, stores uploads/feedback/<uuid>) + screenshot_url on POST /api/feedback (validated '/feedback/' path). tester_feedback.screenshot_url column (alembic 7a8b9c0d1e2f). Admin /feedback-admin shows clickable thumbnails.
+- WelcomeTour.tsx (components/): first-login spotlight walkthrough, once per user (localStorage ifpi_tour_done_v1_<userId>), 5 learner steps / 6 admin steps, skip/next/finish, targets scrollIntoView'd before highlight. Rendered in DashboardLayout.
+- Verified: testing agent iteration_57.json — backend 8/8, frontend 100% (tour flows both roles, persistence, widget upload, admin thumbnails, validation 400/422/401). Post-test fixes: memoized tour steps (flakiness), scrollIntoView for off-screen nav targets (verified via screenshots). Backend tests: tests/test_feedback_screenshot.py.
+
+## 2026-08-12 (session 10c) — Code review fixes (user-provided static analysis report)
+- Investigated all findings first: circular imports = false alarm (already deferred imports); '36 undefined vars' = false positive (tsc clean, pyflakes clean); '16 high-sev security' = bandit found 0 high (mediums mostly false positives).
+- Applied genuine fixes: SCORM manifest parsing hardened with defusedxml (XXE/entity-bomb rejected, verified); removed console.debug (ResearchPage); removed unused api_base (extras.py); deduped _delete_stale_certificates (test_debris_cleanup.py, kept the later/live def); int-cast id_csv (SQL hardening); tempfile.gettempdir() for staging/cache dirs (imports.py, docs_library_service.py); dropped no-placeholder f-strings (streak_digest_worker); removed inner os import (config.py).
+- defusedxml added to requirements.txt (pip freeze). Docs regenerated (build_docs.py) for /api/feedback/screenshot route.
+- SKIPPED by user-approved plan: 275/86/106 complexity-long-function refactors, 72 hook deps, 18 index-keys, TS coverage, file splitting (cosmetic, high regression risk pre staff-deploy).
+- Verified: pytest 47 passed (debris cleanup, docs library, feedback, iter22 auth, docs completeness), backend healthy, XXE functional test pass.
+
+## 2026-08-12 (session 10d) — User manuals v4.0 (comprehensive rewrite)
+- Rewrote /app/docs/guides/ADMIN_USER_GUIDE.md + STUDENT_USER_GUIDE.md to v4.0: added Welcome Tour, exam gate, Attempts left + admin Reset attempts flow (w/ email), Question insights (miss-rate bars, distractor stats, TOP DISTRACTOR, author-alerted chip, re-arm on edit, Export CSV, in-place question edit), learner transcript PDF (My Certificates → Download PDF / Printable transcript), feedback screenshots (attach/paste, admin thumbnails), certificate share preview images; expanded troubleshooting tables. All button names verified against actual frontend code.
+- PDFs auto-rebuilt via services/guide_builder ensure_fresh on download. Verified: both endpoints 200 (admin 12pp/42KB, student 7pp/22KB), pypdf text checks confirm all v4 content, test_public_guides.py 5/5 pass.
+- Download URLs (anonymous): {BASE}/api/public/guides/IFPI_Admin_User_Guide.pdf and /IFPI_Student_User_Guide.pdf; also via sidebar Help & guides.
+
+## 2026-08-12 (session 10e) — Guide screenshots embedded in manuals
+- Captured 17 fresh screenshots (playwright, /tmp/capture_guide_shots.py) into /app/docs/screenshots/guide/*.jpg (1200w JPEG): login, admin dashboard/courses/editor/exams/attempts-modal/question-insights(with distractor stats + author-alerted)/users/settings/reports/feedback-inbox(with thumbnail)/admin tour, learner tour/courses/player(exam-gate banner)/certificates(transcript buttons)/feedback panel(attach screenshot).
+- guide_builder.py: img + .fig caption CSS, link_callback for absolute local image paths. Figures embedded in both guides with numbered captions (Admin 12 figs, Student 6 figs).
+- Verified: PDFs rebuild on download — Admin 17pp/778KB w/ 12 images, Student 9pp/424KB w/ 6 images; pymupdf page render confirms clean layout; test_public_guides 5/5 pass.
+- Reminder for user: click Update Deployment to push v4.0 manuals + screenshots to the live URL.
+
+## 2026-08-12 (session 10f) — Course delete flow
+- CoursesPage: bin button on each card (visible only to course owner or SUPER_ADMIN via new created_by_id in CourseSummary). Published course → greyed bin + info toast 'Unpublish first'; draft → confirm modal (delete-confirm-modal) warning permanent, then DELETE /api/courses/{id}.
+- Backend delete_course guards: 403 unless SUPER_ADMIN or created_by_id==current.id; 409 if status PUBLISHED; audit_service COURSE_DELETED entry added.
+- Admin manual §5.6 'Deleting a course permanently' + troubleshooting row added (PDF auto-rebuilds).
+- Verified: curl (409 published / 200 owner draft / 403 non-owner / created_by_id in list), UI screenshot (toast + modal + card removed), audit row present, regression 48 passed (iter2/3/47/48 incl. course-delete tests).
+
+## 2026-08-12 (session 10g) — Course Archive feature
+- POST /api/courses/{id}/archive (ADMIN/SUPER_ADMIN): 409 '{n} learner(s) are still busy with this course' when IN_PROGRESS enrollments exist; else status→ARCHIVED + COURSE_ARCHIVED audit. POST /{id}/unarchive restores to DRAFT (+audit). ARCHIVED enum value pre-existed; learners/catalog auto-hide (PUBLISHED-only filters).
+- CoursesPage: archive button (box icon) on every admin card; archived cards show ARCHIVED chip + amber restore button; 'Show archived (n)' toggle next to search (archived hidden by default). Error toasts now read backend envelope error.message (was detail-only, busy message was invisible).
+- INCIDENT (repeat of session-7 lesson): batched parallel search_replace on CoursesPage.tsx corrupted it (duplicated tail + reverted line). Fixed by removing orphan block + re-applying filter edit. RULE: never parallel-edit the same file.
+- Cleaned TEST_Iter47/48 course debris from UAT org (scripts/cleanup_test_debris.py); restored 225/226 to PUBLISHED.
+- Admin manual: new §5.6 Archiving (delete renumbered 5.7) + troubleshooting row.
+- Verified: curl (409 busy w/ message, archive/unarchive/republish 200s, learner list hides archived), UI screenshots (busy toast, archive→hidden, show-archived, restore toast), tsc + webpack clean.
+
+## 2026-08-12 (session 10h) — Slide image upload
+- CourseEditPage: Upload button (slide-image-upload-btn) next to Media URL on IMAGE slides → POST /api/uploads/image (5MB cap, client-checked) fills media_url; live preview (slide-image-preview) below. data-testid slide-media-url added to URL input.
+- Admin manual §5.2 step 3 documents slide pictures (URL / Upload / AI visual, swap, remove).
+- Verified: UI screenshot flow — IMAGE chip reveals Upload, file upload sets URL + toast + preview; tsc clean. Course 224 left unchanged (not saved).
+
+## 2026-08-12 (session 10i) — Slide image position + bulk photo upload
+- CourseSlide.image_position (above|beside|behind, default above; migration 8b9c0d1e2f3a). SlideIn/SlideOut + all 3 SlideOut constructions + add/update_slide persist it (invalid values → keep/above).
+- Editor: 'Picture position' chips under image preview (image-position-{above,beside,behind}); save() sends field. 'Add Photo Slides' bulk button (add-photo-slides-btn/input, multi-file) — uploads each, creates local IMAGE slide titled from filename, Save persists.
+- Learner: LearnPage ImageSlideLayout renders 3 layouts (image-layout-above/beside/behind; behind = cover img + slate-900/60 overlay + prose-invert).
+- BONUS FIX from testing-agent finding: POST /courses/{id}/enroll 500 (UNIQUE constraint) on concurrent double-enroll — now idempotent (IntegrityError → rollback → already:true). Verified with parallel curl.
+- Tested: iteration_58.json — backend 5/5 pytest + full Playwright e2e 100% (picker persistence, bulk 3-photo, all 3 learner layouts, regression /learn/224, cleanup). Admin manual §5.2 updated (steps 4-5).
+
+## 2026-08-12 (session 10j) — Learn page graceful 404
+- User console log (prod): /learn/243 → GET/enroll 404s → LearnPage uncaught AxiosError (course was draft/deleted). CORS app.emergent.sh redirect on streak call = platform edge during redeploy, not app bug.
+- LearnPage: loadError state → friendly 'This course isn't available' screen (course-unavailable testid) with Back to My Courses button, instead of infinite spinner + uncaught error.
+- Verified: screenshot /learn/9999 shows friendly screen, back button navs to /courses, valid course 224 still loads. tsc clean.
+
+## 2026-08-12 (session 10k) — Imported course + 'Edit course' shortcut
+- User re-imported 'Utilizing the Fitness Facility (US 254459)' (course 243, 118 slides: 68 TEXT / 44 IMAGE / 6 VIDEO) into PREVIEW via Content imports Upload .zip — now part of committed snapshot, survives redeploys. COURSE 243 = REAL USER DATA — never save/delete/modify in tests.
+- 'Bug': user in learner view expecting picture tools — tools were fine in editor. Fix: staff-only 'Edit course' button (learn-edit-course-btn) in LearnPage header → /courses/{id}/edit.
+- Verified: iteration_59.json — 4/4 pass (button admin-only, editor tools work on imported IMAGE slides, learner hidden, friendly-404 regression). Prior context: prod data loss RCA (redeploy replaces prod disk/DB; workspace = source of truth; user OK, demo data only; persistent DB is go-live requirement).
+- 10k addendum: Edit course button restyled bold solid indigo (user found tools; wanted bolder button). Screenshot verified.
+
+## 2026-08-12 (session 10l) — Video autoplay on slide landing
+- LearnPage: direct video files (mp4/webm/ogg/mov or /api/uploads paths) now render via AutoPlayVideo component (native <video> controls) — tries unmuted play(), falls back to muted if browser blocks; embeds keep iframe with allow=autoplay. serve_upload (iter5.py) mime map extended (mp4/webm/mov/m4v/ogg/mp3/wav/m4a/pdf/gif — was images-only, webm previously served as octet-stream).
+- Verified: screenshot e2e — webm slide (58B Jogging) autoplays UNMUTED at t=3.76s. mp4 didn't decode in headless chromium (missing H.264 codec, test-env only — real Chrome fine, muted fallback engaged correctly).
+
+## 2026-08-12 (session 10m) — Per-slide Edit shortcut
+- LearnPage: staff-only 'Edit slide' button (learn-edit-slide-btn) next to slide title → /courses/{id}/edit?slide={slideId}. CourseEditPage reads ?slide= param, selects that slide and scrolls its rail row into view.
+- Verified via screenshot e2e: slide 100 of course 243 → editor opens with '100. 58B Jogging' active + in view. Note: user has PUBLISHED course 243 themselves.
+
+## 2026-08-12 (session 10n) — Return-to-slide after save
+- CourseEditPage save(): when opened via ?slide= (from 'Edit slide'), after save navs back to /learn/{id}?slide={activeId} with toast 'Saved — taking you back to the slide'. Normal editor opens (no param) keep stay+Saved toast.
+- LearnPage: supports ?slide= deep link — jumps current index to that slide on load.
+- Verified via screenshot e2e round trip: learn slide 4 → Edit slide → Save → back on learn at 4/118 with toast.
+
+## 2026-08-12 (session 10o) — Course progress memory (resume across devices)
+- Enrollment.last_slide_index (migration 9c0d1e2f3a4b). POST /api/courses/{id}/progress {slide_index} clamps to slide count, stores index, bumps enrollment.progress = max(existing, (idx+1)/total*100) unless COMPLETED. /enroll responses now include last_slide_index.
+- LearnPage: enroll response resume → setCurrent + 'Resumed where you left off' toast (skipped when ?slide= deep link present); slide changes saved with 600ms debounce (fire-and-forget).
+- Note: BaseModel import needed adding to routers/courses.py (was missing → startup NameError, fixed).
+- Verified: two fresh browser contexts e2e — device 1 navigates to slide 8, device 2 logs in and resumes at 8/118. Backend healthy, tsc clean.
+
+## 2026-08-13 (session 10p) — Rich text editor + media transparency
+- RichTextEditor.tsx (uncontrolled contentEditable): Bold/Italic/Underline, 9-colour foreColor palette (Range save/restore on mousedown), font-size dropdown (Small 0.85em / Normal / Large 1.4em via styled spans, Heading via formatBlock h3; execCommand fontSize=7 marker swapped to spans — added June 2026, verified via Playwright HTML inspection), text alignment buttons (justifyLeft/Center/Right → style text-align, verified rendering in learn view), bullet/numbered lists, clear formatting, raw-HTML toggle.
+- SlideTemplates.tsx (June 2026): 6 ready-made slide layouts (Title, Title+Bullets, Step by Step, Two Columns via inline flex divs, Quote, Image+Text with image_position=beside). "From Template" button in CourseEditPage sidebar opens picker modal (data-testid slide-template-*); picked template creates a prefilled local slide. Verified E2E: templates save and render correctly through DOMPurify in learner view (flex columns + centred title confirmed via computed styles).
+- BUG FIX (June 2026): "New Course" button silently did nothing when an "Untitled Course" draft already existed (backend 409 duplicate-title, createMut had no onError → unhandled rejection). handleNewCourse now auto-generates a unique title ("Untitled Course 2", 3…) and shows an error toast on failure. Verified: two consecutive clicks both navigate to the editor.
+- FEATURES (June 2026): (1) Import Retry — POST /api/admin/imports/{id}/retry re-runs FAILED/PARTIAL jobs from the same staging dir (410 if dir gone); Retry button (data-testid import-retry-{id}) on ImportsPage. Verified: FAILED job retried → COMPLETED, missing-dir → 410. (2) Video auto-advance — AutoPlayVideo onEnded advances to next slide (skipped on last slide to avoid auto-completing); verified via dispatched 'ended' event (slide 1/118 → 2/118 + toast).
+- CHANGE (June 2026): Course delete permission relaxed — any org ADMIN (or SUPER_ADMIN) can now delete any course in their org; previously only the course *owner* could, which made imported courses (owned by internal migration@ user) undeletable by real admins. Backend owner-check removed in delete_course; frontend canDelete now role-based. Unpublish-before-delete rule unchanged. Delete 404s now gracefully refresh the course list (stale-cache UX). DATABASE_URL made absolute (sqlite:////app/backend/ifpi_lms.db) to prevent split-brain DB files if server CWD differs.
+- BUG FIX (June 2026): Bulk content re-import (Content Imports page) FAILED with "FOREIGN KEY constraint failed" when re-importing a course whose slides had learner activity (slide_views etc.) — import_course_from_directory bulk-wiped course_slides without detaching dependents. Now deletes SlideView/SlideComment rows and NULLs Flashcard/ScormPackage slide_id for old slides first (mirrors delete_slide fix). Reproduced + verified via /api/admin/imports/run on a synthetic course with a slide_view (FAILED before → COMPLETED after). This was the production issue "import ran but course doesn't show".
+- BUG FIX (June 2026): DELETE /api/courses/{id}/slides/{slide_id} 500'd with FK IntegrityError when the slide had slide_views/comments/flashcards/scorm rows. delete_slide now removes SlideView+SlideComment rows and NULLs Flashcard/ScormPackage slide_id before deleting (slide_versions already CASCADE). Verified via curl (200). Replaces plain HTML textarea in CourseEditPage (keyed per slide). NOTE: initial controlled version reversed typing (caret reset per render) — fixed by uncontrolled pattern (iter60 CRITICAL → iter61 100% pass).
+- CourseSlide.media_opacity (20-100, migration a0d1e2f3a4b5), clamped in add/update_slide, in all SlideOut sites. Editor: Media transparency slider for IMAGE/VIDEO slides + live preview dim. Learner: opacity applied in ImageSlideLayout (3 layouts), AutoPlayVideo, video iframe.
+- Tested: iteration_60 (backend 4/4 media_opacity incl clamps; transparency e2e pass; RTE critical bugs found) → fix → iteration_61 (4/4: typing order, bold+red markup, learner render survives DOMPurify, cleanup). tests/test_media_opacity.py added by testing agent. Manual §5.2 updated (toolbar + transparency).

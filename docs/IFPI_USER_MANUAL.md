@@ -473,23 +473,23 @@ Core entities (see `backend/models/` for the full list):
 | `routers/affiliate.py` | 263 |
 | `routers/ai_tutor.py` | 386 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 487 |
+| `routers/auth.py` | 486 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 836 |
+| `routers/courses.py` | 950 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/erp360_sync.py` | 426 |
 | `routers/exams.py` | 459 |
-| `routers/extras.py` | 655 |
-| `routers/feedback.py` | 72 |
+| `routers/extras.py` | 654 |
+| `routers/feedback.py` | 106 |
 | `routers/flashcards.py` | 497 |
-| `routers/imports.py` | 502 |
+| `routers/imports.py` | 547 |
 | `routers/invitations.py` | 206 |
-| `routers/iter5.py` | 352 |
+| `routers/iter5.py` | 356 |
 | `routers/iter8.py` | 367 |
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
@@ -507,7 +507,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13780** |
+| **Total** | **13975** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -629,6 +629,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
 | `/api/admin/imports/{job_id}` | GET |  |
+| `/api/admin/imports/{job_id}/retry` | POST | Re-run a FAILED / PARTIAL import against the same staging directory — |
 | `/api/admin/imports/{job_id}/rollback` | POST | Undo an import job — deletes every course / learning path it created. |
 | `/api/admin/invitations` | GET |  |
 | `/api/admin/invitations` | POST |  |
@@ -757,12 +758,14 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}` | DELETE |  |
 | `/api/courses/{course_id}` | GET |  |
 | `/api/courses/{course_id}` | PATCH |  |
+| `/api/courses/{course_id}/archive` | POST | Safe alternative to deletion — hides the course from learners and the |
 | `/api/courses/{course_id}/complete` | POST |  |
 | `/api/courses/{course_id}/duplicate` | POST | Deep-clone a course (with all slides) as a new DRAFT. Optional template path: |
 | `/api/courses/{course_id}/enroll` | POST |  |
 | `/api/courses/{course_id}/prerequisites` | GET |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
+| `/api/courses/{course_id}/progress` | POST | Remember the learner's position so they resume across devices. |
 | `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
 | `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
 | `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
@@ -777,6 +780,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
 | `/api/courses/{course_id}/toggle-featured` | POST | Flip the marketplace 'Featured' flag on a course (Iter 42). |
+| `/api/courses/{course_id}/unarchive` | POST | Restore an archived course back to DRAFT (re-publish separately). |
 | `/api/courses/{course_id}/unpublish` | POST |  |
 | `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
@@ -798,6 +802,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/exams/{exam_id}/questions/{question_id}` | PATCH | Edit one question in place — unlike PUT /questions (replace), this |
 | `/api/feature-flags` | GET |  |
 | `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
+| `/api/feedback/screenshot` | POST | Store a feedback screenshot; returns the URL to attach on submit. |
 | `/api/gamification/leaderboard` | GET |  |
 | `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
 | `/api/gamification/me` | GET |  |
@@ -889,7 +894,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **297** registered API endpoints._
+_Total: **302** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
