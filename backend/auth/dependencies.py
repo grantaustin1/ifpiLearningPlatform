@@ -50,6 +50,13 @@ class CurrentUser(BaseModel):
         return any(r in allowed for r in self.roles)
 
 
+def can_manage_content(user: "CurrentUser") -> bool:
+    """Shared instructor/admin content-management gate (was duplicated
+    in courses.py and exams.py)."""
+    from core.role_registry import INSTRUCTOR_ROLES
+    return user.has_any_role(INSTRUCTOR_ROLES)
+
+
 def get_current_user(
     token: str = Depends(extract_token),
     db: Session = Depends(get_db),

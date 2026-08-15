@@ -1,0 +1,26 @@
+{
+  "summary": "Iter 63 REGRESSION after LARGE internal refactor (misc.py -> 8 routers, courses.py -> package with 6 modules, services extracted: enrollment_service + course_lifecycle_service, frontend React.lazy + ErrorBoundary). Backend: 28/28 pytest cases PASS across all refactored endpoint groups and new service extractions. Split routers all serve correct shapes/status codes (enrollments, certificates, notifications, gamification, admin/analytics, catalog, billing). Course package: publish-without-slides -> 400, delete-while-published -> 409, archive-blocked-when-learner-busy -> 409, unpublish/archive/unarchive OK, duplicate copies image_position + media_opacity slide fields (bug fix verified). Enrollment service: enroll idempotent (already=true on re-enroll), progress save OK, complete awards XP+cert, second complete returns already_completed. Ratings/reviews, prerequisites CRUD, slide add/update/reorder/delete/versions, rich-text sanitize all pass. Frontend: all 13 lazy-loaded admin routes render with sidebar (dashboard/courses/exams/certificates/leaderboard/imports/users/reports/settings/preferences/live-sessions/billing/courses/243/edit). Learner /learn/243 renders full 99-slide course with all sidebar items (Contents, Introduction, Skeleton, ...), Next button advances slides, and 'Resumed where you left off' toast confirms progress persists across re-entry. ErrorBoundary NOT visible on any healthy page. Zero console errors across the entire admin+learner journey.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter63_refactor_regression.py",
+    "/app/test_reports/pytest/iter63.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Route split for misc.py -> ai/enrollments/certificates/notifications/gamification/admin_analytics/billing/catalog is clean; each keeps its original URL prefix so no client-side changes were required. Verified against live 200s.",
+    "Course package (routers/courses/{crud,enrollment,ratings,slides,prerequisites,common}.py) correctly reuses a single shared `router` object via common.py — registration order preserved. All lifecycle endpoints (publish/archive/delete/duplicate) return correct 4xx guards.",
+    "services/course_lifecycle_service.py::duplicate() properly copies image_position AND media_opacity — verified end-to-end (creates slide with image_position='beside', media_opacity=75 then duplicates and reads back identical values from the copy).",
+    "services/enrollment_service.py preserves idempotent semantics on re-enroll (returns already=true) and second complete (returns already_completed=true).",
+    "Frontend App.tsx lazy-loads all non-critical routes with a single top-level Suspense fallback; ErrorBoundary wraps the whole tree. Verified data-testid='error-boundary' does NOT render on any healthy page.",
+    "Zero console errors across the tested admin+learner journeys — solid regression signal that chunk loading & code-split imports resolve reliably from the preview edge."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter63_refactor_regression.py"],
+  "success_rate": {"backend": "100% (28/28 pass)", "frontend": "100% on all tested routes"},
+  "test_credentials": "uat-admin@ifpi.org / UatAdmin!2026 ; uat-learner@ifpi.org / UatLearner!2026",
+  "seed_data_creation": "Disposable test courses prefixed with TEST_iter63_* created during CRUD/lifecycle/enroll tests, all cleaned up in fixture teardown (unpublish -> delete). Course 243 was read-only.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression suite for the misc.py -> 8-router split + courses.py -> package + service extraction lives at /app/backend/tests/test_iter63_refactor_regression.py (28 tests, 100% pass, ~92s runtime). Existing Iter 62 PG-migration suite still valid at test_iter62_pg_migration.py. Frontend routes are `/courses` `/exams` etc under DashboardLayout (NOT `/dashboard/*` — that path is admin-dashboard only). Learner /learn/{courseId} correctly persists last_slide_index and surfaces a 'Resumed where you left off' toast on re-entry.",
+  "rca of the issue": "No issues found. Refactor is behaviorally identical to pre-refactor code."
+}

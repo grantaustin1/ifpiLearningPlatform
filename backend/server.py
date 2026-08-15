@@ -207,6 +207,18 @@ def health():
 
 @app.on_event("startup")
 def on_startup():
+    # Audit P0 — refuse to run silently with insecure defaults in production.
+    if (settings.environment or "").lower() == "production":
+        _startup_log = logging.getLogger("startup")
+        if settings.jwt_secret == "change-me":
+            _startup_log.critical(
+                "SECURITY: JWT_SECRET is the insecure default — set a real secret!")
+        if not settings.csrf_enabled:
+            _startup_log.critical(
+                "SECURITY: CSRF_ENABLED is false in production — enable it!")
+        if not settings.auth_cookie_secure:
+            _startup_log.critical(
+                "SECURITY: AUTH_COOKIE_SECURE is false in production — enable it!")
     # Seed minimal data if the DB is empty (idempotent).
     from seed.seed_minimal import run_if_empty
     run_if_empty()
