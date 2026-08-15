@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 64 Phase 1 (N+1 fix on courses list/detail + HTTP Range serving on /api/uploads/files/{path}) tested end-to-end. All 13 backend pytest cases pass and Playwright verified real video playback in the learner UI. No regressions found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "course_list_admin": "course 243 -> slide_count=99, enrollment_count>=1 (real value returned, not 0)",
+    "course_list_learner": "only PUBLISHED courses returned; course 243 -> slide_count=99, enrollment_count>=1",
+    "visibility_regression": "admin course count >= learner course count (drafts hidden for learner)",
+    "course_detail_243": "admin & learner both get slide_count=99, len(slides)=99, enrollment_count>=1",
+    "range_first_1024": "Range: bytes=0-1023 -> 206, Content-Range: bytes 0-1023/<size>, body length 1024",
+    "range_suffix_500": "Range: bytes=-500 -> 206 with correct trailing 500-byte window",
+    "range_out_of_bounds": "Range: bytes=999999999- -> 416 with Content-Range: bytes */<size>",
+    "no_range_full_file": "no Range header -> 200 + Accept-Ranges: bytes, Content-Type video/webm",
+    "images_not_broken": "slide image GETs return plain 200 (no Content-Range), Range logic only triggers when Range header present",
+    "video_playback_learn_243_slide_39": "video src /api/uploads/files/imports/327/vids/out1.webm loaded, duration=360.488s, played to currentTime=4.23s, no video.error, browser sent Range: bytes=0- and got 206",
+    "smoke": "admin & learner login OK, dashboard/enrollments endpoint returns 200, course card in UI shows '99 slides, 1'"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter64_phase1_perf.py",
+    "/app/test_reports/pytest/iter64_phase1.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/courses/crud.py get_course still uses c.slides for slide_count via _detail (len(c.slides)) — that lazy load remains. Only enrollment_count was fixed to use scalar count in the detail path. Not a bug (slides are needed anyway to serialize into the response), just noting the asymmetry vs list_courses.",
+    "_range_response regex `bytes=(\\d*)-(\\d*)$` correctly rejects unusable ranges (returns None -> falls through to FileResponse 200). Multi-range (comma-separated) is not supported but that is acceptable for HTML5 <video>.",
+    "Range branch only fires when storage.local_path(path) is not None — object-store paths bypass Range serving entirely. Acceptable for current local-storage deployment; worth documenting for future S3/GCS switch."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter64_phase1_perf.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100%"},
+  "test_credentials": "uat-admin@ifpi.org / UatAdmin!2026 ; uat-learner@ifpi.org / UatLearner!2026",
+  "seed_data_creation": "none — read-only test against real course 243",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter64_phase1_perf.py is the regression suite for Phase 1 (N+1 aggregate counts + Range serving). Course 243 is real content; test asserts slide_count=99 and enrollment_count>=1. Video path imports/327/vids/out1.webm ~50MB, VP9 webm. Chromium Playwright decodes VP9 fine.",
+  "rca of the issue": "n/a — no issue found"
+}

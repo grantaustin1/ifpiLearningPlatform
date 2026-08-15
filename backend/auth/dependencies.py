@@ -82,6 +82,15 @@ def get_current_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
+    # Hot path: this runs on EVERY authenticated request (2 queries).
+    # 30s TTL; explicitly invalidated on role/active changes via
+    # invalidate_current_user_cache().
+    from core.cache import cache_get, cache_set
+    cache_key = f"auth:user:{user_id}"
+    cached_user = cache_get(cache_key)
+    if cached_user is not None:
+        return cached_user
+
     user = db.query(User).filter(User.id == int(user_id)).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User inactive or not found")
@@ -90,13 +99,20 @@ def get_current_user(
     if not roles:
         roles = ["LEARNER"]
 
-    return CurrentUser(
+    current = CurrentUser(
         id=user.id,
         email=user.email,
         name=user.name,
         organization_id=user.organization_id,
         roles=roles,
     )
+    cache_set(cache_key, current, ttl=30)
+    return current
+
+
+def invalidate_current_user_cache(user_id: int) -> None:
+    from core.cache import cache_delete
+    cache_delete(f"auth:user:{user_id}")
 
 
 def requires_roles(*allowed: str):

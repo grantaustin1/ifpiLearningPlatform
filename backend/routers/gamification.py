@@ -33,6 +33,12 @@ def leaderboard(cohort: Optional[str] = None,
     # Iter 38 — was 103 queries via lazy-load of `enrollments` and
     # `badges` for each of 50 users. `selectinload` collapses to 3
     # queries total.
+    # 15s TTL — leaderboard is read-heavy and tolerates slight staleness.
+    from core.cache import cache_get, cache_set
+    _ck = f"lb:{current.organization_id}:{cohort or ''}"
+    _hit = cache_get(_ck)
+    if _hit is not None:
+        return _hit
     q = (db.query(User)
          .options(selectinload(User.enrollments), selectinload(User.badges))
          .filter(User.organization_id == current.organization_id,
@@ -47,6 +53,7 @@ def leaderboard(cohort: Optional[str] = None,
             user_id=u.id, name=u.name, points=u.points or 0,
             badges=len(u.badges), completed=completed,
         ))
+    cache_set(_ck, out, ttl=15)
     return out
 
 

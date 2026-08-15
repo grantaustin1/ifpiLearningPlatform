@@ -19,21 +19,26 @@ def _can_manage(user: CurrentUser) -> bool:
     return can_manage_content(user)
 
 
-def _summary(c: Course) -> CourseSummary:
+def _summary(c: Course, slide_count: int | None = None,
+             enrollment_count: int | None = None) -> CourseSummary:
     meta = c.metadata_json or {}
     return CourseSummary(
         id=c.id, title=c.title, description=c.description, category=c.category,
         cover_color=c.cover_color, cover_image=c.cover_image,
         is_featured=bool(c.is_featured), status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
-        currency=c.currency, slide_count=len(c.slides),
-        enrollment_count=len(c.enrollments), created_at=c.created_at,
+        currency=c.currency,
+        slide_count=len(c.slides) if slide_count is None else slide_count,
+        enrollment_count=(len(c.enrollments) if enrollment_count is None
+                          else enrollment_count),
+        created_at=c.created_at,
         mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
         created_by_id=c.created_by_id,
     )
 
 
-def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
+def _detail(c: Course, exam=None, exam_passed: bool = False,
+            enrollment_count: int | None = None) -> CourseDetail:
     meta = c.metadata_json or {}
     return CourseDetail(
         id=c.id, title=c.title, description=c.description, category=c.category,
@@ -41,7 +46,9 @@ def _detail(c: Course, exam=None, exam_passed: bool = False) -> CourseDetail:
         is_featured=bool(c.is_featured), status=c.status.value,
         duration_minutes=c.duration_minutes, price_cents=c.price_cents,
         currency=c.currency, passing_score=c.passing_score,
-        slide_count=len(c.slides), enrollment_count=len(c.enrollments),
+        slide_count=len(c.slides),
+        enrollment_count=(len(c.enrollments) if enrollment_count is None
+                          else enrollment_count),
         created_at=c.created_at,
         mindmap_thumbnail_svg=meta.get("mindmap_thumbnail_svg"),
         exam_id=exam.id if exam else None,

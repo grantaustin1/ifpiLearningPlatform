@@ -1,0 +1,227 @@
+[
+ {
+  "label": "baseline",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 36.3,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 998.5,
+    "p95_ms": 1088.4,
+    "p99_ms": 1156.1,
+    "max_ms": 1181.8
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 904.6,
+    "p95_ms": 1006.2,
+    "p99_ms": 1077.6,
+    "max_ms": 1376.2
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 1417.5,
+    "p95_ms": 2284.6,
+    "p99_ms": 2316.6,
+    "max_ms": 2375.6
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 798.1,
+    "p95_ms": 849.8,
+    "p99_ms": 890.2,
+    "max_ms": 938.9
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 797.4,
+    "p95_ms": 843.1,
+    "p99_ms": 869.8,
+    "max_ms": 885.9
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 599.3,
+    "p95_ms": 693.6,
+    "p99_ms": 696.7,
+    "max_ms": 703.7
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 1101.4,
+    "p95_ms": 2539.4,
+    "p99_ms": 3058.9,
+    "max_ms": 3335.3
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 3.4,
+    "p95_ms": 7.8,
+    "p99_ms": 10.3,
+    "max_ms": 69.3
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 0,
+  "rps": 33.1
+ },
+ {
+  "label": "after_phase1",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 33.9,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 996.8,
+    "p95_ms": 1088.7,
+    "p99_ms": 1138.5,
+    "max_ms": 1186.2
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 977.5,
+    "p95_ms": 1214.0,
+    "p99_ms": 1291.3,
+    "max_ms": 1298.3
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 800.0,
+    "p95_ms": 1394.2,
+    "p99_ms": 1421.4,
+    "max_ms": 1455.6
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 796.4,
+    "p95_ms": 861.7,
+    "p99_ms": 881.8,
+    "max_ms": 1122.9
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 796.4,
+    "p95_ms": 846.7,
+    "p99_ms": 888.7,
+    "max_ms": 910.8
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 598.3,
+    "p95_ms": 675.5,
+    "p99_ms": 701.1,
+    "max_ms": 707.4
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 1110.1,
+    "p95_ms": 2828.6,
+    "p99_ms": 3465.5,
+    "max_ms": 3633.9
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 3.5,
+    "p95_ms": 9.1,
+    "p99_ms": 12.8,
+    "max_ms": 20.7
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 0,
+  "rps": 35.4
+ },
+ {
+  "label": "after_phase3_cache",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 20.5,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 3.8,
+    "p95_ms": 985.2,
+    "p99_ms": 991.6,
+    "max_ms": 998.6
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 782.7,
+    "p95_ms": 999.2,
+    "p99_ms": 1071.7,
+    "max_ms": 1089.7
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 592.1,
+    "p95_ms": 1377.1,
+    "p99_ms": 1393.5,
+    "max_ms": 1402.5
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 589.4,
+    "p95_ms": 641.3,
+    "p99_ms": 676.6,
+    "max_ms": 953.7
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 4.2,
+    "p95_ms": 591.4,
+    "p99_ms": 603.8,
+    "max_ms": 605.6
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 395.1,
+    "p95_ms": 464.1,
+    "p99_ms": 502.3,
+    "max_ms": 560.7
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 884.9,
+    "p95_ms": 1779.6,
+    "p99_ms": 2365.9,
+    "max_ms": 2448.3
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 4.8,
+    "p95_ms": 14.3,
+    "p99_ms": 19.1,
+    "max_ms": 21.8
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 0,
+  "rps": 58.5
+ }
+]

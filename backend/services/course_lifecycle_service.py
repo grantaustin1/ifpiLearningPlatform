@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser
+from core.cache import invalidate
 from models import (
     Course, CourseSlide, CourseStatus, Enrollment, EnrollmentStatus,
 )
@@ -22,6 +23,7 @@ class CourseLifecycleService:
         ).first()
         if not c:
             raise HTTPException(status_code=404, detail="Course not found")
+        invalidate("catalog:")  # every lifecycle mutation affects the catalog
         return c
 
     def toggle_featured(self, current: CurrentUser, course_id: int) -> dict:

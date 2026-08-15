@@ -59,6 +59,11 @@ def enrollments_weekly(weeks: int = Query(12, ge=4, le=26),
 def analytics(db: Session = Depends(get_db),
               current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
     org = current.organization_id
+    from core.cache import cache_get, cache_set
+    _ck = f"analytics:{org}"
+    _hit = cache_get(_ck)
+    if _hit is not None:
+        return _hit
     total_learners = db.query(User).filter(User.organization_id == org).count()
     total_courses = db.query(Course).filter(Course.organization_id == org).count()
     total_enrollments = db.query(Enrollment).join(Course).filter(Course.organization_id == org).count()

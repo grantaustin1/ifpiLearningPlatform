@@ -54,6 +54,11 @@ def catalog(q: str | None = Query(None),
             page: int = Query(1, ge=1),
             page_size: int = Query(24, ge=1, le=100),
             db: Session = Depends(get_db)):
+    from core.cache import cache_get, cache_set
+    _ck = f"catalog:{q}:{category}:{org}:{featured}:{sort}:{page}:{page_size}"
+    _hit = cache_get(_ck)
+    if _hit is not None:
+        return _hit
     from models import Organization, Enrollment
     from sqlalchemy import func, or_
     query = (
@@ -138,7 +143,7 @@ def catalog(q: str | None = Query(None),
     cats = [r[0] for r in db.query(Course.category).filter(
         Course.status == CourseStatus.PUBLISHED, Course.category.isnot(None),
     ).distinct().all() if r[0]]
-    return {
+    out = {
         "courses": [{
             "id": c.id, "title": c.title, "description": c.description,
             "category": c.category, "cover_color": c.cover_color,
@@ -158,6 +163,8 @@ def catalog(q: str | None = Query(None),
         "total": total, "page": page, "page_size": page_size,
         "sort": sort,
     }
+    cache_set(_ck, out, ttl=60)
+    return out
 
 
 @catalog_router.get("/{course_id}")

@@ -86,6 +86,8 @@ def register_all(app: FastAPI) -> None:
 
     # ── Iter 21: API tokens for external integrations ────────────────
     from routers import api_tokens
+    from routers.api_v2 import v2_router
+    app.include_router(v2_router)
     app.include_router(api_tokens.router)
 
     # ── Iter 22: AI authoring suite (shared infra + gates) ───────────

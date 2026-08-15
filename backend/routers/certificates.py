@@ -310,10 +310,14 @@ def bulk_email_certificates(
         user = c.user
         if not user or not user.email:
             results.append({"id": cid, "status": "no_email"}); continue
-        title = (c.course.title if c.course
-                 else (db.query(LiveSession).filter(
-                     LiveSession.id == c.live_session_id).first().title
-                     if c.live_session_id else "IFPI Certificate"))
+        if c.course:
+            title = c.course.title
+        elif c.live_session_id:
+            ls = db.query(LiveSession).filter(
+                LiveSession.id == c.live_session_id).first()
+            title = ls.title if ls else "IFPI Certificate"
+        else:
+            title = "IFPI Certificate"
         try:
             mail.send_email(
                 to_email=user.email, to_name=user.name,

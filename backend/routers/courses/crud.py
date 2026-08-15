@@ -35,7 +35,22 @@ def list_courses(
     if category:
         query = query.filter(Course.category == category)
     courses = query.order_by(Course.display_order.asc(), Course.created_at.desc()).all()
-    return [_summary(c) for c in courses]
+    # Aggregate counts in two queries instead of lazy-loading every slide and
+    # enrollment row per course (N+1 killer at scale).
+    ids = [c.id for c in courses]
+    slide_counts: dict = {}
+    enroll_counts: dict = {}
+    if ids:
+        from sqlalchemy import func
+        from models import CourseSlide, Enrollment
+        slide_counts = dict(db.query(
+            CourseSlide.course_id, func.count(CourseSlide.id)
+        ).filter(CourseSlide.course_id.in_(ids)).group_by(CourseSlide.course_id).all())
+        enroll_counts = dict(db.query(
+            Enrollment.course_id, func.count(Enrollment.id)
+        ).filter(Enrollment.course_id.in_(ids)).group_by(Enrollment.course_id).all())
+    return [_summary(c, slide_counts.get(c.id, 0), enroll_counts.get(c.id, 0))
+            for c in courses]
 
 
 @router.patch("/reorder")
@@ -83,6 +98,8 @@ def create_course(
     db.add(course)
     db.commit()
     db.refresh(course)
+    from core.cache import invalidate
+    invalidate("catalog:")
     return _detail(course)
 
 
@@ -108,7 +125,12 @@ def get_course(course_id: int, db: Session = Depends(get_db),
             ExamAttempt.user_id == current.id,
             ExamAttempt.passed.is_(True),
         ).first() is not None
-    return _detail(c, exam=exam, exam_passed=exam_passed)
+    from sqlalchemy import func
+    from models import Enrollment
+    n_enrolled = db.query(func.count(Enrollment.id)).filter(
+        Enrollment.course_id == c.id).scalar() or 0
+    return _detail(c, exam=exam, exam_passed=exam_passed,
+                   enrollment_count=n_enrolled)
 
 
 @router.patch("/{course_id}", response_model=CourseDetail)
@@ -126,6 +148,8 @@ def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_
         setattr(c, k, v)
     db.commit()
     db.refresh(c)
+    from core.cache import invalidate
+    invalidate("catalog:")
     return _detail(c)
 
 
