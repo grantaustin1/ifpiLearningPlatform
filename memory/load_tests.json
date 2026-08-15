@@ -223,5 +223,80 @@
   "total_requests": 1200,
   "total_errors": 0,
   "rps": 58.5
+ },
+ {
+  "label": "after_us_region",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 6.4,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 13.8,
+    "p95_ms": 322.6,
+    "p99_ms": 440.6,
+    "max_ms": 465.8
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 267.3,
+    "p95_ms": 333.7,
+    "p99_ms": 362.4,
+    "max_ms": 370.7
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 194.2,
+    "p95_ms": 558.5,
+    "p99_ms": 582.7,
+    "max_ms": 601.9
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 189.2,
+    "p95_ms": 247.0,
+    "p99_ms": 258.4,
+    "max_ms": 268.1
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 12.3,
+    "p95_ms": 38.4,
+    "p99_ms": 220.8,
+    "max_ms": 243.8
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 132.3,
+    "p95_ms": 184.5,
+    "p99_ms": 194.9,
+    "max_ms": 203.3
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 273.9,
+    "p95_ms": 347.7,
+    "p99_ms": 442.2,
+    "max_ms": 454.7
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 14.6,
+    "p95_ms": 50.6,
+    "p99_ms": 84.9,
+    "max_ms": 89.5
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 0,
+  "rps": 187.4
  }
 ]
