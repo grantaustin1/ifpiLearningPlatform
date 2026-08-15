@@ -1,0 +1,37 @@
+{
+  "summary": "Iter 66 — AI Tutor timeout hardening + Save-as-flashcard end-to-end verification for course 243. 8/8 backend pytest cases pass in ~13s total; frontend E2E on /learn/243 confirms tutor panel renders a grounded answer with 4 citations in ~5s and Save-as-flashcard toast fires. No hangs, no 5xx, no 504 in happy path.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "ask_grounded_latency": "'What are the functions of the skeletal system?' -> 200 with 4 citations, <20s (measured ~4-6s in pytest run, ~5s in UI)",
+    "ask_grounded_answer_quality": "Answer references Support/Protection/Movement/Storage/Blood cell formation with inline [1][2][3][4] citations from SourceDocument 50 (Module 1 slide transcripts)",
+    "ask_vague_no_5xx": "'give me more information on this slide' returns 200 (< 20s), no 5xx, no hang — the exact prompt that triggered CF 524 in prod is now safe",
+    "ask_not_504_happy_path": "Normal ask does NOT trigger the 60s asyncio.wait_for guard — answer text has no timeout marker",
+    "session_list": "GET /api/tutor/sessions returns the newly created session in items[]",
+    "session_detail": "GET /api/tutor/sessions/{id} returns >=2 messages (user + assistant) in order",
+    "multi_turn": "Second POST with session_id continues in the same session (returned session_id matches)",
+    "save_as_flashcard_own": "POST /api/tutor/save-as-flashcard with own message_id -> 200 with flashcard_id, front, back_length",
+    "save_as_flashcard_foreign": "Admin trying to save learner's message_id -> 404 (ownership enforced via join on AITutorSession.user_id)",
+    "frontend_ui_e2e": "Learner login -> /learn/243 -> click ai-tutor-toggle -> panel opens -> type question -> tutor-msg-assistant renders 927-char answer with 4 source citation chips -> click save-flashcard-{id} -> 'Saved to your flashcards' toast + green 'Saved to flashcards' badge shown"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter66_tutor_flashcard.py",
+    "/app/test_reports/pytest/iter66.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/ai_tutor.py::_call_llm uses `import asyncio` inside the function body — safe but should be moved to module-level (micro cost, style only).",
+    "The 60s asyncio.wait_for is only wrapped around chat.send_message; if the LlmChat constructor or .with_model ever blocks (e.g. slow provider handshake in emergentintegrations), those seconds are NOT counted toward the 60s budget. In practice the constructor is instant, but worth noting if provider auth ever moves there.",
+    "services.embedding_service.embed_texts 20s timeout is applied per HTTP call, but semantic_search may issue multiple embed calls per query (one for the query). This is fine today, but if query expansion is ever added, ensure the aggregate stays well under the 60s LLM budget plus retrieval time (currently ~2-3s) so the whole /ask stays comfortably under Cloudflare's 100s limit.",
+    "save_as_flashcard truncates the question to 500 chars with an ellipsis but stores the full answer verbatim as `back` — Flashcard.back has no length cap in the endpoint. If a tutor answer ever exceeds a reasonable size (unlikely with the <200 word system prompt), the DB column type will decide. Not a blocker, but a Field(max_length=...) or explicit truncation on `back` would be defensive.",
+    "AITutorPanel.tsx: the send button has no explicit disabled state visible via data-testid when `busy` — the loading spinner is inside the button, which works, but a data-busy attribute would make e2e waits cleaner."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter66_tutor_flashcard.py (new)"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "test_credentials": "uat-learner@ifpi.org / UatLearner!2026 ; uat-admin@ifpi.org / UatAdmin!2026",
+  "seed_data_creation": "Created 1 tutor session with 3 messages (2 asks + 1 multi-turn follow-up) and 1 flashcard saved from the tutor for learner uat-learner in course 243. Total LLM asks: 3 (well under the 4-6 budget).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter66_tutor_flashcard.py is the regression suite for the tutor timeout + save-as-flashcard fixes. Course 243 has SourceDocument id 50 with embeddings — asks return citations. If a future change ever removes those embeddings the grounded-citations assertion will fail (expected). Do not modify course 243 slides.",
+  "rca of the issue": "Original Cloudflare 524 (production, London DB): (a) embedding_service HTTP call had a 90s ceiling and (b) _call_llm had no timeout, so a slow provider response would exceed CF's 100s edge timeout. FIX (verified in this iter): embed_texts hard-timeout dropped to 20s, and _call_llm wraps chat.send_message in asyncio.wait_for(..., timeout=60) returning a friendly 504 if breached. Additionally the imported course 243 had NO source documents so the tutor returned generic non-answers; ingesting its 99 slide transcripts as SourceDocument 50 with embeddings restored grounded answers with citations. This iteration confirms the happy path completes in ~5s with citations and the vague 'give me more information on this slide' prompt (the original repro) returns cleanly without hitting the guard."
+}

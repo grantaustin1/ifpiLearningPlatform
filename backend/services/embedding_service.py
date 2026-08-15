@@ -94,7 +94,7 @@ async def embed_texts(texts: List[str]) -> List[List[float]]:
         "Authorization": f"Bearer {settings.emergent_llm_key}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient(timeout=90) as client:
+    async with httpx.AsyncClient(timeout=20) as client:
         r = await client.post(url, headers=headers, json={
             "model": settings.embedding_model, "input": texts,
         })
