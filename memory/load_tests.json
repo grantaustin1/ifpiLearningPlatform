@@ -298,5 +298,305 @@
   "total_requests": 1200,
   "total_errors": 0,
   "rps": 187.4
+ },
+ {
+  "label": "production_rehearsal",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 139.2,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 292.5,
+    "p95_ms": 7525.9,
+    "p99_ms": 35791.5,
+    "max_ms": 36582.3
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 2211.8,
+    "p95_ms": 21779.2,
+    "p99_ms": 36293.9,
+    "max_ms": 38099.5
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 1557.6,
+    "p95_ms": 12344.3,
+    "p99_ms": 36190.8,
+    "max_ms": 36733.9
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 750.6,
+    "p95_ms": 12306.5,
+    "p99_ms": 20073.9,
+    "max_ms": 36236.6
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 347.9,
+    "p95_ms": 12756.1,
+    "p99_ms": 35967.9,
+    "max_ms": 36405.5
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 1,
+    "p50_ms": 586.4,
+    "p95_ms": 5493.1,
+    "p99_ms": 21238.0,
+    "max_ms": 60005.4
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 898.9,
+    "p95_ms": 19706.9,
+    "p99_ms": 36192.7,
+    "max_ms": 37607.6
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 135.0,
+    "p95_ms": 12368.4,
+    "p99_ms": 20117.2,
+    "max_ms": 35920.7
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 1,
+  "rps": 8.6
+ },
+ {
+  "label": "prod_5users",
+  "users": 5,
+  "loops": 3,
+  "wall_seconds": 6.4,
+  "endpoints": {
+   "catalog": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 191.1,
+    "p95_ms": 602.7,
+    "p99_ms": 602.7,
+    "max_ms": 695.2
+   },
+   "course_detail": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 488.4,
+    "p95_ms": 611.1,
+    "p99_ms": 611.1,
+    "max_ms": 709.6
+   },
+   "courses_list": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 289.4,
+    "p95_ms": 496.2,
+    "p99_ms": 496.2,
+    "max_ms": 503.7
+   },
+   "enroll": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 282.0,
+    "p95_ms": 306.1,
+    "p99_ms": 306.1,
+    "max_ms": 383.5
+   },
+   "leaderboard": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 187.5,
+    "p95_ms": 202.5,
+    "p99_ms": 202.5,
+    "max_ms": 395.7
+   },
+   "notifications": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 249.1,
+    "p95_ms": 431.1,
+    "p99_ms": 431.1,
+    "max_ms": 433.1
+   },
+   "progress": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 293.8,
+    "p95_ms": 403.9,
+    "p99_ms": 403.9,
+    "max_ms": 486.1
+   },
+   "slide_image": {
+    "n": 15,
+    "errors": 0,
+    "p50_ms": 42.1,
+    "p95_ms": 66.8,
+    "p99_ms": 66.8,
+    "max_ms": 68.7
+   }
+  },
+  "total_requests": 120,
+  "total_errors": 0,
+  "rps": 18.9
+ },
+ {
+  "label": "preview_external",
+  "users": 30,
+  "loops": 5,
+  "wall_seconds": 75.0,
+  "endpoints": {
+   "catalog": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 93.5,
+    "p95_ms": 647.4,
+    "p99_ms": 682.2,
+    "max_ms": 776.5
+   },
+   "course_detail": {
+    "n": 150,
+    "errors": 1,
+    "p50_ms": 415.2,
+    "p95_ms": 11842.2,
+    "p99_ms": 36380.4,
+    "max_ms": 60023.3
+   },
+   "courses_list": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 489.4,
+    "p95_ms": 2301.5,
+    "p99_ms": 2340.5,
+    "max_ms": 36250.1
+   },
+   "enroll": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 259.6,
+    "p95_ms": 509.9,
+    "p99_ms": 19833.2,
+    "max_ms": 36237.9
+   },
+   "leaderboard": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 98.3,
+    "p95_ms": 497.9,
+    "p99_ms": 518.0,
+    "max_ms": 1116.2
+   },
+   "notifications": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 438.2,
+    "p95_ms": 1253.8,
+    "p99_ms": 1284.5,
+    "max_ms": 19834.5
+   },
+   "progress": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 345.4,
+    "p95_ms": 727.8,
+    "p99_ms": 759.1,
+    "max_ms": 768.4
+   },
+   "slide_image": {
+    "n": 150,
+    "errors": 0,
+    "p50_ms": 137.8,
+    "p95_ms": 1155.5,
+    "p99_ms": 1219.2,
+    "max_ms": 36074.8
+   }
+  },
+  "total_requests": 1200,
+  "total_errors": 1,
+  "rps": 16.0
+ },
+ {
+  "label": "prod_10users",
+  "users": 10,
+  "loops": 4,
+  "wall_seconds": 22.3,
+  "endpoints": {
+   "catalog": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 212.8,
+    "p95_ms": 1841.7,
+    "p99_ms": 1932.8,
+    "max_ms": 2293.5
+   },
+   "course_detail": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 1414.7,
+    "p95_ms": 2704.7,
+    "p99_ms": 3114.3,
+    "max_ms": 5010.8
+   },
+   "courses_list": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 697.1,
+    "p95_ms": 1102.3,
+    "p99_ms": 1273.7,
+    "max_ms": 2214.1
+   },
+   "enroll": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 498.0,
+    "p95_ms": 1284.2,
+    "p99_ms": 1387.7,
+    "max_ms": 1409.9
+   },
+   "leaderboard": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 302.4,
+    "p95_ms": 793.8,
+    "p99_ms": 865.5,
+    "max_ms": 1181.3
+   },
+   "notifications": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 839.8,
+    "p95_ms": 1457.7,
+    "p99_ms": 1472.3,
+    "max_ms": 1649.5
+   },
+   "progress": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 605.6,
+    "p95_ms": 1703.7,
+    "p99_ms": 1809.9,
+    "max_ms": 2008.9
+   },
+   "slide_image": {
+    "n": 40,
+    "errors": 0,
+    "p50_ms": 41.6,
+    "p95_ms": 64.4,
+    "p99_ms": 69.9,
+    "max_ms": 70.1
+   }
+  },
+  "total_requests": 320,
+  "total_errors": 0,
+  "rps": 14.3
  }
 ]
