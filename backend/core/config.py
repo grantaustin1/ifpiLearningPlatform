@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     gcs_bucket: str = ""
     gcs_project: str = ""
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _sanitize_database_url(cls, v: object) -> object:
+        # Deploy secrets are pasted by hand; strip quotes and any stray
+        # trailing text (a DB URL never contains whitespace).
+        if isinstance(v, str):
+            v = v.strip().strip('"').strip("'").strip()
+            if " " in v:
+                v = v.split()[0]
+        return v
 
     @property
     def is_production(self) -> bool:
