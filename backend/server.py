@@ -202,7 +202,12 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "healthy"}
+    from core.database import engine
+    return {
+        "status": "healthy",
+        "db": engine.dialect.name,
+        "build": "2026-06-16.2",
+    }
 
 
 @app.on_event("startup")
