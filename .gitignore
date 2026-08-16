@@ -7,3 +7,8 @@ backend/snapshots/
 .env
 .env.*
 *.env
+*.db
+*.sqlite3
+backend/uploads/
+__pycache__/
+*.pyc
