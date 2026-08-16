@@ -50,19 +50,6 @@ API = _api_url()
 LOG: list[dict] = []
 
 
-def _is_completion_status_ok(status_code: int, already_completed: bool) -> bool:
-    """Return whether a course-completion response status is expected.
-
-    200/201 are always OK. 422 is OK only when the course was already
-    marked complete (idempotent retry).
-    """
-    if status_code in (200, 201):
-        return True
-    if status_code == 422 and already_completed:
-        return True
-    return False
-
-
 def step(name: str, ok: bool, detail: str = "") -> None:
     LOG.append({"step": name, "ok": ok, "detail": detail})
     flag = "PASS" if ok else "FAIL"
@@ -105,7 +92,7 @@ def main() -> int:
     step("fixture seeded", True)
 
     from core.database import SessionLocal
-    from models import Certificate, Course, Enrollment, EnrollmentStatus, Exam, Invitation, User
+    from models import Course, Exam, Invitation, User
 
     # 2) Admin session
     s = requests.Session()
@@ -167,33 +154,7 @@ def main() -> int:
 
     # 7b) Mark the course complete (issues the certificate)
     r = ls.post(f"{API}/api/courses/{course.id}/complete", timeout=15)
-    completed_despite_422 = False
-    if r.status_code == 422:
-        with SessionLocal() as db:
-            from sqlalchemy import and_
-
-            completed_despite_422 = db.query(Enrollment.id).join(
-                User, User.id == Enrollment.user_id,
-            ).join(
-                Certificate,
-                and_(
-                    Certificate.user_id == Enrollment.user_id,
-                    Certificate.course_id == Enrollment.course_id,
-                ),
-            ).filter(
-                User.email == learner_email,
-                Enrollment.course_id == course.id,
-                Enrollment.status == EnrollmentStatus.COMPLETED,
-            ).first() is not None
-    step(
-        "course marked complete",
-        _is_completion_status_ok(r.status_code, completed_despite_422),
-        (
-            f"status={r.status_code} (already completed + cert issued)"
-            if completed_despite_422
-            else f"status={r.status_code} body={r.text[:200]}"
-        ),
-    )
+    step("course marked complete", r.status_code in (200, 201), f"status={r.status_code}")
 
     # 8) Cert auto-issued?
     r = ls.get(f"{API}/api/certificates", timeout=15)

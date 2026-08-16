@@ -217,8 +217,9 @@ async def sso_exchange(request: Request, response: Response,
     return_to: str | None = None
     if form_post_mode:
         form = await request.form()
-        token = (form.get("token") or form.get("erp_token") or "").strip() or None
-        return_to = (form.get("return_to") or "").strip() or None
+        _tok, _ret = form.get("token") or form.get("erp_token"), form.get("return_to")
+        token = (_tok.strip() if isinstance(_tok, str) else None) or None
+        return_to = (_ret.strip() if isinstance(_ret, str) else None) or None
     else:
         try:
             payload = await request.json()

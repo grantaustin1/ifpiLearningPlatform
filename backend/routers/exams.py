@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as _BaseModel
 from sqlalchemy.orm import Session
 
-from auth.dependencies import CurrentUser, get_current_user, requires_roles
+from auth.dependencies import CurrentUser, can_manage_content, get_current_user, requires_roles
 from core.database import get_db
 from core.role_registry import INSTRUCTOR_ROLES
 from models import Course, CourseSlide, Exam, ExamAttempt, ExamQuestion, QuestionType, User
@@ -48,7 +48,7 @@ def _detail(e: Exam, user_attempt_count: int = 0) -> ExamDetail:
 
 
 def _can_manage(user: CurrentUser) -> bool:
-    return user.has_any_role(INSTRUCTOR_ROLES)
+    return can_manage_content(user)
 
 
 @router.get("", response_model=List[ExamSummary])

@@ -22,7 +22,6 @@ from models import (
 
 
 MAX_FAILED_ATTEMPTS = 5
-MAX_PASSWORD_LENGTH = 64  # bcrypt 5.0 rejects passwords > 72 bytes; 64 gives UTF-8 headroom
 
 
 class AuthService:
@@ -36,10 +35,6 @@ class AuthService:
         existing = self.db.query(User).filter(User.email == email).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
-        if len(password) < 8:
-            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-        if len(password) > MAX_PASSWORD_LENGTH:
-            raise HTTPException(status_code=400, detail=f"Password must be at most {MAX_PASSWORD_LENGTH} characters")
 
         # Default to the first / default academy
         if organization_id is None:
@@ -182,9 +177,6 @@ class AuthService:
         if len(new_password) < 8:
             raise HTTPException(status_code=400,
                                 detail="New password must be at least 8 characters")
-        if len(new_password) > MAX_PASSWORD_LENGTH:
-            raise HTTPException(status_code=400,
-                                detail=f"New password must be at most {MAX_PASSWORD_LENGTH} characters")
         user.password_hash = get_password_hash(new_password)
         user.must_change_password = False
         self.db.commit()
@@ -226,9 +218,6 @@ class AuthService:
         if len(new_password) < 8:
             raise HTTPException(status_code=400,
                                 detail="Password must be at least 8 characters")
-        if len(new_password) > MAX_PASSWORD_LENGTH:
-            raise HTTPException(status_code=400,
-                                detail=f"Password must be at most {MAX_PASSWORD_LENGTH} characters")
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         row = self.db.query(PasswordResetToken).filter(
             PasswordResetToken.token_hash == token_hash

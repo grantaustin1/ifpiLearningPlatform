@@ -14,6 +14,7 @@ from typing import List, Optional
 from fastapi import (
     APIRouter, Depends, File, HTTPException, Request, Response, UploadFile,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.orm import Session
 
@@ -118,17 +119,53 @@ def cover_library(current: CurrentUser = Depends(requires_roles("INSTRUCTOR", "A
     return items
 
 
+def _range_response(path: Path, mime: str, range_header: str):
+    """Serve a single byte range (RFC 7233) so <video> can seek and browsers
+    stop downloading whole files. Returns None if the header is unusable."""
+    import re as _re
+    m = _re.match(r"bytes=(\d*)-(\d*)$", range_header.strip())
+    if not m or (not m.group(1) and not m.group(2)):
+        return None
+    size = path.stat().st_size
+    if m.group(1):
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) else size - 1
+    else:  # suffix range: last N bytes
+        start = max(size - int(m.group(2)), 0)
+        end = size - 1
+    if start >= size:
+        return Response(status_code=416,
+                        headers={"Content-Range": f"bytes */{size}"})
+    end = min(end, size - 1)
+    length = end - start + 1
+
+    def iter_chunk(chunk=1024 * 256):
+        with open(path, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                data = f.read(min(chunk, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        iter_chunk(), status_code=206, media_type=mime,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+            "Cache-Control": "public, max-age=3600",
+        })
+
+
 @uploads_router.get("/files/{path:path}")
-def serve_upload(path: str):
-    """Serve a previously-uploaded file. ONLY meaningful for the `local`
-    backend — S3/GCS URLs are public/CDN and bypass this route."""
+def serve_upload(path: str, request: Request):
+    """Serve a previously-uploaded file (local disk or object-store cache).
+    Supports HTTP Range requests for video seeking."""
     storage = get_storage()
-    if not storage.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-    try:
-        content = storage.load(path)
-    except StorageError as e:
-        raise HTTPException(status_code=404, detail=str(e))
     suffix = Path(path).suffix.lower()
     mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".webp": "image/webp", ".svg": "image/svg+xml", ".gif": "image/gif",
@@ -136,6 +173,20 @@ def serve_upload(path: str):
             ".m4v": "video/x-m4v", ".ogg": "video/ogg",
             ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4",
             ".pdf": "application/pdf"}.get(suffix, "application/octet-stream")
+    local = storage.local_path(path)
+    if local is not None:
+        range_header = request.headers.get("range")
+        if range_header:
+            resp = _range_response(local, mime, range_header)
+            if resp is not None:
+                return resp
+        return FileResponse(local, media_type=mime,
+                            headers={"Cache-Control": "public, max-age=3600",
+                                     "Accept-Ranges": "bytes"})
+    try:
+        content = storage.load(path)
+    except StorageError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return Response(
         content=content, media_type=mime,
         headers={"Cache-Control": "public, max-age=3600"},

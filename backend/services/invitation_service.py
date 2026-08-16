@@ -19,7 +19,6 @@ from services.mail_service import MailService
 
 INVITE_TTL_DAYS = 14
 ALLOWED_INVITE_ROLES = {"ADMIN", "INSTRUCTOR", "BILLING_VIEWER", "LEARNER"}
-MAX_PASSWORD_LENGTH = 64  # bcrypt 5.0 rejects passwords > 72 bytes; 64 gives UTF-8 headroom
 
 
 class InvitationService:
@@ -101,8 +100,6 @@ class InvitationService:
         inv = self.lookup(token)
         if len(password or "") < 8:
             raise HTTPException(status_code=400, detail="Password must be 8+ characters")
-        if len(password or "") > MAX_PASSWORD_LENGTH:
-            raise HTTPException(status_code=400, detail=f"Password must be at most {MAX_PASSWORD_LENGTH} characters")
         user = User(
             email=inv.email, name=name or inv.name,
             password_hash=get_password_hash(password),

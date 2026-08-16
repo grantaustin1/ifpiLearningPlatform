@@ -60,7 +60,7 @@ export function WelcomeTour() {
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [active, idx, step])
+  }, [active, idx, step?.selector])
 
   if (!active || !step) return null
 

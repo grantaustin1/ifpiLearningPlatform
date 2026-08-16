@@ -69,7 +69,12 @@ export default function ImportsPage() {
       toast.success('Retrying import — watch progress below')
       load()
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Could not retry import')
+      if (e?.response?.status === 404) {
+        toast.info('That import run no longer exists — the list was out of date and has been refreshed')
+        load()
+      } else {
+        toast.error(e?.response?.data?.detail || 'Could not retry import')
+      }
     } finally { setRetrying(null) }
   }
 

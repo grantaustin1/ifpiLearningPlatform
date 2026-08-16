@@ -28,15 +28,18 @@ def register_all(app: FastAPI) -> None:
     app.include_router(learning_paths.router)
 
     # ── Misc (AI, enrol, certs, notifs, gamif, admin, billing, catalog) ──
-    from routers import misc
-    app.include_router(misc.ai_router)
-    app.include_router(misc.enroll_router)
-    app.include_router(misc.cert_router)
-    app.include_router(misc.notif_router)
-    app.include_router(misc.gam_router)
-    app.include_router(misc.admin_router)
-    app.include_router(misc.billing_router)
-    app.include_router(misc.catalog_router)
+    from routers import (
+        admin_analytics, ai, billing, catalog, certificates, enrollments,
+        gamification, notifications,
+    )
+    app.include_router(ai.ai_router)
+    app.include_router(enrollments.enroll_router)
+    app.include_router(certificates.cert_router)
+    app.include_router(notifications.notif_router)
+    app.include_router(gamification.gam_router)
+    app.include_router(admin_analytics.admin_router)
+    app.include_router(billing.billing_router)
+    app.include_router(catalog.catalog_router)
 
     # Iter 28 — Public SEO endpoints (no /api prefix)
     from routers import seo
@@ -83,6 +86,8 @@ def register_all(app: FastAPI) -> None:
 
     # ── Iter 21: API tokens for external integrations ────────────────
     from routers import api_tokens
+    from routers.api_v2 import v2_router
+    app.include_router(v2_router)
     app.include_router(api_tokens.router)
 
     # ── Iter 22: AI authoring suite (shared infra + gates) ───────────

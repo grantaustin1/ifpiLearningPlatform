@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 65 — Cache correctness (Phase 2), API v2 envelope (Phase 3), and mypy fixes (Phase 4) verified end-to-end. 18/18 backend pytest cases pass; frontend smoke of login/catalog/courses/leaderboard/learn-243 clean with 0 console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "auth_cache_login_admin_learner": "both /api/auth/me return correct identity/roles right after login",
+    "auth_cache_no_bleed": "admin token -> admin email, learner token -> learner email in same session",
+    "auth_cache_repeated_calls": "5 rapid /me calls all 200 (cache hits)",
+    "auth_cache_refresh_boundary": "call, sleep 32s (past 30s TTL), call again -> 200, identity intact",
+    "catalog_publish_invalidation": "created org-1 course, warmed catalog, published -> course visible immediately (not stale for 60s). Then unpublished -> disappears immediately. Cleaned up.",
+    "catalog_repeat_consistency": "two consecutive /api/catalog calls return identical totals",
+    "leaderboard_15s_consistency": "two rapid /api/gamification/leaderboard calls identical",
+    "admin_analytics_cached": "/api/admin/analytics returns non-zero stats; second call identical",
+    "api_v2_health": "{data:{status:ok}, meta:{version:v2}}",
+    "api_v2_courses_learner": "returns >=4 published courses in envelope with meta.count matching",
+    "api_v2_course_243_detail": "returns 99 slides in data envelope",
+    "api_v2_course_404": "999999 -> 404 with error envelope (correlation_id present)",
+    "api_v2_enrollments": "learner enrollments enveloped with progress + last_slide_index",
+    "api_v2_catalog": "enveloped with meta.total, meta.page, meta.page_size, meta.categories",
+    "v1_regression_courses": "/api/courses returns plain list (not enveloped) — shape unchanged",
+    "v1_regression_course_243": "/api/courses/243 returns id=243 and 99 slides — shape unchanged",
+    "progress_not_cached": "learner enroll + save-progress -> v2/enrollments reflects progress=100 immediately (progress never cached)",
+    "frontend_smoke": "Learner login -> /courses (9 cards visible incl. Module 1 with 99 slides), /catalog (marketplace w/ 4 IFPI Main Academy courses), /leaderboard (rank #1, 1700 XP), /learn/243 (slide 5/99 rendered, 99-slide TOC). 0 console errors across all pages."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter65_cache_and_v2.py",
+    "/app/test_reports/pytest/iter65.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "core/cache.py memory backend sweep is O(N) on every set past 5000 entries — acceptable for now, but note that the sweep holds the lock. For high-write endpoints this could stall briefly. Consider a background sweeper if cache size grows.",
+    "auth cache stores the entire CurrentUser Pydantic object via pickle. If CurrentUser gains fields (e.g. entitlements) they will silently persist for 30s across role changes unless invalidate_current_user_cache() is called on every mutation of those fields. Today only role-sync + deactivation invalidate — worth documenting the contract in a comment above CurrentUser.",
+    "routers/api_v2.py catalog wrapper calls into routers/catalog.catalog() as a plain function. That function itself uses the catalog: cache — so v2/catalog benefits from the same cache key. Good. But the v2 wrapper does NOT pass a `q`/`category`/`org` filter so callers cannot search via v2 yet. Consider exposing filters in the v2 signature for feature parity.",
+    "routers/gamification.py leaderboard cache key includes org+cohort; XP changes may take up to 15s to reflect on the leaderboard. Acceptable per spec but should be documented in the OpenAPI description.",
+    "Test debris: 5 TEST_iter65_prog_* courses could not be DELETE-d (409 conflict — presumably due to existing enrollments/certs). They remain visible in the UAT tenant /courses page. Not a bug in this iteration, but suggests DELETE /api/courses/{id} should either cascade-delete disposable/draft courses or provide an admin force-delete. Filed as a low-priority action.",
+    "services/enrollment_service.save_progress: when slide_index is clamped to (total-1) because total<expected, the response's last_slide_index reflects the clamped value while progress uses (idx+1)/total. That's intentional but could confuse UI if course had fewer slides than the learner expected (observed in test debug output: sent slide_index=1 on a 1-slide course -> last_slide_index=0, progress=100)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter65_cache_and_v2.py (new)"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100%"},
+  "test_credentials": "uat-admin@ifpi.org / UatAdmin!2026 ; uat-learner@ifpi.org / UatLearner!2026 ; admin@ifpi.org / admin123 (used ONLY for catalog cache tests since only org 1 is marketplace_opt_in=True)",
+  "seed_data_creation": "Disposable courses TEST_iter65_* created and (mostly) deleted. 5 residual courses could not be deleted (409, likely because slides/enrollments were attached); UI still functional. Consider periodic cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter65_cache_and_v2.py is the regression suite for Phase 2/3/4. Note: catalog cache invalidation MUST be tested from an admin whose org is marketplace_opt_in=True — uat-sandbox is not opted in, so use admin@ifpi.org (org 1) for those tests. cache_refresh_boundary test sleeps 32s.",
+  "rca of the issue": "n/a — no issue"
+}

@@ -6,9 +6,7 @@ import time
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-if not BASE_URL:
-    pytest.skip("REACT_APP_BACKEND_URL not set", allow_module_level=True)
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 
 ADMIN_EMAIL = "qa-admin@ifpi.org"
 ADMIN_PASSWORD = "QaAdmin!2026"

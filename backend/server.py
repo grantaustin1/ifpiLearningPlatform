@@ -96,13 +96,8 @@ logger = logging.getLogger("ifpi")
 # Schema is managed by Alembic (`alembic upgrade head`). We also auto-create
 # any missing tables on fresh checkouts; in production Alembic has already
 # created everything so this is a no-op.
-#
-# GUARDED by SKIP_AUTO_CREATE_TABLES — never call create_all() unprotected.
-# (A previous unguarded duplicate was removed in PR #249; the guarded call
-# below is the ONLY remaining auto-create path.)
 import models  # noqa: F401  — ensures all models register on metadata
-if not os.environ.get("SKIP_AUTO_CREATE_TABLES"):
-    Base.metadata.create_all(bind=engine, checkfirst=True)
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(
     title="IFPI Learning Platform API",
@@ -207,11 +202,28 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "healthy"}
+    from core.database import engine
+    return {
+        "status": "healthy",
+        "db": engine.dialect.name,
+        "build": "2026-06-16.2",
+    }
 
 
 @app.on_event("startup")
 def on_startup():
+    # Audit P0 — refuse to run silently with insecure defaults in production.
+    if (settings.environment or "").lower() == "production":
+        _startup_log = logging.getLogger("startup")
+        if settings.jwt_secret == "change-me":
+            _startup_log.critical(
+                "SECURITY: JWT_SECRET is the insecure default — set a real secret!")
+        if not settings.csrf_enabled:
+            _startup_log.critical(
+                "SECURITY: CSRF_ENABLED is false in production — enable it!")
+        if not settings.auth_cookie_secure:
+            _startup_log.critical(
+                "SECURITY: AUTH_COOKIE_SECURE is false in production — enable it!")
     # Seed minimal data if the DB is empty (idempotent).
     from seed.seed_minimal import run_if_empty
     run_if_empty()

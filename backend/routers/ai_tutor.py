@@ -159,7 +159,13 @@ async def _call_llm(question: str, citations: list[dict]) -> tuple[str, dict]:
     ).with_model(settings.ai_builder_provider, settings.ai_builder_model)
 
     try:
-        raw = await chat.send_message(UserMessage(text=prompt))
+        import asyncio
+        raw = await asyncio.wait_for(
+            chat.send_message(UserMessage(text=prompt)), timeout=60)
+    except asyncio.TimeoutError:
+        logger.error("Tutor LLM call timed out after 60s")
+        raise HTTPException(status_code=504,
+                            detail="The tutor took too long to answer — please retry")
     except Exception as e:
         logger.exception("Tutor LLM call failed: %s", e)
         raise HTTPException(status_code=502,

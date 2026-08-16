@@ -106,7 +106,12 @@ async def tutor_answer(
     ).with_model(settings.tutor_llm_provider, settings.tutor_llm_model)
 
     try:
-        raw = await chat.send_message(UserMessage(text=user_prompt))
+        import asyncio
+        raw = await asyncio.wait_for(
+            chat.send_message(UserMessage(text=user_prompt)), timeout=60)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504,
+                            detail="Tutor took too long to answer — please retry")
     except Exception as e:   # noqa: BLE001
         logger.exception("Tutor LLM call failed: %s", e)
         raise HTTPException(status_code=502, detail="Tutor generation failed — please retry")

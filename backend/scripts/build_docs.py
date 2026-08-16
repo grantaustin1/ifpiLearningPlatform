@@ -97,43 +97,7 @@ def _summarize_route(route) -> Tuple[str, str, str]:
     return verb, path, summary
 
 
-def _flatten_routes(route_list):
-    """Resolve FastAPI 0.115+ _IncludedRouter objects so we get actual
-    APIRoute instances with correct paths."""
-    for route in route_list:
-        if type(route).__name__ == '_IncludedRouter':
-            # FastAPI 0.115+ wraps included routers in _IncludedRouter.
-            # The real routes live under original_router.routes.
-            orig = getattr(route, 'original_router', None)
-            if orig is not None and hasattr(orig, 'routes'):
-                yield from _flatten_routes(orig.routes)
-            continue
-        yield route
-
-
 def _gen_api_routes() -> str:
-    app = _load_app()
-    if app is None:
-        return ("| Endpoint | Verb | Purpose |\n"
-                "|---|---|---|\n"
-                "| _(unable to introspect — run locally with the backend importable)_ | | |")
-    rows: List[Tuple[str, str, str]] = []
-    for route in _flatten_routes(app.routes):
-        path = getattr(route, "path", "") or ""
-        if not path.startswith("/api"):
-            continue
-        verb, p, summary = _summarize_route(route)
-        if not verb:  # websocket, mount, etc.
-            continue
-        rows.append((p, verb, summary or ""))
-    rows.sort()
-    lines = ["| Endpoint | Verb | Purpose |", "|---|---|---|"]
-    for p, v, s in rows:
-        # Escape pipes in summary
-        s_esc = s.replace("|", "\\|")
-        lines.append(f"| `{p}` | {v} | {s_esc} |")
-    lines.append(f"\n_Total: **{len(rows)}** registered API endpoints._")
-    return "\n".join(lines)
     app = _load_app()
     if app is None:
         return ("| Endpoint | Verb | Purpose |\n"

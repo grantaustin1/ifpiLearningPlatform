@@ -274,6 +274,8 @@ async def erp360_webhook_user(
         advisory_lock(db, org.id, user.erp360_user_id or user.id)
         user.is_active = False
         db.commit()
+        from auth.dependencies import invalidate_current_user_cache
+        invalidate_current_user_cache(user.id)
         background_tasks.add_task(
             _audit_bg, event, email, user_id=user.id, note="deactivated",
         )
@@ -365,6 +367,8 @@ def _replace_erp360_roles(db: Session, user: User,
             # The user keeps the role regardless of ERP360's later state.
             continue
         db.add(UserRole(user_id=user.id, role=role, source="erp360"))
+    from auth.dependencies import invalidate_current_user_cache
+    invalidate_current_user_cache(user.id)
 
 
 def _audit_stub(db: Session, event: str, email: str, *,

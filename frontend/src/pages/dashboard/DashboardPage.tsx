@@ -89,7 +89,7 @@ export default function DashboardPage() {
           <div className="divide-y divide-slate-50">
             {analytics.recent_activity?.length === 0 ? (
               <p className="text-sm text-slate-400 px-6 py-8 text-center">No activity yet.</p>
-            ) : analytics.recent_activity?.map((a: any, i: number) => (
+            ) : analytics.recent_activity?.map((a: { user_name: string; course_title: string; enrolled_at: string }, i: number) => (
               <div key={i} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
                 <p className="text-sm text-slate-600 flex-1">

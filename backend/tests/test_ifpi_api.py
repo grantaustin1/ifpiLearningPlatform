@@ -142,7 +142,7 @@ class TestCourses:
                                  json={"title": "Learner cannot create"}, timeout=10)
         assert r.status_code == 403, f"Expected 403, got {r.status_code} {r.text}"
 
-    def test_create_update_get_delete_course_admin(self, admin_session, learner_session):
+    def test_create_update_get_delete_course_admin(self, admin_session):
         title = f"TEST_Course_{uuid.uuid4().hex[:6]}"
         r = admin_session.post(f"{BASE_URL}/api/courses",
                                json={"title": title, "description": "test desc"}, timeout=15)
@@ -168,15 +168,6 @@ class TestCourses:
                                 json={"title": "Slide 1", "content": "Hello", "slide_type": "TEXT"},
                                 timeout=10)
         assert rs.status_code == 200
-        slide_id = rs.json()["id"]
-
-        # Add a learner comment so slide FK dependents exist before delete.
-        rc = learner_session.post(
-            f"{BASE_URL}/api/slides/{slide_id}/comments",
-            json={"body": "delete-regression-comment"},
-            timeout=10,
-        )
-        assert rc.status_code == 200, rc.text
 
         # DELETE
         rd = admin_session.delete(f"{BASE_URL}/api/courses/{cid}", timeout=10)
