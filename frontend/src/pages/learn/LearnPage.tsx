@@ -49,7 +49,7 @@ export default function LearnPage() {
         setLoadError(true)
       }
     })()
-  }, [courseId])
+  }, [courseId, searchParams])
 
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
