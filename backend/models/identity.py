@@ -389,3 +389,17 @@ class ProgressOutbox(Base):
     created_at = Column(DateTime, default=_utcnow, nullable=False)
     next_attempt_at = Column(DateTime, default=_utcnow, nullable=False)
     processed_at = Column(DateTime, nullable=True)
+
+
+class CampaignLink(Base):
+    """Multi-use public signup link for prospect acquisition campaigns."""
+    __tablename__ = "campaign_links"
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    slug = Column(String(40), unique=True, nullable=False, index=True)
+    auto_enroll_course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
+    signup_count = Column(Integer, default=0, nullable=False, server_default="0")
+    is_active = Column(Boolean, default=True, nullable=False, server_default="1")
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow)

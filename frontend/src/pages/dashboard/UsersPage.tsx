@@ -4,11 +4,12 @@ import { api } from 'lib/api'
 import { Shield, BookOpen, Award, UserPlus, X, Mail, Send, Upload, Users as UsersIcon, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { timeAgo } from 'lib/utils'
+import { CampaignLinksPanel } from 'components/CampaignLinksPanel'
 
 const INVITE_ROLES = ['INSTRUCTOR', 'ADMIN', 'BILLING_VIEWER', 'LEARNER']
 
 export default function UsersPage() {
-  const [tab, setTab] = useState<'users' | 'invitations'>('users')
+  const [tab, setTab] = useState<'users' | 'invitations' | 'campaigns'>('users')
   const [showInvite, setShowInvite] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
   const qc = useQueryClient()
@@ -71,10 +72,10 @@ export default function UsersPage() {
       </div>
 
       <div className="flex border-b border-slate-200 mb-4">
-        {(['users', 'invitations'] as const).map(t => (
+        {(['users', 'invitations', 'campaigns'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} data-testid={`tab-${t}`}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === t ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-            {t === 'users' ? `Members (${users.length})` : `Invitations (${invites.length})`}
+            {t === 'users' ? `Members (${users.length})` : t === 'invitations' ? `Invitations (${invites.length})` : 'Campaign Links'}
           </button>
         ))}
       </div>
@@ -112,7 +113,7 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === 'invitations' ? (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           {invites.length === 0 ? (
             <p className="py-10 text-center text-slate-400 text-sm">No invitations yet — invite your first user.</p>
@@ -153,6 +154,8 @@ export default function UsersPage() {
             </table>
           )}
         </div>
+      ) : (
+        <CampaignLinksPanel />
       )}
     </div>
   )

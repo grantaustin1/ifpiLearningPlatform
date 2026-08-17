@@ -15,6 +15,7 @@ const ChangePasswordPage = lazy(() => import('pages/auth/ChangePasswordPage'))
 const VerifyEmailPage = lazy(() => import('pages/auth/VerifyEmailPage'))
 const VerifyCertPage = lazy(() => import('pages/VerifyCertPage'))
 const AcceptInvitePage = lazy(() => import('pages/AcceptInvitePage'))
+const CampaignSignupPage = lazy(() => import('pages/CampaignSignupPage'))
 const DashboardPage = lazy(() => import('pages/dashboard/DashboardPage'))
 const CoursesPage = lazy(() => import('pages/dashboard/CoursesPage'))
 const CourseEditPage = lazy(() => import('pages/dashboard/CourseEditPage'))
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/marketplace/:id" element={<CourseDetailPage />} />
           <Route path="/verify/:code" element={<VerifyCertPage />} />
           <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
+          <Route path="/join/:slug" element={<CampaignSignupPage />} />
           <Route path="/a/:slug" element={<PortalPage />} />
 
           <Route element={<Protected><DashboardLayout /></Protected>}>

@@ -28,6 +28,10 @@ def register_all(app: FastAPI) -> None:
     app.include_router(learning_paths.router)
     from routers.pathways import pathways_router
     app.include_router(pathways_router)
+    from routers.campaign_links import admin_router as campaign_admin_router
+    from routers.campaign_links import public_router as campaign_public_router
+    app.include_router(campaign_admin_router)
+    app.include_router(campaign_public_router)
 
     # ── Misc (AI, enrol, certs, notifs, gamif, admin, billing, catalog) ──
     from routers import (
