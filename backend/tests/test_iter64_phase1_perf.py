@@ -11,10 +11,13 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     # fallback: read from frontend .env
-    with open("/app/frontend/.env") as f:
-        for ln in f:
-            if ln.startswith("REACT_APP_BACKEND_URL="):
-                BASE_URL = ln.split("=", 1)[1].strip().rstrip("/")
+    try:
+        with open("/app/frontend/.env") as f:
+            for ln in f:
+                if ln.startswith("REACT_APP_BACKEND_URL="):
+                    BASE_URL = ln.split("=", 1)[1].strip().rstrip("/")
+    except FileNotFoundError:
+        pass
 
 ADMIN = {"email": "uat-admin@ifpi.org", "password": "UatAdmin!2026"}
 LEARNER = {"email": "uat-learner@ifpi.org", "password": "UatLearner!2026"}

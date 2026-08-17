@@ -12,7 +12,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 LEARNER = {"email": "uat-learner@ifpi.org", "password": "UatLearner!2026"}
 ADMIN = {"email": "uat-admin@ifpi.org", "password": "UatAdmin!2026"}
 COURSE_ID = 243
