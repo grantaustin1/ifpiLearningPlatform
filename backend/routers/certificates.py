@@ -41,14 +41,21 @@ def my_certificates(db: Session = Depends(get_db),
     # Iter 27 — For attendance certs (LIVE_SESSION_ATTENDANCE), fold
     # the session title into course_title so learner UIs show a
     # meaningful label without a schema change.
-    from models import LiveSession
+    from models import LiveSession, LearningPath
     session_ids = [c.live_session_id for c in rows if c.live_session_id]
     sessions = ({s.id: s for s in db.query(LiveSession).filter(
         LiveSession.id.in_(session_ids)).all()} if session_ids else {})
+    path_ids = [c.learning_path_id for c in rows if c.learning_path_id]
+    qual_paths = ({p.id: p for p in db.query(LearningPath).filter(
+        LearningPath.id.in_(path_ids)).all()} if path_ids else {})
 
     def _title(c):
         if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id in sessions:
             return sessions[c.live_session_id].title
+        if c.type == "QUALIFICATION" and c.learning_path_id in qual_paths:
+            from services.pathway_service import _meta
+            p = qual_paths[c.learning_path_id]
+            return _meta(p).get("designation") or p.title
         return c.course.title if c.course else None
 
     return [CertificateOut(
@@ -451,9 +458,17 @@ def admin_list_certificates(
     session_ids = [c.live_session_id for c in rows if c.live_session_id]
     sessions = {s.id: s for s in db.query(LiveSession).filter(
         LiveSession.id.in_(session_ids))} if session_ids else {}
+    from models import LearningPath
+    path_ids = [c.learning_path_id for c in rows if c.learning_path_id]
+    qual_paths = ({p.id: p for p in db.query(LearningPath).filter(
+        LearningPath.id.in_(path_ids)).all()} if path_ids else {})
     def _title(c):
         if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id in sessions:
             return sessions[c.live_session_id].title
+        if c.type == "QUALIFICATION" and c.learning_path_id in qual_paths:
+            from services.pathway_service import _meta
+            p = qual_paths[c.learning_path_id]
+            return _meta(p).get("designation") or p.title
         return c.course.title if c.course else None
     return {
         "total": total, "page": page, "page_size": page_size,
@@ -524,6 +539,13 @@ def verify_certificate(code: str, db: Session = Depends(get_db)):
         sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
         if sess:
             title = sess.title
+    elif c.type == "QUALIFICATION" and c.learning_path_id:
+        from models import LearningPath
+        from services.pathway_service import _meta
+        p = db.query(LearningPath).filter(
+            LearningPath.id == c.learning_path_id).first()
+        if p:
+            title = _meta(p).get("designation") or p.title
     return {
         "valid": not bool(c.revoked_at),
         "code": c.code, "type": c.type,
@@ -550,6 +572,12 @@ def certificate_og_image(code: str, db: Session = Depends(get_db)):
     if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
         sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
         title = f"Attended · {sess.title}" if sess else "Live Session Attendance"
+    elif c.type == "QUALIFICATION" and c.learning_path_id:
+        from models import LearningPath
+        from services.pathway_service import _meta
+        _p = db.query(LearningPath).filter(
+            LearningPath.id == c.learning_path_id).first()
+        title = (_meta(_p).get("designation") or _p.title) if _p else "IFPI Qualification"
     else:
         title = c.course.title if c.course else "IFPI Certificate"
 
@@ -634,6 +662,12 @@ def certificate_og_image_png(code: str, db: Session = Depends(get_db)):
     if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
         sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
         title = f"Attended · {sess.title}" if sess else "Live Session Attendance"
+    elif c.type == "QUALIFICATION" and c.learning_path_id:
+        from models import LearningPath
+        from services.pathway_service import _meta
+        _p = db.query(LearningPath).filter(
+            LearningPath.id == c.learning_path_id).first()
+        title = (_meta(_p).get("designation") or _p.title) if _p else "IFPI Qualification"
     else:
         title = c.course.title if c.course else "IFPI Certificate"
     recipient = (c.user.name if c.user and c.user.name else "A learner")
@@ -725,10 +759,27 @@ def download_certificate_pdf(
     org = db.query(Organization).filter(Organization.id == c.user.organization_id).first() if c.user else None
 
     # Resolve title + cert type label
+    footer_override = None
     if c.type == "LIVE_SESSION_ATTENDANCE" and c.live_session_id:
         sess = db.query(LiveSession).filter(LiveSession.id == c.live_session_id).first()
         title = sess.title if sess else "Live Session"
         cert_type = "Live Session Attendance"
+    elif c.type == "QUALIFICATION" and c.learning_path_id:
+        from models import LearningPath
+        from services.pathway_service import _meta
+        p = db.query(LearningPath).filter(
+            LearningPath.id == c.learning_path_id).first()
+        meta = _meta(p) if p else {}
+        title = meta.get("designation") or (p.title if p else "IFPI Qualification")
+        parts = ["Qualification"]
+        if meta.get("nqf_level"):
+            parts.append(f"NQF Level {meta['nqf_level']}")
+        if meta.get("total_credits"):
+            parts.append(f"{meta['total_credits']} Credits")
+        cert_type = " · ".join(parts)
+        if meta.get("unit_standards"):
+            footer_override = "Unit Standards: " + "; ".join(
+                us.split(" — ")[0] for us in meta["unit_standards"])
     else:
         title = c.course.title if c.course else "IFPI Course"
         cert_type = "Course Completion" if c.type == "COURSE_COMPLETION" else c.type.replace("_", " ").title()
@@ -756,7 +807,7 @@ def download_certificate_pdf(
             accent_color=(org.cert_accent_color or org.primary_color or "#6366f1") if org else "#6366f1",
             signature_text=org.cert_signature_text if org else None,
             signature_image_url=org.cert_signature_image_url if org else None,
-            footer_text=org.cert_footer_text if org else None,
+            footer_text=footer_override or (org.cert_footer_text if org else None),
         )
     except CircuitBreakerOpen:
         raise HTTPException(

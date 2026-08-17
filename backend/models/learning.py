@@ -151,6 +151,9 @@ class LearningPath(Base):
     estimated_hours = Column(Integer)
     price_cents = Column(Integer, default=0)
     currency = Column(String(3), default="ZAR")
+    # Qualification-track metadata: {qualification, designation, nqf_level,
+    # total_credits, unit_standards}
+    metadata_json = Column(Text, nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

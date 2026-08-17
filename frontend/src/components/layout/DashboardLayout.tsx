@@ -4,7 +4,7 @@ import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare, Milestone,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 import { FeedbackWidget } from 'components/FeedbackWidget'
@@ -14,6 +14,7 @@ const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
   { href: '/courses',       label: 'Courses',      icon: BookOpen },
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
+  { href: '/pathways',      label: 'Qualifications', icon: Milestone },
   { href: '/exams',         label: 'Exams',        icon: ClipboardList },
   { href: '/certificates',  label: 'Certificates', icon: Award },
   { href: '/admin/certificates', label: 'Cert. audit', icon: Shield },
@@ -46,6 +47,7 @@ const ADMIN_NAV = [
 const LEARNER_NAV = [
   { href: '/courses',       label: 'My Courses',     icon: BookOpen },
   { href: '/learning-paths',label: 'Learning Paths', icon: Layers },
+  { href: '/pathways',      label: 'Qualifications', icon: Milestone },
   { href: '/certificates',  label: 'My Certificates',icon: Award },
   { href: '/live-sessions', label: 'Live sessions',  icon: Video },
   { href: '/leaderboard',   label: 'Leaderboard',    icon: Trophy },

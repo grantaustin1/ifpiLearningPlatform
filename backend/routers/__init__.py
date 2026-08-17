@@ -26,6 +26,8 @@ def register_all(app: FastAPI) -> None:
     app.include_router(courses.richtext_router)            # Iter 19
     app.include_router(exams.router)
     app.include_router(learning_paths.router)
+    from routers.pathways import pathways_router
+    app.include_router(pathways_router)
 
     # ── Misc (AI, enrol, certs, notifs, gamif, admin, billing, catalog) ──
     from routers import (

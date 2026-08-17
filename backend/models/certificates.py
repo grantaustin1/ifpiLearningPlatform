@@ -20,6 +20,9 @@ class Certificate(Base):
     # Iter 27 — attach cert to a live session for attendance certs
     live_session_id = Column(Integer, ForeignKey("live_sessions.id"),
                              nullable=True, index=True)
+    # Qualification certs attach to a learning path (track) instead of a course
+    learning_path_id = Column(Integer, ForeignKey("learning_paths.id"),
+                              nullable=True, index=True)
     type = Column(String(50), default="COURSE_COMPLETION")
     code = Column(String(40), unique=True, nullable=False, default=_cuid)
     score = Column(Float, nullable=True)

@@ -143,6 +143,15 @@ class EnrollmentService:
         if completed >= 5 and gam.award_badge(current.id, "COURSE_MASTER"):
             badges.append("COURSE_MASTER")
 
+        # Qualification tracks — award track certs when the last course lands
+        quals: list = []
+        try:
+            from services.pathway_service import check_and_award_qualifications
+            quals = check_and_award_qualifications(db, current)
+        except Exception as ex:
+            import logging
+            logging.getLogger(__name__).warning("Qualification check failed: %s", ex)
+
         # Email the cert PDF (stub mode persists to outbox)
         if cert_is_new:
             try:
@@ -197,7 +206,8 @@ class EnrollmentService:
                 "certificate_code": cert.code,
                 "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
             })
-        return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges}
+        return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges,
+                "qualifications_earned": quals}
 
 
 def _cert_email_html(name: str, course_title: str, verify_url: str) -> str:
