@@ -42,6 +42,10 @@ class Organization(Base):
     smtp_password_enc = Column(Text)                     # Fernet-encrypted; never returned to API clients
     smtp_from_email = Column(String(200))
     smtp_from_name = Column(String(200))
+    # Prospect nurturing — nudge campaign signups who haven't started
+    nurture_enabled = Column(Boolean, default=False, server_default="0")
+    nurture_days = Column(Integer, default=3, server_default="3")
+    nurture_message = Column(Text, nullable=True)
     smtp_use_tls = Column(Boolean, default=True)
     # Cohort milestone celebrations (per-tenant tuneable)
     cohort_threshold = Column(Integer, default=75)         # % completion required to fire
@@ -402,4 +406,18 @@ class CampaignLink(Base):
     signup_count = Column(Integer, default=0, nullable=False, server_default="0")
     is_active = Column(Boolean, default=True, nullable=False, server_default="1")
     created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class CampaignSignup(Base):
+    """One row per campaign-link signup — carries UTM attribution and
+    nurture state."""
+    __tablename__ = "campaign_signups"
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_link_id = Column(Integer, ForeignKey("campaign_links.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    utm_source = Column(String(120), nullable=True)
+    utm_medium = Column(String(120), nullable=True)
+    utm_campaign = Column(String(120), nullable=True)
+    nudged_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)

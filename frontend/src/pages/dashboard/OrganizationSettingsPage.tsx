@@ -360,6 +360,7 @@ export default function OrganizationSettingsPage() {
 
         <SmtpSection inputCls={inputCls} />
         <CohortSettingsSection inputCls={inputCls} />
+        <NurtureSettingsSection inputCls={inputCls} />
         <MarketplaceSection />
       </div>
 
@@ -496,6 +497,80 @@ function SmtpSection({ inputCls }: { inputCls: string }) {
         </button>
       </div>
     </Section>
+  )
+}
+
+function NurtureSettingsSection({ inputCls }: { inputCls: string }) {
+  const [enabled, setEnabled] = useState(false)
+  const [days, setDays] = useState(3)
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [running, setRunning] = useState(false)
+
+  useEffect(() => {
+    api.get('/organization').then(r => {
+      setEnabled(!!r.data.nurture_enabled)
+      setDays(r.data.nurture_days || 3)
+      setMessage(r.data.nurture_message || '')
+    })
+  }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.put('/organization/nurture-settings', {
+        nurture_enabled: enabled, nurture_days: days,
+        nurture_message: message.trim() || null,
+      })
+      toast.success('Nurture settings saved')
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
+    finally { setSaving(false) }
+  }
+
+  const runNow = async () => {
+    setRunning(true)
+    try {
+      const r = await api.post('/organization/nurture-settings/run-now')
+      toast.success(`Nurture pass complete — ${r.data.nudges_sent} nudge(s) sent`)
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Run failed') }
+    finally { setRunning(false) }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6 mt-6" data-testid="nurture-settings-section">
+      <h2 className="font-semibold text-slate-900 mb-1">Prospect Nurturing</h2>
+      <p className="text-xs text-slate-500 mb-4">Automatically nudge campaign signups who haven't started learning. Runs daily at 08:00 UTC. Placeholders: <code className="bg-slate-100 px-1 rounded">{'{name}'}</code> and <code className="bg-slate-100 px-1 rounded">{'{course}'}</code>.</p>
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={() => setEnabled(!enabled)} data-testid="nurture-toggle"
+          className={`w-11 h-6 rounded-full transition-colors relative ${enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+          <span className={`absolute top-0.5 h-5 w-5 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </button>
+        <span className="text-sm text-slate-700">{enabled ? 'Enabled' : 'Disabled'}</span>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="text-xs text-slate-500 block mb-1">Nudge after (days without starting)</label>
+          <input type="number" min={1} max={30} value={days} data-testid="nurture-days-input"
+            onChange={e => setDays(Math.max(1, Math.min(30, Number(e.target.value) || 3)))} className={inputCls} />
+        </div>
+      </div>
+      <div className="mb-4">
+        <label className="text-xs text-slate-500 block mb-1">Custom message (optional — a friendly default is used if empty)</label>
+        <textarea rows={3} value={message} onChange={e => setMessage(e.target.value)} data-testid="nurture-message-input"
+          placeholder="Hi {name}, your first module is waiting…" className={inputCls} />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} data-testid="nurture-save-btn"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-60">
+          {saving ? 'Saving…' : 'Save settings'}
+        </button>
+        <button onClick={runNow} disabled={running || !enabled} data-testid="nurture-run-now-btn"
+          title={!enabled ? 'Enable nurturing first' : 'Send due nudges immediately'}
+          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm px-4 py-2 rounded-lg font-medium disabled:opacity-50">
+          {running ? 'Running…' : 'Run now'}
+        </button>
+      </div>
+    </div>
   )
 }
 

@@ -1,13 +1,39 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { Copy, Link2, Plus, Trash2 } from 'lucide-react'
+import { BarChart3, Copy, Link2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from 'lib/utils'
+
+const AttributionRow = ({ linkId }: { linkId: number }) => {
+  const { data } = useQuery<any>({
+    queryKey: ['campaign-attribution', linkId],
+    queryFn: async () => (await api.get(`/admin/campaign-links/${linkId}/attribution`)).data,
+  })
+  if (!data) return <p className="text-xs text-slate-400 px-4 py-2">Loading…</p>
+  if (!data.breakdown.length) return <p className="text-xs text-slate-400 px-4 py-2">No signups yet.</p>
+  return (
+    <div className="px-4 pb-3" data-testid={`attribution-${linkId}`}>
+      <table className="w-full text-xs">
+        <thead><tr className="text-slate-400 text-left"><th className="py-1 font-medium">utm_source</th><th className="font-medium">utm_medium</th><th className="font-medium text-right">Signups</th></tr></thead>
+        <tbody>
+          {data.breakdown.map((b: any, i: number) => (
+            <tr key={i} className="border-t border-slate-50">
+              <td className="py-1.5 text-slate-700">{b.utm_source}</td>
+              <td className="text-slate-500">{b.utm_medium}</td>
+              <td className="text-right font-semibold text-slate-700">{b.signups}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 export const CampaignLinksPanel = () => {
   const qc = useQueryClient()
   const [showNew, setShowNew] = useState(false)
+  const [expanded, setExpanded] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [courseId, setCourseId] = useState<string>('')
 
@@ -84,21 +110,28 @@ export const CampaignLinksPanel = () => {
       ) : (
         <div className="space-y-2">
           {links.map((l: any) => (
-            <div key={l.id} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl px-4 py-3" data-testid={`campaign-link-${l.id}`}>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-slate-900 text-sm">{l.name}</p>
-                <p className="text-[11px] text-slate-400 truncate">{window.location.origin}{l.join_path}
-                  {l.auto_enroll_course_title && <> · auto-enrolls <span className="text-slate-500">{l.auto_enroll_course_title}</span></>}
-                </p>
+            <div key={l.id} className="bg-white border border-slate-100 rounded-xl" data-testid={`campaign-link-${l.id}`}>
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900 text-sm">{l.name}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{window.location.origin}{l.join_path}
+                    {l.auto_enroll_course_title && <> · auto-enrolls <span className="text-slate-500">{l.auto_enroll_course_title}</span></>}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-slate-600 whitespace-nowrap" data-testid={`campaign-signups-${l.id}`}>{l.signup_count} signup{l.signup_count !== 1 ? 's' : ''}</span>
+                <button onClick={() => setExpanded(expanded === l.id ? null : l.id)} data-testid={`campaign-attribution-btn-${l.id}`}
+                  title="UTM attribution" className={cn('hover:text-indigo-600', expanded === l.id ? 'text-indigo-600' : 'text-slate-400')}>
+                  <BarChart3 className="h-4 w-4" />
+                </button>
+                <button onClick={() => toggleMut.mutate(l)} data-testid={`campaign-toggle-${l.id}`}
+                  className={cn('text-[11px] font-semibold px-2.5 py-1 rounded-full',
+                    l.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400')}>
+                  {l.is_active ? 'Active' : 'Paused'}
+                </button>
+                <button onClick={() => copyLink(l)} data-testid={`campaign-copy-${l.id}`} className="text-slate-400 hover:text-indigo-600"><Copy className="h-4 w-4" /></button>
+                <button onClick={() => window.confirm('Delete this campaign link?') && deleteMut.mutate(l.id)} data-testid={`campaign-delete-${l.id}`} className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
               </div>
-              <span className="text-xs font-semibold text-slate-600 whitespace-nowrap" data-testid={`campaign-signups-${l.id}`}>{l.signup_count} signup{l.signup_count !== 1 ? 's' : ''}</span>
-              <button onClick={() => toggleMut.mutate(l)} data-testid={`campaign-toggle-${l.id}`}
-                className={cn('text-[11px] font-semibold px-2.5 py-1 rounded-full',
-                  l.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400')}>
-                {l.is_active ? 'Active' : 'Paused'}
-              </button>
-              <button onClick={() => copyLink(l)} data-testid={`campaign-copy-${l.id}`} className="text-slate-400 hover:text-indigo-600"><Copy className="h-4 w-4" /></button>
-              <button onClick={() => window.confirm('Delete this campaign link?') && deleteMut.mutate(l.id)} data-testid={`campaign-delete-${l.id}`} className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+              {expanded === l.id && <AttributionRow linkId={l.id} />}
             </div>
           ))}
         </div>

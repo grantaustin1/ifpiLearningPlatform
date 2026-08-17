@@ -96,6 +96,28 @@ def toggle_campaign_link(
     return _out(link)
 
 
+@admin_router.get("/{link_id}/attribution")
+def campaign_attribution(
+    link_id: int, db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    from sqlalchemy import func
+    from models import CampaignSignup as Row
+    link = db.query(CampaignLink).filter(
+        CampaignLink.id == link_id,
+        CampaignLink.organization_id == current.organization_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    rows = (db.query(Row.utm_source, Row.utm_medium, func.count(Row.id))
+            .filter(Row.campaign_link_id == link_id)
+            .group_by(Row.utm_source, Row.utm_medium)
+            .order_by(func.count(Row.id).desc()).all())
+    return {"link_id": link_id, "total": sum(r[2] for r in rows),
+            "breakdown": [{"utm_source": r[0] or "(direct)",
+                           "utm_medium": r[1] or "—",
+                           "signups": r[2]} for r in rows]}
+
+
 @admin_router.delete("/{link_id}")
 def delete_campaign_link(
     link_id: int, db: Session = Depends(get_db),
@@ -132,6 +154,9 @@ class CampaignSignup(BaseModel):
     name: str
     email: EmailStr
     password: str
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
 
 
 @public_router.post("/{slug}/signup", response_model=LoginResponse)
@@ -165,6 +190,12 @@ def campaign_signup(slug: str, body: CampaignSignup, response: Response,
             Course.status == CourseStatus.PUBLISHED).first()
         if course and (course.price_cents or 0) == 0:
             db.add(Enrollment(user_id=user.id, course_id=course.id))
+    from models import CampaignSignup as CampaignSignupRow
+    db.add(CampaignSignupRow(
+        campaign_link_id=link.id, user_id=user.id,
+        utm_source=(body.utm_source or "").strip()[:120] or None,
+        utm_medium=(body.utm_medium or "").strip()[:120] or None,
+        utm_campaign=(body.utm_campaign or "").strip()[:120] or None))
     link.signup_count = (link.signup_count or 0) + 1
     db.commit()
     db.refresh(user)

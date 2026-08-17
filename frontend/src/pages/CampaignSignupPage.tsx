@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, setAccessToken } from 'lib/api'
 import { GraduationCap, Loader2 } from 'lucide-react'
@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 
 export default function CampaignSignupPage() {
   const { slug } = useParams()
+  const [params] = useSearchParams()
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [busy, setBusy] = useState(false)
 
@@ -20,7 +21,12 @@ export default function CampaignSignupPage() {
     e.preventDefault()
     setBusy(true)
     try {
-      const r = await api.post(`/join/${slug}/signup`, form)
+      const r = await api.post(`/join/${slug}/signup`, {
+        ...form,
+        utm_source: params.get('utm_source') || undefined,
+        utm_medium: params.get('utm_medium') || undefined,
+        utm_campaign: params.get('utm_campaign') || undefined,
+      })
       if (r.data?.access_token) setAccessToken(r.data.access_token)
       localStorage.setItem('ifpi_session_hint', '1')
       toast.success('Welcome! Your account is ready.')

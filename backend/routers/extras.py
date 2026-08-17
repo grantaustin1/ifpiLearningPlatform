@@ -210,6 +210,9 @@ def get_org(db: Session = Depends(get_db),
         "cohort_digest_enabled": bool(o.cohort_digest_enabled) if o.cohort_digest_enabled is not None else True,
         "cohort_digest_last_sent_at": o.cohort_digest_last_sent_at.isoformat() if o.cohort_digest_last_sent_at else None,
         "marketplace_opt_in": bool(o.marketplace_opt_in) if o.marketplace_opt_in is not None else True,
+        "nurture_enabled": bool(o.nurture_enabled),
+        "nurture_days": o.nurture_days or 3,
+        "nurture_message": o.nurture_message,
     }
 
 
@@ -241,6 +244,37 @@ def update_cohort_settings(body: CohortSettingsIn, db: Session = Depends(get_db)
 
 class WebhookTestIn(BaseModel):
     webhook_url: str = Field(min_length=8, max_length=500)
+
+
+class NurtureSettingsIn(BaseModel):
+    nurture_enabled: bool = False
+    nurture_days: int = Field(ge=1, le=30, default=3)
+    nurture_message: Optional[str] = None
+
+
+@org_router.put("/nurture-settings")
+def update_nurture_settings(body: NurtureSettingsIn, db: Session = Depends(get_db),
+                            current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    o = db.query(Organization).filter(Organization.id == current.organization_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Organisation not found")
+    o.nurture_enabled = body.nurture_enabled
+    o.nurture_days = body.nurture_days
+    o.nurture_message = (body.nurture_message or "").strip() or None
+    from services import audit_service
+    audit_service.record(db, current, "NURTURE_SETTINGS_UPDATED",
+        target_type="organization", target_id=str(o.id),
+        metadata={"enabled": body.nurture_enabled, "days": body.nurture_days})
+    db.commit()
+    return {"ok": True}
+
+
+@org_router.post("/nurture-settings/run-now")
+def run_nurture_now(db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    from services.nurture_service import run_nurture_pass
+    sent = run_nurture_pass(db, org_id=current.organization_id)
+    return {"ok": True, "nudges_sent": sent}
 
 
 def _detect_provider(url: str) -> str:
