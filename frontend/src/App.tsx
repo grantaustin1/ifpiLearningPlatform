@@ -15,6 +15,7 @@ const ChangePasswordPage = lazy(() => import('pages/auth/ChangePasswordPage'))
 const VerifyEmailPage = lazy(() => import('pages/auth/VerifyEmailPage'))
 const VerifyCertPage = lazy(() => import('pages/VerifyCertPage'))
 const AcceptInvitePage = lazy(() => import('pages/AcceptInvitePage'))
+const CampaignSignupPage = lazy(() => import('pages/CampaignSignupPage'))
 const DashboardPage = lazy(() => import('pages/dashboard/DashboardPage'))
 const CoursesPage = lazy(() => import('pages/dashboard/CoursesPage'))
 const CourseEditPage = lazy(() => import('pages/dashboard/CourseEditPage'))
@@ -42,6 +43,8 @@ const MindMapPage = lazy(() => import('pages/dashboard/MindMapPage'))
 const PublicCatalogPage = lazy(() => import('pages/PublicCatalogPage'))
 const PortalPage = lazy(() => import('pages/PortalPage'))
 const LearningPathsPage = lazy(() => import('pages/dashboard/LearningPathsPage'))
+const PathwaysPage = lazy(() => import('pages/dashboard/PathwaysPage'))
+const AdminPathwaysPage = lazy(() => import('pages/dashboard/AdminPathwaysPage'))
 const LearningPathEditPage = lazy(() => import('pages/dashboard/LearningPathEditPage'))
 const LearnPage = lazy(() => import('pages/learn/LearnPage'))
 const TakeExamPage = lazy(() => import('pages/take/TakeExamPage'))
@@ -101,6 +104,7 @@ export default function App() {
           <Route path="/marketplace/:id" element={<CourseDetailPage />} />
           <Route path="/verify/:code" element={<VerifyCertPage />} />
           <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
+          <Route path="/join/:slug" element={<CampaignSignupPage />} />
           <Route path="/a/:slug" element={<PortalPage />} />
 
           <Route element={<Protected><DashboardLayout /></Protected>}>
@@ -109,6 +113,8 @@ export default function App() {
             <Route path="/courses/:id/edit" element={<Protected adminOnly><CourseEditPage /></Protected>} />
             <Route path="/exams" element={<ExamsPage />} />
             <Route path="/learning-paths" element={<LearningPathsPage />} />
+            <Route path="/pathways" element={<PathwaysPage />} />
+            <Route path="/pathways/admin" element={<Protected adminOnly><AdminPathwaysPage /></Protected>} />
             <Route path="/learning-paths/:id/edit" element={<Protected adminOnly><LearningPathEditPage /></Protected>} />
             <Route path="/certificates" element={<CertificatesPage />} />
             <Route path="/admin/certificates" element={<Protected adminOnly><AdminCertificatesPage /></Protected>} />

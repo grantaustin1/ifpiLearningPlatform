@@ -151,3 +151,5 @@ __all__ = [
     # engagement
     "CourseRating", "CourseView", "LiveSession", "LiveSessionRsvp", "SlideView", "TesterFeedback",
 ]
+from .identity import CampaignLink  # noqa: E402,F401
+from .identity import CampaignSignup  # noqa: E402,F401

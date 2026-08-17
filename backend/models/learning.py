@@ -132,6 +132,8 @@ class Enrollment(Base):
     status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.IN_PROGRESS)
     progress = Column(Float, default=0.0)
     last_slide_index = Column(Integer, default=0)
+    # Recognition of Prior Learning — admin-granted completion, no course cert
+    via_rpl = Column(Boolean, default=False, nullable=False, server_default="0")
     enrolled_at = Column(DateTime, default=_utcnow)
     completed_at = Column(DateTime, nullable=True)
 
@@ -151,6 +153,9 @@ class LearningPath(Base):
     estimated_hours = Column(Integer)
     price_cents = Column(Integer, default=0)
     currency = Column(String(3), default="ZAR")
+    # Qualification-track metadata: {qualification, designation, nqf_level,
+    # total_credits, unit_standards}
+    metadata_json = Column(Text, nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

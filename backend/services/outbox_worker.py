@@ -163,6 +163,18 @@ def _cohort_tick():
         logger.warning("cohort tick took %.1fs — consider increasing interval", elapsed)
 
 
+def _nurture_tick():
+    """Daily prospect-nurture pass (08:00 UTC)."""
+    try:
+        with SessionLocal() as db:
+            from services.nurture_service import run_nurture_pass
+            total = run_nurture_pass(db)
+            if total:
+                logger.info("Sent %s nurture nudge(s)", total)
+    except Exception as e:
+        logger.exception("nurture tick failed: %s", e)
+
+
 def _digest_tick():
     """Weekly cohort digest job. Fires every Monday 09:00 UTC; the service
     self-skips orgs sent in the past 6 days, so a misfire on Mon is harmless."""
@@ -262,6 +274,11 @@ def start_scheduler() -> None:
     sched.add_job(
         _digest_tick, "cron", day_of_week="mon", hour=9, minute=0,
         id="cohort_weekly_digest", max_instances=1, coalesce=True,
+        misfire_grace_time=3600,
+    )
+    sched.add_job(
+        _nurture_tick, "cron", hour=8, minute=0,
+        id="prospect_nurture", max_instances=1, coalesce=True,
         misfire_grace_time=3600,
     )
     sched.add_job(

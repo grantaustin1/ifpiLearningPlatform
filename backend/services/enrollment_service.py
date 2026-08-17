@@ -100,6 +100,22 @@ class EnrollmentService:
         if not c:
             raise HTTPException(status_code=404, detail="Course not found")
 
+        # Quiz gate — a published course exam must be passed before the
+        # course can complete (server-side mirror of the frontend gate).
+        from models import Exam, ExamAttempt
+        gate_exam = db.query(Exam).filter(
+            Exam.course_id == course_id, Exam.is_published.is_(True)).first()
+        if gate_exam:
+            passed_attempt = db.query(ExamAttempt).filter(
+                ExamAttempt.exam_id == gate_exam.id,
+                ExamAttempt.user_id == current.id,
+                ExamAttempt.passed.is_(True)).first()
+            if not passed_attempt:
+                raise HTTPException(status_code=412, detail={
+                    "message": "Pass the course exam to complete this course",
+                    "exam_id": gate_exam.id, "exam_title": gate_exam.title,
+                })
+
         e = db.query(Enrollment).filter(
             Enrollment.user_id == current.id, Enrollment.course_id == course_id,
         ).first()
@@ -142,6 +158,15 @@ class EnrollmentService:
             badges.append("FIRST_COURSE")
         if completed >= 5 and gam.award_badge(current.id, "COURSE_MASTER"):
             badges.append("COURSE_MASTER")
+
+        # Qualification tracks — award track certs when the last course lands
+        quals: list = []
+        try:
+            from services.pathway_service import check_and_award_qualifications
+            quals = check_and_award_qualifications(db, current)
+        except Exception as ex:
+            import logging
+            logging.getLogger(__name__).warning("Qualification check failed: %s", ex)
 
         # Email the cert PDF (stub mode persists to outbox)
         if cert_is_new:
@@ -197,7 +222,8 @@ class EnrollmentService:
                 "certificate_code": cert.code,
                 "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
             })
-        return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges}
+        return {"ok": True, "xp_earned": XP_COURSE_COMPLETE, "badges_earned": badges,
+                "qualifications_earned": quals}
 
 
 def _cert_email_html(name: str, course_title: str, verify_url: str) -> str:
