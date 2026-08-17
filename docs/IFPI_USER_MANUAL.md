@@ -483,15 +483,16 @@ Core entities (see `backend/models/` for the full list):
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
 | `routers/billing.py` | 65 |
+| `routers/campaign_links.py` | 256 |
 | `routers/catalog.py` | 242 |
-| `routers/certificates.py` | 774 |
+| `routers/certificates.py` | 825 |
 | `routers/courses.py` | 950 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/enrollments.py` | 42 |
 | `routers/erp360_sync.py` | 430 |
 | `routers/exams.py` | 459 |
-| `routers/extras.py` | 654 |
+| `routers/extras.py` | 694 |
 | `routers/feedback.py` | 106 |
 | `routers/flashcards.py` | 497 |
 | `routers/gamification.py` | 188 |
@@ -507,6 +508,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/notifications.py` | 48 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
+| `routers/pathways.py` | 76 |
 | `routers/public_catalog.py` | 201 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
@@ -516,7 +518,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **15665** |
+| **Total** | **16088** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -536,6 +538,8 @@ Core entities (see `backend/models/` for the full list):
 | `AuditLog` | `audit_logs` |
 | `BadgeTier` | `badge_tiers` |
 | `BillingEvent` | `billing_events` |
+| `CampaignLink` | `campaign_links` |
+| `CampaignSignup` | `campaign_signups` |
 | `Certificate` | `certificates` |
 | `CertificateRevocationEvent` | `certificate_revocation_events` |
 | `Course` | `courses` |
@@ -588,7 +592,7 @@ Core entities (see `backend/models/` for the full list):
 | `WebhookSubscription` | `webhook_subscriptions` |
 | `XApiStatement` | `xapi_statements` |
 
-_Total: **63** ORM models._
+_Total: **65** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -619,6 +623,12 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/api-tokens/{token_id}/revoke` | POST |  |
 | `/api/admin/audit-digest` | GET | LLM-generated plain-English summary of the last N days of admin |
 | `/api/admin/audit-log` | GET |  |
+| `/api/admin/campaign-links` | GET |  |
+| `/api/admin/campaign-links` | POST |  |
+| `/api/admin/campaign-links/{link_id}` | DELETE |  |
+| `/api/admin/campaign-links/{link_id}` | PATCH |  |
+| `/api/admin/campaign-links/{link_id}/attribution` | GET |  |
+| `/api/admin/campaign-links/{link_id}/qr` | GET | Printable QR PNG pointing at the public join URL. |
 | `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
 | `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
 | `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
@@ -821,6 +831,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/health` | GET |  |
 | `/api/invitations/{token}` | GET |  |
 | `/api/invitations/{token}/accept` | POST |  |
+| `/api/join/{slug}` | GET |  |
+| `/api/join/{slug}/signup` | POST |  |
 | `/api/kiosk/settings` | GET |  |
 | `/api/kiosk/unlock` | POST |  |
 | `/api/leads` | POST | Public endpoint for partner sites / marketing pages to drop a lead in. |
@@ -863,6 +875,8 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/organization/cohort-digest/send-now` | POST | Manual trigger — queues the weekly cohort digest immediately for this |
 | `/api/organization/cohort-settings` | PUT |  |
 | `/api/organization/cohort-settings/test-webhook` | POST | Send a sample celebration message to verify the configured webhook. |
+| `/api/organization/nurture-settings` | PUT |  |
+| `/api/organization/nurture-settings/run-now` | POST |  |
 | `/api/organization/smtp` | GET | Returns the SMTP config minus the password. Password is write-only. |
 | `/api/organization/smtp` | PUT |  |
 | `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
@@ -870,6 +884,11 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/organization/themes` | POST | Create a custom theme preset for the caller's organization. |
 | `/api/organization/themes/{preset_id}` | DELETE | Delete a custom theme preset. Orgs currently using it keep their |
 | `/api/organization/themes/{preset_id}` | PUT | Update a custom theme preset (org-scoped). |
+| `/api/pathways/admin/completions` | GET |  |
+| `/api/pathways/admin/completions.csv` | GET |  |
+| `/api/pathways/admin/rpl` | POST |  |
+| `/api/pathways/admin/rpl/{user_id}/{course_id}` | DELETE |  |
+| `/api/pathways/map` | GET |  |
 | `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
 | `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
 | `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
@@ -908,7 +927,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **307** registered API endpoints._
+_Total: **322** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
