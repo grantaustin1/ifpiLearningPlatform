@@ -1,5 +1,10 @@
 # IFPI Learning Platform — Test Credentials
 
+## Kiosk PIN (IFPI Main Academy, org 1)
+- Kiosk lock PIN: `2026` (reset 2026-06; unlocks the "Kiosk locked" screen for any user in org 1)
+- Fallback: click "Use password instead" and enter the account password
+- Kiosk mode enabled, idle timeout 120s
+
 Both accounts live in the default "IFPI Main Academy" tenant (`organization_id=1`).
 
 ## UAT Sandbox tenant (org `uat-sandbox`, created 2026-07-30)
