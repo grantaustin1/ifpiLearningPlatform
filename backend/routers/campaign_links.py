@@ -96,6 +96,36 @@ def toggle_campaign_link(
     return _out(link)
 
 
+@admin_router.get("/{link_id}/qr")
+def campaign_qr(
+    link_id: int, base: str = "", db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Printable QR PNG pointing at the public join URL."""
+    link = db.query(CampaignLink).filter(
+        CampaignLink.id == link_id,
+        CampaignLink.organization_id == current.organization_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    base = (base or "").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")) or len(base) > 200:
+        raise HTTPException(status_code=400, detail="Invalid base URL")
+    import io
+    import re
+    import qrcode
+    from qrcode.constants import ERROR_CORRECT_H
+    qr = qrcode.QRCode(error_correction=ERROR_CORRECT_H, box_size=16, border=4)
+    qr.add_data(f"{base}/join/{link.slug}")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    safe = re.sub(r"[^a-zA-Z0-9_-]+", "-", link.name).strip("-").lower() or "campaign"
+    return Response(
+        buf.getvalue(), media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="qr-{safe}.png"'})
+
+
 @admin_router.get("/{link_id}/attribution")
 def campaign_attribution(
     link_id: int, db: Session = Depends(get_db),

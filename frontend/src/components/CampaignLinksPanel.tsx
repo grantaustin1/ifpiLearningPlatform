@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
-import { BarChart3, Copy, Link2, Plus, Trash2 } from 'lucide-react'
+import { BarChart3, Copy, Link2, Plus, QrCode, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from 'lib/utils'
 
@@ -79,6 +79,21 @@ export const CampaignLinksPanel = () => {
     navigator.clipboard.writeText(`${window.location.origin}${l.join_path}`)
     toast.success('Link copied — share it anywhere')
   }
+
+  const downloadQr = async (l: any) => {
+    try {
+      const res = await api.get(`/admin/campaign-links/${l.id}/qr`, {
+        params: { base: window.location.origin }, responseType: 'blob',
+      })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `qr-${l.name.replace(/[^a-zA-Z0-9_-]+/g, '-').toLowerCase()}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('QR code downloaded — print-ready')
+    } catch { toast.error('QR download failed') }
+  }
   const published = courses.filter((c: any) => c.status === 'PUBLISHED')
 
   return (
@@ -139,6 +154,7 @@ export const CampaignLinksPanel = () => {
                   {l.is_active ? 'Active' : 'Paused'}
                 </button>
                 <button onClick={() => copyLink(l)} data-testid={`campaign-copy-${l.id}`} className="text-slate-400 hover:text-indigo-600"><Copy className="h-4 w-4" /></button>
+                <button onClick={() => downloadQr(l)} data-testid={`campaign-qr-${l.id}`} title="Download print-ready QR code" className="text-slate-400 hover:text-indigo-600"><QrCode className="h-4 w-4" /></button>
                 <button onClick={() => window.confirm('Delete this campaign link?') && deleteMut.mutate(l.id)} data-testid={`campaign-delete-${l.id}`} className="text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
               </div>
               {expanded === l.id && <AttributionRow linkId={l.id} />}
