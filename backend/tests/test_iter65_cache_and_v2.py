@@ -17,7 +17,7 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 ADMIN = ("uat-admin@ifpi.org", "UatAdmin!2026")
 LEARNER = ("uat-learner@ifpi.org", "UatLearner!2026")
 # Org-1 admin needed for catalog cache tests since only org 1 (IFPI Main Academy)
