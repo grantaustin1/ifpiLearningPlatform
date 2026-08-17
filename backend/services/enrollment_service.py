@@ -100,6 +100,22 @@ class EnrollmentService:
         if not c:
             raise HTTPException(status_code=404, detail="Course not found")
 
+        # Quiz gate — a published course exam must be passed before the
+        # course can complete (server-side mirror of the frontend gate).
+        from models import Exam, ExamAttempt
+        gate_exam = db.query(Exam).filter(
+            Exam.course_id == course_id, Exam.is_published.is_(True)).first()
+        if gate_exam:
+            passed_attempt = db.query(ExamAttempt).filter(
+                ExamAttempt.exam_id == gate_exam.id,
+                ExamAttempt.user_id == current.id,
+                ExamAttempt.passed.is_(True)).first()
+            if not passed_attempt:
+                raise HTTPException(status_code=412, detail={
+                    "message": "Pass the course exam to complete this course",
+                    "exam_id": gate_exam.id, "exam_title": gate_exam.title,
+                })
+
         e = db.query(Enrollment).filter(
             Enrollment.user_id == current.id, Enrollment.course_id == course_id,
         ).first()
