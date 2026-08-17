@@ -115,3 +115,113 @@ def check_and_award_qualifications(db: Session, user) -> list[str]:
             logger.warning("Qualification notify failed: %s", ex)
         awarded.append(designation)
     return awarded
+
+
+def admin_completions(db: Session, org_id: int) -> list[dict]:
+    """Compliance matrix: per track, learner × module states."""
+    from models import User, UserRole
+    paths = _qual_paths(db, org_id)
+    learners = (db.query(User).join(UserRole, UserRole.user_id == User.id)
+                .filter(User.organization_id == org_id,
+                        UserRole.role == "LEARNER")
+                .order_by(User.name, User.email).all())
+    learner_ids = [u.id for u in learners]
+    enrs: dict[tuple[int, int], Enrollment] = {}
+    if learner_ids:
+        for e in db.query(Enrollment).filter(
+                Enrollment.user_id.in_(learner_ids)).all():
+            enrs[(e.user_id, e.course_id)] = e
+    qual_certs = set()
+    if learner_ids:
+        for c in db.query(Certificate).filter(
+                Certificate.user_id.in_(learner_ids),
+                Certificate.type == "QUALIFICATION",
+                Certificate.revoked_at.is_(None)).all():
+            qual_certs.add((c.user_id, c.learning_path_id))
+    out = []
+    for p in paths:
+        meta = _meta(p)
+        courses = [{"course_id": i.course_id, "title": i.course.title}
+                   for i in p.items if i.course]
+        rows = []
+        for u in learners:
+            cells = []
+            for c in courses:
+                e = enrs.get((u.id, c["course_id"]))
+                if e and e.status == EnrollmentStatus.COMPLETED:
+                    state = "rpl" if e.via_rpl else "completed"
+                elif e:
+                    state = "in_progress"
+                else:
+                    state = "not_started"
+                cells.append({"course_id": c["course_id"], "state": state,
+                              "progress": round(e.progress or 0, 1) if e else 0})
+            rows.append({"user_id": u.id, "name": u.name, "email": u.email,
+                         "cells": cells,
+                         "qualified": (u.id, p.id) in qual_certs})
+        out.append({"id": p.id, "title": p.title,
+                    "designation": meta.get("designation"),
+                    "nqf_level": meta.get("nqf_level"),
+                    "total_credits": meta.get("total_credits"),
+                    "courses": courses, "learners": rows})
+    return out
+
+
+def grant_rpl(db: Session, admin, user_id: int, course_id: int) -> dict:
+    """Mark a module completed via RPL. No course certificate; counts
+    toward prerequisites and qualification awards."""
+    from datetime import datetime, timezone
+    from fastapi import HTTPException
+    from models import Course, User
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.organization_id == admin.organization_id).first()
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.organization_id == admin.organization_id).first()
+    if not user or not course:
+        raise HTTPException(status_code=404, detail="User or course not found")
+    e = db.query(Enrollment).filter(
+        Enrollment.user_id == user_id,
+        Enrollment.course_id == course_id).first()
+    if e and e.status == EnrollmentStatus.COMPLETED and not e.via_rpl:
+        raise HTTPException(status_code=409,
+                            detail="Already completed normally — RPL not needed")
+    if not e:
+        e = Enrollment(user_id=user_id, course_id=course_id)
+        db.add(e)
+    e.status = EnrollmentStatus.COMPLETED
+    e.progress = 100.0
+    e.via_rpl = True
+    e.completed_at = datetime.now(timezone.utc)
+    db.flush()
+    quals = check_and_award_qualifications(db, user)
+    try:
+        from services.audit_service import record
+        record(db, admin, "RPL_GRANTED", target_type="course",
+               target_id=str(course_id),
+               metadata={"learner_email": user.email,
+                         "course_title": course.title})
+    except Exception:
+        pass
+    db.commit()
+    return {"ok": True, "qualifications_earned": quals}
+
+
+def revoke_rpl(db: Session, admin, user_id: int, course_id: int) -> dict:
+    from fastapi import HTTPException
+    from models import User
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.organization_id == admin.organization_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    e = db.query(Enrollment).filter(
+        Enrollment.user_id == user_id,
+        Enrollment.course_id == course_id,
+        Enrollment.via_rpl.is_(True)).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="No RPL grant found")
+    db.delete(e)
+    db.commit()
+    return {"ok": True}

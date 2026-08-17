@@ -132,6 +132,8 @@ class Enrollment(Base):
     status = Column(SQLEnum(EnrollmentStatus), default=EnrollmentStatus.IN_PROGRESS)
     progress = Column(Float, default=0.0)
     last_slide_index = Column(Integer, default=0)
+    # Recognition of Prior Learning — admin-granted completion, no course cert
+    via_rpl = Column(Boolean, default=False, nullable=False, server_default="0")
     enrolled_at = Column(DateTime, default=_utcnow)
     completed_at = Column(DateTime, nullable=True)
 

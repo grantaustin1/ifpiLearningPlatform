@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from 'lib/api'
+import { useAuth } from 'contexts/AuthContext'
 import {
   Award, CheckCircle2, Circle, Download, GraduationCap, Hammer, Lock,
-  PlayCircle, Milestone,
+  PlayCircle, Milestone, ShieldCheck,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 
@@ -41,6 +42,8 @@ function StageCard({ stage, index, onOpen }: { stage: any; index: number; onOpen
 
 export default function PathwaysPage() {
   const nav = useNavigate()
+  const { hasRole } = useAuth()
+  const isAdmin = hasRole('ADMIN', 'SUPER_ADMIN')
   const { data: tracks = [], isLoading } = useQuery<any[]>({
     queryKey: ['pathways-map'],
     queryFn: async () => (await api.get('/pathways/map')).data,
@@ -57,11 +60,19 @@ export default function PathwaysPage() {
 
   return (
     <div className="p-8 max-w-5xl" data-testid="pathways-page">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 font-display flex items-center gap-2">
-          <Milestone className="h-6 w-6 text-violet-600" /> Qualification Pathways
-        </h1>
-        <p className="text-slate-500 mt-1">Your route to an IFPI professional designation. Complete every module in a track to earn the qualification certificate.</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 font-display flex items-center gap-2">
+            <Milestone className="h-6 w-6 text-violet-600" /> Qualification Pathways
+          </h1>
+          <p className="text-slate-500 mt-1">Your route to an IFPI professional designation. Complete every module in a track to earn the qualification certificate.</p>
+        </div>
+        {isAdmin && (
+          <button onClick={() => nav('/pathways/admin')} data-testid="pathways-admin-btn"
+            className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-medium whitespace-nowrap">
+            <ShieldCheck className="h-4 w-4 text-violet-600" /> Track Compliance
+          </button>
+        )}
       </div>
 
       {isLoading ? (
