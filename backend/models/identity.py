@@ -46,6 +46,8 @@ class Organization(Base):
     nurture_enabled = Column(Boolean, default=False, server_default="0")
     nurture_days = Column(Integer, default=3, server_default="3")
     nurture_message = Column(Text, nullable=True)
+    nurture_second_enabled = Column(Boolean, default=False, server_default="0")
+    nurture_second_days = Column(Integer, default=7, server_default="7")
     smtp_use_tls = Column(Boolean, default=True)
     # Cohort milestone celebrations (per-tenant tuneable)
     cohort_threshold = Column(Integer, default=75)         # % completion required to fire
@@ -420,4 +422,5 @@ class CampaignSignup(Base):
     utm_medium = Column(String(120), nullable=True)
     utm_campaign = Column(String(120), nullable=True)
     nudged_at = Column(DateTime, nullable=True)
+    second_nudged_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)

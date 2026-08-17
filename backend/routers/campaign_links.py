@@ -112,7 +112,21 @@ def campaign_attribution(
             .filter(Row.campaign_link_id == link_id)
             .group_by(Row.utm_source, Row.utm_medium)
             .order_by(func.count(Row.id).desc()).all())
+    # Daily signup trend, last 30 days (gaps zero-filled)
+    from datetime import datetime, timedelta, timezone
+    start = (datetime.now(timezone.utc).replace(tzinfo=None)
+             - timedelta(days=29)).replace(hour=0, minute=0, second=0,
+                                           microsecond=0)
+    daily = dict(db.query(func.date(Row.created_at), func.count(Row.id))
+                 .filter(Row.campaign_link_id == link_id,
+                         Row.created_at >= start)
+                 .group_by(func.date(Row.created_at)).all())
+    trend = []
+    for i in range(30):
+        d = (start + timedelta(days=i)).date()
+        trend.append({"date": d.isoformat(), "signups": int(daily.get(d, 0))})
     return {"link_id": link_id, "total": sum(r[2] for r in rows),
+            "trend": trend,
             "breakdown": [{"utm_source": r[0] or "(direct)",
                            "utm_medium": r[1] or "—",
                            "signups": r[2]} for r in rows]}

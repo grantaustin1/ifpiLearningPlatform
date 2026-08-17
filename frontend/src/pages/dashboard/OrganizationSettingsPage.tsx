@@ -504,6 +504,8 @@ function NurtureSettingsSection({ inputCls }: { inputCls: string }) {
   const [enabled, setEnabled] = useState(false)
   const [days, setDays] = useState(3)
   const [message, setMessage] = useState('')
+  const [secondEnabled, setSecondEnabled] = useState(false)
+  const [secondDays, setSecondDays] = useState(7)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
 
@@ -512,6 +514,8 @@ function NurtureSettingsSection({ inputCls }: { inputCls: string }) {
       setEnabled(!!r.data.nurture_enabled)
       setDays(r.data.nurture_days || 3)
       setMessage(r.data.nurture_message || '')
+      setSecondEnabled(!!r.data.nurture_second_enabled)
+      setSecondDays(r.data.nurture_second_days || 7)
     })
   }, [])
 
@@ -521,6 +525,8 @@ function NurtureSettingsSection({ inputCls }: { inputCls: string }) {
       await api.put('/organization/nurture-settings', {
         nurture_enabled: enabled, nurture_days: days,
         nurture_message: message.trim() || null,
+        nurture_second_enabled: secondEnabled,
+        nurture_second_days: secondDays,
       })
       toast.success('Nurture settings saved')
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Save failed') }
@@ -552,6 +558,21 @@ function NurtureSettingsSection({ inputCls }: { inputCls: string }) {
           <label className="text-xs text-slate-500 block mb-1">Nudge after (days without starting)</label>
           <input type="number" min={1} max={30} value={days} data-testid="nurture-days-input"
             onChange={e => setDays(Math.max(1, Math.min(30, Number(e.target.value) || 3)))} className={inputCls} />
+        </div>
+      </div>
+      <div className="border border-slate-100 rounded-xl p-4 mb-4 bg-slate-50/50">
+        <div className="flex items-center gap-3 mb-2">
+          <button onClick={() => setSecondEnabled(!secondEnabled)} data-testid="nurture-second-toggle"
+            className={`w-9 h-5 rounded-full transition-colors relative ${secondEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+            <span className={`absolute top-0.5 h-4 w-4 bg-white rounded-full shadow transition-transform ${secondEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </button>
+          <span className="text-sm text-slate-700 font-medium">Final reminder</span>
+        </div>
+        <p className="text-xs text-slate-500 mb-2">One last nudge for prospects who still haven't started after the first reminder.</p>
+        <div className="max-w-[240px]">
+          <label className="text-xs text-slate-500 block mb-1">Days after first nudge</label>
+          <input type="number" min={1} max={60} value={secondDays} data-testid="nurture-second-days-input"
+            onChange={e => setSecondDays(Math.max(1, Math.min(60, Number(e.target.value) || 7)))} className={inputCls} />
         </div>
       </div>
       <div className="mb-4">

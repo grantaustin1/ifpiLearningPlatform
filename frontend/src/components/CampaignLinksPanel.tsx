@@ -11,9 +11,18 @@ const AttributionRow = ({ linkId }: { linkId: number }) => {
     queryFn: async () => (await api.get(`/admin/campaign-links/${linkId}/attribution`)).data,
   })
   if (!data) return <p className="text-xs text-slate-400 px-4 py-2">Loading…</p>
-  if (!data.breakdown.length) return <p className="text-xs text-slate-400 px-4 py-2">No signups yet.</p>
+  const max = Math.max(1, ...(data.trend || []).map((t: any) => t.signups))
   return (
     <div className="px-4 pb-3" data-testid={`attribution-${linkId}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Daily signups — last 30 days</p>
+      <div className="flex items-end gap-[2px] h-14 mb-3" data-testid={`trend-chart-${linkId}`}>
+        {(data.trend || []).map((t: any) => (
+          <div key={t.date} title={`${t.date}: ${t.signups} signup${t.signups !== 1 ? 's' : ''}`}
+            className={cn('flex-1 rounded-t-sm min-h-[2px]', t.signups > 0 ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-slate-100')}
+            style={{ height: `${Math.max(4, (t.signups / max) * 100)}%` }} />
+        ))}
+      </div>
+      {!data.breakdown.length ? <p className="text-xs text-slate-400">No signups yet.</p> : (
       <table className="w-full text-xs">
         <thead><tr className="text-slate-400 text-left"><th className="py-1 font-medium">utm_source</th><th className="font-medium">utm_medium</th><th className="font-medium text-right">Signups</th></tr></thead>
         <tbody>
@@ -26,6 +35,7 @@ const AttributionRow = ({ linkId }: { linkId: number }) => {
           ))}
         </tbody>
       </table>
+      )}
     </div>
   )
 }

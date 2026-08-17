@@ -213,6 +213,8 @@ def get_org(db: Session = Depends(get_db),
         "nurture_enabled": bool(o.nurture_enabled),
         "nurture_days": o.nurture_days or 3,
         "nurture_message": o.nurture_message,
+        "nurture_second_enabled": bool(o.nurture_second_enabled),
+        "nurture_second_days": o.nurture_second_days or 7,
     }
 
 
@@ -250,6 +252,8 @@ class NurtureSettingsIn(BaseModel):
     nurture_enabled: bool = False
     nurture_days: int = Field(ge=1, le=30, default=3)
     nurture_message: Optional[str] = None
+    nurture_second_enabled: bool = False
+    nurture_second_days: int = Field(ge=1, le=60, default=7)
 
 
 @org_router.put("/nurture-settings")
@@ -261,6 +265,8 @@ def update_nurture_settings(body: NurtureSettingsIn, db: Session = Depends(get_d
     o.nurture_enabled = body.nurture_enabled
     o.nurture_days = body.nurture_days
     o.nurture_message = (body.nurture_message or "").strip() or None
+    o.nurture_second_enabled = body.nurture_second_enabled
+    o.nurture_second_days = body.nurture_second_days
     from services import audit_service
     audit_service.record(db, current, "NURTURE_SETTINGS_UPDATED",
         target_type="organization", target_id=str(o.id),

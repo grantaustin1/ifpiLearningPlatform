@@ -19,6 +19,30 @@ DEFAULT_MESSAGE = (
     "qualification. Jump back in!"
 )
 
+SECOND_MESSAGE = (
+    "Hi {name}, this is a final friendly reminder — {course} is still "
+    "waiting for you. Learners who start their first bite usually finish "
+    "the whole module. Give it five minutes today!"
+)
+
+
+def _send_nudge(db, org, user, course_title, message, subject, kind):
+    try:
+        from services.mail_service import MailService
+        MailService(db).send_email(
+            to_email=user.email, to_name=user.name, subject=subject,
+            body_html=f"<p>{message}</p>", body_text=message,
+            template=kind, organization_id=org.id, user_id=user.id)
+    except Exception as ex:
+        logger.warning("Nurture email failed for %s: %s", user.email, ex)
+    try:
+        from services.gamification_service import GamificationService
+        GamificationService(db).notify(
+            user.id, kind.upper(), "Pick up where you left off",
+            message, "/pathways")
+    except Exception:
+        pass
+
 
 def run_nurture_pass(db: Session, org_id: int | None = None) -> int:
     """Send one nudge per stale campaign signup. Returns nudges sent."""
@@ -52,25 +76,44 @@ def run_nurture_pass(db: Session, org_id: int | None = None) -> int:
             message = (org.nurture_message or DEFAULT_MESSAGE).replace(
                 "{name}", user.name or "there").replace(
                 "{course}", course_title or "your first course")
-            try:
-                from services.mail_service import MailService
-                MailService(db).send_email(
-                    to_email=user.email, to_name=user.name,
-                    subject=f"Your learning journey at {org.name} is waiting",
-                    body_html=f"<p>{message}</p>",
-                    body_text=message, template="nurture_nudge",
-                    organization_id=org.id, user_id=user.id)
-            except Exception as ex:
-                logger.warning("Nurture email failed for %s: %s", user.email, ex)
-            try:
-                from services.gamification_service import GamificationService
-                GamificationService(db).notify(
-                    user.id, "NURTURE_NUDGE",
-                    "Pick up where you left off",
-                    message, "/pathways")
-            except Exception:
-                pass
+            _send_nudge(db, org, user, course_title, message,
+                        f"Your learning journey at {org.name} is waiting",
+                        "nurture_nudge")
             signup.nudged_at = datetime.now(timezone.utc).replace(tzinfo=None)
             sent += 1
+        if org.nurture_second_enabled:
+            second_days = max(1, org.nurture_second_days or 7)
+            cutoff2 = (datetime.now(timezone.utc).replace(tzinfo=None)
+                       - timedelta(days=second_days))
+            stale2 = (db.query(CampaignSignup, User, CampaignLink)
+                      .join(User, User.id == CampaignSignup.user_id)
+                      .join(CampaignLink,
+                            CampaignLink.id == CampaignSignup.campaign_link_id)
+                      .filter(CampaignLink.organization_id == org.id,
+                              CampaignSignup.nudged_at.isnot(None),
+                              CampaignSignup.second_nudged_at.is_(None),
+                              CampaignSignup.nudged_at <= cutoff2)
+                      .all())
+            for signup, user, link in stale2:
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                started = db.query(Enrollment).filter(
+                    Enrollment.user_id == user.id,
+                    Enrollment.progress > 0).first()
+                if started:
+                    signup.second_nudged_at = now
+                    continue
+                course_title = None
+                if link.auto_enroll_course_id:
+                    c = db.query(Course).filter(
+                        Course.id == link.auto_enroll_course_id).first()
+                    course_title = c.title if c else None
+                message = SECOND_MESSAGE.replace(
+                    "{name}", user.name or "there").replace(
+                    "{course}", course_title or "your first course")
+                _send_nudge(db, org, user, course_title, message,
+                            f"Final reminder — your place at {org.name}",
+                            "nurture_final")
+                signup.second_nudged_at = now
+                sent += 1
         db.commit()
     return sent
