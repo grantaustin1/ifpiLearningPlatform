@@ -468,34 +468,43 @@ Core entities (see `backend/models/` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
+| `routers/admin_analytics.py` | 163 |
 | `routers/admin_entitlements.py` | 185 |
 | `routers/admin_organizations.py` | 202 |
 | `routers/affiliate.py` | 263 |
-| `routers/ai_tutor.py` | 386 |
+| `routers/ai.py` | 34 |
+| `routers/ai_tutor.py` | 392 |
 | `routers/api_tokens.py` | 284 |
-| `routers/auth.py` | 486 |
+| `routers/api_v2.py` | 68 |
+| `routers/auth.py` | 487 |
 | `routers/authoring.py` | 131 |
 | `routers/authoring_extras.py` | 198 |
 | `routers/authoring_media.py` | 284 |
 | `routers/authoring_tutor.py` | 458 |
 | `routers/badge_tiers.py` | 133 |
-| `routers/courses.py` | 836 |
+| `routers/billing.py` | 65 |
+| `routers/catalog.py` | 242 |
+| `routers/certificates.py` | 774 |
+| `routers/courses.py` | 950 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
-| `routers/erp360_sync.py` | 426 |
+| `routers/enrollments.py` | 42 |
+| `routers/erp360_sync.py` | 430 |
 | `routers/exams.py` | 459 |
 | `routers/extras.py` | 654 |
 | `routers/feedback.py` | 106 |
 | `routers/flashcards.py` | 497 |
-| `routers/imports.py` | 502 |
+| `routers/gamification.py` | 188 |
+| `routers/imports.py` | 551 |
 | `routers/invitations.py` | 206 |
-| `routers/iter5.py` | 352 |
+| `routers/iter5.py` | 407 |
 | `routers/iter8.py` | 367 |
 | `routers/learning_paths.py` | 285 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
 | `routers/misc.py` | 1391 |
 | `routers/narration.py` | 204 |
+| `routers/notifications.py` | 48 |
 | `routers/onboarding.py` | 97 |
 | `routers/owner_dashboard.py` | 226 |
 | `routers/public_catalog.py` | 201 |
@@ -507,7 +516,7 @@ Core entities (see `backend/models/` for the full list):
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **13812** |
+| **Total** | **15665** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -629,6 +638,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
 | `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
 | `/api/admin/imports/{job_id}` | GET |  |
+| `/api/admin/imports/{job_id}/retry` | POST | Re-run a FAILED / PARTIAL import against the same staging directory — |
 | `/api/admin/imports/{job_id}/rollback` | POST | Undo an import job — deletes every course / learning path it created. |
 | `/api/admin/invitations` | GET |  |
 | `/api/admin/invitations` | POST |  |
@@ -757,13 +767,15 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}` | DELETE |  |
 | `/api/courses/{course_id}` | GET |  |
 | `/api/courses/{course_id}` | PATCH |  |
+| `/api/courses/{course_id}/archive` | POST | Safe alternative to deletion — blocked while learners are busy. |
 | `/api/courses/{course_id}/complete` | POST |  |
-| `/api/courses/{course_id}/duplicate` | POST | Deep-clone a course (with all slides) as a new DRAFT. Optional template path: |
+| `/api/courses/{course_id}/duplicate` | POST | Deep-clone a course (with all slides) as a new DRAFT. |
 | `/api/courses/{course_id}/enroll` | POST |  |
 | `/api/courses/{course_id}/prerequisites` | GET |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
 | `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
-| `/api/courses/{course_id}/publish` | POST | Explicit publish action with validation. Course must have at least |
+| `/api/courses/{course_id}/progress` | POST | Remember the learner's position so they resume across devices. |
+| `/api/courses/{course_id}/publish` | POST | Explicit publish action — course must have at least one slide. |
 | `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
 | `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
 | `/api/courses/{course_id}/reviews` | GET | All written reviews for a course (incl. hidden) — admin moderation view. Iter 47. |
@@ -777,6 +789,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
 | `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
 | `/api/courses/{course_id}/toggle-featured` | POST | Flip the marketplace 'Featured' flag on a course (Iter 42). |
+| `/api/courses/{course_id}/unarchive` | POST | Restore an archived course back to DRAFT (re-publish separately). |
 | `/api/courses/{course_id}/unpublish` | POST |  |
 | `/api/docs` | GET |  |
 | `/api/enrollments` | GET |  |
@@ -883,14 +896,19 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/tutor/sessions/{session_id}/archive` | POST |  |
 | `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
 | `/api/uploads/cover-library` | GET | Curated course-cover photo gallery (Iter 43). Files are placed by |
-| `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file. ONLY meaningful for the `local` |
+| `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file (local disk or object-store cache). |
 | `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
 | `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
+| `/api/v2/catalog` | GET | Public course catalog (enveloped) |
+| `/api/v2/courses` | GET | List courses visible to the caller |
+| `/api/v2/courses/{course_id}` | GET | Course detail with slides |
+| `/api/v2/enrollments` | GET | Caller's enrollments with progress |
+| `/api/v2/health` | GET | Service health (enveloped) |
 | `/api/webhook/stripe` | POST | Stripe webhook receiver. Idempotent — the poll path and the |
 | `/api/xapi/statements` | GET |  |
 | `/api/xapi/statements` | POST |  |
 
-_Total: **298** registered API endpoints._
+_Total: **307** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
