@@ -1,7 +1,16 @@
 """Iteration 58 — Slide image_position + bulk photo upload backend tests."""
+
+
 import os
 import io
 import pytest
+
+# Skip integration tests that hit a live external API when running in CI.
+pytestmark = pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="Skip external integration tests in CI",
+)
+
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")

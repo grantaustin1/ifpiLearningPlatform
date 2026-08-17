@@ -1,4 +1,11 @@
 """Backend tests for media_opacity clamping (Iter 60)"""
+
+# Skip integration tests that hit a live external API when running in CI.
+pytestmark = pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="Skip external integration tests in CI",
+)
+
 import os, requests, pytest
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://learning-hub-968.preview.emergentagent.com').rstrip('/')

@@ -1,10 +1,19 @@
 """Tests for feedback screenshot upload + tour-related backend paths (iter 57)."""
+
+
 import io
 import os
 import struct
 import zlib
 
 import pytest
+
+# Skip integration tests that hit a live external API when running in CI.
+pytestmark = pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="Skip external integration tests in CI",
+)
+
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://learning-hub-968.preview.emergentagent.com").rstrip("/")
