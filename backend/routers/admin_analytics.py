@@ -1,25 +1,28 @@
-"""Admin analytics overview routes."""
+"""Admin analytics overview routes — includes audit log, cohorts, leaderboard, digest."""
 from __future__ import annotations
 
+import csv
+import io
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session, selectinload
 
 from auth.dependencies import CurrentUser, requires_roles
 from core.database import get_db
 from models import (
-    Certificate, Course, Enrollment, EnrollmentStatus, Exam,
-    ExamAttempt, User,
+    AuditLog, Certificate, Course, Enrollment, EnrollmentStatus, Exam,
+    ExamAttempt, Organization, User, UserBadge,
 )
 from schemas import (
     AnalyticsOverview,
 )
 
 logger = logging.getLogger(__name__)
-
 
 
 # ── Analytics (admin) ────────────────────────────────────────────────
@@ -76,9 +79,7 @@ def analytics(db: Session = Depends(get_db),
     attempts = db.query(ExamAttempt).join(Exam).filter(Exam.organization_id == org).all()
     avg_score = round(sum(a.score for a in attempts) / len(attempts)) if attempts else 0
 
-    # Monthly enrollments — last 6 months via Python (DB-agnostic; avoids DATE_TRUNC)
     from collections import OrderedDict
-    from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     months = OrderedDict()
     for i in range(5, -1, -1):
@@ -92,7 +93,6 @@ def analytics(db: Session = Depends(get_db),
             months[key] += 1
     monthly = [{"month": k, "count": v} for k, v in months.items()]
 
-    # Top courses by enrolment
     top_q = db.query(Course, func.count(Enrollment.id).label("c")).outerjoin(Enrollment).filter(
         Course.organization_id == org,
     ).group_by(Course.id).order_by(desc("c")).limit(8).all()
@@ -130,12 +130,6 @@ def list_users(response: Response,
                limit: int = 200,
                offset: int = 0,
                current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
-    # Iter 38 — was 1542 queries via lazy-load of user_roles/enrollments/
-    # certificates for each user. `selectinload` collapses this to 4 SQL
-    # statements total (1 for users + 1 per relationship, regardless of
-    # user count). Added pagination via query params + response headers
-    # (Github/Stripe convention) so the list-shaped body stays
-    # backwards-compatible with existing frontend consumers.
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     q = (db.query(User)
@@ -161,3 +155,168 @@ def list_users(response: Response,
     } for u in rows]
 
 
+# ── Audit log (migrated from iter8.py) ───────────────────────────────
+@admin_router.get("/audit-log")
+def list_audit(
+    actor: Optional[int] = None,
+    action: Optional[str] = None,
+    target_type: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    q = db.query(AuditLog).filter(AuditLog.organization_id == current.organization_id)
+    if actor is not None:
+        q = q.filter(AuditLog.actor_user_id == actor)
+    if action:
+        q = q.filter(AuditLog.action == action.upper())
+    if target_type:
+        q = q.filter(AuditLog.target_type == target_type)
+    total = q.count()
+    rows = q.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    actor_ids = {r.actor_user_id for r in rows if r.actor_user_id}
+    users = {u.id: u for u in db.query(User).filter(User.id.in_(actor_ids)).all()}
+    return {
+        "total": total,
+        "items": [{
+            "id": r.id, "action": r.action,
+            "target_type": r.target_type, "target_id": r.target_id,
+            "metadata": r.audit_metadata or {},
+            "ip_address": r.ip_address,
+            "actor": {"id": r.actor_user_id, "email": users[r.actor_user_id].email,
+                      "name": users[r.actor_user_id].name} if r.actor_user_id in users else None,
+            "created_at": r.created_at,
+        } for r in rows],
+    }
+
+
+# ── Cohorts (migrated from iter8.py) ─────────────────────────────────
+@admin_router.get("/cohorts")
+def list_cohorts(db: Session = Depends(get_db),
+                 current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    """Distinct cohort labels with learner counts."""
+    rows = db.query(User.cohort, func.count(User.id)).filter(
+        User.organization_id == current.organization_id,
+        User.cohort.isnot(None),
+        User.cohort != "",
+    ).group_by(User.cohort).all()
+    return [{"cohort": r[0], "learner_count": r[1]} for r in rows]
+
+
+@admin_router.get("/reports/cohort-stats")
+def cohort_stats(
+    cohort: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """Completion / exam-score / time-to-graduation for a cohort."""
+    base = db.query(User).filter(User.organization_id == current.organization_id)
+    if cohort:
+        base = base.filter(User.cohort == cohort)
+    user_ids = [u.id for u in base.all()]
+    if not user_ids:
+        return {"cohort": cohort, "learners": 0, "enrollments": 0, "completions": 0,
+                "completion_rate": 0, "avg_exam_score": 0, "certificates_issued": 0,
+                "badges_earned": 0}
+    enrollments = db.query(Enrollment).filter(Enrollment.user_id.in_(user_ids))
+    total_enr = enrollments.count()
+    completed = enrollments.filter(Enrollment.status == EnrollmentStatus.COMPLETED).count()
+    avg_score = db.query(func.avg(ExamAttempt.score)).filter(
+        ExamAttempt.user_id.in_(user_ids),
+        ExamAttempt.score.isnot(None),
+    ).scalar() or 0
+    certs = db.query(Certificate).filter(Certificate.user_id.in_(user_ids)).count()
+    badges = db.query(UserBadge).filter(UserBadge.user_id.in_(user_ids)).count()
+    return {
+        "cohort": cohort, "learners": len(user_ids),
+        "enrollments": total_enr, "completions": completed,
+        "completion_rate": round((completed / total_enr) * 100, 1) if total_enr else 0,
+        "avg_exam_score": round(float(avg_score), 1),
+        "certificates_issued": certs, "badges_earned": badges,
+    }
+
+
+# ── Leaderboard CSV (migrated from iter8.py) ─────────────────────────
+@admin_router.get("/leaderboard.csv")
+def leaderboard_csv(cohort: Optional[str] = None,
+                    db: Session = Depends(get_db),
+                    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN"))):
+    q = db.query(User).filter(
+        User.organization_id == current.organization_id, User.is_active.is_(True),
+    )
+    if cohort:
+        q = q.filter(User.cohort == cohort)
+    rows = q.order_by(User.points.desc().nullslast()).all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["rank", "name", "email", "cohort", "xp", "badges_earned", "certificates"])
+    for i, u in enumerate(rows, 1):
+        badges = db.query(UserBadge).filter(UserBadge.user_id == u.id).count()
+        certs = db.query(Certificate).filter(Certificate.user_id == u.id).count()
+        w.writerow([i, u.name or "", u.email, u.cohort or "", u.points or 0, badges, certs])
+    name = f"leaderboard{'_' + cohort if cohort else ''}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={name}"},
+    )
+
+
+# ── Audit digest (migrated from iter8.py) ────────────────────────────
+@admin_router.get("/audit-digest")
+async def audit_digest(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current: CurrentUser = Depends(requires_roles("ADMIN", "SUPER_ADMIN")),
+):
+    """LLM-generated plain-English summary of the last N days of admin activity."""
+    days = max(1, min(days, 90))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    from sqlalchemy import func as _func
+    action_counts = (db.query(AuditLog.action, _func.count(AuditLog.id))
+                     .filter(AuditLog.organization_id == current.organization_id,
+                             AuditLog.created_at >= since)
+                     .group_by(AuditLog.action)
+                     .all())
+    by_action: dict[str, int] = {a: n for a, n in action_counts}
+    total_rows = sum(by_action.values())
+    rows = (db.query(AuditLog)
+            .filter(AuditLog.organization_id == current.organization_id,
+                    AuditLog.created_at >= since)
+            .order_by(AuditLog.created_at.desc())
+            .limit(300).all())
+    deterministic = (
+        f"In the last {days} days: {total_rows} admin action(s) recorded."
+        + ((" "
+            + ", ".join(f"{k.replace('_', ' ').title()}: {v}"
+                        for k, v in sorted(by_action.items(), key=lambda kv: -kv[1])[:6])
+            + ".") if by_action else " No admin activity to summarise.")
+    )
+    digest = deterministic
+    if rows:
+        try:
+            from core.config import settings
+            if settings.emergent_llm_key:
+                from emergentintegrations.llm.chat import LlmChat, UserMessage
+                import uuid as _uuid
+                lines = "\n".join(
+                    f"- {r.created_at:%Y-%m-%d}  {r.action}  {r.target_type or ''}#{r.target_id or ''}  meta={r.audit_metadata}"
+                    for r in rows[:80]
+                )
+                chat = LlmChat(api_key=settings.emergent_llm_key,
+                               session_id=f"digest-{_uuid.uuid4().hex}",
+                               system_message="You produce concise, executive-friendly summaries of admin activity. 3-5 sentences, plain English, no jargon, no markdown.").with_model(
+                    settings.ai_builder_provider, settings.ai_builder_model)
+                resp = await chat.send_message(UserMessage(
+                    text=f"Summarise the last {days} days of admin activity for an "
+                         f"IFPI Learning academy. Counts: {by_action}\n\nRaw rows:\n{lines}"))
+                digest = (resp if isinstance(resp, str) else getattr(resp, "content", str(resp))).strip()
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger("ifpi.audit_digest").exception("digest LLM call failed: %s", e)
+            digest = deterministic + " (AI summary unavailable — see logs.)"
+    return {
+        "days": days, "total_actions": len(rows),
+        "counts_by_action": by_action,
+        "summary": digest,
+    }
