@@ -1,6 +1,6 @@
 """Observability + security middleware (Iter 30d).
 
-Adds three tiny middlewares that mirror ERP360's Sprint C hardening:
+Adds four tiny middlewares that mirror ERP360's Sprint C hardening:
 
 1. **Correlation-ID** — every request gets an `x-correlation-id` header
    (generated if the client didn't send one). It's put into a context
@@ -20,6 +20,11 @@ Adds three tiny middlewares that mirror ERP360's Sprint C hardening:
    from the same `email + IP` combo in 15 minutes, we return 429 with a
    Retry-After header. Uses the Redis-backed rate limiter service so
    the counter is shared across replicas.
+
+4. **API rate-limit headers** — every `/api/*` response carries
+   `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`
+   (on 429). A generous per-IP cap (300/min) avoids hurting real users
+   while giving bots a clear signal.
 
 Design constraints:
 - Zero-config: safe to import & install unconditionally.
@@ -435,6 +440,90 @@ class CSRFProtectMiddleware(BaseHTTPMiddleware):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 5. API rate-limit headers (design recommendation #15)
+# ─────────────────────────────────────────────────────────────────────
+
+class RateLimitHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds standard rate-limit headers to every `/api/*` response.
+
+    Uses a generous per-IP cap (300 req / 60 s) so legitimate users
+    never hit it.  When the cap is exceeded we return 429 with
+    `Retry-After` and the usual error envelope.
+
+    Headers injected on every response:
+      X-RateLimit-Limit     — total requests allowed per window
+      X-RateLimit-Remaining — requests left in current window
+      X-RateLimit-Reset     — unix timestamp when the window resets
+    """
+
+    LIMIT = 300
+    WINDOW_SECS = 60.0
+    # Paths that skip rate-limiting (health probes, docs, static)
+    EXEMPT_PREFIXES = (
+        "/api/health",
+        "/api/docs",
+        "/api/redoc",
+        "/api/openapi.json",
+        "/static",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from services.rate_limits import SlidingWindowLimiter
+        self._limiter = SlidingWindowLimiter(
+            limit=self.LIMIT, window_seconds=self.WINDOW_SECS,
+        )
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if any(path.startswith(p) for p in self.EXEMPT_PREFIXES):
+            return await call_next(request)
+
+        ip = self._client_ip(request)
+        allowed, remaining = self._limiter.check(ip)
+        reset_ts = int(time.time() + self.WINDOW_SECS)
+
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": {
+                        "code": "RATE_LIMITED",
+                        "message": "Too many requests — try again shortly.",
+                        "status": 429,
+                        "correlation_id": get_correlation_id(),
+                    }
+                },
+                headers={
+                    "Retry-After": str(int(self.WINDOW_SECS)),
+                    "X-RateLimit-Limit": str(self.LIMIT),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(reset_ts),
+                },
+            )
+
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(self.LIMIT)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Reset"] = str(reset_ts)
+        return response
+
+    @staticmethod
+    def _client_ip(request: Request) -> str:
+        from core.config import settings as _settings
+        if _settings.test_bypass_enabled:
+            test_ip = request.headers.get("x-test-client-ip") or ""
+            if test_ip.strip():
+                return test_ip.strip()
+        fwd = request.headers.get("x-forwarded-for") or ""
+        if fwd:
+            first = fwd.split(",")[0].strip()
+            if first:
+                return first
+        return getattr(request.client, "host", "0.0.0.0") or "0.0.0.0"
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Iter 32 · Security headers
 # ─────────────────────────────────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -539,4 +628,5 @@ def install_middleware(app: FastAPI) -> None:
     app.add_middleware(LoginBruteForceMiddleware)
     app.add_middleware(CSRFProtectMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RateLimitHeadersMiddleware)
     install_exception_handlers(app)
