@@ -1,10 +1,12 @@
-"""Auth primitives: password hashing + JWT encode/decode.
+"""Auth primitives: password hashing + JWT encode/decode + request signing.
 
 Mirrors ERP360's `core/security.py` shape so the SSO bridge can verify
 tokens issued by ERP360 with identical code.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -73,3 +75,17 @@ def create_refresh_token(subject: str | int, family_id: str) -> str:
 def decode_token(token: str) -> dict:
     """Raise JWTError on invalid/expired."""
     return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+
+def sign_outgoing_payload(body: bytes) -> dict:
+    """HMAC-sign a request body for the ERP360 SSO bridge.
+
+    Returns headers dict with X-Signature, X-Timestamp and X-Service-Token.
+    Returns empty dict when no shared secret is configured.
+    """
+    secret = settings.erp360_sso_shared_secret
+    if not secret:
+        return {}
+    ts = str(int(datetime.now(timezone.utc).timestamp()))
+    sig = hmac.new(secret.encode(), body + ts.encode(), hashlib.sha256).hexdigest()
+    return {"X-Signature": sig, "X-Timestamp": ts, "X-Service-Token": secret}
