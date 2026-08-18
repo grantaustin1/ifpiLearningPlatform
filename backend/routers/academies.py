@@ -5,6 +5,7 @@ import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from auth.dependencies import CurrentUser, requires_roles
