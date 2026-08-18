@@ -41,6 +41,7 @@ def register_all(app: FastAPI) -> None:
     app.include_router(ai.ai_router)
     app.include_router(enrollments.enroll_router)
     app.include_router(certificates.cert_router)
+    app.include_router(certificates.preview_router)        # from iter5
     app.include_router(notifications.notif_router)
     app.include_router(gamification.gam_router)
     app.include_router(admin_analytics.admin_router)
@@ -52,27 +53,25 @@ def register_all(app: FastAPI) -> None:
     app.include_router(seo.router)
 
     # ── Onboarding: invitations + lead capture + org/outbox ──────────
-    from routers import invitations, extras
+    from routers import invitations
+    from routers import leads, organization, outbox
     app.include_router(invitations.admin_router)
     app.include_router(invitations.public_router)
-    app.include_router(extras.leads_router)
-    app.include_router(extras.org_router)
-    app.include_router(extras.public_branding_router)
-    app.include_router(extras.outbox_router)
-    app.include_router(extras.paths_extra_router)
+    app.include_router(leads.leads_router)
+    app.include_router(organization.org_router)
+    app.include_router(organization.public_branding_router)
+    app.include_router(outbox.outbox_router)
 
-    # ── Iter 5: cert preview, uploads, slide comments, academies, portal ──
-    from routers import iter5
-    app.include_router(iter5.preview_router)
-    app.include_router(iter5.uploads_router)
-    app.include_router(iter5.comments_router)
-    app.include_router(iter5.academies_router)
-    app.include_router(iter5.portal_router)
+    # ── Uploads, comments, academies, portal (from iter5) ────────────
+    from routers import uploads, comments, academies, portal
+    app.include_router(uploads.uploads_router)
+    app.include_router(comments.comments_router)
+    app.include_router(academies.academies_router)
+    app.include_router(portal.portal_router)
 
-    # ── Iter 6+: badge tiers, audit log ──────────────────────────────
-    from routers import badge_tiers, iter8
+    # ── Iter 6+: badge tiers ────────────────────────────────────────
+    from routers import badge_tiers
     app.include_router(badge_tiers.router)
-    app.include_router(iter8.router)
 
     # ── Iter 15: outgoing webhooks ───────────────────────────────────
     from routers import webhooks
@@ -191,4 +190,3 @@ def register_all(app: FastAPI) -> None:
     from routers import marketplace_analytics
     app.include_router(marketplace_analytics.public_router)
     app.include_router(marketplace_analytics.admin_router)
-
