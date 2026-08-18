@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
+import { API_URL } from 'lib/env'
 import { GraduationCap, Eye, EyeOff, ArrowRight, BookOpen, Award, Users, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -17,15 +18,12 @@ export default function LoginPage() {
   const [ssoEnabled, setSsoEnabled] = useState(false)
   const [ssoInitiateUrl, setSsoInitiateUrl] = useState<string | null>(null)
   const [ssoExchanging, setSsoExchanging] = useState(false)
-  // Iter 30i — 2FA gate state. When the login response says
-  // requires_2fa=true, we swap the password form for a TOTP code form.
   const [twoFA, setTwoFA] = useState<{ challengeId: string } | null>(null)
   const [twoFACode, setTwoFACode] = useState('')
   const [brand, setBrand] = useState<{ name: string; logo_url: string | null; primary_color: string; accent_color: string }>({
     name: 'IFPI Learning', logo_url: null, primary_color: '#262262', accent_color: '#F5A500',
   })
 
-  // Load the org branding for this deployment (public — no auth needed)
   useEffect(() => {
     api.get('/branding/public', { validateStatus: (s) => s < 500 })
       .then(r => { if (r.status === 200 && r.data) setBrand({
@@ -37,11 +35,8 @@ export default function LoginPage() {
       .catch(() => { /* silent — fall back to defaults */ })
   }, [])
 
-  const backend = (import.meta as any).env?.VITE_API_URL
-    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
-    || ''
   const resolvedLogo = brand.logo_url
-    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
+    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${API_URL}${brand.logo_url}`)
     : null
 
   // Probe SSO availability on mount
@@ -85,11 +80,6 @@ export default function LoginPage() {
       }
       const u = outcome.user
       toast.success(`Welcome back, ${u.name || u.email}`)
-      // Iter 33d — Route forced-password-change users DIRECTLY to the
-      // change-password page. Going via /dashboard first creates a
-      // flash/race with <Protected> and can be aborted mid-transition
-      // by any background API 401 (KioskShell, TermsGate). Direct nav
-      // guarantees the form stays put until the user completes it.
       if (u.must_change_password) {
         nav('/change-password?forced=1', { replace: true })
         return
@@ -123,7 +113,6 @@ export default function LoginPage() {
 
   const onSsoClick = () => {
     if (ssoInitiateUrl) {
-      // Full redirect — ERP360 will bounce back with ?erp_token=…
       window.location.href = ssoInitiateUrl
     } else {
       toast.error('ERP360 URL not configured — set ERP360_BASE_URL on the backend')
@@ -274,7 +263,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Iter 32 — Forgot-password link. Hidden during 2FA challenge. */}
           {!twoFA && (
             <div className="text-center mt-4">
               <Link to="/forgot-password" data-testid="login-forgot-password"
