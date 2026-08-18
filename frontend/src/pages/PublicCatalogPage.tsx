@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useParams } from 'react-router-dom'
 import axios from 'axios'
+import { API_URL } from 'lib/env'
 import { BookOpen, CheckCircle2, XCircle, Search, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePrompt } from 'components/PromptDialog'
-
-const API = (import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''
 
 interface Item { id: number; title: string; description?: string; category?: string; duration_minutes?: number }
 interface Cert {
@@ -24,7 +23,7 @@ export default function PublicCatalogPage() {
           <BookOpen className="text-indigo-600" />
           <div>
             <h1 className="text-xl font-bold text-slate-900">IFPI Learning</h1>
-            <p className="text-xs text-slate-500">Public catalog · certificate verification</p>
+            <p className="text-xs text-slate-500">Public catalog \u00b7 certificate verification</p>
           </div>
         </div>
         <nav className="flex gap-2 bg-slate-100 rounded-lg p-1">
@@ -56,7 +55,7 @@ function CatalogTab() {
     setLoading(true); setError(null)
     try {
       const headers: any = tokenInput ? { Authorization: `Bearer ${tokenInput}` } : {}
-      const r = await axios.get(`${API}/api/public/catalog`, {
+      const r = await axios.get(`${API_URL}/api/public/catalog`, {
         headers, params: q ? { q } : undefined,
       })
       setItems(r.data.items)
@@ -78,7 +77,7 @@ function CatalogTab() {
         <label className="text-xs font-semibold text-slate-600">API token (with <code>read:catalog</code> scope)</label>
         <div className="flex gap-2">
           <input value={tokenInput} onChange={e => setTokenInput(e.target.value)}
-            placeholder="ifpi_…"
+            placeholder="ifpi_\u2026"
             className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono"
             data-testid="pub-catalog-token-input" />
           <button onClick={saveToken}
@@ -91,7 +90,7 @@ function CatalogTab() {
             <Search className="h-4 w-4 absolute left-3 top-3 text-slate-400" />
             <input value={q} onChange={e => setQ(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && load()}
-              placeholder="Search course title or description…"
+              placeholder="Search course title or description\u2026"
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
               data-testid="pub-catalog-search-input" />
           </div>
@@ -103,7 +102,7 @@ function CatalogTab() {
 
       {error && <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 text-sm" data-testid="pub-catalog-error">{error}</div>}
       {loading ? (
-        <div className="text-sm text-slate-500">Loading…</div>
+        <div className="text-sm text-slate-500">Loading\u2026</div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4" data-testid="pub-catalog-list">
           {items.map(c => (
@@ -139,11 +138,11 @@ function VerifyTab() {
     if (!code.trim()) return
     setBusy(true); setCert(null); setNotFound(false)
     try {
-      const r = await axios.get(`${API}/api/public/certificates/verify/${encodeURIComponent(code.trim())}`)
+      const r = await axios.get(`${API_URL}/api/public/certificates/verify/${encodeURIComponent(code.trim())}`)
       setCert(r.data)
     } catch (e: any) {
       if (e?.response?.status === 404) setNotFound(true)
-      else if (e?.response?.status === 429) toast.error('Too many verification attempts — please try again in a minute.')
+      else if (e?.response?.status === 429) toast.error('Too many verification attempts \u2014 please try again in a minute.')
     } finally { setBusy(false) }
   }
 
@@ -162,13 +161,13 @@ function VerifyTab() {
         <div className="flex gap-2">
           <input value={code} onChange={e => setCode(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && verify()}
-            placeholder="Certificate code…"
+            placeholder="Certificate code\u2026"
             className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono"
             data-testid="pub-cert-code-input" />
           <button onClick={verify} disabled={busy}
             data-testid="pub-cert-verify-btn"
             className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold px-5 rounded-lg">
-            {busy ? 'Checking…' : 'Verify'}
+            {busy ? 'Checking\u2026' : 'Verify'}
           </button>
         </div>
       </div>
@@ -182,11 +181,11 @@ function VerifyTab() {
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
             {[
               ['Holder', cert.holder_name],
-              ['Course', cert.course_title || '—'],
+              ['Course', cert.course_title || '\u2014'],
               ['Type', cert.type],
-              ['Issued', cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : '—'],
-              ['Score', cert.score != null ? `${cert.score}%` : '—'],
-              ['Issuing organization', cert.organization_name || '—'],
+              ['Issued', cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : '\u2014'],
+              ['Score', cert.score != null ? `${cert.score}%` : '\u2014'],
+              ['Issuing organization', cert.organization_name || '\u2014'],
               ['Code', cert.code],
             ].map(([k, v]) => (
               <div key={k}>
@@ -208,7 +207,7 @@ function VerifyTab() {
                 })
                 if (navigator.clipboard) {
                   navigator.clipboard.writeText(url).then(
-                    () => toast.success('Verify link copied · share it with recruiters'),
+                    () => toast.success('Verify link copied \u00b7 share it with recruiters'),
                     () => showManualCopy(),
                   )
                 } else {
@@ -220,7 +219,7 @@ function VerifyTab() {
             >
               🔗 Copy shareable verify link
             </button>
-            <span className="text-[11px] text-slate-500">Send this to recruiters — they can verify without an IFPI account.</span>
+            <span className="text-[11px] text-slate-500">Send this to recruiters \u2014 they can verify without an IFPI account.</span>
           </div>
         </div>
       )}

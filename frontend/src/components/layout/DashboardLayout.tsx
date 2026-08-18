@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
+import { API_URL } from 'lib/env'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
   GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare, Milestone,
@@ -66,8 +67,6 @@ export default function DashboardLayout() {
   const [streak, setStreak] = useState<{ current_streak: number; longest_streak: number; reviewed_today: boolean } | null>(null)
   useEffect(() => {
     api.get('/organization').then(r => setOrg(r.data || {})).catch(() => {})
-    // Fetch flashcard streak — every user has one, staff included (they can review too).
-    // Polls once per mount + every 60s in case user reviews in another tab.
     const fetchStreak = () => {
       api.get('/learn/flashcards/streak').then(r => setStreak(r.data)).catch(() => {})
     }
@@ -76,11 +75,8 @@ export default function DashboardLayout() {
     return () => window.clearInterval(id)
   }, [])
   const brandName = org.name || 'IFPI Learning'
-  const backend = (import.meta as any).env?.VITE_API_URL
-    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL)
-    || ''
   const resolvedLogo = org.logo_url
-    ? (org.logo_url.startsWith('http') ? org.logo_url : `${backend}${org.logo_url}`)
+    ? (org.logo_url.startsWith('http') ? org.logo_url : `${API_URL}${org.logo_url}`)
     : null
 
   const handleLogout = async () => { await logout(); nav('/login') }
@@ -119,7 +115,7 @@ export default function DashboardLayout() {
             </NavLink>
           ))}
           <a
-            href={`${backend}/api/public/guides/${isAdmin ? 'IFPI_Admin_User_Guide.pdf' : 'IFPI_Student_User_Guide.pdf'}`}
+            href={`${API_URL}/api/public/guides/${isAdmin ? 'IFPI_Admin_User_Guide.pdf' : 'IFPI_Student_User_Guide.pdf'}`}
             target="_blank" rel="noopener noreferrer"
             data-testid="sidebar-help-link"
             title={isAdmin ? 'Open the Administrator User Guide (PDF)' : 'Open the Student User Guide (PDF)'}
