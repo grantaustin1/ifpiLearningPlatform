@@ -1,6 +1,6 @@
 """Observability + security middleware (Iter 30d).
 
-Adds four tiny middlewares that mirror ERP360's Sprint C hardening:
+Adds five tiny middlewares that mirror ERP360's Sprint C hardening:
 
 1. **Correlation-ID** — every request gets an `x-correlation-id` header
    (generated if the client didn't send one). It's put into a context
@@ -25,6 +25,10 @@ Adds four tiny middlewares that mirror ERP360's Sprint C hardening:
    `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`
    (on 429). A generous per-IP cap (300/min) avoids hurting real users
    while giving bots a clear signal.
+
+5. **Auto audit-log** — mutating requests under `/api/*` are recorded
+   in the `audit_logs` table as a compliance safety net, even when
+   handlers forget to call `audit_service.record()` explicitly.
 
 Design constraints:
 - Zero-config: safe to import & install unconditionally.
@@ -614,7 +618,8 @@ def _consteq(a: str, b: str) -> bool:
 
 
 def install_middleware(app: FastAPI) -> None:
-    """Wire up correlation-ID, exception envelope, brute-force lockout, CSRF.
+    """Wire up correlation-ID, exception envelope, brute-force lockout, CSRF,
+    rate-limit headers, security headers, and auto audit-log.
 
     Order matters (middleware runs in REVERSE order of registration):
       1. CorrelationId FIRST registered → LAST executed on outbound path
@@ -622,11 +627,15 @@ def install_middleware(app: FastAPI) -> None:
       2. BruteForce → runs early on inbound; blocks bad-actor logins.
       3. CSRF → runs after brute-force so brute-force gate isn't itself
          CSRF-gated (login is exempt anyway).
-      4. Exception handlers are registered separately, not stacked.
+      4. SecurityHeaders → adds headers on the way out.
+      5. RateLimitHeaders → counts requests and adds rate-limit headers.
+      6. AuditLog → records mutating requests after the handler runs.
     """
+    from core.audit_middleware import AuditLogMiddleware
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(LoginBruteForceMiddleware)
     app.add_middleware(CSRFProtectMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RateLimitHeadersMiddleware)
+    app.add_middleware(AuditLogMiddleware)
     install_exception_handlers(app)
