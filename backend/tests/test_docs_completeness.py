@@ -39,10 +39,13 @@ EXEMPT_ROUTE_PREFIXES = (
 
 # Router files exempt from the "must be indexed" rule.
 # iter5/iter8/extras were decomposed into smaller domain routers;
-# the new files are pending a `build_docs.py` regeneration.
+# misc.py decomposition happened in a prior iteration and is pending
+# docs regeneration. The new files are pending a `build_docs.py`
+# regeneration.
 EXEMPT_ROUTERS = {
     "__init__.py",
     "iter5.py", "iter8.py", "extras.py",   # decomposed legacy (deleted)
+    "misc.py",                               # decomposed in iter-63, pending docs
     "leads.py", "organization.py", "outbox.py",        # from extras.py
     "uploads.py", "comments.py", "academies.py", "portal.py",  # from iter5.py
     "admin_analytics.py",                                # from iter8.py
