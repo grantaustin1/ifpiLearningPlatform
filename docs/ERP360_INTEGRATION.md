@@ -35,7 +35,7 @@ Body shape (already JSON-serialised before signing):
 }
 ```
 
-The signature helper lives at `routers/iter5.py::sign_outgoing_payload`.
+The signature helper lives at `core/security.py::sign_outgoing_payload`.
 
 ---
 
@@ -139,4 +139,4 @@ No code changes on IFPI's side — only env vars.
 
 ---
 
-*Last reviewed: 2026-02-08. Maintained by the IFPI team. Questions: tag @ifpi-eng.*
+*Last reviewed: 2026-08-18. Maintained by the IFPI team. Questions: tag @ifpi-eng.*
