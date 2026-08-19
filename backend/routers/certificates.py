@@ -16,7 +16,7 @@ from core.config import settings
 from core.database import get_db
 from core.role_registry import ADMIN_ROLES
 from models import (
-    Certificate, Enrollment, EnrollmentStatus, Exam, ExamAttempt, Organization, User,
+    Certificate, Course, Enrollment, EnrollmentStatus, Exam, ExamAttempt, Organization, User,
 )
 from schemas import (
     CertificateOut,
