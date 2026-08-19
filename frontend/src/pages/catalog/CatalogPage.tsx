@@ -242,7 +242,7 @@ export default function CatalogPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="catalog-grid">
-            {data.courses.map(c => <CourseCard key={c.id} c={c} onEnroll={handleEnroll} />)}
+            {data?.courses.map(c => <CourseCard key={c.id} c={c} onEnroll={handleEnroll} />)}
           </div>
         )}
       </div>
