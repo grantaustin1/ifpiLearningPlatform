@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 // Bundle analyzer — run with ANALYZE=true npm run build
 const analyze = process.env.ANALYZE === 'true'
@@ -8,6 +9,7 @@ const analyze = process.env.ANALYZE === 'true'
 export default defineConfig({
   plugins: [
     react(),
+    tsconfigPaths(),
     analyze && (await import('rollup-plugin-visualizer')).visualizer({
       open: true,
       gzipSize: true,
