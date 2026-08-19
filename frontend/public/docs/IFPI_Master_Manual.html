@@ -17,523 +17,452 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <li><a href="#phase-d">Phase D — AI Authoring Suite Configuration</a></li>
 <li><a href="#phase-e">Phase E — Integrations (ERP360 SSO, Webhooks, API Tokens, SCORM)</a></li>
 <li><a href="#phase-f">Phase F — Compliance, Certificates &amp; Public Catalog</a></li>
+<li><a href="#phase-g">Phase G — Production Deployment &amp; Observability</a></li>
 <li><a href="#audit">Audit &amp; Verification Checklist</a></li>
 <li><a href="#failures">Failure Scenario Matrix</a></li>
 </ol>
 <hr />
-<h1 id="0-pre-flight-first-login-system-orientation-0-preflight">0. Pre-Flight — First Login &amp; System Orientation {#0-preflight}</h1>
-<h2 id="step-01-initial-login">Step 0.1 — Initial Login</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>URL</strong></td>
-<td><code>https://&lt;your-tenant&gt;.ifpi.example.com/login</code></td>
-</tr>
-<tr>
-<td><strong>Route</strong></td>
-<td><code>/login</code> → <code>POST /api/auth/login</code></td>
-</tr>
-<tr>
-<td><strong>First user</strong></td>
-<td>Provisioned automatically as <code>admin@&lt;org&gt;.ifpi.org</code></td>
-</tr>
-<tr>
-<td><strong>Password</strong></td>
-<td>Set at tenant creation by Platform Ops</td>
-</tr>
-</tbody>
-</table>
-<h3 id="what-you-see-on-first-login">What you see on first login</h3>
-<ul>
-<li><strong>Dashboard</strong> with 4 KPI tiles (Active Learners, Courses Published, Certificates Issued, AI Spend This Month)</li>
-<li><strong>Health chip</strong> in header — green when API + DB + storage are all live</li>
-<li><strong>"Onboarding wizard"</strong> modal if this is the first Owner session (Phases A–F guided)</li>
-</ul>
-<h3 id="what-if-this-fails">What if this fails?</h3>
-<ul>
-<li><strong><code>401 INVALID_CREDENTIALS</code></strong> → confirm you're on the right tenant subdomain</li>
-<li><strong><code>503</code></strong> → backend is warming up. Retry after 30 s</li>
-<li><strong>Blank page</strong> → hard-refresh; the SPA uses localStorage for the JWT</li>
-</ul>
-<h3 id="zero-blocker-check">Zero-blocker check</h3>
-<p>Change the Owner password immediately (<code>Profile → Security → Change Password</code>). The default password is shared with Platform Ops.</p>
-<hr />
-<h1 id="phase-a-branding-academy-identity-phase-a">Phase A — Branding &amp; Academy Identity {#phase-a}</h1>
-<p><strong>Route:</strong> <code>/dashboard/organization/settings</code><br />
-<strong>Permission:</strong> <code>OWNER</code>, <code>SUPER_ADMIN</code></p>
-<h2 id="step-a1-organization-profile">Step A.1 — Organization Profile</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Impact</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Name</strong></td>
-<td>Appears on certificates, invitation emails, PDF exports</td>
-</tr>
-<tr>
-<td><strong>Slug</strong></td>
-<td>Used in <code>POST /api/public/catalog?slug=</code> and email links; <strong>cannot be changed after certificates are issued</strong></td>
-</tr>
-<tr>
-<td><strong>Timezone</strong></td>
-<td>All streaks, deadlines, cohort digests fire in this TZ; <strong>do not change once learners exist</strong></td>
-</tr>
-<tr>
-<td><strong>Locale</strong></td>
-<td>Default UI language for new learners; overridable per user</td>
-</tr>
-</tbody>
-</table>
-<h3 id="impact-analysis">Impact analysis</h3>
-<p>Timezone changes mid-operation shift <strong>all historical enrollment timestamps</strong> on displays (streaks re-compute from raw UTC). Set this correctly on day 0.</p>
-<h3 id="verify">Verify</h3>
-<ul>
-<li><code>GET /api/organizations/current</code> returns the profile</li>
-<li>Certificate previews (Phase F) render with the new name</li>
-</ul>
-<h2 id="step-a2-branding-colors-logo">Step A.2 — Branding (Colors + Logo)</h2>
-<ul>
-<li><strong>Primary color</strong> cascades to: sidebar accent, button primaries, certificate ribbon, PDF headings, email HTML links.</li>
-<li><strong>Logo</strong> appears on: <code>/login</code>, sidebar header, cert PDF top-left, transcript PDF.</li>
-</ul>
-<h3 id="what-if-this-fails_1">What if this fails?</h3>
-<ul>
-<li>Upload rejected (&gt;2 MB or wrong MIME) → toast with size limit. IFPI accepts <code>png</code>, <code>jpg</code>, <code>svg</code>.</li>
-<li>Logo doesn't appear on cert → clear the cert cache by regenerating one preview.</li>
-</ul>
-<h2 id="step-a3-certificate-template">Step A.3 — Certificate Template</h2>
-<p>Pick one of the built-in templates or upload a custom Nano-Banana-generated banner (<code>Authoring → Visuals → Generate certificate banner</code>).</p>
-<ul>
-<li>Preview via <code>GET /api/certificates/preview?course_id=&lt;any&gt;</code></li>
-<li>Verify link + QR are auto-added in the bottom-right (Iter 30b)</li>
-</ul>
-<hr />
-<h1 id="phase-b-personnel-cohorts-the-role-fortress-phase-b">Phase B — Personnel, Cohorts &amp; The Role Fortress {#phase-b}</h1>
-<p><strong>Route:</strong> <code>/dashboard/users</code> and <code>/dashboard/academies</code><br />
-<strong>Permission:</strong> <code>ADMIN</code>+</p>
-<h2 id="step-b1-understanding-ifpis-role-matrix">Step B.1 — Understanding IFPI's Role Matrix</h2>
-<!-- AUTO:BEGIN role_matrix -->
-<table>
-<thead>
-<tr>
-<th>Role</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>SUPER_ADMIN</code></td>
-<td>Platform super-admin — can manage all academies</td>
-</tr>
-<tr>
-<td><code>ADMIN</code></td>
-<td>Academy administrator — full control of one academy</td>
-</tr>
-<tr>
-<td><code>INSTRUCTOR</code></td>
-<td>Can create courses/exams and grade learners</td>
-</tr>
-<tr>
-<td><code>BILLING_VIEWER</code></td>
-<td>Read-only access to billing/invoicing</td>
-</tr>
-<tr>
-<td><code>LEARNER</code></td>
-<td>End-user enrolled in courses (default)</td>
-</tr>
-</tbody>
-</table>
-<!-- AUTO:END role_matrix -->
-
-<p><strong>Alias tolerated from external systems / SSO (auto-mapped):</strong></p>
-<!-- AUTO:BEGIN role_aliases -->
-<table>
-<thead>
-<tr>
-<th>Alias</th>
-<th>Canonical</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>OWNER</code></td>
-<td><code>ADMIN</code></td>
-</tr>
-<tr>
-<td><code>MANAGER</code></td>
-<td><code>ADMIN</code></td>
-</tr>
-<tr>
-<td><code>PLATFORM_ADMIN</code></td>
-<td><code>SUPER_ADMIN</code></td>
-</tr>
-<tr>
-<td><code>TRAINER</code></td>
-<td><code>INSTRUCTOR</code></td>
-</tr>
-<tr>
-<td><code>STUDENT</code></td>
-<td><code>LEARNER</code></td>
-</tr>
-<tr>
-<td><code>USER</code></td>
-<td><code>LEARNER</code></td>
-</tr>
-</tbody>
-</table>
-<!-- AUTO:END role_aliases -->
-
-<p>Roles are <strong>additive</strong> — a user with <code>INSTRUCTOR</code> + <code>LEARNER</code> sees both dashboards.</p>
-<h2 id="step-b2-creating-users">Step B.2 — Creating Users</h2>
-<p>Two paths:</p>
-<ol>
-<li><strong>Invitation</strong> (recommended for humans)</li>
-<li><code>Users → Invite</code> → email(s), role, cohort</li>
-<li><code>POST /api/admin/invitations/bulk</code> behind the scenes</li>
-<li>
-<p>Invitee clicks link, sets password → JIT-provisioned into your org</p>
-</li>
-<li>
-<p><strong>SSO handshake</strong> (recommended when ERP360 is enabled — see Phase E.1)</p>
-</li>
-<li>Users appear in IFPI <strong>on first sign-in from ERP360</strong> with roles mapped by policy (see <a href="#sso-roles">SSO role mapping</a>)</li>
-</ol>
-<h2 id="step-b3-cohorts">Step B.3 — Cohorts</h2>
-<p>Cohorts group learners for:
-- Leaderboards (<code>/dashboard/leaderboard?cohort=INTAKE-2026-Q1</code>)
-- Bulk-invitations
-- Digest emails (weekly cohort recap)
-- Certificate-issuing rules</p>
-<p><strong>Naming convention:</strong> <code>&lt;STREAM&gt;-&lt;YEAR&gt;-&lt;INTAKE&gt;</code> (e.g., <code>SALES-2026-Q1</code>). Cohorts are ≤100 chars.</p>
-<h2 id="step-b4-two-factor-authentication-recommended">Step B.4 — Two-Factor Authentication (RECOMMENDED)</h2>
+<h1 id="0-getting-in-first-login-what-youll-see-0-preflight">0. Getting In — First Login &amp; What You'll See {#0-preflight}</h1>
 <blockquote>
-<p><strong>Status: Backlog for IFPI v1.1</strong> — TOTP + SMS 2FA are on the roadmap. If enabling now, use ERP360 SSO (Phase E.1) which enforces its own 2FA.</p>
+<p><strong>In plain English:</strong> How to log in for the first time, what the app looks like when you land, and what to do if something goes wrong.</p>
+</blockquote>
+<h2 id="01-your-first-sign-in">0.1 — Your first sign-in</h2>
+<ul>
+<li><strong>Where:</strong> <code>https://&lt;your-tenant&gt;.ifpi.example.com/login</code></li>
+<li><strong>Who set up your login:</strong> IFPI Platform Ops. They will have emailed you an email address and a temporary password.</li>
+<li><strong>What happens on first login:</strong> IFPI will <strong>force you to change the password</strong> before it lets you into the dashboard. This is on purpose — the temporary password should never survive past day one.</li>
+</ul>
+<p>Type your temporary password in the "current password" box, pick a new one (at least 8 characters, different from the old one), confirm it, and hit <strong>Save</strong>. You'll land on the dashboard.</p>
+<h2 id="02-what-the-dashboard-shows-you">0.2 — What the dashboard shows you</h2>
+<p>When you land you'll see:</p>
+<ul>
+<li><strong>Four key numbers at the top</strong> — Active Learners, Courses Published, Certificates Issued, AI Spend This Month.</li>
+<li><strong>A little green health dot</strong> in the header — this means the system is healthy. If it's ever red, take a screenshot and ping Platform Ops.</li>
+<li><strong>An onboarding checklist</strong> if this is your first time — walks you through Phases A to F below.</li>
+</ul>
+<h2 id="03-when-something-goes-wrong">0.3 — When something goes wrong</h2>
+<ul>
+<li><strong>"Invalid credentials"</strong> — double-check you're on the right website (the tenant address IFPI Ops gave you), and that you're typing the password with the right capitalisation. Copy-paste is safer than typing.</li>
+<li><strong>A blank white page</strong> — hard-refresh the browser (Ctrl+Shift+R on Windows, Cmd+Shift+R on Mac).</li>
+<li><strong>"Server is warming up"</strong> — wait 30 seconds and try again. This only happens on the first login of the day if the system was idle.</li>
+</ul>
+<h2 id="04-forgotten-your-password">0.4 — Forgotten your password?</h2>
+<p>Click <strong>"Forgot password?"</strong> on the login screen. IFPI emails you a single-use reset link (valid for 24 hours). Follow it, pick a new password, done.</p>
+<p>If you can't get in even with reset (e.g. the email address on file is wrong), contact IFPI Platform Ops. There's a rescue tool they can run to reset your account from the server side.</p>
+<h2 id="05-verifying-your-email-address">0.5 — Verifying your email address</h2>
+<p>New self-registered users get a verification email. Until you click the link, you can log in but you can't do sensitive things like publishing courses to the public catalogue. If the email didn't arrive, look under <code>Profile → Security → Resend verification</code>.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- Login endpoint: `POST /api/auth/login`. Cookie-based auth; `access_token` is null in the response body by design (see `AUTH_COOKIE_MODE=on`).
+- Forced-change flag: `user.must_change_password=true` — redirects to `/change-password?forced=1`.
+- Change-password endpoint: `POST /api/auth/change-password` (requires current password + CSRF header).
+- Forgot/reset: `POST /api/auth/forgot-password` (rate-limited 3/hr per email + 10/hr per IP), `POST /api/auth/reset-password`.
+- Verify email: `POST /api/auth/verify-email` (single-use token, 24 h TTL).
+- Rescue CLI: `python /app/backend/scripts/reset_admin_password.py --email <admin>` (requires `ADMIN_RESCUE_SECRET` env var).
+
+</details>
+
+<hr />
+<h1 id="phase-a-making-it-look-like-your-academy-phase-a">Phase A — Making It Look Like Your Academy {#phase-a}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> Name your academy, upload your logo, pick your colour, and choose what your certificates should look like. Do this before you invite anyone — it's what learners will see first.</p>
+</blockquote>
+<p><strong>Where:</strong> <code>Organisation Settings</code> (under your name in the top-right).
+<strong>Who can do this:</strong> the Owner and Super Admins.</p>
+<h2 id="a1-naming-and-identity">A.1 — Naming and identity</h2>
+<ul>
+<li><strong>Academy name</strong> — appears on every certificate, every email you send from IFPI, and every PDF export. Get this right.</li>
+<li><strong>Slug</strong> — a short, URL-friendly version of your name (e.g. <code>ifpi-main</code>). This appears in shareable links. ⚠️ <strong>Once you've issued certificates, you can't change this</strong> — those links would break.</li>
+<li><strong>Timezone</strong> — the clock IFPI uses when counting streaks, sending weekly digests, and stamping deadlines. Pick your headquarters timezone. ⚠️ <strong>Don't change this after learners start using the system</strong> — historical dates will visibly shift on screen.</li>
+<li><strong>Language</strong> — the default UI language for new learners. Individual users can still switch to their own preferred language.</li>
+</ul>
+<h2 id="a2-colours-and-logo">A.2 — Colours and logo</h2>
+<ul>
+<li><strong>Primary colour</strong> — cascades everywhere: sidebar accent, buttons, certificate ribbon, PDF headings, email links. Pick a colour that reflects your brand.</li>
+<li><strong>Logo</strong> — appears on the login screen, the sidebar header, the top-left of every certificate, and every transcript PDF. Upload a PNG, JPG, or SVG, max 2 MB.</li>
+</ul>
+<p>If the upload gets rejected, it's almost always the file being too big or the wrong file type. Resize and try again.</p>
+<h2 id="a3-certificate-design">A.3 — Certificate design</h2>
+<p>You get two options:
+- <strong>Pick a built-in template</strong> — pre-designed, works for most academies.
+- <strong>AI-generate a custom banner</strong> — use IFPI's AI Authoring tool (<code>Authoring → Visuals → Generate certificate banner</code>) to make something unique to your brand. Great for corporate academies with a specific look.</p>
+<p>Preview any certificate before you go live: click any course → <strong>Preview Certificate</strong> and see how it renders with real learner data.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- Profile: `GET/PATCH /api/organizations/current`.
+- Cert branding fields on `organizations` table: `cert_accent_color`, `cert_signature_text`, `cert_signature_image_url`, `cert_footer_text`, `theme_preset`.
+- Preview URL: `GET /api/certificates/preview?course_id=<any>`.
+- Verify link + QR are auto-added in the bottom-right of every PDF (Iter 30b).
+
+</details>
+
+<hr />
+<h1 id="phase-b-inviting-people-setting-their-access-phase-b">Phase B — Inviting People &amp; Setting Their Access {#phase-b}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> Add your team and learners, group them into cohorts (like classes), and decide what each person can do.</p>
+</blockquote>
+<p><strong>Where:</strong> <code>Users</code> in the sidebar.
+<strong>Who can do this:</strong> Admins and above.</p>
+<h2 id="b1-the-five-roles-in-plain-english">B.1 — The five roles, in plain English</h2>
+<p>There are five levels of access. Everyone gets exactly one primary role, though someone can hold multiple if their job needs it (e.g. an instructor who's also enrolled as a learner).</p>
+<ul>
+<li><strong>Super Admin</strong> — reserved for Platform Ops. Can manage every academy on the platform. You probably won't create these.</li>
+<li><strong>Admin</strong> — full control of <em>your</em> academy. Can invite people, create courses, publish, manage billing, revoke certificates. This is what your senior staff should have.</li>
+<li><strong>Instructor</strong> — can build courses, write exams, and grade learner submissions. Can't invite people or change billing.</li>
+<li><strong>Billing Viewer</strong> — read-only look at invoices and spend. Give this to your finance person if they don't need to build content.</li>
+<li><strong>Learner</strong> — the default. Enrols in courses, watches slides, sits exams, earns certificates. Cannot see the admin dashboard at all.</li>
+</ul>
+<p><strong>If someone signs into IFPI from an external system</strong> (like ERP360), IFPI translates the external role into one of these five automatically — no work needed from you.</p>
+<h2 id="b2-two-ways-to-add-people">B.2 — Two ways to add people</h2>
+<p><strong>Option 1 — Invite by email (the normal way for humans).</strong>
+Go to <code>Users → Invite</code>, paste one or many email addresses, pick a role, optionally assign them to a cohort. IFPI sends each person an email with a signup link. They click, choose their password, and they're in.</p>
+<p><strong>Option 2 — Single sign-on from ERP360 (if you use ERP360).</strong>
+Users don't need an IFPI invitation at all — the first time they click "Open Learning Academy" from ERP360, IFPI creates their account automatically with the right role. See Phase E for how to enable this.</p>
+<h2 id="b3-cohorts-groups-of-learners">B.3 — Cohorts (groups of learners)</h2>
+<p>A cohort is just a group name you attach to learners. It lets you:
+- <strong>See a leaderboard just for that group</strong> — great for competitive cohorts.
+- <strong>Invite a whole group at once</strong> — paste 30 emails, all get the same cohort label.
+- <strong>Send weekly digest emails</strong> to that group only.
+- <strong>Restrict certificate issuing</strong> to only members of a specific cohort (e.g. "only issue this cert to the Sales 2026 Q1 cohort").</p>
+<p>Suggested naming pattern: <code>STREAM-YEAR-INTAKE</code>, for example <code>SALES-2026-Q1</code> or <code>ONBOARDING-2026-NEW-HIRES</code>. Keep it under 100 characters.</p>
+<h2 id="b4-two-factor-authentication-highly-recommended-for-admins">B.4 — Two-factor authentication (highly recommended for admins)</h2>
+<p>Any user can add <strong>two-factor authentication</strong> to their account for extra security. It works with Google Authenticator, 1Password, Authy, or any TOTP app.</p>
+<p><strong>To turn it on for yourself:</strong> <code>Profile → Security → Two-Factor Authentication → Set up</code>. Scan the QR code with your phone, enter the 6-digit code to confirm, and IFPI gives you <strong>10 recovery codes</strong>. Save these somewhere safe (a password manager) — they're what you use if you ever lose your phone.</p>
+<p><strong>As an admin, you can also force a user to reset their 2FA</strong> (e.g. they lost their phone) from <code>Users → [name] → Reset 2FA</code>. All 2FA resets are logged.</p>
+<p>If your users sign in via ERP360 SSO, IFPI relies on ERP360's own MFA instead of asking for a second factor twice.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- Role table: SUPER_ADMIN, ADMIN, INSTRUCTOR, BILLING_VIEWER, LEARNER.
+- SSO alias mapping (see `role_registry.py`): OWNER/MANAGER→ADMIN, PLATFORM_ADMIN→SUPER_ADMIN, TRAINER→INSTRUCTOR, STUDENT/USER/VIEWER→LEARNER.
+- Invitation endpoint: `POST /api/admin/invitations/bulk`.
+- 2FA endpoints: `POST /api/auth/2fa/setup-init`, `POST /api/auth/2fa/setup`, `POST /api/auth/2fa/challenge`, `POST /api/auth/2fa/disable`.
+- Admin 2FA reset: `POST /api/admin/users/{id}/2fa/disable` — audit-logged.
+- Roles are additive; `user.user_roles` is a many-to-many list.
+
+</details>
+
+<hr />
+<h1 id="phase-c-building-courses-learning-paths-phase-c">Phase C — Building Courses &amp; Learning Paths {#phase-c}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> How to create a course, add slides to it, chain courses together into a learning path, and finally publish so learners can see it.</p>
+</blockquote>
+<p><strong>Where:</strong> <code>Courses</code> in the sidebar.
+<strong>Who can do this:</strong> Instructors and Admins.</p>
+<h2 id="c1-create-a-course">C.1 — Create a course</h2>
+<p>Click <strong>New Course</strong> and fill in:
+- <strong>Title</strong> — this is what learners will see. Also appears on the certificate.
+- <strong>Category</strong> — helps learners filter the catalogue (e.g. "Sales", "Compliance", "Product").
+- <strong>Passing score</strong> — the mark a learner needs on the exam. Default 70%.
+- <strong>Duration estimate</strong> — how long you think the course takes. Shown to learners, feeds workload reports.
+- <strong>Price</strong> — leave at 0 for a free course, or set an amount to charge learners (via Stripe — see Phase E).
+- <strong>Status</strong> — starts at <em>Draft</em>. You'll flip this to <em>Published</em> once the course is ready.</p>
+<h2 id="c2-add-slides">C.2 — Add slides</h2>
+<p>A slide is one piece of content. You can build a slide two ways:</p>
+<ul>
+<li><strong>Manually</strong> — click <em>Add Slide</em>, choose the type (Text, Video, Audio, Image, PDF, or SCORM package), write the content, save.</li>
+<li><strong>With AI</strong> — click <em>Generate outline</em> under Authoring → Course Builder. IFPI's AI reads any reference material you upload, drafts a full outline, and creates all the slides for you. You then edit anything you don't like. See Phase D.</li>
+</ul>
+<p>Slides have an <strong>order number</strong>. Drag them around to reorder — the numbers update automatically.</p>
+<h2 id="c3-prerequisites-who-can-enrol">C.3 — Prerequisites (who can enrol)</h2>
+<p>You can require a learner to complete Course A before they can enrol in Course B. Go to <code>Course → Prerequisites → Add</code>.</p>
+<p>If you accidentally create a loop (A requires B, B requires A), IFPI blocks the change and shows you the loop.</p>
+<h2 id="c4-learning-paths-courses-in-a-series">C.4 — Learning paths (courses in a series)</h2>
+<p>A <strong>learning path</strong> is an ordered series of courses. Perfect for:
+- Certification tracks — "IFPI Sales Foundation → Advanced → Master".
+- Onboarding — 7 courses that unlock one after the other for new hires.</p>
+<p>Go to <code>Learning Paths → New Path</code>, add courses in the order you want, and publish it. Learners see the whole journey and their progress through it.</p>
+<h2 id="c5-publishing">C.5 — Publishing</h2>
+<p>When you're ready to make a course visible to learners, flip its status from Draft to Published. IFPI does a pre-flight check first — it will refuse to publish if:
+- The course has zero required slides.
+- The slide order has gaps (this only happens if a slide was deleted incorrectly — rare).
+- You set a passing score but forgot to add a passing exam.</p>
+<p>If it refuses, it tells you exactly what's missing so you can fix it and try again.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- Course model: `models/learning.py::Course`. Status enum: DRAFT | PUBLISHED | ARCHIVED.
+- Publish endpoint: `PATCH /api/courses/{id}` with `{status: "PUBLISHED"}`. Returns `422 COURSE_NOT_PUBLISHABLE` with a checklist on failure.
+- Prerequisite DAG check: creating a cycle returns `422 CYCLE_DETECTED` (`services/course_service.py`).
+- Slide reorder: `POST /api/courses/{id}/slides/reorder`.
+- Learning path model: `models/learning.py::LearningPath` + `LearningPathItem`.
+
+</details>
+
+<hr />
+<h1 id="phase-d-turning-on-ai-content-generation-phase-d">Phase D — Turning on AI Content Generation {#phase-d}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> IFPI's AI can draft courses, generate quizzes, make flashcards, narrate slides, and even create images and videos. This phase is where you tell it how much to spend and which AI to use for each job.</p>
+</blockquote>
+<p><strong>Where:</strong> <code>Organisation Settings → AI Authoring</code>.
+<strong>Prerequisite:</strong> Platform Ops has already given your tenant an "Emergent LLM Key" — you don't need to do anything with API keys yourself.</p>
+<h2 id="d1-setting-a-spending-cap">D.1 — Setting a spending cap</h2>
+<p>Your team uses IFPI's AI features by clicking buttons. Each button click costs a small amount (typically a few cents). You control the monthly ceiling so nobody accidentally runs up a big bill.</p>
+<ul>
+<li><strong>Monthly cap</strong> — default is US$50. Bump this up if your team plans to generate a lot of content in a month.</li>
+<li><strong>Per-course cap</strong> — default US$5. Stops a single course from running away with the whole budget if something goes wrong.</li>
+<li><strong>Alert threshold</strong> — default 80%. When your monthly spend hits this, IFPI emails all admins so you can decide whether to raise the cap or pause work.</li>
+</ul>
+<p>You can see your live spend on the <code>Tokens</code> page — there's a 14-day chart showing your spend against your budget line.</p>
+<h2 id="d2-picking-the-right-ai-for-each-job">D.2 — Picking the right AI for each job</h2>
+<p>IFPI supports different AI providers for different jobs. The defaults are sensible; only change them if you have a strong preference.</p>
+<ul>
+<li><strong>Course &amp; slide generation</strong> — GPT-4o (fast and reliable). Alternatives: Claude 4.5, Gemini 3 Pro.</li>
+<li><strong>Flashcards</strong> — GPT-4o-mini (cheap, good enough). Alternative: Claude Haiku.</li>
+<li><strong>Voice narration</strong> — OpenAI TTS (natural-sounding, auto-detects the language).</li>
+<li><strong>Infographics &amp; certificate banners</strong> — Nano Banana (Google's image model).</li>
+<li><strong>Video overviews</strong> — Sora 2 (the OpenAI video model).</li>
+<li><strong>Deep research</strong> — Tavily (needs a separate API key — see below).</li>
+<li><strong>AI Tutor answers</strong> — GPT-4o.</li>
+</ul>
+<h2 id="d3-deep-research-optional">D.3 — Deep research (optional)</h2>
+<p>If you want IFPI's AI to be able to search the live web when building a course (e.g. "generate a course on the latest 2026 GDPR amendments"), you need a <strong>Tavily API key</strong>.</p>
+<p>Get one from tavily.com, paste it into <code>Settings → Integrations → Tavily</code>, and the "Deep Research" button appears in the Course Builder. Without it, the AI uses only your uploaded reference documents.</p>
+<h2 id="d4-multi-language-narration">D.4 — Multi-language narration</h2>
+<p>IFPI's AI narration works in 8 languages out of the box: English, Spanish, French, German, Hindi, Japanese, Portuguese, Chinese. Pick a default language for your academy. Learners can still override it on any individual slide.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- Budget enforcement: `services/ai_budget_service.py` — checks before every LLM/media dispatch.
+- Model routing: `services/ai_router_service.py`.
+- Tavily key: `TAVILY_API_KEY` env var OR self-serve `Settings → Integrations`.
+- All other AI providers use the Emergent LLM Key (single key, multi-provider).
+- Cost ledger table: `ai_usage_ledger` — aggregated per-org per billing month.
+- Job orchestration: `models/ai.py::AIJob` (PENDING → RUNNING → COMPLETED/FAILED).
+
+</details>
+
+<hr />
+<h1 id="phase-e-connecting-ifpi-to-other-systems-phase-e">Phase E — Connecting IFPI to Other Systems {#phase-e}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> How to let other software talk to IFPI. This covers single sign-on (so staff don't need a separate IFPI password), API tokens (for automations), webhooks (getting notified when things happen), and SCORM export (making your courses playable in other learning systems).</p>
+</blockquote>
+<h2 id="e1-single-sign-on-from-erp360-sso-roles">E.1 — Single sign-on from ERP360 {#sso-roles}</h2>
+<p><strong>Purpose:</strong> Let your staff sign into IFPI using their ERP360 identity — no second password to manage.</p>
+<p><strong>How to switch it on</strong> (this is a Platform Ops job, not something you do from the dashboard):
+1. Ops adds three settings to IFPI's config: <code>SSO_ENABLED=true</code>, a shared secret from ERP360, and IFPI's identifier.
+2. Ops restarts the backend.
+3. You verify by clicking <code>Profile → Sign-in methods</code> — you should see "Single sign-on: enabled".</p>
+<p><strong>What your users see afterwards:</strong>
+1. They log into ERP360 as usual.
+2. They click the "Open Learning Academy" tile.
+3. They land in IFPI already signed in. No IFPI password ever created.</p>
+<p><strong>How roles are translated:</strong>
+- ERP360's OWNER, SUPER_ADMIN, ADMIN, MANAGER → IFPI's <strong>Admin</strong>
+- ERP360's TRAINER → IFPI's <strong>Instructor</strong>
+- ERP360's VIEWER, RECEPTION, MEMBER → IFPI's <strong>Learner</strong>
+- Anyone unrecognised → <strong>Learner</strong> (safe default)</p>
+<h2 id="e2-api-tokens-for-automation">E.2 — API tokens (for automation)</h2>
+<p>If your team has scripts, spreadsheets, or third-party tools that need to read from or write to IFPI, they need an <strong>API token</strong>.</p>
+<p>Go to <code>Tokens → New Token</code>, give it a name (so you remember what it's for), and pick scopes:
+- <strong>read:catalog</strong> — read your public course catalogue.
+- <strong>read:analytics</strong> — read dashboards and spend figures.
+- <strong>write:courses</strong> — create/edit courses and slides.
+- <strong>write:learners</strong> — bulk-invite learners, create users.
+- <strong>sign:webhooks</strong> — validate incoming webhooks from IFPI.</p>
+<p>⚠️ <strong>The token is shown once, at creation.</strong> Copy it immediately into wherever it needs to go. If you lose it, revoke it and generate a new one.</p>
+<p>The <code>Tokens</code> page also shows a live chart of how each token is being used, so you can spot abuse.</p>
+<h2 id="e3-outgoing-webhooks">E.3 — Outgoing webhooks</h2>
+<p>A <strong>webhook</strong> is IFPI phoning your other systems when something happens. Perfect for keeping ERP360 in sync, updating a CRM, or triggering a Slack message.</p>
+<p>Go to <code>Webhooks → New Subscription</code>, paste a URL where you want the notifications sent, and pick which events matter to you:
+- <strong>course.published</strong> — someone published a new course
+- <strong>enrollment.completed</strong> — a learner finished a course
+- <strong>certificate.issued</strong> — a certificate was awarded
+- <strong>certificate.revoked</strong> — a certificate was revoked
+- <strong>learner.invited</strong> — someone was invited into the academy
+- <strong>ai.spend.threshold</strong> — you hit your AI spending alert threshold</p>
+<p>Each notification is cryptographically signed so your receiving system knows it really came from IFPI. If your endpoint fails, IFPI retries with exponential backoff for up to 24 hours before giving up.</p>
+<h2 id="e4-exporting-courses-as-scorm-xapi">E.4 — Exporting courses as SCORM / xAPI</h2>
+<p>If you sell training to another organisation and they want to host it in <em>their</em> learning system, you can export your course as a <strong>SCORM package</strong>. It's the industry-standard format that Cornerstone, Moodle, TalentLMS, and most enterprise LMSes accept.</p>
+<p>From any course: <code>Course → Publish → SCORM → Download</code>. IFPI generates a ZIP file that the other system can import directly.</p>
+<p>xAPI (Tin Can) statements are also collected automatically as learners take your courses, so you have a modern activity log alongside the older SCORM format.</p>
+<h2 id="e5-standalone-or-paired-with-erp360">E.5 — Standalone or paired with ERP360</h2>
+<p>IFPI runs happily either way — no code changes needed:</p>
+<ul>
+<li><strong>Standalone</strong> — the default. Users have their own IFPI passwords, invitations are by email.</li>
+<li><strong>Paired with ERP360</strong> — SSO is on, users appear automatically when they click through from ERP360, and (optionally) billing routes back to ERP360's lite-billing module.</li>
+</ul>
+<p>Ask Platform Ops which mode makes sense for your rollout.</p>
+<details>
+<summary><em>Technical reference for Platform Ops</em></summary>
+
+- SSO env vars: `SSO_ENABLED`, `ERP360_SSO_SHARED_SECRET`, `SSO_ISSUER`, `SSO_AUDIENCE`.
+- Handshake: HS256 JWT with claims `iss, aud, sub, email, name, roles, iat, exp (60s), jti`. Verified against replay via `sso_jti_seen` table.
+- Exchange endpoint: `POST /api/auth/sso-exchange`.
+- API token model: `models/integrations.py::ApiToken`. SHA-256 hashed at rest; only prefix stored for UI display.
+- Webhook model: `WebhookSubscription` + `WebhookDelivery`. HMAC-SHA256 signature in `X-IFPI-Signature` header.
+- Retry schedule: exponential backoff, 24h max, dead-lettered after.
+- SCORM export: `POST /api/courses/{id}/export-scorm`. Runtime shim at `/api/scorm/runtime.js`.
+- Full event catalogue: `docs/IFPI_WEBHOOK_EVENTS.md`.
+
+</details>
+
+<hr />
+<h1 id="phase-f-certificates-public-sharing-data-rules-phase-f">Phase F — Certificates, Public Sharing &amp; Data Rules {#phase-f}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> This is where you decide (a) how the world verifies a certificate you've issued, (b) whether outsiders can browse your course catalogue without logging in, and (c) how long we keep learner data before we delete it.</p>
 </blockquote>
 <hr />
-<h1 id="phase-c-courses-learning-paths-prerequisites-phase-c">Phase C — Courses, Learning Paths &amp; Prerequisites {#phase-c}</h1>
-<p><strong>Route:</strong> <code>/dashboard/courses</code><br />
-<strong>Permission:</strong> <code>INSTRUCTOR</code>+</p>
-<h2 id="step-c1-create-a-course">Step C.1 — Create a Course</h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Impact</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Title</strong></td>
-<td>Shown on catalog, cert PDF, transcript</td>
-</tr>
-<tr>
-<td><strong>Category</strong></td>
-<td>Filters the public catalog + admin lists</td>
-</tr>
-<tr>
-<td><strong>Passing Score</strong></td>
-<td>Applies to the summative exam only (default 70)</td>
-</tr>
-<tr>
-<td><strong>Duration Estimate</strong></td>
-<td>Displayed to learners; feeds workload heatmaps</td>
-</tr>
-<tr>
-<td><strong>Price (cents)</strong></td>
-<td>Set &gt; 0 to enable Stripe checkout on the catalog (backlog)</td>
-</tr>
-<tr>
-<td><strong>Status</strong></td>
-<td><code>DRAFT</code> → <code>PUBLISHED</code> → <code>ARCHIVED</code>. Only <code>PUBLISHED</code> shows on catalog</td>
-</tr>
-</tbody>
-</table>
-<h2 id="step-c2-add-slides">Step C.2 — Add Slides</h2>
-<p>Two options:
-1. <strong>Manual</strong> — one at a time via the slide editor.
-2. <strong>AI generation</strong> — <code>Authoring → Course Builder → Generate outline</code>. See Phase D.</p>
-<p>Each slide has: <code>title, content (HTML/MD), slide_type (TEXT/VIDEO/QUIZ/…), media_url, narration_url, order_index</code>.</p>
-<h2 id="step-c3-prerequisites">Step C.3 — Prerequisites</h2>
-<p><code>Course → Prerequisites → Add</code>. Prevents <code>POST /api/courses/{id}/enroll</code> for learners who haven't completed the prereq.</p>
-<p><strong>Rule:</strong> Prerequisites are <strong>DAG-checked</strong> — creating a cycle returns <code>422 CYCLE_DETECTED</code>.</p>
-<h2 id="step-c4-learning-paths">Step C.4 — Learning Paths</h2>
-<p>A learning path is an <strong>ordered set of courses</strong>. Best-fit for:
-- Certification tracks (e.g., "IFPI Sales Foundation → Advanced → Master")
-- Onboarding journeys (7 courses, sequential unlock)</p>
-<p>Route: <code>/dashboard/learning-paths</code></p>
-<h2 id="step-c5-publish">Step C.5 — Publish</h2>
-<p><code>Course → Status → PUBLISHED</code> runs a <strong>pre-publish audit</strong>:
-- ≥ 1 slide with <code>is_required=true</code>
-- Slide <code>order_index</code> values are contiguous
-- Passing exam exists (if <code>passing_score &gt; 0</code>)</p>
-<p>Failing the audit returns <code>422 COURSE_NOT_PUBLISHABLE</code> with a checklist.</p>
-<hr />
-<h1 id="phase-d-ai-authoring-suite-configuration-phase-d">Phase D — AI Authoring Suite Configuration {#phase-d}</h1>
-<p><strong>Route:</strong> <code>/dashboard/authoring/*</code><br />
-<strong>Prerequisite:</strong> Emergent LLM Key is configured by Platform Ops (Universal Key).</p>
-<h2 id="step-d1-set-the-ai-spend-budget">Step D.1 — Set the AI Spend Budget</h2>
-<p><code>Organization Settings → AI Budget</code><br />
-- <strong>Monthly USD cap</strong> (default $50) — enforced by <code>services/ai_budget_service.py</code>
-- <strong>Per-course cap</strong> (default $5) — prevents a runaway single course
-- <strong>Alert threshold</strong> (default 80 %) — emails Owners when hit</p>
-<p>Verify: <code>/dashboard/tokens</code> shows the 14-day spend chart with your budget line.</p>
-<h2 id="step-d2-choose-default-models-per-feature">Step D.2 — Choose Default Models per Feature</h2>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Default</th>
-<th>Alternates</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Course/Slide generation</td>
-<td><code>gpt-4o</code></td>
-<td><code>claude-4.5</code>, <code>gemini-3-pro</code></td>
-</tr>
-<tr>
-<td>Flashcards</td>
-<td><code>gpt-4o-mini</code></td>
-<td><code>claude-4.5-haiku</code></td>
-</tr>
-<tr>
-<td>Narration (TTS)</td>
-<td><code>openai-tts-1</code></td>
-<td>multi-language auto-detect</td>
-</tr>
-<tr>
-<td>Infographic</td>
-<td><code>nano-banana</code></td>
-<td>(image only)</td>
-</tr>
-<tr>
-<td>Video overview</td>
-<td><code>sora-2</code></td>
-<td>(video only)</td>
-</tr>
-<tr>
-<td>Deep research</td>
-<td><code>tavily</code> (API key required)</td>
-<td>—</td>
-</tr>
-<tr>
-<td>Tutor Q&amp;A</td>
-<td><code>gpt-4o</code></td>
-<td><code>claude-4.5</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="step-d3-optional-api-keys">Step D.3 — Optional API Keys</h2>
-<table>
-<thead>
-<tr>
-<th>Integration</th>
-<th>Env Var</th>
-<th>Where</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Tavily (Deep Research)</td>
-<td><code>TAVILY_API_KEY</code></td>
-<td>Platform Ops or self-serve <code>Settings → Integrations</code></td>
-</tr>
-<tr>
-<td>Sora 2 / Nano Banana / TTS / GPT</td>
-<td>Emergent LLM Key</td>
-<td>already set by Platform Ops</td>
-</tr>
-</tbody>
-</table>
-<h2 id="step-d4-enable-voices-for-multi-lang-tts">Step D.4 — Enable Voices for Multi-Lang TTS</h2>
-<p><code>Authoring → Narration</code> supports 8 base languages (<code>en, es, fr, de, hi, ja, pt, zh</code>). Pick a default per academy.</p>
-<hr />
-<h1 id="phase-e-integrations-phase-e">Phase E — Integrations {#phase-e}</h1>
-<h2 id="step-e1-erp360-sso-handoff-sso-roles">Step E.1 — ERP360 SSO Handoff {#sso-roles}</h2>
-<p><strong>Purpose:</strong> Let staff sign in to IFPI using their ERP360 identity, without a second password.</p>
-<h3 id="enable">Enable</h3>
-<ol>
-<li>In IFPI backend <code>.env</code>:
-   <code>env
-   SSO_ENABLED=true
-   ERP360_SSO_SHARED_SECRET=&lt;shared HS256 secret from ERP360 Platform Admin&gt;
-   SSO_ISSUER=erp360
-   SSO_AUDIENCE=ifpi-lms</code></li>
-<li>Restart backend (<code>supervisorctl restart backend</code>).</li>
-<li>Verify: <code>GET /api/auth/sso-status</code> returns <code>{"enabled": true}</code>.</li>
-</ol>
-<h3 id="handshake-flow">Handshake flow</h3>
-<ol>
-<li>In ERP360, user clicks the "Open Learning Academy" tile.</li>
-<li>ERP360 mints an HS256 JWT with claims: <code>iss, aud, sub, email, name, roles, iat, exp (60 s), jti</code>.</li>
-<li>Browser posts to <code>POST /api/auth/sso-exchange</code>.</li>
-<li>IFPI validates signature + issuer + audience + jti (replay), JIT-provisions the user if new, and returns IFPI's own access token.</li>
-</ol>
-<h3 id="role-mapping-default">Role mapping (default)</h3>
-<table>
-<thead>
-<tr>
-<th>ERP360 Role</th>
-<th>IFPI Role</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>OWNER</code>, <code>SUPER_ADMIN</code>, <code>ADMIN</code></td>
-<td><code>ADMIN</code></td>
-</tr>
-<tr>
-<td><code>MANAGER</code></td>
-<td><code>ADMIN</code></td>
-</tr>
-<tr>
-<td><code>TRAINER</code></td>
-<td><code>INSTRUCTOR</code></td>
-</tr>
-<tr>
-<td><code>VIEWER</code>, <code>RECEPTION</code>, <code>MEMBER</code></td>
-<td><code>LEARNER</code></td>
-</tr>
-<tr>
-<td>unknown</td>
-<td><code>LEARNER</code> (fail-safe)</td>
-</tr>
-</tbody>
-</table>
-<h3 id="testing">Testing</h3>
-<pre><code class="language-bash">curl -X POST https://&lt;ifpi&gt;/api/auth/sso-exchange \
-  -H &quot;Content-Type: application/json&quot; \
-  -d '{&quot;erp_token&quot;: &quot;&lt;signed_jwt&gt;&quot;}'
-</code></pre>
-<h2 id="step-e2-api-tokens">Step E.2 — API Tokens</h2>
-<p><strong>Route:</strong> <code>/dashboard/tokens</code>. Roles: <code>ADMIN</code>+</p>
-<p>Create scoped tokens for machine access:</p>
-<table>
-<thead>
-<tr>
-<th>Scope</th>
-<th>Grants</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>read:catalog</code></td>
-<td>Anonymous public catalog + verify endpoints</td>
-</tr>
-<tr>
-<td><code>read:analytics</code></td>
-<td>KPI + spend dashboards</td>
-</tr>
-<tr>
-<td><code>write:courses</code></td>
-<td>Course + slide CRUD</td>
-</tr>
-<tr>
-<td><code>write:learners</code></td>
-<td>Bulk invite + user CRUD</td>
-</tr>
-<tr>
-<td><code>sign:webhooks</code></td>
-<td>HMAC verifying inbound webhooks</td>
-</tr>
-</tbody>
-</table>
-<p>Tokens are <strong>shown once at creation</strong>. Every call is logged in <code>api_token_calls</code> for the usage analytics chart.</p>
-<h2 id="step-e3-outgoing-webhooks">Step E.3 — Outgoing Webhooks</h2>
-<p><strong>Route:</strong> <code>/dashboard/webhooks</code>. Roles: <code>ADMIN</code>+</p>
-<p>Subscribe to events: <code>course.published</code>, <code>enrollment.completed</code>, <code>certificate.issued</code>, <code>learner.invited</code>, <code>ai.spend.threshold</code>.</p>
+<h2 id="f1-making-certificates-trustworthy">F.1 — Making certificates trustworthy</h2>
+<p>Every certificate IFPI issues is designed to be <strong>impossible to fake</strong>. Here's what a recipient (or their future employer) gets:</p>
 <ul>
-<li><strong>HMAC signed</strong> with per-webhook secret in <code>X-IFPI-Signature</code>.</li>
-<li><strong>Retry:</strong> exponential backoff for 24 h; dead letter shown in the UI.</li>
+<li><strong>A unique 22-character code</strong> printed on the certificate — think of it like a passport number.</li>
+<li><strong>A hidden digital signature</strong> built in — anyone can check it's genuine, but nobody can forge one.</li>
+<li><strong>A QR code</strong> on the PDF. Point a phone camera at it and it opens the verification page automatically.</li>
+<li><strong>A public link</strong> anyone can visit to confirm the certificate is real. No login needed.</li>
 </ul>
-<h2 id="step-e4-scorm-xapi-publishing">Step E.4 — SCORM / xAPI Publishing</h2>
-<p>Enable in <code>Course → Publish → SCORM</code>. IFPI serves a SCORM 1.2/2004 runtime shim at <code>/api/scorm/runtime.js</code> so external LMSes can import your courses as <code>.zip</code> packages.</p>
-<h2 id="step-e5-sibling-app-mode-vs-stand-alone">Step E.5 — Sibling-App Mode vs Stand-Alone</h2>
-<p>IFPI runs in <strong>either mode</strong> with no code changes:</p>
-<table>
-<thead>
-<tr>
-<th>Mode</th>
-<th>How to enable</th>
-<th>Impact</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Stand-alone</strong></td>
-<td>Default. <code>SSO_ENABLED=false</code></td>
-<td>Users log in with local password, invitations via email.</td>
-</tr>
-<tr>
-<td><strong>Sibling to ERP360</strong></td>
-<td><code>SSO_ENABLED=true</code> + shared secret</td>
-<td>ERP360 users appear via SSO; billing can be routed to ERP360 lite-billing (backlog toggle).</td>
-</tr>
-</tbody>
-</table>
-<p>See <a href="../IFPI_INTEGRATION_MATRIX.md"><code>docs/IFPI_INTEGRATION_MATRIX.md</code></a> for the sync boundary contract.</p>
+<p>The verification page shows: <strong>who the certificate was issued to, which course they completed, and when.</strong> That's it — no other personal info leaks.</p>
+<p><strong>Protection against abuse:</strong> the public verification page allows 30 checks per minute per visitor. Enough for a recruiter checking a candidate; not enough for someone scraping the site.</p>
 <hr />
-<h1 id="phase-f-compliance-certificates-public-catalog-phase-f">Phase F — Compliance, Certificates &amp; Public Catalog {#phase-f}</h1>
-<h2 id="step-f1-certificate-verification">Step F.1 — Certificate Verification</h2>
-<p>Every issued certificate carries:
-- Unique 22-char alphanumeric <code>certificate_code</code>
-- Signed <code>verifier_token</code> (JWT, cannot be forged)
-- Public QR + click-through link on the PDF (Iter 30b)
-- <code>GET /api/public/certificates/verify/{code}</code> returns holder + course + issued-at</p>
-<p>Rate limit: 30/min per IP (Redis-backed, shared across replicas).</p>
-<h2 id="step-f2-public-catalog">Step F.2 — Public Catalog</h2>
-<p><code>Organization Settings → Public Access → Enable</code><br />
-- Anonymous browsing at <code>/catalog?token=&lt;read:catalog token&gt;</code> (or an internal API token)
-- Only <code>PUBLISHED</code> courses appear
-- Verify pane at <code>/catalog?verify=&lt;code&gt;</code> for third parties (recruiters, regulators)</p>
-<h2 id="step-f3-retention-deletion-gdpr-popia">Step F.3 — Retention &amp; Deletion (GDPR / POPIA)</h2>
+<h2 id="f2-letting-outsiders-browse-your-courses">F.2 — Letting outsiders browse your courses</h2>
+<p>You can turn on a <strong>Public Catalogue</strong> so people can see what courses you offer without needing an account. Useful for:
+- Sales &amp; marketing pages
+- Recruitment ("what training does IFPI provide?")
+- Regulators checking your programme</p>
+<p><strong>How to switch it on:</strong> <code>Organisation Settings → Public Access → Enable</code>.</p>
+<p><strong>What visitors see:</strong>
+- Only <strong>Published</strong> courses appear (drafts and archived courses stay hidden)
+- They can browse, but can't enrol — enrolling still requires signing up
+- They can also verify a certificate they've been shown, using the same public catalogue page</p>
+<p><strong>How to switch it off:</strong> flip the same toggle back to off. Everything becomes login-only again immediately.</p>
+<hr />
+<h2 id="f3-how-long-we-keep-data-gdpr-popia">F.3 — How long we keep data (GDPR / POPIA)</h2>
+<p>Different types of information are kept for different reasons. Here's the shape of it in plain English:</p>
+<ul>
+<li><strong>Learner personal details</strong> (name, email, profile) — kept for <strong>7 years after they last used the platform</strong>, then only the Owner can permanently delete them. Every delete is written to the audit log.</li>
+<li><strong>Certificates</strong> — kept <strong>forever</strong>, because the whole point is that they can still be verified 20 years later. If you need to invalidate one (e.g. plagiarism found after the fact), use <strong>Revoke</strong> — the certificate stays in the system but marked as revoked, and the PDF cannot be re-downloaded.</li>
+<li><strong>AI conversation logs &amp; prompts</strong> — automatically deleted <strong>after 90 days</strong>. No manual clean-up needed.</li>
+<li><strong>Audit log</strong> (record of who did what, when) — kept for <strong>3 years</strong>. Users cannot delete their own audit entries; only Platform Ops with database access can.</li>
+</ul>
+<h3 id="what-learners-can-do-themselves-iter-33">What learners can do themselves (Iter 33)</h3>
+<p>Users no longer need to email support to exercise their data rights. From <code>Profile → Privacy</code> they can:</p>
+<ul>
+<li><strong>Download a copy of everything</strong> — one click, gets a ZIP containing their profile, enrolments, certificates, flashcard progress and audit trail as JSON files.</li>
+<li><strong>Request account deletion</strong> — click delete, receive a 6-digit code by email (expires in 10 minutes), enter the code, done. All personal details are wiped; certificates remain verifiable but show "IFPI Learner" instead of the person's name.</li>
+</ul>
+<h3 id="bulk-certificate-operations-for-admins">Bulk certificate operations (for admins)</h3>
+<p>If an entire cohort's certificates need to be revoked or reactivated (e.g. an accreditation issue), you can do it in one go from <code>Certificates → Bulk actions</code>:</p>
+<ul>
+<li><strong>Revoke many</strong> — up to 500 at once. Skips any already revoked (safe to re-run).</li>
+<li><strong>Un-revoke many</strong> — the reverse, in case the revocation was a mistake.</li>
+<li><strong>Re-email download links</strong> — sends every affected holder a fresh email.</li>
+<li><strong>Download a ZIP of PDFs</strong> — up to 100 certificates bundled into one file.</li>
+</ul>
+<p>Every bulk action requires typing a confirmation word and adding a reason, and all of it goes into the audit log.</p>
+<h3 id="monthly-compliance-report">Monthly compliance report</h3>
+<p>If your team has enabled it, IFPI automatically <strong>emails a monthly PDF summary</strong> to whoever you've listed. It covers: active users, certificates issued and revoked in the month, deletion requests, failed logins, and the most common admin actions. Nothing to schedule — it just arrives.</p>
+<hr />
+<h2 id="f4-motivation-engagement-streaks-badges-digests">F.4 — Motivation &amp; engagement (streaks, badges, digests)</h2>
+<p>Under <code>Organisation Settings → Gamification</code> you have three levers to keep learners engaged:</p>
+<ul>
+<li><strong>Daily streaks</strong> — counts consecutive days a learner has been active. Resets at midnight in your organisation's timezone. Shown on their dashboard.</li>
+<li><strong>Badges</strong> — automatically awarded for milestones (finish a course, get 100% on an exam, complete 5 courses, etc.). Badge names and thresholds are configurable per organisation.</li>
+<li><strong>Weekly cohort digest</strong> — a friendly recap email sent every Monday morning to every learner in a cohort, showing what their peers achieved and nudging them toward what's next.</li>
+</ul>
+<p>All three are opt-in for the learner (they can silence digests from <code>Profile → Notifications</code>).</p>
+<hr />
+<h1 id="phase-g-going-live-in-production-platform-ops-phase-g">Phase G — Going Live in Production (Platform Ops) {#phase-g}</h1>
+<blockquote>
+<p><strong>In plain English:</strong> This phase is for whoever is <em>deploying</em> IFPI to the internet. If you're an academy admin, you can skip it — your Platform Ops team handles this. It covers the config that must be right before you accept real users, the monitoring wired in for you, and the rescue tools when things go wrong.</p>
+</blockquote>
+<p><strong>Status:</strong> hardened in Iter 32. All items below are <strong>required</strong> before flipping the tenant to a public URL.</p>
+<h2 id="step-g1-pre-flight-config-validation">Step G.1 — Pre-flight config validation</h2>
+<p><code>python /app/backend/scripts/deploy_precheck.py</code> is a <strong>fail-closed</strong> script that boot-blocks the backend if any of these are wrong:</p>
 <table>
 <thead>
 <tr>
-<th>Data class</th>
-<th>Retention</th>
-<th>Deletion path</th>
+<th>Rule</th>
+<th>What it checks</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Learner PII</td>
-<td>7 y after last activity</td>
-<td>Owner-only <code>DELETE /api/users/{id}?hard=true</code> (audit-logged)</td>
+<td><code>ENVIRONMENT</code> set</td>
+<td>Missing → assumed <code>production</code> (strictest mode).</td>
 </tr>
 <tr>
-<td>Certificate</td>
-<td>Forever (verifiability)</td>
-<td>Revoke via <code>PATCH /api/certificates/{id}</code> (status = REVOKED); PDF re-issue blocked</td>
+<td>No dev secrets in prod</td>
+<td>Rejects <code>JWT_SECRET=changeme</code>, <code>SEED_ADMIN_PASSWORD=admin123</code>, etc.</td>
 </tr>
 <tr>
-<td>AI logs / prompts</td>
-<td>90 d</td>
-<td>Auto-purged by <code>outbox_worker</code></td>
+<td><code>MONGO_URL</code> absent</td>
+<td>IFPI is <strong>PostgreSQL-only</strong>. Any Mongo config aborts boot.</td>
 </tr>
 <tr>
-<td>Audit log</td>
-<td>3 y</td>
-<td>Not user-deletable</td>
+<td>Storage backend</td>
+<td><code>STORAGE_BACKEND=s3</code> requires <code>S3_*</code> vars. <code>local</code> blocks prod boot.</td>
+</tr>
+<tr>
+<td>CORS</td>
+<td>Wildcard <code>*</code> rejected when <code>ENVIRONMENT=production</code>.</td>
+</tr>
+<tr>
+<td>Sentry DSN</td>
+<td>Warning if missing (not fatal).</td>
 </tr>
 </tbody>
 </table>
-<h2 id="step-f4-streaks-badges-cohort-digests">Step F.4 — Streaks, Badges &amp; Cohort Digests</h2>
-<p>Enable in <code>Organization Settings → Gamification</code>:
-- <strong>Streaks</strong> — daily activity counter, resets at TZ-midnight
-- <strong>Badges</strong> — earned per course + exam completion (see <code>badge_tiers</code> table)
-- <strong>Cohort digest</strong> — weekly recap emailed to every learner in a cohort</p>
+<p>Wire this into your container <code>ENTRYPOINT</code> so bad configs never reach a healthy pod.</p>
+<h2 id="step-g2-environment-template">Step G.2 — Environment template</h2>
+<p><code>/app/.env.production.template</code> — copy to <code>.env.production</code> and fill:</p>
+<ul>
+<li><code>DATABASE_URL</code> (Neon / RDS Postgres — must be <code>postgresql+psycopg2://…</code>)</li>
+<li><code>JWT_SECRET</code> (32+ random bytes; rotate every 90 d)</li>
+<li><code>SEED_ADMIN_PASSWORD</code> (governs the seeded owner in prod — never <code>admin123</code>)</li>
+<li><code>STORAGE_BACKEND=s3</code> + <code>S3_*</code> (Cloudflare R2 or AWS S3)</li>
+<li><code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code>, <code>EMAIL_FROM</code> (Resend / SES / Mailgun)</li>
+<li><code>SENTRY_DSN</code> (both backend + frontend; separate DSNs recommended)</li>
+<li><code>ALLOWED_ORIGINS=https://academy.&lt;your-org&gt;.com</code> (legacy alias — still honoured for backwards compat)</li>
+<li><strong><code>CORS_ORIGINS=https://academy.&lt;your-org&gt;.com,https://&lt;other-approved-origin&gt;</code></strong> — this is the <strong>deployment-surface env var name</strong> per Emergent deploy support. Set this in <strong>Manage Deployments → Secrets</strong> on the deployed app. Comma-separated, exact origins only, <strong>no wildcards</strong>. Deploy secret wins if both <code>CORS_ORIGINS</code> and <code>ALLOWED_ORIGINS</code> are set.</li>
+<li>Emergent preview URLs (<code>*.preview.emergentagent.com</code>) inject <code>Access-Control-Allow-Origin: *</code> at the Cloudflare edge and cannot be reconfigured; cross-origin credentialed flows (e.g. SSO click-through with ERP360) <strong>only work on the deployed surface</strong> where the ingress passes through app-emitted CORS headers unchanged.</li>
+<li><code>RATE_LIMIT_REDIS_URL</code> (optional but recommended for multi-replica)</li>
+<li><strong><code>AUTH_COOKIE_SECURE=true</code></strong> — MUST be <code>true</code> in any HTTPS deployment (Iter 33e). Modern browsers silently drop the <code>Secure</code>-less auth cookie on HTTPS in many contexts, which shows up as "login succeeds then the very next request 401s." Set to <code>false</code> only for local HTTP dev.</li>
+<li><code>AUTH_COOKIE_SAMESITE=lax</code> (default) — flip to <code>none</code> <strong>only</strong> if the frontend and API are on different subdomains AND you're also setting <code>Secure=true</code>.</li>
+</ul>
+<h2 id="step-g3-security-headers">Step G.3 — Security headers</h2>
+<p><code>core/middleware.py::SecurityHeadersMiddleware</code> adds on every response:</p>
+<ul>
+<li><code>Content-Security-Policy</code> — locked to self + integrated third-parties (Sentry, Tavily)</li>
+<li><code>Strict-Transport-Security: max-age=31536000; includeSubDomains; preload</code></li>
+<li><code>X-Frame-Options: DENY</code>, <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: same-origin</code></li>
+<li><code>Permissions-Policy: camera=(), microphone=(self), geolocation=()</code></li>
+</ul>
+<p>Verify with <code>curl -I https://&lt;your-host&gt;/api/health | grep -i "content-security"</code>.</p>
+<h2 id="step-g4-sentry-correlation-ids">Step G.4 — Sentry &amp; correlation IDs</h2>
+<ul>
+<li><code>sentry_sdk</code> initialised in <code>server.py</code> with tracing sample-rate <code>0.2</code> and <code>environment</code> tag from <code>ENVIRONMENT</code>.</li>
+<li>Every request gets an <code>X-Correlation-ID</code> header (generated or forwarded). Logged via <code>CorrelationIdMiddleware</code> and attached to every Sentry event.</li>
+<li>Frontend forwards the same header via the Axios interceptor so front + back stack traces link automatically.</li>
+</ul>
+<h2 id="step-g5-rate-limiting">Step G.5 — Rate limiting</h2>
+<ul>
+<li>Redis-backed via <code>services/rate_limit_service.py</code>. Falls back to an in-memory bucket if <code>RATE_LIMIT_REDIS_URL</code> is unset (single-replica dev only).</li>
+<li>Endpoints covered: <code>/auth/login</code>, <code>/auth/forgot-password</code>, <code>/auth/register</code>, <code>/auth/verify-email/resend</code>, <code>/public/certificates/verify/{code}</code>, <code>/marketplace/*</code>.</li>
+<li>Client IP resolved from <code>X-Forwarded-For</code> (K8s ingress). Test override: <code>X-Test-Client-Ip</code> header, only when <code>ALLOW_TEST_TOKEN_HEADER=true</code>.</li>
+</ul>
+<h2 id="step-g6-locked-out-admin-rescue">Step G.6 — Locked-out admin rescue</h2>
+<p>If the owner rotates the seeded password wrong twice and gets locked out:</p>
+<pre><code class="language-bash">cd /app/backend
+python scripts/reset_admin_password.py --email admin@ifpi.org
+# Prints a random 20-char password, sets must_change_password=true.
+# Hand this to the admin over a secure channel; they'll rotate on next login.
+</code></pre>
+<p>The seed script itself (<code>seed/seed_minimal.py</code>) is <strong>idempotent</strong> — it will NEVER overwrite an existing user's password. Proved by test <code>test_iteration33_sprint.py::test_seed_does_not_overwrite_existing_admin</code>.</p>
+<h2 id="step-g7-pgvector-activation-p2-option-a-iter-34">Step G.7 — pgvector activation (P2 option a, Iter 34)</h2>
+<p>The RAG tutor is <strong>pgvector-ready</strong> but ships in Python-cosine fallback mode. To activate the fast path in production:</p>
+<ol>
+<li><strong>Provision</strong> — Neon Postgres (or any Postgres 15+) with the <code>vector</code> extension enabled. Neon: <code>Settings → Extensions → vector</code>. Self-hosted: <code>sudo apt install postgresql-15-pgvector</code>.</li>
+<li><strong>Flip flag</strong> — set <code>USE_PGVECTOR=true</code> in <code>.env.production</code> (or your K8s config-map). Model-level column type + service query branch both read this at import / call time.</li>
+<li><strong>Migrate</strong> — <code>alembic upgrade head</code>. Migration <code>d2e3f4a5b6c7_pgvector_ready.py</code>:</li>
+<li>Is a <strong>NO-OP on SQLite</strong> (dev)</li>
+<li>Is a <strong>NO-OP on Postgres without the <code>vector</code> extension available</strong> (safe cluster)</li>
+<li>When both conditions are met, runs <code>CREATE EXTENSION vector</code>, alters <code>source_chunks.embedding</code> from <code>json</code> to <code>vector(1536)</code> (cast in-place, no data loss), and creates an HNSW cosine index.</li>
+<li><strong>Verify</strong> — <code>SELECT indexname FROM pg_indexes WHERE tablename='source_chunks'</code> should show <code>ix_source_chunks_embedding_hnsw</code>. Any semantic-search request will now use <code>&lt;=&gt;</code> cosine distance in Postgres instead of the Python fallback.</li>
+</ol>
+<p><strong>Rollback</strong> — the same migration downgrade path casts the column back to <code>json</code>. Application code adapts automatically because <code>services/embedding_service.py::_use_pgvector()</code> short-circuits when the flag flips off.</p>
+<p><strong>Capacity note</strong> — pgvector's design ceiling on a modest Neon compute (1 vCPU, 4 GB) is ~1M chunks with sub-100ms search. Above that, tune the HNSW <code>m</code> / <code>ef_construction</code> params in the migration.</p>
 <hr />
 <h1 id="audit-verification-checklist-audit">Audit &amp; Verification Checklist {#audit}</h1>
 <p>Run this before your first learner cohort goes live.</p>
@@ -548,6 +477,12 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <li>[ ] SSO-status endpoint reachable (if enabling ERP360 SSO)</li>
 <li>[ ] At least one webhook subscribed and delivered a <code>test.ping</code> event</li>
 <li>[ ] Backup / export: run <code>POST /api/admin/exports/full</code> and download the ZIP</li>
+<li>[ ] <strong>Iter 32:</strong> <code>python backend/scripts/deploy_precheck.py</code> exits 0</li>
+<li>[ ] <strong>Iter 32:</strong> <code>curl -I</code> shows <code>Strict-Transport-Security</code> + <code>Content-Security-Policy</code></li>
+<li>[ ] <strong>Iter 32:</strong> Trigger a test Sentry event; confirm it appears in the project</li>
+<li>[ ] <strong>Iter 33:</strong> New user receives verification email; unverified access returns 403</li>
+<li>[ ] <strong>Iter 33:</strong> <code>GET /api/auth/me/export</code> returns a ZIP with 5 JSON files</li>
+<li>[ ] <strong>Iter 33:</strong> Rate-limiter blocks 6th failed login within 60 s (<code>429</code>)</li>
 </ul>
 <hr />
 <h1 id="failure-scenario-matrix-failures">Failure Scenario Matrix {#failures}</h1>
@@ -560,6 +495,16 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>Login succeeds but the next API call 401s</td>
+<td><code>AUTH_COOKIE_SECURE=false</code> on an HTTPS deployment — browser dropped the cookie</td>
+<td>Set <code>AUTH_COOKIE_SECURE=true</code> in <code>.env</code>, restart backend, hard-refresh browser (Iter 33e)</td>
+</tr>
+<tr>
+<td>"Change password page disappears"</td>
+<td>Fixed in Iter 33d — API interceptor no longer bounces users off auth-flow pages</td>
+<td>If still happening, hard-refresh; you're on a stale bundle</td>
+</tr>
 <tr>
 <td>Users can't log in</td>
 <td>JWT_SECRET rotated without invalidation broadcast</td>
@@ -595,541 +540,358 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Missing <code>imsmanifest.xml</code> root</td>
 <td>Re-export via <code>/dashboard/courses/{id}/export-scorm</code></td>
 </tr>
+<tr>
+<td>Backend refuses to boot in prod</td>
+<td><code>deploy_precheck.py</code> found a dev secret or missing config</td>
+<td>Read the printed error, fix the env var, redeploy</td>
+</tr>
+<tr>
+<td>Admin locked out after password rotation</td>
+<td>Wrong password entered on forced-change screen</td>
+<td>Run <code>python backend/scripts/reset_admin_password.py --email admin@…</code></td>
+</tr>
+<tr>
+<td>Users report "please verify your email" 403</td>
+<td><code>email_verified_at</code> is NULL</td>
+<td>Ask user to click link, or <code>POST /api/auth/resend-verification</code></td>
+</tr>
+<tr>
+<td>Forgot-password email never arrives</td>
+<td>SMTP mis-configured OR rate limit hit (3/hr per email)</td>
+<td>Check <code>Organization → SMTP → Send test</code>; check <code>outbox_messages</code> for FAILED rows</td>
+</tr>
+<tr>
+<td>Sentry not receiving events</td>
+<td><code>SENTRY_DSN</code> missing OR sample-rate <code>0.0</code></td>
+<td>Confirm env var; trigger <code>/api/_test/raise</code> (dev only)</td>
+</tr>
+<tr>
+<td>CSP blocks a legit third-party script</td>
+<td>Domain not in the allow-list</td>
+<td>Edit <code>SecurityHeadersMiddleware.CSP_POLICY</code> in <code>core/middleware.py</code></td>
+</tr>
 </tbody>
 </table>
 <hr />
 <p><em>Auto-generated from IFPI v1.0 route registry. Do not hand-edit — regenerate with <code>python /app/backend/scripts/build_setup_guide.py</code>.</em></p>
 <hr />
 <!-- === IFPI_USER_MANUAL.md === -->
-<h1 id="ifpi-learning-academy-user-manual-v10">IFPI Learning Academy — User Manual v1.0</h1>
+<h1 id="ifpi-learning-academy-staff-handbook">IFPI Learning Academy — Staff Handbook</h1>
 <blockquote>
-<p>Complete feature reference for admins, instructors, and learners.<br />
-<strong>Read this AFTER completing the <a href="./IFPI_SETUP_MANUAL.md">Setup Manual</a>.</strong></p>
+<p><strong>A friendly walk-through of IFPI Learning, written for the people who actually use it every day.</strong></p>
 </blockquote>
-<p><strong>Version:</strong> 1.0<br />
-<strong>Audience:</strong> All roles (<code>OWNER</code>, <code>ADMIN</code>, <code>INSTRUCTOR</code>, <code>LEARNER</code>)<br />
-<strong>Screenshots:</strong> 24 key screens documented in <code>/app/docs/screenshots/</code> (auto-refreshed on release).</p>
+<p><strong>Who this is for:</strong> Frances, the content team, instructors, learners — anyone who signs into IFPI to do work. If you're deploying the platform to a server, read the Setup Manual instead.</p>
+<p><strong>How to read it:</strong> Start with "Getting In." Everything else you can dip into when you need it. Every section has screenshots of the actual screens so you know what to look for.</p>
 <hr />
-<h2 id="table-of-contents_1">Table of Contents</h2>
+<h2 id="whats-inside">What's inside</h2>
 <ol>
-<li><a href="#1-execsum">Executive Summary</a></li>
-<li><a href="#2-getting-started">Getting Started</a></li>
-<li><a href="#3-roles">Roles &amp; Permissions</a></li>
-<li><a href="#4-dashboards">The Dashboard Landscape</a></li>
-<li><a href="#5-authoring">Course Authoring — Manual &amp; AI</a></li>
-<li><a href="#6-ai-suite">The AI Authoring Suite in Depth</a></li>
-<li><a href="#7-learner">Learner Experience</a></li>
-<li><a href="#8-certificates">Certificates, Verification &amp; Sharing</a></li>
-<li><a href="#9-analytics">Analytics &amp; Reports</a></li>
-<li><a href="#10-integrations">Integrations &amp; Exports</a></li>
-<li><a href="#11-roles-deep">Roles Deep-Dive</a></li>
-<li><a href="#12-data-model">Data Model Overview</a></li>
-<li><a href="#13-api">API Reference (Selective)</a></li>
+<li><a href="#2-getting-started">Getting In — logging in the first time</a></li>
+<li><a href="#4-dashboards">Your Dashboard — what everything means</a></li>
+<li><a href="#5-authoring">Building a Course — manually or with AI</a></li>
+<li><a href="#6-ai-suite">The AI Authoring Suite — every generator explained</a></li>
+<li><a href="#7-learner">What Learners See — the other side of the app</a></li>
+<li><a href="#8-certificates">Certificates — issuing, sharing, revoking</a></li>
+<li><a href="#9-analytics">Reports and Analytics</a></li>
+<li><a href="#10-integrations">Sharing with Other Systems</a></li>
+<li><a href="#account-self">Your Account — profile, password, privacy</a></li>
+<li><a href="#15-docs-library">Where to Find These Manuals in the App</a></li>
 </ol>
+<blockquote>
+<p><em>Technical appendix (§11–14) — reference material for developers and Platform Ops. Feel free to skip if you're not a coder.</em></p>
+</blockquote>
 <hr />
-<h1 id="1-executive-summary-1-execsum">1. Executive Summary {#1-execsum}</h1>
-<p>IFPI Learning Academy is a <strong>multi-tenant Learning Management System (LMS)</strong> built on the ERP360 tech stack (FastAPI + React 19 + SQLAlchemy). It ships with a full <strong>AI Authoring Suite</strong> so courses, slides, quizzes, flashcards, narration, visuals, videos and mind-maps are generated from a topic prompt in minutes rather than assembled by hand.</p>
-<h2 id="key-capabilities">Key capabilities</h2>
-<table>
-<thead>
-<tr>
-<th>Capability</th>
-<th>Backend</th>
-<th>Highlights</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>AI course generation</strong></td>
-<td><code>services/ai_builder_service.py</code></td>
-<td>Full outline → slides → quiz → images in one flow</td>
-</tr>
-<tr>
-<td><strong>Deep Research</strong></td>
-<td><code>services/tutor_service.py</code> + Tavily</td>
-<td>Grounded citations for every AI-generated fact</td>
-</tr>
-<tr>
-<td><strong>Spaced Repetition Flashcards</strong></td>
-<td>SM-2 algorithm</td>
-<td><code>LearnerFlashcardsPage.tsx</code> swipeable UX</td>
-</tr>
-<tr>
-<td><strong>Video overviews</strong></td>
-<td>Sora 2 via background worker</td>
-<td>Async job queue with progress polling</td>
-</tr>
-<tr>
-<td><strong>Infographics</strong></td>
-<td>Nano Banana</td>
-<td>Per-slide + certificate banners</td>
-</tr>
-<tr>
-<td><strong>Multi-lang narration</strong></td>
-<td>OpenAI TTS</td>
-<td>8 base languages + auto-detect</td>
-</tr>
-<tr>
-<td><strong>Mind maps + PPTX export</strong></td>
-<td><code>reactflow</code></td>
-<td>Preview thumbnails on course cards (Iter 30b)</td>
-</tr>
-<tr>
-<td><strong>SCORM/xAPI</strong></td>
-<td><code>routers/scorm_xapi.py</code></td>
-<td>Import + export + hosted runtime shim</td>
-</tr>
-<tr>
-<td><strong>PDF Certificates</strong></td>
-<td><code>services/pdf_certificate_service.py</code></td>
-<td>QR + clickable verify link, LinkedIn share</td>
-</tr>
-<tr>
-<td><strong>Public Catalog</strong></td>
-<td><code>routers/public_catalog.py</code></td>
-<td>Read-only browsing via API token</td>
-</tr>
-<tr>
-<td><strong>SSO (ERP360)</strong></td>
-<td>Iter 14</td>
-<td>HS256 with replay protection</td>
-</tr>
-<tr>
-<td><strong>API Tokens + Webhooks</strong></td>
-<td>Iter 12–13</td>
-<td>Scoped, HMAC-signed</td>
-</tr>
-<tr>
-<td><strong>Gamification</strong></td>
-<td>Streaks, Badges, XP, Cohorts</td>
-<td>Weekly digest emails</td>
-</tr>
-</tbody>
-</table>
-<h2 id="numbers-you-should-know">Numbers you should know</h2>
-<table>
-<thead>
-<tr>
-<th>Metric</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Backend routers</td>
-<td>23</td>
-</tr>
-<tr>
-<td>Backend services</td>
-<td>33</td>
-</tr>
-<tr>
-<td>SQLAlchemy models</td>
-<td>40+</td>
-</tr>
-<tr>
-<td>Alembic migrations</td>
-<td>18</td>
-</tr>
-<tr>
-<td>Frontend pages (React)</td>
-<td>45+</td>
-</tr>
-<tr>
-<td>Backend integration tests</td>
-<td>32 files, 142 tests</td>
-</tr>
-<tr>
-<td>Supported roles</td>
-<td>6 (OWNER, SUPER_ADMIN, ADMIN, INSTRUCTOR, LEARNER, API_TOKEN)</td>
-</tr>
-<tr>
-<td>AI providers wired</td>
-<td>5 (GPT-4o, Claude 4.5, Gemini 3, Nano Banana, Sora 2)</td>
-</tr>
-</tbody>
-</table>
+<h1 id="1-what-ifpi-learning-is-in-two-paragraphs">1. What IFPI Learning Is, In Two Paragraphs</h1>
+<p>IFPI Learning Academy is a place where your organisation runs its training. You build courses, invite learners, they watch videos and take quizzes, they earn certificates, you see reports of how they're doing. That's it in a sentence.</p>
+<p>What makes IFPI unusual is the <strong>AI Authoring Suite</strong>. Instead of writing every slide by hand, you can hand IFPI a topic ("Introduction to Music Copyright") and it drafts the entire course for you — outline, slides, quiz questions, flashcards, even narration and a short video summary. You edit anything you don't like. What used to take a full week of a content designer's time now takes an afternoon.</p>
+<p>| Webhooks, API Tokens | ADMIN+ |
+| Reports, Leaderboard | ADMIN+ (all) / LEARNER (own) |
+| Organization Settings | OWNER, SUPER_ADMIN |</p>
 <hr />
-<h1 id="2-getting-started-2-getting-started">2. Getting Started {#2-getting-started}</h1>
-<h2 id="21-system-requirements">2.1 System requirements</h2>
+<h1 id="2-getting-in-your-first-sign-in-2-getting-started">2. Getting In — Your First Sign-In {#2-getting-started}</h1>
+<h2 id="21-what-you-need">2.1 What you need</h2>
 <ul>
-<li>Modern browser (Chrome 120+, Firefox 120+, Safari 17+)</li>
-<li>Cookies + localStorage enabled</li>
-<li>For SSO: same-origin login on ERP360</li>
+<li>A modern web browser (Chrome, Edge, Firefox or Safari from the last two years)</li>
+<li>Cookies enabled (they are by default — you'd know if they weren't)</li>
+<li>The web address, email, and password IFPI Platform Ops emailed you</li>
 </ul>
-<h2 id="22-login">2.2 Login</h2>
+<h2 id="22-the-login-screen">2.2 The login screen</h2>
+<p>Type the web address into your browser (it looks like <code>https://your-academy.ifpi.example.com/login</code>). You'll see this:</p>
+<p><img alt="The IFPI login screen" src="screenshots/01_login.png" /></p>
+<p>Type your email in the top box, your password in the bottom box, and click <strong>Sign in</strong>.</p>
+<h2 id="23-if-its-your-first-time-change-the-password">2.3 If it's your first time — change the password</h2>
+<p>The first password IFPI gave you is temporary. As soon as you sign in, IFPI will show you a screen asking you to pick a new one.</p>
 <ul>
-<li><strong>URL:</strong> <code>https://&lt;your-tenant&gt;.ifpi.example.com/login</code></li>
-<li><strong>Credentials source:</strong> Owner + any invited users. See Setup Manual Phase B.</li>
-<li><strong>Session:</strong> Bearer JWT (60 min access + refresh) stored in localStorage.</li>
+<li>Type the temporary password in "Current password"</li>
+<li>Type a new password (at least 8 characters, different from the old one) in "New password"</li>
+<li>Type the same new password again in "Confirm new password"</li>
+<li>Click <strong>Save new password</strong></li>
 </ul>
-<h2 id="23-main-navigation">2.3 Main navigation</h2>
-<p>Sidebar reveals sections per role:</p>
-<table>
-<thead>
-<tr>
-<th>Section</th>
-<th>Roles</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Dashboard</td>
-<td>All</td>
-</tr>
-<tr>
-<td>Courses</td>
-<td>INSTRUCTOR+ (author) / LEARNER (my enrollments)</td>
-</tr>
-<tr>
-<td>Learning Paths</td>
-<td>INSTRUCTOR+ / LEARNER</td>
-</tr>
-<tr>
-<td>Authoring</td>
-<td>INSTRUCTOR+</td>
-</tr>
-<tr>
-<td>Certificates</td>
-<td>LEARNER (own) / ADMIN+ (all)</td>
-</tr>
-<tr>
-<td>Users, Academies, Cohorts</td>
-<td>ADMIN+</td>
-</tr>
-<tr>
-<td>Webhooks, API Tokens</td>
-<td>ADMIN+</td>
-</tr>
-<tr>
-<td>Reports, Leaderboard</td>
-<td>ADMIN+ (all) / LEARNER (own)</td>
-</tr>
-<tr>
-<td>Organization Settings</td>
-<td>OWNER, SUPER_ADMIN</td>
-</tr>
-</tbody>
-</table>
+<p>You'll land on your dashboard. <strong>Write down your new password somewhere safe</strong> — IFPI can email you a reset link if you forget, but only if the email on your account is correct.</p>
+<h2 id="24-if-you-forget-your-password">2.4 If you forget your password</h2>
+<p>On the login screen, click <strong>"Forgot your password?"</strong>. Type your email, hit send, check your inbox. There'll be a link that's good for 24 hours — click it, pick a new password, done.</p>
+<p>If the email never arrives (check your spam folder first), contact whoever set up your IFPI account. They have a rescue tool.</p>
+<h2 id="25-signing-out">2.5 Signing out</h2>
+<p>Click your name in the bottom-left corner, then <strong>Sign out</strong>. Always do this on a shared computer.</p>
 <hr />
-<h1 id="3-roles-permissions-3-roles">3. Roles &amp; Permissions {#3-roles}</h1>
-<table>
-<thead>
-<tr>
-<th>Permission Key</th>
-<th>OWNER</th>
-<th>ADMIN</th>
-<th>INSTRUCTOR</th>
-<th>LEARNER</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>courses:create</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>courses:publish</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>courses:delete</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>ai:generate:course</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>ai:generate:video</code> (Sora 2)</td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>users:invite</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>users:delete</code></td>
-<td>✔</td>
-<td>✔ (own org)</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>webhooks:manage</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>api_tokens:manage</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>certificates:issue</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>certificates:revoke</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>settings:edit_org</code></td>
-<td>✔</td>
-<td>✘</td>
-<td>✘</td>
-<td>✘</td>
-</tr>
-<tr>
-<td><code>learner:enrol</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✘</td>
-<td>✔</td>
-</tr>
-<tr>
-<td><code>learner:review_flashcards</code></td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-<td>✔</td>
-</tr>
-<tr>
-<td><code>public_catalog:read</code> (via token)</td>
-<td>via API scope</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-</tr>
-</tbody>
-</table>
+<h1 id="3-who-can-do-what-roles-3-roles">3. Who Can Do What (Roles) {#3-roles}</h1>
+<p>Everyone in IFPI has a <strong>role</strong>. Your role decides what you see when you sign in. There are five:</p>
+<ul>
+<li><strong>Admin</strong> — you can do everything: invite people, build courses, publish them, issue certificates, see all the reports. This is what senior IFPI staff have.</li>
+<li><strong>Instructor</strong> — you can build courses and grade learners. You can't invite new members or see billing.</li>
+<li><strong>Learner</strong> — the most common role. You take courses, sit exams, earn certificates. You don't see any admin screens.</li>
+<li><strong>Billing Viewer</strong> — read-only look at invoices and spend. For finance staff who don't build content.</li>
+<li><strong>Super Admin</strong> — reserved for IFPI Platform Ops. Manages every academy on the platform.</li>
+</ul>
+<p>People can hold more than one role if they need to (e.g. an instructor who also enrolls in colleagues' courses).</p>
 <hr />
-<h1 id="4-the-dashboard-landscape-4-dashboards">4. The Dashboard Landscape {#4-dashboards}</h1>
-<h2 id="41-owneradmin-dashboard-dashboard">4.1 Owner/Admin Dashboard (<code>/dashboard</code>)</h2>
-<p>Tiles: Active Learners (7-day), Courses Published, Certificates Issued (30-day), AI Spend This Month, Streaks Broken (7-day).</p>
-<h2 id="42-instructor-dashboard">4.2 Instructor Dashboard</h2>
+<h1 id="4-your-dashboard-what-everything-means-4-dashboards">4. Your Dashboard — What Everything Means {#4-dashboards}</h1>
+<p>The dashboard is the first thing you see when you sign in. What appears there depends on your role.</p>
+<h2 id="41-what-admins-see">4.1 What Admins see</h2>
+<p><img alt="The Admin dashboard" src="screenshots/03_dashboard_admin.png" /></p>
+<p>Going around the screen:</p>
 <ul>
-<li>My courses (with slide counts + enrollment counts)</li>
-<li>Draft courses stalled &gt; 14 d (nudge to publish)</li>
-<li>Pending exam grading queue</li>
+<li><strong>Four numbers at the top</strong> — Active Learners, Courses Published, Certificates Issued, and AI Spend This Month. These give you the health of your academy in one glance.</li>
+<li><strong>Onboarding progress</strong> — a percentage showing how much of the initial setup you've completed. Click it to see the checklist.</li>
+<li><strong>Members needing action</strong> — learners who've stalled: not signed in for 2 weeks, failed an exam, have a certificate about to expire, etc. Click any row to jump to that person.</li>
+<li><strong>Docs opened this week</strong> — how many times your team has read the setup and user manuals (the ones you're reading right now). Handy for spotting who might need help.</li>
+<li><strong>Quick actions</strong> — coloured shortcut tiles for common jobs: build a course, invite members, view reports, open the AI suite.</li>
 </ul>
-<h2 id="43-learner-dashboard">4.3 Learner Dashboard</h2>
+<h2 id="42-what-instructors-see">4.2 What Instructors see</h2>
+<p>Same shape as the admin dashboard, but with fewer tiles — no billing figures, no invite-members button. Focused on the courses you own and the learners taking them.</p>
+<h2 id="43-what-learners-see">4.3 What Learners see</h2>
+<p><img alt="The learner dashboard" src="screenshots/20_learner_dashboard.png" /></p>
 <ul>
-<li>In-progress courses (with % complete)</li>
-<li>Flashcards due today (SM-2)</li>
-<li>Next cert unlockable in ≤ 3 lessons</li>
-<li>Personal streak + badges</li>
+<li><strong>My Courses</strong> — cards for every course you're enrolled in. Click one to pick up where you left off.</li>
+<li><strong>Streak counter</strong> — how many days in a row you've been active. Great gamification.</li>
+<li><strong>Certificates</strong> — your earned certificates, ready to download or share.</li>
+<li><strong>Flashcards due today</strong> — quick-review deck powered by spaced repetition.</li>
 </ul>
-<h2 id="44-tokensai-spend-dashboard-dashboardtokens">4.4 Tokens/AI Spend Dashboard (<code>/dashboard/tokens</code>)</h2>
-<p>Iter 30 feature. 14-day stacked bar chart of spend per provider + budget line + endpoint hit-count table.</p>
+<h2 id="44-watching-your-ai-spend">4.4 Watching your AI spend</h2>
+<p>If your academy uses the AI Authoring Suite, keep an eye on <code>Tokens &amp; Spend</code> in the sidebar. It shows a rolling 14-day chart of how much AI content generation is costing you, against your monthly cap.</p>
 <hr />
-<h1 id="5-course-authoring-manual-ai-5-authoring">5. Course Authoring — Manual &amp; AI {#5-authoring}</h1>
-<h2 id="51-manual-authoring-flow">5.1 Manual authoring flow</h2>
-<p><code>Courses → New → Fill title/category → Slides → Add slide → …</code></p>
-<p>Slide types:
-- <strong>TEXT</strong> — HTML/MD content, sanitized via <code>bleach</code>
-- <strong>VIDEO</strong> — external URL or Sora-2 generated
-- <strong>QUIZ</strong> — inline MCQ, tracked in <code>slide_quizzes</code>
-- <strong>DOWNLOAD</strong> — attached file (PDF/PPTX)
-- <strong>INTERACTIVE</strong> — iframe SCORM package</p>
-<h2 id="52-the-publish-gate">5.2 The publish gate</h2>
-<p><code>services/versioning_service.py</code> snapshots every slide on publish. Learners always see a <strong>frozen version</strong> so mid-course edits don't disrupt progress.</p>
-<h2 id="53-prerequisites-dag">5.3 Prerequisites (DAG)</h2>
-<p>Add prerequisite courses via <code>/dashboard/courses/{id}/prerequisites</code>. Cycles are auto-rejected.</p>
-<h2 id="54-comments-per-slide">5.4 Comments per slide</h2>
-<p>Learners can leave threaded comments; instructors + admins moderate. All comments carry the org boundary + PII redactor (<code>services/pii_redactor.py</code>).</p>
+<h1 id="5-building-a-course-5-authoring">5. Building a Course {#5-authoring}</h1>
+<h2 id="51-the-two-ways-to-build">5.1 The two ways to build</h2>
+<p>Every course starts with clicking <strong>New Course</strong> from the Courses page.</p>
+<p><img alt="The Courses page" src="screenshots/04_courses_list_admin.png" /></p>
+<p>From there you have two paths:</p>
+<ul>
+<li><strong>Build slide-by-slide, by hand</strong> — the traditional way. Best when you already have all your material written and you just need to type it in.</li>
+<li><strong>Generate the whole thing with AI</strong> — the fast way. Type a topic, IFPI drafts everything, you edit what needs editing. Best when you're starting from scratch.</li>
+</ul>
+<p>Most content teams use a mix: AI generates a first draft, humans polish it.</p>
+<h2 id="52-building-a-course-by-hand">5.2 Building a course by hand</h2>
+<p>Click <strong>New Course</strong>, fill in the title, description, category, and any prerequisites (see next section). Save.</p>
+<p>You'll land on the course editor:</p>
+<p><img alt="The Course editor" src="screenshots/05_course_edit.png" /></p>
+<ul>
+<li><strong>Left panel</strong> — the list of slides. Click <strong>+ Add slide</strong> to create one.</li>
+<li><strong>Middle</strong> — the content editor for the currently selected slide.</li>
+<li><strong>Right</strong> — settings for this slide (type, ordering, whether it's required).</li>
+</ul>
+<p>Slide types you can pick:
+- <strong>Text</strong> — write in the box like it's a document. Supports headings, lists, bold, links.
+- <strong>Video</strong> — paste a video URL (YouTube, Vimeo, or upload your own).
+- <strong>Image</strong> — upload a graphic.
+- <strong>PDF</strong> — upload a PDF document.
+- <strong>Audio</strong> — for narration or podcasts.
+- <strong>SCORM</strong> — upload a pre-built SCORM course package from another system.</p>
+<p>Drag slides up and down to reorder. Save as you go.</p>
+<h2 id="53-adding-prerequisites">5.3 Adding prerequisites</h2>
+<p>If Course B should only be available to learners who've finished Course A, add A as a prerequisite of B. Click <strong>Prerequisites → Add</strong>, pick the course, save.</p>
+<p>You can chain many prerequisites together. IFPI will refuse to create a loop (A requires B, B requires A) — no headaches.</p>
+<h2 id="54-letting-people-comment-on-slides">5.4 Letting people comment on slides</h2>
+<p>Under each slide, learners can leave comments — great for questions or clarifications. Instructors can reply, pin useful threads, and mute problem users. Turn comments off per slide if you want to.</p>
+<h2 id="55-publishing">5.5 Publishing</h2>
+<p>Once you're happy, flip the course status from <strong>Draft</strong> to <strong>Published</strong>. IFPI does a quick check first — you need at least one required slide, and if you set a passing score you need a passing exam. If anything's missing it tells you exactly what.</p>
+<p>Published courses appear in the catalogue immediately. Learners can now enrol.</p>
 <hr />
-<h1 id="6-the-ai-authoring-suite-in-depth-6-ai-suite">6. The AI Authoring Suite In Depth {#6-ai-suite}</h1>
-<h2 id="61-course-builder-one-shot-outline">6.1 Course Builder — one-shot outline</h2>
-<p><code>/dashboard/authoring/course-builder</code>
-- Prompt: <em>topic + audience level + duration target</em>
-- Output: title, description, category, ≥ 5 slides, an exam with 4 questions
-- Backend: <code>services/ai_builder_service.py</code> → GPT-4o with structured outputs</p>
-<h2 id="62-deep-research-tavily-grounded">6.2 Deep Research — Tavily-grounded</h2>
-<p><code>/dashboard/authoring/research</code>
-- Query → 5–8 web sources → summarized citations
-- Every fact in generated slides is footnoted with source URLs
-- Requires <code>TAVILY_API_KEY</code> on the backend</p>
-<h2 id="63-flashcards">6.3 Flashcards</h2>
-<p><code>/dashboard/authoring/flashcards/{course_id}</code>
-- AI-generated from slides or from a raw text blob
-- Preview/edit before saving
-- Learner sees them via <code>LearnerFlashcardsPage</code> with SM-2 spacing</p>
-<h2 id="64-narration-multi-lang-tts">6.4 Narration (Multi-Lang TTS)</h2>
-<ul>
-<li><code>/dashboard/authoring/narration/{course_id}</code></li>
-<li>8 base voices × 8 languages</li>
-<li>Auto-plays inline on the learner slide viewer</li>
-</ul>
-<h2 id="65-visuals-nano-banana">6.5 Visuals (Nano Banana)</h2>
-<p>Per-slide infographics, cert banners, cohort-badge images.</p>
-<h2 id="66-video-overview-sora-2">6.6 Video Overview (Sora 2)</h2>
-<ul>
-<li>Async job — <code>POST /api/authoring/video/generate</code> returns a <code>job_id</code></li>
-<li>Poll <code>GET /api/authoring/jobs/{job_id}</code> for progress</li>
-<li>Backing worker: <code>services/background_worker.py</code></li>
-</ul>
-<h2 id="67-mind-map-reactflow">6.7 Mind Map (<code>reactflow</code>)</h2>
-<ul>
-<li>Auto-generates a topic map from course content</li>
-<li><strong>New in Iter 30b:</strong> SVG preview thumbnails saved as base64 → shown on course cards for admins</li>
-<li>Export to PPTX via <code>services/pptx_export_service.py</code></li>
-</ul>
-<h2 id="68-tutor-qa">6.8 Tutor Q&amp;A</h2>
-<p>Source-grounded chatbot. Only cites content the learner has already unlocked.</p>
-<h2 id="69-budget-spend-controls">6.9 Budget &amp; Spend Controls</h2>
-<p><code>services/ai_budget_service.py</code>
-- Per-org monthly cap (USD)
-- Per-course cap
-- Alert email to Owner at 80 %
-- Hard block at 100 % (with override toggle)</p>
+<h1 id="6-the-ai-authoring-suite-6-ai-suite">6. The AI Authoring Suite {#6-ai-suite}</h1>
+<p>This is where IFPI shines. Every tool here saves your content team hours of work. All of these are on the <strong>Authoring</strong> page.</p>
+<p><img alt="The AI Authoring hub" src="screenshots/06_authoring_course_builder.png" /></p>
+<h2 id="61-course-builder-draft-a-whole-course-in-one-shot">6.1 Course Builder — draft a whole course in one shot</h2>
+<p>Type a topic in the box (e.g. "Introduction to Music Copyright Law for African Producers"), pick the target audience level and length, click <strong>Generate</strong>. IFPI does the rest:</p>
+<ol>
+<li>Drafts an outline (usually 6-10 slides).</li>
+<li>Writes each slide's content.</li>
+<li>Writes a matching quiz with the answer key.</li>
+<li>Suggests images for each slide.</li>
+</ol>
+<p>You review the outline first — reject slides you don't want, tweak the ones you like. IFPI regenerates just those bits. Once you're happy, click <strong>Save all</strong> and the whole course appears in your Courses list, ready to edit or publish.</p>
+<h2 id="62-deep-research-grounded-in-real-sources">6.2 Deep Research — grounded in real sources</h2>
+<p>If you're teaching something factual (regulations, industry statistics), turn on <strong>Deep Research</strong>. IFPI's AI will search the live web while drafting, and every claim it makes gets a citation. Learners see the sources on the slide.</p>
+<p>Requires a Tavily API key (see Setup Manual Phase D).</p>
+<h2 id="63-flashcards-spaced-repetition-study">6.3 Flashcards — spaced repetition study</h2>
+<p><img alt="Generating flashcards" src="screenshots/07_authoring_flashcards.png" /></p>
+<p>Click <strong>Generate flashcards</strong> on any published course. IFPI reads the slides and produces study cards (question on the front, answer on the back). Learners see these on their dashboard, sorted by which they most need to review — using the SM-2 algorithm, the one Anki uses.</p>
+<h2 id="64-narration-text-becomes-voice">6.4 Narration — text becomes voice</h2>
+<p>For any slide, click <strong>Narrate</strong>. IFPI reads the slide content aloud in a natural voice. Eight languages supported out of the box, and IFPI auto-detects which one to use based on the slide's text.</p>
+<h2 id="65-visuals-ai-generated-images">6.5 Visuals — AI-generated images</h2>
+<p>For any slide, click <strong>Generate visual</strong>. IFPI uses Google's Nano Banana model to produce an image that matches the slide's content. Refresh a few times if the first one isn't quite right.</p>
+<p>Also used for certificate banners — see Setup Manual Phase A.</p>
+<h2 id="66-video-overview-sora-2">6.6 Video overview — Sora 2</h2>
+<p>Click <strong>Generate video overview</strong> on a course. IFPI produces a ~30-second promotional clip that summarises the course. Useful for your marketing pages or the course catalogue thumbnail. Takes 2-3 minutes to render — IFPI notifies you when it's done.</p>
+<h2 id="67-mind-maps">6.7 Mind maps</h2>
+<p><img alt="The mind-map view" src="screenshots/08_mindmap.png" /></p>
+<p>For any course, click <strong>Mind map</strong>. IFPI lays out every slide as a node in an interactive diagram — great for showing learners how the pieces connect. Drag nodes around; the layout saves automatically.</p>
+<h2 id="68-ai-tutor-qa-for-learners">6.8 AI Tutor — Q&amp;A for learners</h2>
+<p>Learners can click <strong>Ask the tutor</strong> on any slide. IFPI reads the whole course and answers their question, citing the specific slide the answer came from. Zero hallucinations.</p>
+<h2 id="69-keeping-ai-costs-under-control">6.9 Keeping AI costs under control</h2>
+<p>Every generation click costs a few cents. Your budget cap (Setup Manual Phase D) stops it running away. You'll see the live spend on the <code>Tokens &amp; Spend</code> page, and IFPI emails all admins when you hit 80% of your monthly cap.</p>
 <hr />
-<h1 id="7-learner-experience-7-learner">7. Learner Experience {#7-learner}</h1>
-<h2 id="71-enrolment">7.1 Enrolment</h2>
-<p>Learner clicks <code>Enroll</code> → <code>POST /api/courses/{id}/enroll</code> → creates a <code>courseenrollment</code> row.</p>
-<h2 id="72-slide-progression">7.2 Slide progression</h2>
-<p><code>POST /api/courses/{id}/slides/{sid}/complete</code> marks progress. Slides can be <code>is_required</code> — the course cert only unlocks when all required slides done.</p>
-<h2 id="73-exams">7.3 Exams</h2>
-<p><code>POST /api/exams/{id}/attempts</code> with <code>{answers: {question_id: choice}}</code>. Grading is server-side; score returned with pass/fail + XP + newly-earned badges.</p>
-<h2 id="74-flashcards-sm-2">7.4 Flashcards (SM-2)</h2>
-<p><code>GET /api/learn/flashcards/courses/{id}</code> returns due cards. Swipe / grade quality 0–5 → server computes next interval.</p>
-<h2 id="75-certificates">7.5 Certificates</h2>
-<p>On course complete + exam pass, cert issued automatically. Download PDF + share to LinkedIn.</p>
-<h2 id="76-public-verification">7.6 Public verification</h2>
-<p>Recruiters or regulators can paste the cert code into <code>/verify</code> (no login required). Rate-limited to 30/min per IP via Redis.</p>
-<h2 id="77-gamification">7.7 Gamification</h2>
+<h1 id="7-what-learners-see-7-learner">7. What Learners See {#7-learner}</h1>
+<p>Now flip perspective — this is what someone with the <strong>Learner</strong> role experiences.</p>
+<h2 id="71-finding-and-enrolling-in-a-course">7.1 Finding and enrolling in a course</h2>
+<p><img alt="The learner catalogue" src="screenshots/21_learner_courses.png" /></p>
+<p>From their dashboard, learners click <strong>Browse courses</strong>. They see every course you've published, filterable by category. Click a card → <strong>Enrol</strong>. If the course has prerequisites they haven't finished, IFPI politely blocks the enrol and tells them which course they need to complete first.</p>
+<h2 id="72-taking-a-slide-by-slide-course">7.2 Taking a slide-by-slide course</h2>
+<p><img alt="Inside a slide" src="screenshots/22_slide_view.png" /></p>
+<p>Learners move through slides one at a time. Progress is saved automatically, so they can close their laptop and resume from the same slide next week. On each slide they can:</p>
 <ul>
-<li><strong>XP</strong> — earned per slide, exam, cohort activity</li>
-<li><strong>Streaks</strong> — consecutive days with any learning activity</li>
-<li><strong>Badges</strong> — <code>EXAM_PASSER</code>, <code>PERFECT_SCORE</code>, <code>FLASHCARD_MASTER</code>, <code>PATH_COMPLETER</code>, ...</li>
-<li><strong>Leaderboard</strong> — org-wide or cohort-scoped</li>
+<li><strong>Ask the AI Tutor</strong> a question about what they just read.</li>
+<li><strong>Leave a comment</strong> (if you enabled it).</li>
+<li><strong>Play narration</strong> if you generated it.</li>
 </ul>
+<p>The progress bar at the top shows how far they are through the course.</p>
+<h2 id="73-taking-an-exam">7.3 Taking an exam</h2>
+<p>At the end of a course, if you set a passing score, learners take a summative exam. It can have multiple-choice, true/false, or short-answer questions. IFPI grades automatically (except short-answer, which comes to instructors for manual marking).</p>
+<p>If they fail, they can retake (subject to the max-attempts limit you set). Every attempt is recorded.</p>
+<h2 id="74-flashcards">7.4 Flashcards</h2>
+<p>If you generated flashcards, learners see a "Review flashcards" tile on their dashboard. It shows the cards they most need to review based on how well they remembered them last time (this is spaced repetition — the same technique Anki, Duolingo, and Quizlet use).</p>
+<h2 id="75-earning-a-certificate">7.5 Earning a certificate</h2>
+<p>Once they've completed all required slides AND passed the exam (if there is one), the certificate is generated automatically. They can download it, share it to LinkedIn with one click, or send anyone a public verification link.</p>
+<h2 id="76-motivation-streaks-and-badges">7.6 Motivation — streaks and badges</h2>
+<p>Learners see their <strong>daily streak</strong> on the dashboard (consecutive days active). They earn badges for milestones: finishing their first course, getting 100% on an exam, completing a learning path. Weekly digest emails recap what their cohort achieved and nudge them toward what's next.</p>
 <hr />
 <h1 id="8-certificates-verification-sharing-8-certificates">8. Certificates, Verification &amp; Sharing {#8-certificates}</h1>
-<h2 id="81-certificate-contents">8.1 Certificate contents</h2>
+<h1 id="8-certificates-8-certificates">8. Certificates {#8-certificates}</h1>
+<p><img alt="The certificates admin page" src="screenshots/17_certificates_admin.png" /></p>
+<h2 id="81-whats-on-the-certificate">8.1 What's on the certificate</h2>
+<p>Every certificate IFPI issues shows:</p>
 <ul>
-<li>Learner name</li>
-<li>Course title</li>
-<li>Cohort (if any)</li>
-<li>Passing score</li>
-<li>Issued date</li>
-<li>Organization branding (logo, primary color)</li>
-<li><strong>QR + clickable verify link</strong> (Iter 30b)</li>
-<li>Unique 22-char certificate code</li>
+<li><strong>Learner's name</strong> — the person who earned it</li>
+<li><strong>Course title</strong> — what they completed</li>
+<li><strong>Their cohort</strong> — if they were in one (e.g. "Sales 2026 Q1")</li>
+<li><strong>Passing score</strong> — the mark they achieved</li>
+<li><strong>Date issued</strong> — when they earned it</li>
+<li><strong>Your academy's branding</strong> — your logo, your colour, your signature</li>
+<li><strong>A unique 22-character code</strong> — think of it as the certificate's fingerprint</li>
+<li><strong>A QR code and clickable link</strong> — for instant verification</li>
 </ul>
-<h2 id="82-verification-endpoint">8.2 Verification endpoint</h2>
-<pre><code>GET /api/public/certificates/verify/{code}
-→ {holder_name, course_title, issued_at, valid, revoked}
-</code></pre>
-<h2 id="83-linkedin-add-to-profile">8.3 LinkedIn "Add to Profile"</h2>
-<p>Every cert card has an "Add to LinkedIn" button that pre-fills the <a href="https://www.linkedin.com/profile/add">add-to-profile URL</a> with the cert code + course + issuing org.</p>
-<h2 id="84-revocation">8.4 Revocation</h2>
-<p>Owner/Admin can revoke via <code>PATCH /api/certificates/{id}</code> → verify endpoint returns <code>revoked: true</code>, PDF regen is blocked.</p>
+<p>The PDF looks like this when downloaded:</p>
+<p><img alt="Sample certificate PDF" src="screenshots/18_cert_pdf.png" /></p>
+<h2 id="82-how-outsiders-verify-a-certificate">8.2 How outsiders verify a certificate</h2>
+<p>If a recruiter, regulator, or client wants to check a certificate is genuine, they:</p>
+<ol>
+<li>Scan the QR code with their phone, <strong>or</strong></li>
+<li>Type the 22-character code into your academy's <code>/verify</code> page</li>
+</ol>
+<p>Either way, they see a simple confirmation showing who was awarded the certificate, for which course, and when. That's it — no other personal data is exposed.</p>
+<h2 id="83-sharing-to-linkedin">8.3 Sharing to LinkedIn</h2>
+<p>Learners see a <strong>"Add to LinkedIn"</strong> button on every certificate they've earned. One click pre-fills the LinkedIn form with the certificate code, course title, and your academy name.</p>
+<h2 id="84-revoking-a-certificate">8.4 Revoking a certificate</h2>
+<p>Sometimes you need to invalidate a certificate — plagiarism found after the fact, accreditation issue, etc. <strong>Revoke</strong> does this without deleting anything.</p>
+<p>From the <strong>Certificates</strong> page:
+- <strong>Revoke one</strong> — click the certificate row, hit <strong>Revoke</strong>, type "REVOKE" to confirm, add a reason. Done. The certificate stays visible but marked "Revoked" and the PDF cannot be re-downloaded.
+- <strong>Revoke many at once</strong> — tick the checkboxes on multiple rows, click <strong>Bulk actions → Revoke selected</strong>. Same confirmation.
+- <strong>Un-revoke</strong> — if it was a mistake, click <strong>Un-revoke</strong> to bring it back.
+- <strong>Re-email download links</strong> — for holders who lost their email.
+- <strong>Download a batch as ZIP</strong> — bundle up to 100 certificate PDFs into a single ZIP file for archiving.</p>
+<p>Every revoke, un-revoke, or bulk action is logged forever. Nothing is silent.</p>
+<h2 id="85-monthly-compliance-report">8.5 Monthly compliance report</h2>
+<p>If enabled, IFPI emails a monthly PDF summary of everything certificate-related to whoever you've listed — certificates issued, revoked, deletion requests, failed login attempts, top admin actions. Nothing to schedule. It just arrives.</p>
 <hr />
-<h1 id="9-analytics-reports-9-analytics">9. Analytics &amp; Reports {#9-analytics}</h1>
-<p>Route: <code>/dashboard/reports</code></p>
-<table>
-<thead>
-<tr>
-<th>Report</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Enrolment funnel</strong></td>
-<td>Signup → Enrol → Complete → Cert conversion</td>
-</tr>
-<tr>
-<td><strong>Course health</strong></td>
-<td>Drop-off per slide, quiz avg score, time-on-slide</td>
-</tr>
-<tr>
-<td><strong>Cohort persistency</strong></td>
-<td>30/60/90-day retention</td>
-</tr>
-<tr>
-<td><strong>AI spend</strong></td>
-<td>Per-provider breakdown, cost per certificate issued</td>
-</tr>
-<tr>
-<td><strong>Instructor workload</strong></td>
-<td>Slides authored, courses live, pending grading</td>
-</tr>
-<tr>
-<td><strong>Token usage</strong></td>
-<td>API token calls by endpoint &amp; status code (<code>api_token_calls</code>)</td>
-</tr>
-</tbody>
-</table>
-<p>Exports: CSV + PDF (button on every report).</p>
-<hr />
-<h1 id="10-integrations-exports-10-integrations">10. Integrations &amp; Exports {#10-integrations}</h1>
-<h2 id="101-erp360-sso">10.1 ERP360 SSO</h2>
-<p>See Setup Manual Phase E.1.</p>
-<h2 id="102-api-tokens">10.2 API Tokens</h2>
-<p>Scoped tokens for machine access. Every call is written to <code>api_token_calls</code> with timestamp, endpoint, status → surfaces in the tokens analytics page.</p>
-<h2 id="103-outgoing-webhooks">10.3 Outgoing Webhooks</h2>
-<p>HMAC-signed, retried with exponential backoff. Events: <code>course.published</code>, <code>enrollment.completed</code>, <code>certificate.issued</code>, <code>learner.invited</code>, <code>ai.spend.threshold</code>, <code>webhook.test.ping</code>.</p>
-<h2 id="104-scormxapi">10.4 SCORM/xAPI</h2>
-<p><code>GET /api/scorm/runtime.js</code> serves a hosted runtime shim so external LMSes can embed IFPI courses. Export a full package via <code>GET /api/courses/{id}/export-scorm</code>.</p>
-<h2 id="105-pptx-export">10.5 PPTX export</h2>
-<p><code>GET /api/courses/{id}/export-pptx</code> → downloadable deck.</p>
-<h2 id="106-full-data-export-gdpr">10.6 Full data export (GDPR)</h2>
-<p><code>POST /api/admin/exports/full</code> → email delivered ZIP of all your org's data.</p>
-<hr />
-<h1 id="11-roles-deep-dive-11-roles-deep">11. Roles Deep-Dive {#11-roles-deep}</h1>
-<p>Full permission matrix lives in <code>backend/core/role_registry.py</code>. Changes to permissions require both a code change AND a migration to backfill legacy users.</p>
-<hr />
-<h1 id="12-data-model-overview-12-data-model">12. Data Model Overview {#12-data-model}</h1>
-<p>Core entities (see <code>backend/models/__init__.py</code> for the full list):</p>
+<h1 id="9-reports-and-analytics-9-analytics">9. Reports and Analytics {#9-analytics}</h1>
+<p>Under <strong>Reports</strong> in the sidebar, you get a set of pre-built dashboards. Everything can be exported as CSV or PDF.</p>
 <ul>
-<li><strong>Organization</strong> — tenant boundary (<code>organizations</code> table)</li>
-<li><strong>Academy</strong> — sub-tenant grouping inside an org (departments, franchises)</li>
-<li><strong>User</strong> — with roles JSON + cohort</li>
+<li><strong>Enrolment funnel</strong> — how many people signed up, enrolled, completed, earned a certificate. Where you're losing them.</li>
+<li><strong>Course health</strong> — for each course, which slide learners drop off at, average quiz scores, time spent per slide. Tells you which slides need work.</li>
+<li><strong>Cohort persistency</strong> — 30, 60, 90-day retention. Are the November hires still active in February?</li>
+<li><strong>AI spend</strong> — how much each AI provider is costing, spend per certificate issued.</li>
+<li><strong>Instructor workload</strong> — how many courses each instructor owns, how much grading is pending.</li>
+<li><strong>Token usage</strong> — if you have API tokens (Setup Manual Phase E), see what they're being used for.</li>
+</ul>
+<hr />
+<h1 id="10-sharing-with-other-systems-10-integrations">10. Sharing with Other Systems {#10-integrations}</h1>
+<h2 id="101-erp360-sso">10.1 ERP360 SSO</h2>
+<p>See Setup Manual Phase E.1 for the technical setup — but for staff purposes, once it's enabled you just click through from ERP360 to IFPI and never sign in again.</p>
+<h2 id="102-talking-to-ifpi-from-spreadsheets-and-scripts-api-tokens">10.2 Talking to IFPI from spreadsheets and scripts (API tokens)</h2>
+<p>If your team uses spreadsheets that pull IFPI data (e.g. "how many active learners this month?"), or if you want another system to create courses automatically, you'll need an <strong>API token</strong>. See Setup Manual Phase E.2.</p>
+<p>Once you have a token, you can share it with your automations. Every call is logged, so if a token is misused you can see it and revoke it.</p>
+<h2 id="103-getting-notified-when-things-happen-webhooks">10.3 Getting notified when things happen (webhooks)</h2>
+<p>If you'd like Slack, Discord, or another system to be notified when a course is published, a certificate is issued, or an AI spend threshold is hit, use <strong>webhooks</strong>. Setup Manual Phase E.3 explains how to point them at your other tools.</p>
+<h2 id="104-exporting-courses-to-other-systems-scorm">10.4 Exporting courses to other systems (SCORM)</h2>
+<p>Selling training to another company? You can export any course as a SCORM package (industry standard). Their learning system will import it as-is. From any course → <strong>Publish → SCORM → Download</strong>.</p>
+<h2 id="105-exporting-a-course-as-a-slide-deck-pptx">10.5 Exporting a course as a slide deck (PPTX)</h2>
+<p>Every course can also be downloaded as a PowerPoint presentation — handy for offline presentations or handing content to another platform. Click <strong>Export → PowerPoint</strong> on the course page.</p>
+<hr />
+<h1 id="your-account-profile-password-privacy-account-self">Your Account — Profile, Password, Privacy {#account-self}</h1>
+<p>This section is for <strong>every user</strong>, whatever their role.</p>
+<p><img alt="The Profile page" src="screenshots/24_profile.png" /></p>
+<h2 id="what-you-can-change">What you can change</h2>
+<p>Click your name in the sidebar and pick <strong>Profile</strong>. From here:</p>
+<ul>
+<li><strong>Change your display name</strong> — what appears on your certificates and comments.</li>
+<li><strong>Upload a profile photo</strong> — appears next to your comments and on the leaderboard.</li>
+<li><strong>Change your password</strong> — see below.</li>
+<li><strong>Turn on Two-Factor Authentication</strong> — highly recommended. Uses Google Authenticator or any TOTP app. Setup Manual Phase B.4 explains.</li>
+<li><strong>Language</strong> — pick your preferred language for the UI (independent of your academy's default).</li>
+<li><strong>Notifications</strong> — decide which emails you want (weekly digest, cohort recap, streak nudges).</li>
+</ul>
+<h2 id="change-your-password">Change your password</h2>
+<p><code>Profile → Security → Change Password</code>. Type your current password, then your new one twice. Save. You stay signed in.</p>
+<p>If you forgot the current one, sign out, then use the <strong>Forgot password?</strong> link on the sign-in screen.</p>
+<h2 id="download-all-your-data-gdpr">Download all your data (GDPR)</h2>
+<p>Under <code>Profile → Privacy → Download my data</code> you can download a ZIP file containing everything IFPI has about you: your profile, enrolments, progress, certificates, flashcard history, and audit trail. Perfect for GDPR "data portability" requests. Zero admin approval needed.</p>
+<h2 id="delete-your-account-gdpr-right-to-erasure">Delete your account (GDPR Right to Erasure)</h2>
+<p>Under <code>Profile → Privacy → Delete my account</code>:</p>
+<ol>
+<li>Click <strong>Request deletion</strong>. IFPI emails you a 6-digit code (valid for 10 minutes).</li>
+<li>Type the code, click confirm.</li>
+<li>Your personal details are wiped, your sessions and API tokens revoked, and your certificates continue to verify but show "IFPI Learner" instead of your name.</li>
+</ol>
+<p>The deletion is permanent. Every step is logged.</p>
+<h2 id="verify-your-email">Verify your email</h2>
+<p>If your email address changes, IFPI will send a verification link to the new one. Until you click it, some sensitive actions are blocked. Look under <code>Profile → Security → Resend verification</code> if the email didn't arrive.</p>
+<hr />
+<h1 id="11-rate-limits-fair-use">11. Rate Limits &amp; Fair Use</h1>
+<p>To keep IFPI stable, some pages have gentle rate limits. Most staff never hit them:</p>
+<ul>
+<li><strong>Signing in</strong> — 5 attempts per minute, 10 per hour on the same email.</li>
+<li><strong>New account signup</strong> — 3 per hour from the same IP address.</li>
+<li><strong>Forgot-password requests</strong> — 3 per hour per email address.</li>
+<li><strong>Email verification resends</strong> — 2 per hour per user.</li>
+<li><strong>Public certificate verification</strong> — 30 checks per minute per visitor.</li>
+<li><strong>Public catalogue browsing</strong> — 60 pages per minute per visitor.</li>
+</ul>
+<p>If a legitimate user ever hits a limit (unusual), they see a friendly "try again in a moment" message. Nothing else breaks.</p>
+<hr />
+<h1 id="12-technical-reference">12. Technical Reference</h1>
+<blockquote>
+<p><em>Everything below is for developers and Platform Ops. Non-technical staff can skip this — nothing here is required for daily use.</em></p>
+</blockquote>
+<h2 id="121-full-permission-matrix">12.1 Full permission matrix</h2>
+<p>Full permission keys live in <code>backend/core/role_registry.py</code>. Changes to permissions require both a code change AND a migration to backfill legacy users.</p>
+<h2 id="122-data-model-overview-12-data-model">12.2 Data model overview {#12-data-model}</h2>
+<p>Core entities (see <code>backend/models/</code> for the full list):</p>
+<ul>
+<li><strong>Organization</strong> — tenant boundary</li>
+<li><strong>User</strong> — with roles + cohort</li>
 <li><strong>Course</strong> → <strong>CourseSlide</strong> (ordered) → <strong>SlideComment</strong></li>
 <li><strong>Exam</strong> → <strong>ExamQuestion</strong> → <strong>ExamAttempt</strong></li>
 <li><strong>Flashcard</strong> → <strong>FlashcardReview</strong> (SM-2 state per learner)</li>
 <li><strong>Enrolment</strong> + <strong>CourseProgress</strong></li>
-<li><strong>Certificate</strong> + <code>verifier_token</code></li>
-<li><strong>AITokenCall</strong> (usage analytics)</li>
-<li><strong>AIJob</strong> (async Sora / Nano Banana jobs)</li>
-<li><strong>APIToken</strong> (scoped machine access)</li>
-<li><strong>Webhook</strong> + <strong>WebhookDelivery</strong></li>
-<li><strong>AuditLog</strong> (append-only)</li>
+<li><strong>Certificate</strong> + verifier token + revocation events</li>
+<li><strong>AITokenCall</strong> + <strong>AIJob</strong> + <strong>AIUsageLedger</strong></li>
+<li><strong>APIToken</strong> + <strong>APITokenCall</strong></li>
+<li><strong>WebhookSubscription</strong> + <strong>WebhookDelivery</strong></li>
+<li><strong>AuditLog</strong> (append-only, 3-year retention)</li>
 <li><strong>Invitation</strong> (with cohort binding)</li>
 <li><strong>OutboxMessage</strong> (email queue)</li>
 <li><strong>BadgeTier</strong> + <strong>UserBadge</strong></li>
+<li><strong>LiveSession</strong> + <strong>LiveSessionRsvp</strong></li>
+<li><strong>CourseView</strong> + <strong>SlideView</strong> (funnel analytics)</li>
 </ul>
-<h2 id="121-backend-router-inventory">12.1 Backend Router Inventory</h2>
+<h2 id="123-backend-router-inventory">12.3 Backend Router Inventory</h2>
 <!-- AUTO:BEGIN router_index -->
 <table>
 <thead>
@@ -1140,12 +902,44 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </thead>
 <tbody>
 <tr>
+<td><code>routers/academies.py</code></td>
+<td>109</td>
+</tr>
+<tr>
+<td><code>routers/admin_analytics.py</code></td>
+<td>322</td>
+</tr>
+<tr>
+<td><code>routers/admin_entitlements.py</code></td>
+<td>185</td>
+</tr>
+<tr>
+<td><code>routers/admin_organizations.py</code></td>
+<td>202</td>
+</tr>
+<tr>
+<td><code>routers/affiliate.py</code></td>
+<td>263</td>
+</tr>
+<tr>
+<td><code>routers/ai.py</code></td>
+<td>34</td>
+</tr>
+<tr>
+<td><code>routers/ai_tutor.py</code></td>
+<td>392</td>
+</tr>
+<tr>
 <td><code>routers/api_tokens.py</code></td>
 <td>284</td>
 </tr>
 <tr>
+<td><code>routers/api_v2.py</code></td>
+<td>68</td>
+</tr>
+<tr>
 <td><code>routers/auth.py</code></td>
-<td>154</td>
+<td>487</td>
 </tr>
 <tr>
 <td><code>routers/authoring.py</code></td>
@@ -1168,64 +962,164 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>133</td>
 </tr>
 <tr>
+<td><code>routers/billing.py</code></td>
+<td>65</td>
+</tr>
+<tr>
+<td><code>routers/campaign_links.py</code></td>
+<td>256</td>
+</tr>
+<tr>
+<td><code>routers/catalog.py</code></td>
+<td>242</td>
+</tr>
+<tr>
+<td><code>routers/certificates.py</code></td>
+<td>960</td>
+</tr>
+<tr>
+<td><code>routers/comments.py</code></td>
+<td>84</td>
+</tr>
+<tr>
 <td><code>routers/courses.py</code></td>
-<td>656</td>
+<td>950</td>
+</tr>
+<tr>
+<td><code>routers/docs_library.py</code></td>
+<td>103</td>
+</tr>
+<tr>
+<td><code>routers/email_diagnostics.py</code></td>
+<td>127</td>
+</tr>
+<tr>
+<td><code>routers/enrollments.py</code></td>
+<td>42</td>
+</tr>
+<tr>
+<td><code>routers/erp360_sync.py</code></td>
+<td>430</td>
 </tr>
 <tr>
 <td><code>routers/exams.py</code></td>
-<td>212</td>
+<td>459</td>
 </tr>
 <tr>
-<td><code>routers/extras.py</code></td>
-<td>543</td>
+<td><code>routers/feedback.py</code></td>
+<td>106</td>
 </tr>
 <tr>
 <td><code>routers/flashcards.py</code></td>
 <td>497</td>
 </tr>
 <tr>
+<td><code>routers/gamification.py</code></td>
+<td>188</td>
+</tr>
+<tr>
 <td><code>routers/imports.py</code></td>
-<td>502</td>
+<td>551</td>
 </tr>
 <tr>
 <td><code>routers/invitations.py</code></td>
-<td>195</td>
+<td>206</td>
 </tr>
 <tr>
-<td><code>routers/iter5.py</code></td>
-<td>337</td>
-</tr>
-<tr>
-<td><code>routers/iter8.py</code></td>
-<td>293</td>
+<td><code>routers/leads.py</code></td>
+<td>140</td>
 </tr>
 <tr>
 <td><code>routers/learning_paths.py</code></td>
-<td>285</td>
+<td>306</td>
+</tr>
+<tr>
+<td><code>routers/live_sessions.py</code></td>
+<td>851</td>
+</tr>
+<tr>
+<td><code>routers/marketplace_analytics.py</code></td>
+<td>430</td>
 </tr>
 <tr>
 <td><code>routers/misc.py</code></td>
-<td>372</td>
+<td>1391</td>
 </tr>
 <tr>
 <td><code>routers/narration.py</code></td>
 <td>204</td>
 </tr>
 <tr>
+<td><code>routers/notifications.py</code></td>
+<td>48</td>
+</tr>
+<tr>
+<td><code>routers/onboarding.py</code></td>
+<td>97</td>
+</tr>
+<tr>
+<td><code>routers/organization.py</code></td>
+<td>467</td>
+</tr>
+<tr>
+<td><code>routers/outbox.py</code></td>
+<td>83</td>
+</tr>
+<tr>
+<td><code>routers/owner_dashboard.py</code></td>
+<td>226</td>
+</tr>
+<tr>
+<td><code>routers/pathways.py</code></td>
+<td>76</td>
+</tr>
+<tr>
+<td><code>routers/portal.py</code></td>
+<td>40</td>
+</tr>
+<tr>
 <td><code>routers/public_catalog.py</code></td>
-<td>143</td>
+<td>201</td>
+</tr>
+<tr>
+<td><code>routers/query_builder.py</code></td>
+<td>250</td>
+</tr>
+<tr>
+<td><code>routers/scheduled_reports.py</code></td>
+<td>188</td>
 </tr>
 <tr>
 <td><code>routers/scorm_xapi.py</code></td>
-<td>499</td>
+<td>512</td>
+</tr>
+<tr>
+<td><code>routers/seo.py</code></td>
+<td>369</td>
+</tr>
+<tr>
+<td><code>routers/stripe_payments.py</code></td>
+<td>303</td>
+</tr>
+<tr>
+<td><code>routers/terms_kiosk.py</code></td>
+<td>339</td>
+</tr>
+<tr>
+<td><code>routers/totp.py</code></td>
+<td>268</td>
+</tr>
+<tr>
+<td><code>routers/uploads.py</code></td>
+<td>134</td>
 </tr>
 <tr>
 <td><code>routers/webhooks.py</code></td>
-<td>203</td>
+<td>253</td>
 </tr>
 <tr>
 <td><strong>Total</strong></td>
-<td><strong>6583</strong></td>
+<td><strong>15992</strong></td>
 </tr>
 </tbody>
 </table>
@@ -1246,8 +1140,28 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>ai_jobs</code></td>
 </tr>
 <tr>
+<td><code>AITutorMessage</code></td>
+<td><code>ai_tutor_messages</code></td>
+</tr>
+<tr>
+<td><code>AITutorSession</code></td>
+<td><code>ai_tutor_sessions</code></td>
+</tr>
+<tr>
 <td><code>AIUsageLedger</code></td>
 <td><code>ai_usage_ledger</code></td>
+</tr>
+<tr>
+<td><code>AccountDeletionRequest</code></td>
+<td><code>account_deletion_requests</code></td>
+</tr>
+<tr>
+<td><code>AffiliateCode</code></td>
+<td><code>affiliate_codes</code></td>
+</tr>
+<tr>
+<td><code>AffiliateReferral</code></td>
+<td><code>affiliate_referrals</code></td>
 </tr>
 <tr>
 <td><code>ApiToken</code></td>
@@ -1270,8 +1184,20 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>billing_events</code></td>
 </tr>
 <tr>
+<td><code>CampaignLink</code></td>
+<td><code>campaign_links</code></td>
+</tr>
+<tr>
+<td><code>CampaignSignup</code></td>
+<td><code>campaign_signups</code></td>
+</tr>
+<tr>
 <td><code>Certificate</code></td>
 <td><code>certificates</code></td>
+</tr>
+<tr>
+<td><code>CertificateRevocationEvent</code></td>
+<td><code>certificate_revocation_events</code></td>
 </tr>
 <tr>
 <td><code>Course</code></td>
@@ -1282,12 +1208,32 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>course_prerequisites</code></td>
 </tr>
 <tr>
+<td><code>CourseRating</code></td>
+<td><code>course_ratings</code></td>
+</tr>
+<tr>
 <td><code>CourseSlide</code></td>
 <td><code>course_slides</code></td>
 </tr>
 <tr>
+<td><code>CourseView</code></td>
+<td><code>course_views</code></td>
+</tr>
+<tr>
+<td><code>CustomThemePreset</code></td>
+<td><code>custom_theme_presets</code></td>
+</tr>
+<tr>
+<td><code>EmailVerificationToken</code></td>
+<td><code>email_verification_tokens</code></td>
+</tr>
+<tr>
 <td><code>Enrollment</code></td>
 <td><code>enrollments</code></td>
+</tr>
+<tr>
+<td><code>Erp360SeenEvent</code></td>
+<td><code>erp360_seen_events</code></td>
 </tr>
 <tr>
 <td><code>Exam</code></td>
@@ -1300,6 +1246,10 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>ExamQuestion</code></td>
 <td><code>exam_questions</code></td>
+</tr>
+<tr>
+<td><code>FeatureFlag</code></td>
+<td><code>feature_flags</code></td>
 </tr>
 <tr>
 <td><code>Flashcard</code></td>
@@ -1318,6 +1268,10 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>invitations</code></td>
 </tr>
 <tr>
+<td><code>KioskSettings</code></td>
+<td><code>kiosk_settings</code></td>
+</tr>
+<tr>
 <td><code>LearningPath</code></td>
 <td><code>learning_paths</code></td>
 </tr>
@@ -1328,6 +1282,14 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>LearningPathItem</code></td>
 <td><code>learning_path_items</code></td>
+</tr>
+<tr>
+<td><code>LiveSession</code></td>
+<td><code>live_sessions</code></td>
+</tr>
+<tr>
+<td><code>LiveSessionRsvp</code></td>
+<td><code>live_session_rsvps</code></td>
 </tr>
 <tr>
 <td><code>Notification</code></td>
@@ -1342,12 +1304,28 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>outbox_messages</code></td>
 </tr>
 <tr>
+<td><code>PasswordResetToken</code></td>
+<td><code>password_reset_tokens</code></td>
+</tr>
+<tr>
+<td><code>PaymentTransaction</code></td>
+<td><code>payment_transactions</code></td>
+</tr>
+<tr>
 <td><code>Person</code></td>
 <td><code>persons</code></td>
 </tr>
 <tr>
+<td><code>ProgressOutbox</code></td>
+<td><code>progress_outbox</code></td>
+</tr>
+<tr>
 <td><code>RefreshToken</code></td>
 <td><code>refresh_tokens</code></td>
+</tr>
+<tr>
+<td><code>ScheduledReport</code></td>
+<td><code>scheduled_reports</code></td>
 </tr>
 <tr>
 <td><code>ScormPackage</code></td>
@@ -1360,6 +1338,10 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>SlideVersion</code></td>
 <td><code>slide_versions</code></td>
+</tr>
+<tr>
+<td><code>SlideView</code></td>
+<td><code>slide_views</code></td>
 </tr>
 <tr>
 <td><code>SourceChunk</code></td>
@@ -1376,6 +1358,18 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>Subscription</code></td>
 <td><code>subscriptions</code></td>
+</tr>
+<tr>
+<td><code>TermsAcceptance</code></td>
+<td><code>terms_acceptances</code></td>
+</tr>
+<tr>
+<td><code>TermsVersion</code></td>
+<td><code>terms_versions</code></td>
+</tr>
+<tr>
+<td><code>TesterFeedback</code></td>
+<td><code>tester_feedback</code></td>
 </tr>
 <tr>
 <td><code>User</code></td>
@@ -1403,7 +1397,7 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 </tbody>
 </table>
-<p><em>Total: <strong>40</strong> ORM models.</em></p>
+<p><em>Total: <strong>65</strong> ORM models.</em></p>
 <!-- AUTO:END model_index -->
 
 <hr />
@@ -1435,9 +1429,44 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/admin/affiliate/codes</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/affiliate/codes</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/affiliate/codes/{code_id}</code></td>
+<td>PATCH</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/affiliate/earnings</code></td>
+<td>GET</td>
+<td>Aggregate earnings by status. Cents-based to avoid float drift.</td>
+</tr>
+<tr>
+<td><code>/api/admin/affiliate/referrals</code></td>
+<td>GET</td>
+<td>Referrals attributed to codes I own.</td>
+</tr>
+<tr>
+<td><code>/api/admin/affiliate/referrals/{referral_id}/mark-credited</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/admin/analytics</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/admin/analytics/enrollments-weekly</code></td>
+<td>GET</td>
+<td>Enrolments or completions per ISO week (Iter 43/44 dashboard chart).</td>
 </tr>
 <tr>
 <td><code>/api/admin/api-tokens</code></td>
@@ -1472,12 +1501,42 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>/api/admin/audit-digest</code></td>
 <td>GET</td>
-<td>LLM-generated plain-English summary of the last N days of admin</td>
+<td>LLM-generated plain-English summary of the last N days of admin activity.</td>
 </tr>
 <tr>
 <td><code>/api/admin/audit-log</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links/{link_id}</code></td>
+<td>DELETE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links/{link_id}</code></td>
+<td>PATCH</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links/{link_id}/attribution</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/campaign-links/{link_id}/qr</code></td>
+<td>GET</td>
+<td>Printable QR PNG pointing at the public join URL.</td>
 </tr>
 <tr>
 <td><code>/api/admin/cert-preview</code></td>
@@ -1488,6 +1547,71 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/admin/cohorts</code></td>
 <td>GET</td>
 <td>Distinct cohort labels with learner counts.</td>
+</tr>
+<tr>
+<td><code>/api/admin/course-dropoff/{course_id}</code></td>
+<td>GET</td>
+<td>Iter 26 — Per-slide unique-viewers + drop-off %. For each slide</td>
+</tr>
+<tr>
+<td><code>/api/admin/dashboard/docs-engagement</code></td>
+<td>GET</td>
+<td>Iter 33c — Docs engagement tile for the Owner dashboard.</td>
+</tr>
+<tr>
+<td><code>/api/admin/dashboard/members-needing-action</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/docs</code></td>
+<td>GET</td>
+<td>Return catalog of downloadable documents with metadata.</td>
+</tr>
+<tr>
+<td><code>/api/admin/docs/{slug}/pdf</code></td>
+<td>GET</td>
+<td>Stream a rendered PDF of the requested document.</td>
+</tr>
+<tr>
+<td><code>/api/admin/docs/{slug}/raw</code></td>
+<td>GET</td>
+<td>Return the raw markdown source (with AUTO-BLOCK markers).</td>
+</tr>
+<tr>
+<td><code>/api/admin/email/send-test</code></td>
+<td>POST</td>
+<td>Queue a test email and dispatch it synchronously so the admin</td>
+</tr>
+<tr>
+<td><code>/api/admin/email/transport-status</code></td>
+<td>GET</td>
+<td>Report which delivery transports are active for THIS org, in</td>
+</tr>
+<tr>
+<td><code>/api/admin/entitlements/user/{user_id}</code></td>
+<td>GET</td>
+<td>List every paid course in the caller's org + whether the target</td>
+</tr>
+<tr>
+<td><code>/api/admin/entitlements/user/{user_id}/course/{course_id}</code></td>
+<td>GET</td>
+<td>One user, one course — the "why can't they enroll?" answer.</td>
+</tr>
+<tr>
+<td><code>/api/admin/feature-flags/{flag_key}</code></td>
+<td>PUT</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/feedback</code></td>
+<td>GET</td>
+<td>All feedback for the caller's org, newest first.</td>
+</tr>
+<tr>
+<td><code>/api/admin/feedback/{feedback_id}/status</code></td>
+<td>POST</td>
+<td>Flip a feedback item between NEW and REVIEWED.</td>
 </tr>
 <tr>
 <td><code>/api/admin/imports</code></td>
@@ -1508,6 +1632,11 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/admin/imports/{job_id}</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/admin/imports/{job_id}/retry</code></td>
+<td>POST</td>
+<td>Re-run a FAILED / PARTIAL import against the same staging directory —</td>
 </tr>
 <tr>
 <td><code>/api/admin/imports/{job_id}/rollback</code></td>
@@ -1535,9 +1664,44 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/admin/kiosk/settings</code></td>
+<td>PUT</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/admin/leaderboard.csv</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/admin/marketplace-funnel</code></td>
+<td>GET</td>
+<td>Iter 25 — Cross-course marketplace funnel roll-up for the current</td>
+</tr>
+<tr>
+<td><code>/api/admin/marketplace-funnel/{course_id}</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/onboarding/checklist</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/organizations</code></td>
+<td>GET</td>
+<td>List every org in the deployment (super-admin only — regular</td>
+</tr>
+<tr>
+<td><code>/api/admin/organizations/{org_id}/integrations/erp360</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/organizations/{org_id}/integrations/erp360</code></td>
+<td>PATCH</td>
+<td>Merge-update the org's ERP360 integration config. Only the</td>
 </tr>
 <tr>
 <td><code>/api/admin/outbox</code></td>
@@ -1555,9 +1719,39 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker</td>
 </tr>
 <tr>
+<td><code>/api/admin/query-builder/build</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/admin/reports/cohort-stats</code></td>
 <td>GET</td>
-<td>Completion / exam-score / time-to-graduation for a cohort, or for</td>
+<td>Completion / exam-score / time-to-graduation for a cohort.</td>
+</tr>
+<tr>
+<td><code>/api/admin/scheduled-reports</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/scheduled-reports</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/scheduled-reports/{report_id}</code></td>
+<td>DELETE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/scheduled-reports/{report_id}</code></td>
+<td>PUT</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/scheduled-reports/{report_id}/run-now</code></td>
+<td>POST</td>
+<td></td>
 </tr>
 <tr>
 <td><code>/api/admin/scorm</code></td>
@@ -1575,8 +1769,28 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Return the currently active storage backend + a probe result so admins</td>
 </tr>
 <tr>
+<td><code>/api/admin/terms</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/terms</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/terms/acceptances</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/admin/users</code></td>
 <td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/admin/users/{user_id}/2fa/disable</code></td>
+<td>POST</td>
 <td></td>
 </tr>
 <tr>
@@ -1588,6 +1802,11 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/admin/webhooks</code></td>
 <td>POST</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/admin/webhooks/deliveries</code></td>
+<td>GET</td>
+<td>Recent WebhookDelivery rows across ALL subscriptions in the</td>
 </tr>
 <tr>
 <td><code>/api/admin/webhooks/{sub_id}</code></td>
@@ -1610,9 +1829,54 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Fires a <code>webhook.test</code> event with a tiny payload so admins can confirm</td>
 </tr>
 <tr>
+<td><code>/api/affiliate/lookup/{code}</code></td>
+<td>GET</td>
+<td>Public — thin preview so signup forms can show</td>
+</tr>
+<tr>
 <td><code>/api/ai/course-builder</code></td>
 <td>POST</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/challenge</code></td>
+<td>POST</td>
+<td>Public — accepts {challenge_id, code} and returns the standard</td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/disable</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/setup</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/setup-init</code></td>
+<td>POST</td>
+<td>Return a fresh secret + QR. Nothing is persisted here — the</td>
+</tr>
+<tr>
+<td><code>/api/auth/2fa/status</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/auth/_test/reset-rate-limit</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/auth/change-password</code></td>
+<td>POST</td>
+<td>Self-service password change. Verifies the old password, sets the</td>
+</tr>
+<tr>
+<td><code>/api/auth/forgot-password</code></td>
+<td>POST</td>
+<td>Emails a single-use reset link if the address matches an active</td>
 </tr>
 <tr>
 <td><code>/api/auth/login</code></td>
@@ -1626,8 +1890,23 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 <tr>
 <td><code>/api/auth/me</code></td>
+<td>DELETE</td>
+<td>Step 2 of self-deletion. Consumes the emailed code + anonymises</td>
+</tr>
+<tr>
+<td><code>/api/auth/me</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/auth/me/delete-request</code></td>
+<td>POST</td>
+<td>Step 1 of self-deletion. Emails a 6-digit confirmation code that</td>
+</tr>
+<tr>
+<td><code>/api/auth/me/export</code></td>
+<td>GET</td>
+<td>GDPR Right to Data Portability. Returns a JSON bundle of every</td>
 </tr>
 <tr>
 <td><code>/api/auth/refresh</code></td>
@@ -1640,14 +1919,29 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/auth/resend-verification</code></td>
+<td>POST</td>
+<td>Re-issue + email a verification link. Rate-limited (2/hr per</td>
+</tr>
+<tr>
+<td><code>/api/auth/reset-password</code></td>
+<td>POST</td>
+<td>Consume a reset token + set a new password. On success, logs the</td>
+</tr>
+<tr>
 <td><code>/api/auth/sso-exchange</code></td>
 <td>POST</td>
-<td>Inbound SSO from ERP360. Body: {"erp_token": "..."}.</td>
+<td>Inbound SSO from ERP360. Supports two response modes:</td>
 </tr>
 <tr>
 <td><code>/api/auth/sso-status</code></td>
 <td>GET</td>
 <td>Public endpoint — the login page calls this on mount to decide whether</td>
+</tr>
+<tr>
+<td><code>/api/auth/verify-email</code></td>
+<td>POST</td>
+<td>Consume an email-verification token. Called by the /verify-email/:token</td>
 </tr>
 <tr>
 <td><code>/api/authoring/budget</code></td>
@@ -1850,14 +2144,74 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/catalog/organizations</code></td>
+<td>GET</td>
+<td>Iter 27 — Cross-tenant marketplace search: list opted-in</td>
+</tr>
+<tr>
+<td><code>/api/catalog/{course_id}</code></td>
+<td>GET</td>
+<td>Public course detail — shown on marketplace product page.</td>
+</tr>
+<tr>
+<td><code>/api/catalog/{course_id}/reviews</code></td>
+<td>GET</td>
+<td>Best written reviews for a public course — highest stars first,</td>
+</tr>
+<tr>
+<td><code>/api/catalog/{course_id}/slides/{slide_id}/track-view</code></td>
+<td>POST</td>
+<td>Iter 26 — Fire once per (slide, learner, day) from the course</td>
+</tr>
+<tr>
+<td><code>/api/catalog/{course_id}/track-view</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/certificates</code></td>
 <td>GET</td>
 <td></td>
 </tr>
 <tr>
+<td><code>/api/certificates/admin-export.csv</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/admin-list</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/bulk-email</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/bulk-revoke</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/bulk-unrevoke</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/bulk-zip</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/certificates/transcript</code></td>
 <td>GET</td>
-<td>Generate a branded PDF transcript for the calling user. Lists every</td>
+<td>Generate a branded PDF transcript for the calling user.</td>
+</tr>
+<tr>
+<td><code>/api/certificates/transcript.json</code></td>
+<td>GET</td>
+<td>Iter 50 — JSON payload behind the printable transcript page.</td>
 </tr>
 <tr>
 <td><code>/api/certificates/verify/{code}</code></td>
@@ -1865,9 +2219,34 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/certificates/verify/{code}/og-image.png</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/verify/{code}/og-image.svg</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/certificates/{cert_id}/pdf</code></td>
 <td>GET</td>
-<td>Generate a branded PDF for a certificate. Owner or admin only.</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/{cert_id}/revocation-history</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/{cert_id}/revoke</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/certificates/{cert_id}/unrevoke</code></td>
+<td>POST</td>
+<td></td>
 </tr>
 <tr>
 <td><code>/api/courses</code></td>
@@ -1900,6 +2279,11 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/courses/{course_id}/archive</code></td>
+<td>POST</td>
+<td>Safe alternative to deletion — blocked while learners are busy.</td>
+</tr>
+<tr>
 <td><code>/api/courses/{course_id}/complete</code></td>
 <td>POST</td>
 <td></td>
@@ -1907,7 +2291,7 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>/api/courses/{course_id}/duplicate</code></td>
 <td>POST</td>
-<td>Deep-clone a course (with all slides) as a new DRAFT. Optional template path:</td>
+<td>Deep-clone a course (with all slides) as a new DRAFT.</td>
 </tr>
 <tr>
 <td><code>/api/courses/{course_id}/enroll</code></td>
@@ -1930,9 +2314,39 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/courses/{course_id}/progress</code></td>
+<td>POST</td>
+<td>Remember the learner's position so they resume across devices.</td>
+</tr>
+<tr>
 <td><code>/api/courses/{course_id}/publish</code></td>
 <td>POST</td>
-<td>Explicit publish action with validation. Course must have at least</td>
+<td>Explicit publish action — course must have at least one slide.</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/rating</code></td>
+<td>GET</td>
+<td>Average + count + the caller's own rating for a course.</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/rating</code></td>
+<td>POST</td>
+<td>Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44.</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/reviews</code></td>
+<td>GET</td>
+<td>All written reviews for a course (incl. hidden) — admin moderation view. Iter 47.</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/reviews/{rating_id}/reply</code></td>
+<td>POST</td>
+<td>Post/update a public academy reply under a learner review.</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden</code></td>
+<td>POST</td>
+<td>Hide/unhide a written review from the public course page. Iter 47.</td>
 </tr>
 <tr>
 <td><code>/api/courses/{course_id}/slides</code></td>
@@ -1970,6 +2384,16 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/courses/{course_id}/toggle-featured</code></td>
+<td>POST</td>
+<td>Flip the marketplace 'Featured' flag on a course (Iter 42).</td>
+</tr>
+<tr>
+<td><code>/api/courses/{course_id}/unarchive</code></td>
+<td>POST</td>
+<td>Restore an archived course back to DRAFT (re-publish separately).</td>
+</tr>
+<tr>
 <td><code>/api/courses/{course_id}/unpublish</code></td>
 <td>POST</td>
 <td></td>
@@ -1983,6 +2407,21 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/enrollments</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/erp360/sync/status</code></td>
+<td>GET</td>
+<td>Public probe. Returns whether IFPI is ready to receive ERP360</td>
+</tr>
+<tr>
+<td><code>/api/erp360/sync/test-ping</code></td>
+<td>POST</td>
+<td>Round-trip verification. Currently a stub — synthetic outbound</td>
+</tr>
+<tr>
+<td><code>/api/erp360/webhooks/user</code></td>
+<td>POST</td>
+<td>Receive <code>user.role_changed</code> and <code>user.deactivated</code> events from ERP360.</td>
 </tr>
 <tr>
 <td><code>/api/exams</code></td>
@@ -2016,8 +2455,28 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 <tr>
 <td><code>/api/exams/{exam_id}/attempts</code></td>
+<td>GET</td>
+<td>Per-learner attempt summary for an exam (admin/instructor).</td>
+</tr>
+<tr>
+<td><code>/api/exams/{exam_id}/attempts</code></td>
 <td>POST</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/exams/{exam_id}/attempts/reset</code></td>
+<td>POST</td>
+<td>Wipe a learner's attempts for one exam so they can retake it.</td>
+</tr>
+<tr>
+<td><code>/api/exams/{exam_id}/question-insights</code></td>
+<td>GET</td>
+<td>Per-question correct/miss rates across all attempts, so admins can</td>
+</tr>
+<tr>
+<td><code>/api/exams/{exam_id}/question-insights.csv</code></td>
+<td>GET</td>
+<td>Same data as /question-insights, as a CSV for curriculum reviews.</td>
 </tr>
 <tr>
 <td><code>/api/exams/{exam_id}/questions</code></td>
@@ -2025,14 +2484,54 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>mode='replace' (default) wipes &amp; sets. mode='append' adds to existing.</td>
 </tr>
 <tr>
+<td><code>/api/exams/{exam_id}/questions/{question_id}</code></td>
+<td>PATCH</td>
+<td>Edit one question in place — unlike PUT /questions (replace), this</td>
+</tr>
+<tr>
+<td><code>/api/feature-flags</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/feedback</code></td>
+<td>POST</td>
+<td>Log an in-app feedback item (bug report, idea, other).</td>
+</tr>
+<tr>
+<td><code>/api/feedback/screenshot</code></td>
+<td>POST</td>
+<td>Store a feedback screenshot; returns the URL to attach on submit.</td>
+</tr>
+<tr>
 <td><code>/api/gamification/leaderboard</code></td>
 <td>GET</td>
 <td></td>
 </tr>
 <tr>
+<td><code>/api/gamification/learning-streak</code></td>
+<td>GET</td>
+<td>Iter 26 — Consecutive-day learning streak. A day counts when the</td>
+</tr>
+<tr>
 <td><code>/api/gamification/me</code></td>
 <td>GET</td>
 <td></td>
+</tr>
+<tr>
+<td><code>/api/gamification/preferences</code></td>
+<td>GET</td>
+<td>Iter 31 — per-user gamification preferences.</td>
+</tr>
+<tr>
+<td><code>/api/gamification/preferences</code></td>
+<td>PATCH</td>
+<td>Iter 31 — toggle weekly streak digest opt-in/out.</td>
+</tr>
+<tr>
+<td><code>/api/gamification/streak-leaderboard</code></td>
+<td>GET</td>
+<td>Iter 28 — Org-wide "top streaks this week" leaderboard.</td>
 </tr>
 <tr>
 <td><code>/api/health</code></td>
@@ -2046,6 +2545,26 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 <tr>
 <td><code>/api/invitations/{token}/accept</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/join/{slug}</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/join/{slug}/signup</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/kiosk/settings</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/kiosk/unlock</code></td>
 <td>POST</td>
 <td></td>
 </tr>
@@ -2130,6 +2649,81 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/live-sessions</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/subscribe-url</code></td>
+<td>POST</td>
+<td>Return a URL the caller can hand to their calendar app. The URL</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/subscribe-url/qr</code></td>
+<td>GET</td>
+<td>Iter 25 — Return an SVG QR code encoding the current user's</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/subscribe-url/rotate</code></td>
+<td>POST</td>
+<td>Iter 25 — Bump the org's subscription_secret_version. Every</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/subscribe/{token}.ics</code></td>
+<td>GET</td>
+<td>Iter 24 — Persistent calendar subscription. Token authenticates</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/upcoming</code></td>
+<td>GET</td>
+<td>List sessions the current user can RSVP to: their cohort (or</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}</code></td>
+<td>DELETE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}</code></td>
+<td>PATCH</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}/cancel</code></td>
+<td>POST</td>
+<td>Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics).</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}/ics</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}/mark-attendance</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}/rsvp</code></td>
+<td>POST</td>
+<td>RSVP to a single session (default) OR the whole series when</td>
+</tr>
+<tr>
+<td><code>/api/live-sessions/{session_id}/uncancel</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/notifications</code></td>
 <td>GET</td>
 <td></td>
@@ -2175,6 +2769,16 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Send a sample celebration message to verify the configured webhook.</td>
 </tr>
 <tr>
+<td><code>/api/organization/nurture-settings</code></td>
+<td>PUT</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/organization/nurture-settings/run-now</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/organization/smtp</code></td>
 <td>GET</td>
 <td>Returns the SMTP config minus the password. Password is write-only.</td>
@@ -2192,7 +2796,57 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <tr>
 <td><code>/api/organization/themes</code></td>
 <td>GET</td>
-<td>Read-only list of curated theme presets an ADMIN can apply in one click.</td>
+<td>Built-in presets + this org's custom presets (marked <code>custom: true</code>).</td>
+</tr>
+<tr>
+<td><code>/api/organization/themes</code></td>
+<td>POST</td>
+<td>Create a custom theme preset for the caller's organization.</td>
+</tr>
+<tr>
+<td><code>/api/organization/themes/{preset_id}</code></td>
+<td>DELETE</td>
+<td>Delete a custom theme preset. Orgs currently using it keep their</td>
+</tr>
+<tr>
+<td><code>/api/organization/themes/{preset_id}</code></td>
+<td>PUT</td>
+<td>Update a custom theme preset (org-scoped).</td>
+</tr>
+<tr>
+<td><code>/api/pathways/admin/completions</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/pathways/admin/completions.csv</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/pathways/admin/rpl</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/pathways/admin/rpl/{user_id}/{course_id}</code></td>
+<td>DELETE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/pathways/map</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/payments/v1/checkout/session</code></td>
+<td>POST</td>
+<td>Create a Stripe Checkout Session for the target course.</td>
+</tr>
+<tr>
+<td><code>/api/payments/v1/checkout/status/{session_id}</code></td>
+<td>GET</td>
+<td>Poll Stripe for the payment status of a checkout session and</td>
 </tr>
 <tr>
 <td><code>/api/portal/{slug}</code></td>
@@ -2210,6 +2864,11 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td>Anonymous verification. Rate-limited to 30/min per IP (Redis</td>
 </tr>
 <tr>
+<td><code>/api/public/guides/{filename}</code></td>
+<td>GET</td>
+<td>Anonymous download of the platform user-guide PDFs.</td>
+</tr>
+<tr>
 <td><code>/api/rich-text/sanitize</code></td>
 <td>POST</td>
 <td>Server-side HTML sanitizer for the rich-text editor preview.</td>
@@ -2223,6 +2882,31 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/scorm/runtime.js</code></td>
 <td>GET</td>
 <td>Serve the IFPI SCORM runtime bridge as a static JS payload.</td>
+</tr>
+<tr>
+<td><code>/api/seo/certificates/share/{code}</code></td>
+<td>GET</td>
+<td>Iter 28 — Public shareable brag-card for a certificate.</td>
+</tr>
+<tr>
+<td><code>/api/seo/courses/share/{course_id}</code></td>
+<td>GET</td>
+<td>Iter 48 — Public shareable link for a marketplace course.</td>
+</tr>
+<tr>
+<td><code>/api/seo/robots.txt</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/seo/sitemap-{org_id}.xml</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/seo/sitemap.xml</code></td>
+<td>GET</td>
+<td></td>
 </tr>
 <tr>
 <td><code>/api/slides/{slide_id}/comments</code></td>
@@ -2240,14 +2924,54 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td></td>
 </tr>
 <tr>
+<td><code>/api/terms/accept</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/terms/current</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/tutor/ask</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/tutor/save-as-flashcard</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/tutor/sessions</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/tutor/sessions/{session_id}</code></td>
+<td>GET</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/api/tutor/sessions/{session_id}/archive</code></td>
+<td>POST</td>
+<td></td>
+</tr>
+<tr>
 <td><code>/api/uploads/bulk-media</code></td>
 <td>POST</td>
 <td>Multi-file upload. Each file is independently stored. Failed files</td>
 </tr>
 <tr>
+<td><code>/api/uploads/cover-library</code></td>
+<td>GET</td>
+<td>Curated course-cover photo gallery (Iter 43). Files are placed by</td>
+</tr>
+<tr>
 <td><code>/api/uploads/files/{path:path}</code></td>
 <td>GET</td>
-<td>Serve a previously-uploaded file. ONLY meaningful for the <code>local</code></td>
+<td>Serve a previously-uploaded file (local disk or object-store cache).</td>
 </tr>
 <tr>
 <td><code>/api/uploads/image</code></td>
@@ -2258,6 +2982,36 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 <td><code>/api/uploads/media</code></td>
 <td>POST</td>
 <td>Single-file upload for video/audio/PDF/image. If <code>course_id</code> is set,</td>
+</tr>
+<tr>
+<td><code>/api/v2/catalog</code></td>
+<td>GET</td>
+<td>Public course catalog (enveloped)</td>
+</tr>
+<tr>
+<td><code>/api/v2/courses</code></td>
+<td>GET</td>
+<td>List courses visible to the caller</td>
+</tr>
+<tr>
+<td><code>/api/v2/courses/{course_id}</code></td>
+<td>GET</td>
+<td>Course detail with slides</td>
+</tr>
+<tr>
+<td><code>/api/v2/enrollments</code></td>
+<td>GET</td>
+<td>Caller's enrollments with progress</td>
+</tr>
+<tr>
+<td><code>/api/v2/health</code></td>
+<td>GET</td>
+<td>Service health (enveloped)</td>
+</tr>
+<tr>
+<td><code>/api/webhook/stripe</code></td>
+<td>POST</td>
+<td>Stripe webhook receiver. Idempotent — the poll path and the</td>
 </tr>
 <tr>
 <td><code>/api/xapi/statements</code></td>
@@ -2271,7 +3025,7 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tr>
 </tbody>
 </table>
-<p><em>Total: <strong>170</strong> registered API endpoints.</em></p>
+<p><em>Total: <strong>322</strong> registered API endpoints.</em></p>
 <!-- AUTO:END api_routes -->
 
 <p>Highlights (curated):</p>
@@ -2372,7 +3126,88 @@ Structured as a 6-phase forensic walkthrough — every step lists <strong>what t
 </tbody>
 </table>
 <hr />
-<p><em>Regenerate this manual whenever routers are added: <code>python /app/backend/scripts/build_user_manual.py</code> — the script scans <code>router.routes</code>, <code>role_registry.py</code>, and model tables to keep everything in sync.</em></p>
+<h1 id="14-security-observability-14-security">14. Security &amp; Observability {#14-security}</h1>
+<p><strong>Shipped in Iterations 32–33.</strong> All items below apply automatically to every tenant — no per-org config needed.</p>
+<h2 id="141-security-headers">14.1 Security headers</h2>
+<p>Injected on every response by <code>core/middleware.py::SecurityHeadersMiddleware</code>:</p>
+<ul>
+<li><code>Content-Security-Policy</code> — locked to self + integrated third-parties (Sentry, Tavily)</li>
+<li><code>Strict-Transport-Security: max-age=31536000; includeSubDomains; preload</code></li>
+<li><code>X-Frame-Options: DENY</code></li>
+<li><code>X-Content-Type-Options: nosniff</code></li>
+<li><code>Referrer-Policy: same-origin</code></li>
+<li><code>Permissions-Policy: camera=(), microphone=(self), geolocation=()</code></li>
+</ul>
+<h2 id="142-sentry-correlation-ids">14.2 Sentry + correlation IDs</h2>
+<ul>
+<li>Backend + frontend both initialise <code>sentry-sdk</code>. Trace sample-rate <code>0.2</code> in prod.</li>
+<li>Every request receives an <code>X-Correlation-ID</code> (generated or forwarded). Frontend Axios interceptor echoes it back so stack traces link across tiers.</li>
+<li>Add a DSN via <code>SENTRY_DSN</code> (backend) and <code>REACT_APP_SENTRY_DSN</code> (frontend). No DSN = Sentry silently no-ops.</li>
+</ul>
+<h2 id="143-rate-limiting">14.3 Rate limiting</h2>
+<p>See § 10.8 for the endpoint table. Redis-backed (<code>RATE_LIMIT_REDIS_URL</code>) with in-memory fallback for dev.</p>
+<h2 id="144-audit-log">14.4 Audit log</h2>
+<p>Every mutating admin action + every sensitive read (cert download, doc preview, GDPR export) writes to the <code>audit_logs</code> table. Immutable, retained 3 years, viewable at <code>/dashboard/audit</code>. Export via <code>GET /api/admin/audit-log?format=csv</code>.</p>
+<h2 id="145-deployment-fail-closed-check">14.5 Deployment fail-closed check</h2>
+<p><code>python backend/scripts/deploy_precheck.py</code> runs at container startup and refuses to boot if:
+- <code>ENVIRONMENT</code> unset (assumed prod)
+- Dev secrets present (<code>JWT_SECRET=changeme</code>, <code>SEED_ADMIN_PASSWORD=admin123</code>, …)
+- Mongo config detected (IFPI is PostgreSQL-only)
+- CORS wildcard in prod
+- <code>STORAGE_BACKEND=local</code> in prod</p>
+<h2 id="146-locked-out-rescue-tool">14.6 Locked-out rescue tool</h2>
+<p><code>python backend/scripts/reset_admin_password.py --email &lt;owner&gt;</code> prints a random 20-char password and re-sets <code>must_change_password=true</code>. Idempotent seed script guarantees no user's password is ever overwritten by a redeploy.</p>
+<hr />
+<h1 id="15-documentation-library-in-app-15-docs-library">15. Documentation Library (in-app) {#15-docs-library}</h1>
+<p><strong>Where to find these manuals inside IFPI:</strong></p>
+<blockquote>
+<p><code>Dashboard → Organization Settings → Documents</code> (ADMIN+ only).</p>
+</blockquote>
+<p>The tab (see <code>frontend/src/pages/dashboard/OrganizationDocumentsTab.tsx</code>) lists every manual with:
+- Live line count, size, last-modified timestamp
+- <strong>Inline preview</strong> — click a row to render the PDF in an iframe below (no download friction)
+- <strong>Download PDF</strong> — server-rendered from the source markdown via <code>xhtml2pdf</code>, cached 1 h
+- <strong>Download Markdown</strong> — raw source for import into Notion / Confluence
+- Every preview and download is written to the audit log so admins can measure engagement.</p>
+<p><strong>Catalog served by <code>/api/admin/docs</code>:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Slug</th>
+<th>Title</th>
+<th>Audience</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>setup-manual</code></td>
+<td>IFPI Setup Manual</td>
+<td>Owner, Super Admin</td>
+</tr>
+<tr>
+<td><code>user-manual</code></td>
+<td>IFPI User Manual</td>
+<td>All roles</td>
+</tr>
+<tr>
+<td><code>integration-matrix</code></td>
+<td>IFPI ↔ ERP360 Integration Matrix</td>
+<td>Platform Ops, Owner</td>
+</tr>
+<tr>
+<td><code>assessment</code></td>
+<td>IFPI vs ERP360 Comparative Assessment</td>
+<td>Owner, Platform Ops</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Endpoints (all <code>requires_admin</code>):</strong>
+- <code>GET /api/admin/docs</code> — manifest
+- <code>GET /api/admin/docs/{slug}/pdf?preview=true|false</code> — streamed PDF
+- <code>GET /api/admin/docs/{slug}/raw</code> — raw markdown</p>
+<p>Manuals stay in sync with the codebase: AUTO-BLOCK sections (route index, model index, role matrix) are regenerated by <code>python backend/scripts/build_docs.py</code>. Human-written prose outside those markers is preserved.</p>
+<hr />
+<p><em>Regenerate this manual whenever routers or models change: <code>python /app/backend/scripts/build_docs.py</code>.</em></p>
 <hr />
 <!-- === IFPI_INTEGRATION_MATRIX.md === -->
 <h1 id="ifpi-erp360-integration-matrix">IFPI ↔ ERP360 Integration Matrix</h1>
