@@ -253,7 +253,7 @@ class TestAuditDigest:
             "sys.path.insert(0, '/app/backend')\n"
             "from core.database import SessionLocal\n"
             "from auth.dependencies import CurrentUser\n"
-            "from routers.iter8 import audit_digest\n"
+            "from routers.admin_analytics import audit_digest\n"
             "from models import User\n"
             "db = SessionLocal()\n"
             "u = db.query(User).filter(User.email=='admin@ifpi.org').first()\n"

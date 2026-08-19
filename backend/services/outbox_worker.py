@@ -94,7 +94,7 @@ def _dispatch_one(msg: OutboxMessage) -> tuple[str, Optional[str], Optional[str]
         }
         # Sign the request body for downstream HMAC verification
         import json
-        from routers.iter5 import sign_outgoing_payload
+        from core.security import sign_outgoing_payload
         raw = json.dumps(payload).encode("utf-8")
         headers = sign_outgoing_payload(raw) or {"X-Service-Token": settings.erp360_sso_shared_secret}
         with httpx.Client(timeout=20) as cli:

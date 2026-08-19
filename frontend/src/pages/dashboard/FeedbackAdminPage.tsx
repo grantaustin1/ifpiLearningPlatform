@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from 'lib/api'
+import { BACKEND_URL } from 'lib/env'
 import { MessageSquare, CheckCircle2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -8,8 +9,6 @@ const CAT_STYLE: Record<string, string> = {
   IDEA: 'bg-amber-50 text-amber-700 border-amber-100',
   OTHER: 'bg-slate-50 text-slate-600 border-slate-200',
 }
-
-const BACKEND = process.env.REACT_APP_BACKEND_URL || ''
 
 export default function FeedbackAdminPage() {
   const qc = useQueryClient()
@@ -46,12 +45,12 @@ export default function FeedbackAdminPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-slate-800 whitespace-pre-wrap">{f.message}</p>
                   {f.screenshot_url && (
-                    <a href={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND}${f.screenshot_url}`}
+                    <a href={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND_URL}${f.screenshot_url}`}
                       target="_blank" rel="noopener noreferrer"
                       data-testid={`feedback-screenshot-${f.id}`}
                       className="inline-block mt-2 rounded-lg border border-slate-200 overflow-hidden hover:border-indigo-300 transition-colors">
                       <img
-                        src={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND}${f.screenshot_url}`}
+                        src={f.screenshot_url.startsWith('http') ? f.screenshot_url : `${BACKEND_URL}${f.screenshot_url}`}
                         alt="Attached screenshot" className="h-24 object-cover" loading="lazy" />
                     </a>
                   )}

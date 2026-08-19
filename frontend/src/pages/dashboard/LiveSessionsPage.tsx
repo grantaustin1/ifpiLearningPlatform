@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from 'lib/api'
+import { API_URL } from 'lib/env'
 import { useAuth } from 'contexts/AuthContext'
 import { toast } from 'sonner'
 import {
@@ -91,9 +92,6 @@ export default function LiveSessionsPage() {
       } else {
         toast.success(r.data.status === 'RSVP' ? 'You\u2019re RSVP\u2019d' : 'RSVP cancelled')
       }
-      // Iter 29 — Cohort auto-enrol from RSVP: surface the enrolment
-      // as a distinct celebratory toast so the learner knows the
-      // course is now on their dashboard.
       if (r.data.auto_enrolled && r.data.course_id) {
         toast.success('\u2728 You\u2019ve also been enrolled in the course', {
           action: {
@@ -116,8 +114,7 @@ export default function LiveSessionsPage() {
   const getSubscriptionUrl = async (kind: 'admin' | 'learner' | 'my_rsvps') => {
     try {
       const r = await api.post(`/live-sessions/subscribe-url?kind=${kind}`)
-      const backend = (import.meta as any).env?.VITE_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || window.location.origin
-      const fullUrl = `${backend}${r.data.path}`
+      const fullUrl = `${API_URL}${r.data.path}`
       setSubscriptionKind(kind)
       setSubscriptionUrl(fullUrl)
       setShowKindPicker(false)
@@ -127,8 +124,6 @@ export default function LiveSessionsPage() {
   }
 
   const onSubscribeClick = () => {
-    // Admins go straight to the admin feed; learners choose between
-    // "everything in my cohort" and "only sessions I RSVP'd to".
     if (isAdmin) return getSubscriptionUrl('admin')
     setShowKindPicker(true)
   }
@@ -142,8 +137,7 @@ export default function LiveSessionsPage() {
     }))) return
     try {
       const r = await api.post('/live-sessions/subscribe-url/rotate')
-      toast.success(`Secret rotated to v${r.data.new_version} — old URLs revoked`)
-      // Refresh the current modal's URL to the new one
+      toast.success(`Secret rotated to v${r.data.new_version} \u2014 old URLs revoked`)
       if (subscriptionUrl) await getSubscriptionUrl(subscriptionKind)
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Rotation failed')
@@ -238,7 +232,7 @@ export default function LiveSessionsPage() {
           <p className="text-sm">No upcoming live sessions.</p>
           {isAdmin && (
             <button onClick={() => setShowCreate(true)} className="text-indigo-600 text-sm font-medium mt-2">
-              Schedule your first session →
+              Schedule your first session \u2192
             </button>
           )}
         </div>
@@ -278,7 +272,7 @@ export default function LiveSessionsPage() {
                 {s.description && <p className="text-sm text-slate-600 mt-2 line-clamp-2">{s.description}</p>}
                 <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-slate-500">
                   <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {fmtDate(s.start_at)}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {s.duration_minutes}m · {relTime(s.start_at)}</span>
+                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {s.duration_minutes}m \u00b7 {relTime(s.start_at)}</span>
                   <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {s.rsvp_count}{s.max_attendees ? `/${s.max_attendees}` : ''} RSVP</span>
                   {s.cohort && <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{s.cohort}</span>}
                 </div>
@@ -294,7 +288,7 @@ export default function LiveSessionsPage() {
                         className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${rsvped
                           ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                           : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}>
-                        {rsvped ? <><Check className="h-3.5 w-3.5" /> RSVP&apos;d</> : <><UserCheck className="h-3.5 w-3.5" /> RSVP</>}
+                        {rsvped ? <><Check className="h-3.5 w-3.5" /> RSVP\u2019d</> : <><UserCheck className="h-3.5 w-3.5" /> RSVP</>}
                       </button>
                       {(s.recurrence_rule || s.parent_series_id) && (
                         <button onClick={() => toggleRsvp(s, true)} data-testid={`rsvp-series-${s.id}`}
@@ -341,4 +335,3 @@ export default function LiveSessionsPage() {
     </div>
   )
 }
-

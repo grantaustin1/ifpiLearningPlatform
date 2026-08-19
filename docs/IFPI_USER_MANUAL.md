@@ -468,7 +468,8 @@ Core entities (see `backend/models/` for the full list):
 <!-- AUTO:BEGIN router_index -->
 | File | Lines |
 |---|---|
-| `routers/admin_analytics.py` | 163 |
+| `routers/academies.py` | 109 |
+| `routers/admin_analytics.py` | 322 |
 | `routers/admin_entitlements.py` | 185 |
 | `routers/admin_organizations.py` | 202 |
 | `routers/affiliate.py` | 263 |
@@ -485,30 +486,32 @@ Core entities (see `backend/models/` for the full list):
 | `routers/billing.py` | 65 |
 | `routers/campaign_links.py` | 256 |
 | `routers/catalog.py` | 242 |
-| `routers/certificates.py` | 825 |
+| `routers/certificates.py` | 960 |
+| `routers/comments.py` | 84 |
 | `routers/courses.py` | 950 |
 | `routers/docs_library.py` | 103 |
 | `routers/email_diagnostics.py` | 127 |
 | `routers/enrollments.py` | 42 |
 | `routers/erp360_sync.py` | 430 |
 | `routers/exams.py` | 459 |
-| `routers/extras.py` | 694 |
 | `routers/feedback.py` | 106 |
 | `routers/flashcards.py` | 497 |
 | `routers/gamification.py` | 188 |
 | `routers/imports.py` | 551 |
 | `routers/invitations.py` | 206 |
-| `routers/iter5.py` | 407 |
-| `routers/iter8.py` | 367 |
-| `routers/learning_paths.py` | 285 |
+| `routers/leads.py` | 140 |
+| `routers/learning_paths.py` | 306 |
 | `routers/live_sessions.py` | 851 |
 | `routers/marketplace_analytics.py` | 430 |
 | `routers/misc.py` | 1391 |
 | `routers/narration.py` | 204 |
 | `routers/notifications.py` | 48 |
 | `routers/onboarding.py` | 97 |
+| `routers/organization.py` | 467 |
+| `routers/outbox.py` | 83 |
 | `routers/owner_dashboard.py` | 226 |
 | `routers/pathways.py` | 76 |
+| `routers/portal.py` | 40 |
 | `routers/public_catalog.py` | 201 |
 | `routers/query_builder.py` | 250 |
 | `routers/scheduled_reports.py` | 188 |
@@ -517,8 +520,9 @@ Core entities (see `backend/models/` for the full list):
 | `routers/stripe_payments.py` | 303 |
 | `routers/terms_kiosk.py` | 339 |
 | `routers/totp.py` | 268 |
+| `routers/uploads.py` | 134 |
 | `routers/webhooks.py` | 253 |
-| **Total** | **16088** |
+| **Total** | **15992** |
 <!-- AUTO:END router_index -->
 
 ## 12.2 Model Inventory
@@ -621,7 +625,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/api-tokens/analytics/usage` | GET | Return per-day request counts for the org over the last `days` days, |
 | `/api/admin/api-tokens/{token_id}` | DELETE |  |
 | `/api/admin/api-tokens/{token_id}/revoke` | POST |  |
-| `/api/admin/audit-digest` | GET | LLM-generated plain-English summary of the last N days of admin |
+| `/api/admin/audit-digest` | GET | LLM-generated plain-English summary of the last N days of admin activity. |
 | `/api/admin/audit-log` | GET |  |
 | `/api/admin/campaign-links` | GET |  |
 | `/api/admin/campaign-links` | POST |  |
@@ -666,7 +670,7 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/admin/outbox/stats` | GET |  |
 | `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
 | `/api/admin/query-builder/build` | POST |  |
-| `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort, or for |
+| `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort. |
 | `/api/admin/scheduled-reports` | GET |  |
 | `/api/admin/scheduled-reports` | POST |  |
 | `/api/admin/scheduled-reports/{report_id}` | DELETE |  |
@@ -756,21 +760,21 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 | `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
 | `/api/catalog/{course_id}/track-view` | POST |  |
 | `/api/certificates` | GET |  |
-| `/api/certificates/admin-export.csv` | GET | Iter 30 — CSV export for compliance / auditors. All org certs |
-| `/api/certificates/admin-list` | GET | Iter 30 — Admin view: paginated list of ALL certs in the org. |
-| `/api/certificates/bulk-email` | POST | Iter 31 — Bulk re-email certificate download links to owners. |
-| `/api/certificates/bulk-revoke` | POST | Iter 30 — Bulk revoke. Skips already-revoked certs (idempotent) |
-| `/api/certificates/bulk-unrevoke` | POST | Iter 31 — Bulk lift-revocation. Skips currently-active certs |
-| `/api/certificates/bulk-zip` | POST | Iter 31 — Bundle up to 100 cert PDFs into a single ZIP for |
-| `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. Lists every |
+| `/api/certificates/admin-export.csv` | GET |  |
+| `/api/certificates/admin-list` | GET |  |
+| `/api/certificates/bulk-email` | POST |  |
+| `/api/certificates/bulk-revoke` | POST |  |
+| `/api/certificates/bulk-unrevoke` | POST |  |
+| `/api/certificates/bulk-zip` | POST |  |
+| `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. |
 | `/api/certificates/transcript.json` | GET | Iter 50 — JSON payload behind the printable transcript page. |
 | `/api/certificates/verify/{code}` | GET |  |
-| `/api/certificates/verify/{code}/og-image.png` | GET | Iter 50 — PNG OG image for social share previews. LinkedIn does |
-| `/api/certificates/verify/{code}/og-image.svg` | GET | Iter 28 — SVG OG image for social share previews. 1200×630 to |
-| `/api/certificates/{cert_id}/pdf` | GET | Generate a branded PDF for a certificate. Owner or admin only. |
-| `/api/certificates/{cert_id}/revocation-history` | GET | Iter 30 — Compliance audit trail. Lists REVOKE/UNREVOKE events |
-| `/api/certificates/{cert_id}/revoke` | POST | Iter 29 — Revoke a certificate. Requires ADMIN role. Idempotent |
-| `/api/certificates/{cert_id}/unrevoke` | POST | Iter 29 — Clear a revocation flag. In case of a mistaken |
+| `/api/certificates/verify/{code}/og-image.png` | GET |  |
+| `/api/certificates/verify/{code}/og-image.svg` | GET |  |
+| `/api/certificates/{cert_id}/pdf` | GET |  |
+| `/api/certificates/{cert_id}/revocation-history` | GET |  |
+| `/api/certificates/{cert_id}/revoke` | POST |  |
+| `/api/certificates/{cert_id}/unrevoke` | POST |  |
 | `/api/courses` | GET |  |
 | `/api/courses` | POST |  |
 | `/api/courses/reorder` | PATCH | Body: {"course_ids": [id1, id2, ...]} — sets display_order to the |

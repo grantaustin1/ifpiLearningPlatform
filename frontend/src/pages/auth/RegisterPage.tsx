@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from 'contexts/AuthContext'
 import { api } from 'lib/api'
+import { API_URL } from 'lib/env'
 import { GraduationCap } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -27,10 +28,8 @@ export default function RegisterPage() {
       .catch(() => {})
   }, [])
 
-  const backend = (import.meta as any).env?.VITE_API_URL
-    || (typeof process !== 'undefined' && (process as any).env?.REACT_APP_BACKEND_URL) || ''
   const resolvedLogo = brand.logo_url
-    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${backend}${brand.logo_url}`)
+    ? (brand.logo_url.startsWith('http') ? brand.logo_url : `${API_URL}${brand.logo_url}`)
     : null
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -38,8 +37,6 @@ export default function RegisterPage() {
     try {
       await register(email, password, name)
       toast.success('Welcome to IFPI Learning!')
-      // Honor ?next=... so marketplace signup handoff works
-      // (auto_enroll flag is picked up by CourseDetailPage after auth)
       const next = params.get('next')
       const autoEnroll = params.get('auto_enroll')
       if (next) {

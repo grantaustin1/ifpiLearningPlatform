@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
+import { API_URL } from 'lib/env'
 import { ArrowLeft, Save, Plus, Trash2, Eye, CheckCircle2, Send, EyeOff, GripVertical, Lock, X, History, RotateCcw, Sparkles, Upload, LayoutTemplate } from 'lucide-react'
 import { toast } from 'sonner'
 import { SortableList } from 'components/SortableList'
@@ -86,8 +87,6 @@ export default function CourseEditPage() {
       }
       setSavedAt(new Date())
       if (searchParams.get('slide')) {
-        // Came from the course view via "Edit slide" — jump straight back
-        // to the same slide so the change is visible immediately.
         toast.success('Saved — taking you back to the slide')
         const backSlide = active && active > 0 ? `?slide=${active}` : ''
         nav(`/learn/${id}${backSlide}`)
@@ -261,11 +260,9 @@ export default function CourseEditPage() {
               <Sparkles className="h-3.5 w-3.5" /> Mind map
             </button>
             <a
-              href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
+              href={`${API_URL}/api/authoring/pptx/${course.id}`}
               onClick={(e) => {
-                // Attach auth token as query fallback isn't safe; fetch + blob download instead.
                 e.preventDefault()
-                const tok = localStorage.getItem('ifpi_access_token') || ''
                 api.get(`/authoring/pptx/${course.id}`, { responseType: 'blob' }).then(r => {
                   const url = URL.createObjectURL(r.data)
                   const a = document.createElement('a')
@@ -274,7 +271,6 @@ export default function CourseEditPage() {
                   a.click()
                   URL.revokeObjectURL(url)
                 }).catch(() => toast.error('PPTX export failed'))
-                void tok
               }}
               data-testid="pptx-download-btn"
               className="inline-flex items-center gap-1.5 text-xs border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium cursor-pointer">
@@ -465,14 +461,12 @@ export default function CourseEditPage() {
           )}
         </div>
 
-        {/* Iter 24 — Marketplace funnel analytics */}
         {course?.id && (
           <div className="mt-6 pt-4 border-t border-slate-200">
             <CourseFunnelPanel courseId={course.id} />
           </div>
         )}
 
-        {/* Iter 47 — Written review moderation */}
         {course?.id && <CourseReviewsPanel courseId={course.id} />}
       </aside>
 
@@ -723,7 +717,7 @@ function VisualEditor({ slide, onUpdated }: { slide: any; onUpdated: () => void 
       })
       toast.success(`Image generated · ${(r.data.size_bytes / 1024).toFixed(0)} KB`)
       setPrompt('')
-      setBusy(false)         // reset before async reload to keep the button snappy
+      setBusy(false)
       await onUpdated()
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Image generation failed')
@@ -877,32 +871,26 @@ function SpendPreviewModal({ preview, onCancel, onConfirm }:
           {remaining != null && (
             <div className="flex items-baseline justify-between text-sm">
               <span className="text-slate-500">Remaining this month</span>
-              <span className={`font-semibold tabular-nums ${willExceed ? 'text-rose-600' : 'text-emerald-700'}`}
-                data-testid="video-spend-remaining">
+              <span className={`font-semibold ${willExceed ? 'text-rose-600' : 'text-purple-700'}`} data-testid="video-spend-remaining">
                 ${cents(remaining)}
               </span>
             </div>
           )}
           {willExceed && (
-            <div className="bg-rose-100 border border-rose-200 text-rose-800 rounded-lg p-2 text-xs" data-testid="video-spend-warning">
-              This generation will exceed your organization's monthly AI budget.
-            </div>
+            <p className="text-xs text-rose-600 font-medium" data-testid="video-spend-warning">
+              ⚠️ This will exceed your monthly budget. The video will still be generated, but future spend may be restricted.
+            </p>
           )}
         </div>
-        <p className="text-xs text-slate-500">
-          Renders take 2-6 minutes. You can safely close this page and come back — the job runs in the background.
-        </p>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} data-testid="video-spend-cancel"
-            className="text-sm border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium">Cancel</button>
-          <button onClick={onConfirm} disabled={willExceed} data-testid="video-spend-confirm"
-            className="text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white px-5 py-2 rounded-lg font-semibold">
-            Generate for ${cents(cost)}
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-medium">
+            Confirm & generate
           </button>
         </div>
       </div>
     </div>
   )
 }
-
-
