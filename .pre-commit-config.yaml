@@ -25,7 +25,17 @@ repos:
         files: ^backend/.*\.py$
         stages: [commit]
 
-      # Raw URL guard — warns about raw localhost URLs in source
+      # Docs auto-regeneration — keeps AUTO-BLOCKs in sync with code
+      - id: build-docs
+        name: Regenerate IFPI manual docs
+        description: Rebuild auto-blocks in docs/IFPI_*_MANUAL.md when backend changes
+        entry: bash -c 'cd backend && python scripts/build_docs.py'
+        language: system
+        files: ^(backend/.*\.py|docs/IFPI_.*\.md)$
+        pass_filenames: false
+        stages: [commit]
+
+      # Raw URL guard � warns about raw localhost URLs in source
       - id: raw-url-guard
         name: Raw URL guard
         description: Prevent hardcoded localhost/preview URLs in source files
