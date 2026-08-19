@@ -39,3 +39,12 @@ api.interceptors.response.use(
 )
 
 export default api
+export { api }
+
+export function setAccessToken(token: string | null) {
+  if (token) {
+    localStorage.setItem('access_token', token)
+  } else {
+    localStorage.removeItem('access_token')
+  }
+}

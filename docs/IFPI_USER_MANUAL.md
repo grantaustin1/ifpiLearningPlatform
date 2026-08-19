@@ -530,7 +530,73 @@ Core entities (see `backend/models/` for the full list):
 <!-- AUTO:BEGIN model_index -->
 | Model | Table |
 |---|---|
-| _(introspection failed: ModuleNotFoundError("No module named 'sqlalchemy'"))_ | |
+| `AIJob` | `ai_jobs` |
+| `AITutorMessage` | `ai_tutor_messages` |
+| `AITutorSession` | `ai_tutor_sessions` |
+| `AIUsageLedger` | `ai_usage_ledger` |
+| `AccountDeletionRequest` | `account_deletion_requests` |
+| `AffiliateCode` | `affiliate_codes` |
+| `AffiliateReferral` | `affiliate_referrals` |
+| `ApiToken` | `api_tokens` |
+| `ApiTokenCall` | `api_token_calls` |
+| `AuditLog` | `audit_logs` |
+| `BadgeTier` | `badge_tiers` |
+| `BillingEvent` | `billing_events` |
+| `CampaignLink` | `campaign_links` |
+| `CampaignSignup` | `campaign_signups` |
+| `Certificate` | `certificates` |
+| `CertificateRevocationEvent` | `certificate_revocation_events` |
+| `Course` | `courses` |
+| `CoursePrerequisite` | `course_prerequisites` |
+| `CourseRating` | `course_ratings` |
+| `CourseSlide` | `course_slides` |
+| `CourseView` | `course_views` |
+| `CustomThemePreset` | `custom_theme_presets` |
+| `EmailVerificationToken` | `email_verification_tokens` |
+| `Enrollment` | `enrollments` |
+| `Erp360SeenEvent` | `erp360_seen_events` |
+| `Exam` | `exams` |
+| `ExamAttempt` | `exam_attempts` |
+| `ExamQuestion` | `exam_questions` |
+| `FeatureFlag` | `feature_flags` |
+| `Flashcard` | `flashcards` |
+| `FlashcardReview` | `flashcard_reviews` |
+| `ImportJob` | `import_jobs` |
+| `Invitation` | `invitations` |
+| `KioskSettings` | `kiosk_settings` |
+| `LearningPath` | `learning_paths` |
+| `LearningPathEnrollment` | `learning_path_enrollments` |
+| `LearningPathItem` | `learning_path_items` |
+| `LiveSession` | `live_sessions` |
+| `LiveSessionRsvp` | `live_session_rsvps` |
+| `Notification` | `notifications` |
+| `Organization` | `organizations` |
+| `OutboxMessage` | `outbox_messages` |
+| `PasswordResetToken` | `password_reset_tokens` |
+| `PaymentTransaction` | `payment_transactions` |
+| `Person` | `persons` |
+| `ProgressOutbox` | `progress_outbox` |
+| `RefreshToken` | `refresh_tokens` |
+| `ScheduledReport` | `scheduled_reports` |
+| `ScormPackage` | `scorm_packages` |
+| `SlideComment` | `slide_comments` |
+| `SlideVersion` | `slide_versions` |
+| `SlideView` | `slide_views` |
+| `SourceChunk` | `source_chunks` |
+| `SourceDocument` | `source_documents` |
+| `SsoJtiSeen` | `sso_jti_seen` |
+| `Subscription` | `subscriptions` |
+| `TermsAcceptance` | `terms_acceptances` |
+| `TermsVersion` | `terms_versions` |
+| `TesterFeedback` | `tester_feedback` |
+| `User` | `users` |
+| `UserBadge` | `user_badges` |
+| `UserRole` | `user_roles` |
+| `WebhookDelivery` | `webhook_deliveries` |
+| `WebhookSubscription` | `webhook_subscriptions` |
+| `XApiStatement` | `xapi_statements` |
+
+_Total: **65** ORM models._
 <!-- AUTO:END model_index -->
 
 ---
@@ -542,7 +608,12 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 <!-- AUTO:BEGIN api_routes -->
 | Endpoint | Verb | Purpose |
 |---|---|---|
-| _(unable to introspect — run locally with the backend importable)_ | | |
+| `/api` | GET |  |
+| `/api/docs` | GET |  |
+| `/api/health` | GET |  |
+| `/api/openapi.json` | GET |  |
+
+_Total: **4** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
