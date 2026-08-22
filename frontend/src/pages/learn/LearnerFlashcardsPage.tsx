@@ -207,7 +207,7 @@ export default function LearnerFlashcardsPage() {
                 )}
                 {!flipped && (
                   <button className="mt-6 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600" data-testid="lfc-show-answer">
-                    <Eye className="h-3.5 w-3.5" /> Reveal (Space)
+                    <Eye className="h-3.5 w-3.5" /> <span className="sm:hidden">Tap to reveal</span><span className="hidden sm:inline">Reveal (Space)</span>
                   </button>
                 )}
               </div>
@@ -219,7 +219,7 @@ export default function LearnerFlashcardsPage() {
                       onClick={() => submitReview(q)}
                       disabled={submitting}
                       data-testid={`lfc-rate-${q}`}
-                      className={`${color} text-white rounded-xl py-3 px-2 text-xs font-bold disabled:opacity-60 transition`}
+                      className={`${color} text-white rounded-xl py-3 px-2 min-h-[44px] text-xs font-bold disabled:opacity-60 transition`}
                     >
                       <div className="text-lg leading-none">{q}</div>
                       <div className="mt-1">{label}</div>
@@ -234,7 +234,8 @@ export default function LearnerFlashcardsPage() {
                     className="inline-flex items-center gap-1 disabled:opacity-40" data-testid="lfc-prev">
                     <ChevronLeft className="h-3.5 w-3.5" /> Prev
                   </button>
-                  <span>Space to flip · 1-5 to rate</span>
+                  <span className="hidden sm:inline">Space to flip · 1-5 to rate</span>
+                  <span className="sm:hidden">Tap card to flip</span>
                   <button onClick={() => { if (i < cards.length - 1) { setI(i + 1); setFlipped(false) } }}
                     disabled={i >= cards.length - 1}
                     className="inline-flex items-center gap-1 disabled:opacity-40" data-testid="lfc-next">

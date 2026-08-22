@@ -1,0 +1,39 @@
+{
+  "summary": "Mobile (375x667) responsiveness testing for learner-facing pages on IFPI Learning Platform. Logged in as uat-learner. Verified DashboardLayout mobile behavior, WelcomeTour mobile filtering, /courses, /leaderboard, LearnPage player, FeedbackWidget, and desktop regression at 1440x900. All 10 phases of the mobile fix are functioning correctly. Flashcards route was not verifiable (no flashcards exist for the tested course 297). Exam-taking page not reached (no gated exam readily available); noted as skipped per instructions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DashboardLayout backdrop (z-30) sits BEHIND sidebar (z-40) which is 240px wide. Playwright ElementHandle.click on the backdrop uses its bounding-box center (~x=187) which lands within the sidebar overlay — the sidebar aside intercepts pointer events but has no close handler, so the click is a no-op. Real users tapping the visible dark area (x > 240) close it correctly (verified via page.mouse.click(320,400) and via backdrop.click() JS dispatch, both closed the sidebar). Not a user-facing bug, but automated tests must click at coord >240 or dispatch via JS. Consider adding a click handler on the sidebar's outside overlay area or moving backdrop above sidebar for cleaner testability.",
+    "LearnPage Prev/Next buttons render 298px wide inside a p-4 container on 375px viewport (i.e., 375 - 32px padding - ~45px sidebar list gutter = ~298). This is expected 'full-width within content area', not a bug. Buttons ARE stacked vertically with adequate tap targets (36-38px height — slightly under the 44px WCAG recommendation for touch targets; consider min-h-[44px])."
+  ],
+  "verified_items": [
+    "Mobile /courses: mobile-header + hamburger visible; sidebar hidden at x=-240; no horizontal scroll (scrollWidth=375)",
+    "Hamburger opens sidebar (x:0) with backdrop (z-30, dark)",
+    "Backdrop tap on visible area closes sidebar (verified via mouse.click(320,400) and JS backdrop.click())",
+    "X button (sidebar-close-btn) closes sidebar",
+    "nav-leaderboard link navigates to /leaderboard AND auto-closes sidebar",
+    "WelcomeTour on mobile filters out nav-* spotlight steps — only 3 steps shown (Welcome, Help & guides, Feedback button). Tour card fits within 375px (x=16, w=343)",
+    "/courses: p-4 padding, search input works, courses-search-clear (X) appears after typing and clears the search",
+    "/leaderboard: table wrapped in overflow-x-auto; no page-level horizontal scroll",
+    "LearnPage /learn/297: slide content readable, no horizontal scroll (scrollWidth=375). Prev/Next stacked vertically, ~full-width within content area",
+    "FeedbackWidget: floating btn visible; panel fits viewport (x=20, w=335); contains 6 Lucide SVG icons; no emojis in category buttons (Bug/Idea/Other rendered as text with Lucide icons)",
+    "Desktop 1440x900 regression: mobile-header hidden, hamburger hidden, sidebar permanently visible (x=0, w=240), no horizontal scroll on /courses or /leaderboard, feedback widget visible bottom-right"
+  ],
+  "not_verified": [
+    "Flashcards page — course 297 has no flashcards; /learn/297/flashcards did not render lfc-card. Skipped per instructions.",
+    "Exam taking page (/take/exam/{id}) — no readily-reachable exam gate encountered during navigation. Skipped per instructions."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100% of verified items (10/10 core mobile scenarios + desktop regression)"},
+  "test_credentials": "uat-learner@ifpi.org / UatLearner!2026 (used, works)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Mobile responsiveness fix verified end-to-end on preview URL. If retesting flashcards, use a course that has flashcards seeded (course 297 does not). Exam gate requires completing a course. Note: sidebar-backdrop click via Playwright ElementHandle.click() will fail because click center lands on sidebar aside (z-40 > backdrop z-30) — use page.mouse.click(320,400) or JS dispatch. Consider recommending main agent add min-h-[44px] to LearnPage Prev/Next for WCAG touch-target compliance."
+}

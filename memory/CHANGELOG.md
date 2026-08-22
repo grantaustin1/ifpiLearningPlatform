@@ -2230,3 +2230,18 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - yarn --frozen-lockfile CI failure: workspace package.json+yarn.lock verified
   consistent via fresh-dir simulation (EXIT:0). GitHub repo copy is stale —
   user must push via Save to GitHub.
+
+## 2026-08-22 — Mobile Responsiveness Fix (learner-facing) + Kiosk PIN reset
+- Kiosk PIN for org 1 reset to `2026` (was unrecoverable hash). Password fallback works.
+- Implemented full mobile fix per uploaded IFPI_Emergent_Mobile_Fix.pdf (all phases):
+  - DashboardLayout: mobile hamburger header, slide-in sidebar (translate-x), backdrop overlay, X close, auto-close on nav/resize.
+  - CoursesPage: p-4 md:p-8, search clear-X button (data-testid courses-search-clear).
+  - LearnPage: 44px star touch targets (p-2.5), stacked full-width prev/next with min-h-[44px].
+  - TakeExamPage: stacked header (no truncate), break-words on options, stacked min-h-[44px] footer buttons.
+  - LearnerFlashcardsPage: tap-to-flip hints, min-h-[44px] rating buttons.
+  - LeaderboardPage: overflow-x-auto wrapper, min-w-[600px] table, responsive cell padding.
+  - FeedbackWidget: viewport-fit panel width, safe-area-inset-bottom, Lucide icons replace emoji.
+  - WelcomeTour: filters nav-* spotlight steps on <768px, mobile-fit tooltip (top-centered).
+  - CatalogPage: aspect-video covers on mobile; index.css scroll-indicator utility.
+- Tested: iteration_68.json — 100% pass at 375x667 + desktop 1440x900 regression. Flashcards/exam pages skipped (no seed data reachable), code changes there are class-only.
+- Note for tests: sidebar-backdrop (z-30) is behind sidebar (z-40); click backdrop at x>240 or via JS dispatch.

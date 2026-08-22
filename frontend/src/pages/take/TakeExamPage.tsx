@@ -118,9 +118,9 @@ export default function TakeExamPage() {
   const q = exam.questions[current]
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col" data-testid="exam-taking">
-      <div className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <span className="font-semibold truncate max-w-xs">{exam.title}</span>
-        <div className="flex items-center gap-4">
+      <div className="bg-white border-b px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <span className="font-semibold break-words">{exam.title}</span>
+        <div className="flex items-center gap-4 flex-shrink-0">
           {timeLeft !== null && <span className={`inline-flex items-center gap-1.5 font-mono font-semibold text-sm ${timeLeft < 60 ? 'text-red-600' : 'text-slate-700'}`}><Clock className="h-4 w-4" /> {fmt(timeLeft)}</span>}
           <span className="text-sm text-slate-500">{Object.keys(answers).length}/{exam.questions.length}</span>
         </div>
@@ -138,7 +138,7 @@ export default function TakeExamPage() {
               {(q.options || []).map((opt: string, i: number) => (
                 <button key={i} onClick={() => setAnswers(a => ({ ...a, [q.id]: String(i) }))}
                   data-testid={`option-${i}`}
-                  className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm transition-all ${answers[q.id] === String(i) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' : 'border-slate-200 hover:border-slate-300'}`}>
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm break-words transition-all ${answers[q.id] === String(i) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' : 'border-slate-200 hover:border-slate-300'}`}>
                   <span className="font-semibold mr-2">{String.fromCharCode(65 + i)}.</span>{opt}
                 </button>
               ))}
@@ -161,15 +161,15 @@ export default function TakeExamPage() {
           )}
         </div>
       </div>
-      <div className="bg-white border-t px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-t px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <button onClick={() => setCurrent(Math.max(0, current - 1))} disabled={current === 0}
-          className="inline-flex items-center gap-2 border border-slate-200 rounded-lg px-4 py-2 text-sm disabled:opacity-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
+          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] border border-slate-200 rounded-lg px-4 py-2 text-sm disabled:opacity-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
         {current < exam.questions.length - 1 ? (
           <button onClick={() => setCurrent(current + 1)} data-testid="next-question-btn"
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm">Next <ChevronRight className="h-4 w-4" /></button>
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm">Next <ChevronRight className="h-4 w-4" /></button>
         ) : (
           <button onClick={submit} data-testid="submit-exam-btn"
-            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm"><CheckCircle className="h-4 w-4" /> Submit</button>
+            className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm"><CheckCircle className="h-4 w-4" /> Submit</button>
         )}
       </div>
     </div>

@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api } from 'lib/api'
-import { MessageSquarePlus, X, Send, ImagePlus, Trash2 } from 'lucide-react'
+import { MessageSquarePlus, X, Send, ImagePlus, Trash2, Bug, Lightbulb, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CATEGORIES = [
-  { value: 'BUG', label: '🐞 Bug' },
-  { value: 'IDEA', label: '💡 Idea' },
-  { value: 'OTHER', label: '💬 Other' },
+  { value: 'BUG', label: 'Bug', icon: Bug },
+  { value: 'IDEA', label: 'Idea', icon: Lightbulb },
+  { value: 'OTHER', label: 'Other', icon: MessageCircle },
 ]
 
 export function FeedbackWidget() {
@@ -57,11 +57,13 @@ export function FeedbackWidget() {
     <>
       <button onClick={() => setOpen(true)} data-testid="feedback-widget-btn"
         title="Report an issue"
-        className="fixed bottom-5 right-5 z-40 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-3.5 shadow-lg shadow-indigo-200 hover:scale-105 transition-all">
+        style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+        className="fixed right-5 z-40 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-3.5 shadow-lg shadow-indigo-200 hover:scale-105 transition-all">
         <MessageSquarePlus className="h-5 w-5" />
       </button>
       {open && (
-        <div className="fixed bottom-20 right-5 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200" data-testid="feedback-widget-panel">
+        <div style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+          className="fixed right-5 z-50 w-[calc(100vw-2.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200" data-testid="feedback-widget-panel">
           <div className="px-4 py-3 border-b flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-900">Report an issue</p>
             <button onClick={() => setOpen(false)} data-testid="feedback-widget-close"><X className="h-4 w-4 text-slate-400" /></button>
@@ -72,8 +74,8 @@ export function FeedbackWidget() {
               {CATEGORIES.map(c => (
                 <button key={c.value} onClick={() => setCategory(c.value)}
                   data-testid={`feedback-cat-${c.value.toLowerCase()}`}
-                  className={`flex-1 text-xs font-medium rounded-lg py-1.5 border transition-colors ${category === c.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                  {c.label}
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg py-1.5 border transition-colors ${category === c.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                  <c.icon className="h-3.5 w-3.5" /> {c.label}
                 </button>
               ))}
             </div>
