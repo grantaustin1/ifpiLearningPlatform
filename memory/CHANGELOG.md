@@ -2251,3 +2251,8 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - InstallPrompt.tsx mounted in DashboardLayout: Android/Chrome shows native "Install app" button via beforeinstallprompt; iOS Safari shows Share -> Add to Home Screen instructions. Dismiss stored in localStorage (ifpi_install_prompt_dismissed_v1). Mobile-only (md:hidden).
 - Sandbox retirement: org 327 renamed "UAT Sandbox (retired)", status=SUSPENDED, its last PUBLISHED course (243) archived. Public catalog now lists only IFPI Main Academy. Only remaining user is system Migration Bot.
 - Verified: build OK, manifest/sw/icons served 200 on preview, install banner renders at 375px with iOS UA, catalog API shows single org.
+
+## 2026-08-22 (later 2) — Offline Slides + Weekly Progress Emails + Deploy Check
+- sw.js v2: shell cache (index.html network-first fallback), learn-API cache (network-first, cache fallback for /api/courses, /api/learn, /api/organization, /api/learning-paths, /api/auth/me), static assets stale-while-revalidate, all other /api GETs get clean 503 JSON offline. Verified via Playwright offline reload: /learn/297 renders slides fully offline. CRA dev-overlay errors offline are dev-mode only (absent in prod build).
+- services/progress_digest_service.py: weekly learner progress digest (pathway % bars, in-progress courses, courses completed this week). Idempotent via 6-day outbox lookback per user (template='progress_digest'). Skips .local/migration emails and users with nothing in progress. Scheduled Mon 09:30 UTC as 'learner_progress_digest' in outbox_worker. Verified: queued 2 digests, second run queued 0.
+- Deployment agent scan: PASS, no blockers. User to press Deploy on platform.
