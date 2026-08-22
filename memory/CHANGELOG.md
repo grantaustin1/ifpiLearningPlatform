@@ -2245,3 +2245,9 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
   - CatalogPage: aspect-video covers on mobile; index.css scroll-indicator utility.
 - Tested: iteration_68.json — 100% pass at 375x667 + desktop 1440x900 regression. Flashcards/exam pages skipped (no seed data reachable), code changes there are class-only.
 - Note for tests: sidebar-backdrop (z-30) is behind sidebar (z-40); click backdrop at x>240 or via JS dispatch.
+
+## 2026-08-22 (later) — PWA Install Prompt + Sandbox Retirement
+- PWA: added manifest.json (standalone, start_url /courses, navy theme), minimal sw.js (registered in index.tsx), generated app icons (icon-192/512, apple-touch-icon), iOS meta tags in index.html.
+- InstallPrompt.tsx mounted in DashboardLayout: Android/Chrome shows native "Install app" button via beforeinstallprompt; iOS Safari shows Share -> Add to Home Screen instructions. Dismiss stored in localStorage (ifpi_install_prompt_dismissed_v1). Mobile-only (md:hidden).
+- Sandbox retirement: org 327 renamed "UAT Sandbox (retired)", status=SUSPENDED, its last PUBLISHED course (243) archived. Public catalog now lists only IFPI Main Academy. Only remaining user is system Migration Bot.
+- Verified: build OK, manifest/sw/icons served 200 on preview, install banner renders at 375px with iOS UA, catalog API shows single org.

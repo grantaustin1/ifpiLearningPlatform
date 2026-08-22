@@ -9,6 +9,7 @@ import {
 import { cn } from 'lib/utils'
 import { FeedbackWidget } from 'components/FeedbackWidget'
 import { WelcomeTour } from 'components/WelcomeTour'
+import { InstallPrompt } from 'components/InstallPrompt'
 
 const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
@@ -190,6 +191,7 @@ export default function DashboardLayout() {
           <Outlet />
           <FeedbackWidget />
           <WelcomeTour />
+          <InstallPrompt />
         </main>
       </div>
     </div>
