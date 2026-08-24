@@ -163,6 +163,19 @@ def _cohort_tick():
         logger.warning("cohort tick took %.1fs — consider increasing interval", elapsed)
 
 
+def _progress_digest_tick():
+    """Weekly learner progress digest (Mon 09:30 UTC). Self-idempotent
+    via a 6-day outbox lookback per user."""
+    try:
+        with SessionLocal() as db:
+            from services.progress_digest_service import run_progress_digest
+            total = run_progress_digest(db)
+            if total:
+                logger.info("Queued %s learner progress digest(s)", total)
+    except Exception as e:
+        logger.exception("progress digest tick failed: %s", e)
+
+
 def _nurture_tick():
     """Daily prospect-nurture pass (08:00 UTC)."""
     try:
@@ -280,6 +293,11 @@ def start_scheduler() -> None:
         _nurture_tick, "cron", hour=8, minute=0,
         id="prospect_nurture", max_instances=1, coalesce=True,
         misfire_grace_time=3600,
+    )
+    sched.add_job(
+        _progress_digest_tick, "cron", day_of_week="mon", hour=9, minute=30,
+        id="learner_progress_digest", max_instances=1, coalesce=True,
+        misfire_grace_time=86400,
     )
     sched.add_job(
         _webhook_retry_tick, "interval", seconds=30,

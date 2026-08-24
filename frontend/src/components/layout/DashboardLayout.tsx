@@ -5,11 +5,12 @@ import { api } from 'lib/api'
 import { API_URL } from 'lib/env'
 import {
   LayoutDashboard, BookOpen, ClipboardList, Award, BarChart3, Users,
-  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare, Milestone,
+  GraduationCap, LogOut, Trophy, CreditCard, Globe, Layers, Mail, Settings, Building2, Shield, Webhook, FolderInput, KeyRound, Sparkles, Database, Send, Video, TrendingUp, SlidersHorizontal, Link2, Search, HelpCircle, MessageSquare, Milestone, Menu, X,
 } from 'lucide-react'
 import { cn } from 'lib/utils'
 import { FeedbackWidget } from 'components/FeedbackWidget'
 import { WelcomeTour } from 'components/WelcomeTour'
+import { InstallPrompt } from 'components/InstallPrompt'
 
 const ADMIN_NAV = [
   { href: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
@@ -65,6 +66,12 @@ export default function DashboardLayout() {
 
   const [org, setOrg] = useState<{ name?: string; logo_url?: string | null }>({})
   const [streak, setStreak] = useState<{ current_streak: number; longest_streak: number; reviewed_today: boolean } | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth >= 768) setSidebarOpen(false) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   useEffect(() => {
     api.get('/organization').then(r => setOrg(r.data || {})).catch(() => {})
     const fetchStreak = () => {
@@ -83,9 +90,16 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="w-60 flex-shrink-0 bg-ink-900 text-slate-300 flex flex-col">
-        <div className="px-5 py-5 border-b border-white/5">
-          <Link to={isAdmin ? '/dashboard' : '/courses'} className="flex items-center gap-3" data-testid="sidebar-brand">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} data-testid="sidebar-backdrop" />
+      )}
+      <aside className={cn(
+        'w-60 flex-shrink-0 bg-ink-900 text-slate-300 flex flex-col',
+        'fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-in-out md:static md:translate-x-0',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      )} data-testid="dashboard-sidebar">
+        <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between gap-2">
+          <Link to={isAdmin ? '/dashboard' : '/courses'} className="flex items-center gap-3 min-w-0" data-testid="sidebar-brand">
             {resolvedLogo ? (
               <div className="w-9 h-9 rounded-lg bg-white/95 flex items-center justify-center overflow-hidden shadow-lg shadow-black/40" data-testid="sidebar-org-logo">
                 <img src={resolvedLogo} alt={brandName} className="max-w-[80%] max-h-[80%] object-contain" />
@@ -100,10 +114,14 @@ export default function DashboardLayout() {
               <p className="text-[10px] text-slate-500 mt-0.5">{isAdmin ? 'Admin Portal' : 'Learner Portal'}</p>
             </div>
           </Link>
+          <button onClick={() => setSidebarOpen(false)} data-testid="sidebar-close-btn"
+            className="md:hidden text-slate-400 hover:text-white p-1.5 -mr-1 rounded-lg hover:bg-white/5 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" data-testid="sidebar-nav">
           {items.map(item => (
-            <NavLink key={item.href} to={item.href} end
+            <NavLink key={item.href} to={item.href} end onClick={() => setSidebarOpen(false)}
               data-testid={`nav-${item.href.replace('/', '')}`}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all',
@@ -157,11 +175,21 @@ export default function DashboardLayout() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto bg-slate-50">
-        <Outlet />
-        <FeedbackWidget />
-        <WelcomeTour />
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="md:hidden flex items-center gap-3 bg-ink-900 text-white px-4 py-3 flex-shrink-0" data-testid="mobile-header">
+          <button onClick={() => setSidebarOpen(true)} data-testid="mobile-menu-btn"
+            className="p-1.5 -ml-1 rounded-lg hover:bg-white/10 transition-colors">
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-semibold text-sm truncate">{brandName}</span>
+        </header>
+        <main className="flex-1 overflow-y-auto bg-slate-50">
+          <Outlet />
+          <FeedbackWidget />
+          <WelcomeTour />
+          <InstallPrompt />
+        </main>
+      </div>
     </div>
   )
 }

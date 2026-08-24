@@ -79,28 +79,30 @@ export default function LeaderboardPage() {
       )}
 
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-slate-50 border-b"><tr>
-            <th className="text-left px-6 py-3 font-medium text-slate-500">Rank</th>
-            <th className="text-left px-6 py-3 font-medium text-slate-500">Learner</th>
-            <th className="text-right px-6 py-3 font-medium text-slate-500">XP</th>
-            <th className="text-right px-6 py-3 font-medium text-slate-500">Badges</th>
-            <th className="text-right px-6 py-3 font-medium text-slate-500">Completed</th>
+            <th className="text-left px-3 md:px-6 py-3 font-medium text-slate-500">Rank</th>
+            <th className="text-left px-3 md:px-6 py-3 font-medium text-slate-500">Learner</th>
+            <th className="text-right px-3 md:px-6 py-3 font-medium text-slate-500">XP</th>
+            <th className="text-right px-3 md:px-6 py-3 font-medium text-slate-500">Badges</th>
+            <th className="text-right px-3 md:px-6 py-3 font-medium text-slate-500">Completed</th>
           </tr></thead>
           <tbody className="divide-y">
             {rows.map((r: any, i: number) => (
               <tr key={r.user_id} data-testid={`lb-row-${i}`}>
-                <td className="px-6 py-4">
+                <td className="px-3 py-3 md:px-6 md:py-4">
                   {i < 3 ? <Trophy className={`h-5 w-5 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`} /> : <span className="text-slate-500 font-semibold">#{i + 1}</span>}
                 </td>
-                <td className="px-6 py-4 font-medium">{r.name || `Learner #${r.user_id}`}</td>
-                <td className="px-6 py-4 text-right"><span className="inline-flex items-center gap-1 font-semibold"><Star className="h-3.5 w-3.5 text-amber-500" />{r.points}</span></td>
-                <td className="px-6 py-4 text-right"><span className="inline-flex items-center gap-1 text-slate-600"><Award className="h-3.5 w-3.5" />{r.badges}</span></td>
-                <td className="px-6 py-4 text-right"><span className="inline-flex items-center gap-1 text-slate-600"><CheckCircle className="h-3.5 w-3.5" />{r.completed}</span></td>
+                <td className="px-3 py-3 md:px-6 md:py-4 font-medium">{r.name || `Learner #${r.user_id}`}</td>
+                <td className="px-3 py-3 md:px-6 md:py-4 text-right"><span className="inline-flex items-center gap-1 font-semibold"><Star className="h-3.5 w-3.5 text-amber-500" />{r.points}</span></td>
+                <td className="px-3 py-3 md:px-6 md:py-4 text-right"><span className="inline-flex items-center gap-1 text-slate-600"><Award className="h-3.5 w-3.5" />{r.badges}</span></td>
+                <td className="px-3 py-3 md:px-6 md:py-4 text-right"><span className="inline-flex items-center gap-1 text-slate-600"><CheckCircle className="h-3.5 w-3.5" />{r.completed}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

@@ -227,7 +227,7 @@ export default function LearnPage() {
                         }}
                         onMouseEnter={() => setHoverRating(n)} onMouseLeave={() => setHoverRating(0)}
                         data-testid={`rate-star-${n}`}
-                        className="p-0.5 transition-transform hover:scale-110">
+                        className="p-2.5 transition-transform hover:scale-110">
                         <Star className={`h-7 w-7 ${(hoverRating || myRating) >= n ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />
                       </button>
                     ))}
@@ -263,11 +263,11 @@ export default function LearnPage() {
           )}
         </div>
         {slide && (
-          <div className="bg-white border-t px-6 py-4 flex items-center justify-between">
+          <div className="bg-white border-t px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <button onClick={() => setCurrent(Math.max(0, current - 1))} disabled={current === 0} data-testid="prev-slide-btn"
-              className="inline-flex items-center gap-2 border border-slate-200 rounded-lg px-4 py-2 text-sm disabled:opacity-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] border border-slate-200 rounded-lg px-4 py-2 text-sm disabled:opacity-50"><ChevronLeft className="h-4 w-4" /> Previous</button>
             <button onClick={next} disabled={finishing} data-testid="next-slide-btn"
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">
               {finishing ? 'Finishing…' : (isLast
                 ? (examGate
                   ? <><CheckCircle className="h-4 w-4" /> Take exam</>

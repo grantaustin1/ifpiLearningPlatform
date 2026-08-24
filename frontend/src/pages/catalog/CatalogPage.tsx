@@ -37,7 +37,7 @@ function CourseCard({ c, onEnroll }: { c: CatalogCourse; onEnroll: (c: CatalogCo
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-slate-100 flex flex-col" data-testid={`catalog-card-${c.id}`}>
       <Link to={`/catalog/${c.id}`} className="block group">
-        <div className={`h-32 ${c.cover_color} p-4 flex items-end relative overflow-hidden`}>
+        <div className={`aspect-video sm:aspect-auto sm:h-32 ${c.cover_color} p-4 flex items-end relative overflow-hidden`}>
           {c.cover_image && (
             <>
               <img src={c.cover_image} alt={c.title} loading="lazy"

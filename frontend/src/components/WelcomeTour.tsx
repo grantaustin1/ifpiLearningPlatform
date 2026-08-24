@@ -41,8 +41,10 @@ export function WelcomeTour() {
     if (!user?.id) return
     if (localStorage.getItem(doneKey(user.id))) return
     const t = window.setTimeout(() => {
-      setSteps((isAdmin ? ADMIN_STEPS : LEARNER_STEPS)
-        .filter(s => !s.selector || !!document.querySelector(s.selector)))
+      const isMobile = window.innerWidth < 768
+      const stepSet = (isAdmin ? ADMIN_STEPS : LEARNER_STEPS)
+        .filter(s => !isMobile || !s.selector || !s.selector.includes('nav-'))
+      setSteps(stepSet.filter(s => !s.selector || !!document.querySelector(s.selector)))
       setActive(true)
     }, 900)
     return () => window.clearTimeout(t)
@@ -73,8 +75,11 @@ export function WelcomeTour() {
 
   const spotlight = step.selector && rect
   const pad = 6
+  const isMobileVp = window.innerWidth < 640
   const tooltipStyle: React.CSSProperties = spotlight
-    ? (rect!.left < window.innerWidth / 2
+    ? (isMobileVp
+        ? { top: 16, left: '50%', transform: 'translateX(-50%)' }
+        : rect!.left < window.innerWidth / 2
         ? { top: Math.min(Math.max(rect!.top - 20, 16), window.innerHeight - 240), left: rect!.right + 18 }
         : { top: Math.max(rect!.top - 190, 16), left: Math.max(rect!.left - 340, 16) })
     : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
@@ -94,7 +99,7 @@ export function WelcomeTour() {
       ) : (
         <div className="absolute inset-0 bg-slate-950/72" style={{ backgroundColor: 'rgba(2,6,23,0.72)' }} />
       )}
-      <div className="absolute w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-5" style={tooltipStyle} data-testid="welcome-tour-card">
+      <div className="absolute w-[calc(100vw-2rem)] max-w-sm sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-5" style={tooltipStyle} data-testid="welcome-tour-card">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
             <Sparkles className="h-3.5 w-3.5 text-white" />
