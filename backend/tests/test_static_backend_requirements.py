@@ -60,6 +60,33 @@ def test_reportlab_pin_compatibility():
     assert version in SpecifierSet(XHTML2PDF_0_2_17_REPORTLAB_SPEC)
 
 
+def test_no_url_based_requirements():
+    """URL-pinned packages (pkg @ https://...) break pip resolution and may become
+    unreachable in CI.  Only plain PyPI packages are allowed."""
+    requirements_text = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
+        encoding="utf-8"
+    )
+    url_lines = [
+        line.strip()
+        for line in requirements_text.splitlines()
+        if " @ https://" in line or " @ http://" in line
+    ]
+    assert url_lines == [], (
+        "requirements.txt must not contain URL-based requirements — "
+        f"found: {url_lines}"
+    )
+
+
+def test_litellm_not_in_requirements():
+    """litellm is hosted on an internal URL unreachable in public CI; it must not
+    be added back to requirements.txt."""
+    requirements_by_name = _requirements_by_name()
+    assert "litellm" not in requirements_by_name, (
+        "litellm must not be in requirements.txt — its wheel is on an internal URL "
+        "that breaks public CI (see Endpoint Signature Lint failures)"
+    )
+
+
 def test_emergentintegrations_not_in_requirements():
     """emergentintegrations caused CI failures (missing from PyPI, external wheel).
     It must never re-enter requirements.txt."""
