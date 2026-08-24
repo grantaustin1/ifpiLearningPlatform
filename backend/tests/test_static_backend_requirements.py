@@ -70,6 +70,18 @@ def test_emergentintegrations_not_in_requirements():
     )
 
 
+def test_litellm_not_in_requirements():
+    """litellm is only used transitively by emergentintegrations (internal wheel).
+    It is not imported anywhere in the backend and its wheel URL is inaccessible
+    in public CI, causing the Endpoint Signature Lint job to fail."""
+    requirements_by_name = _requirements_by_name()
+    assert "litellm" not in requirements_by_name, (
+        "litellm must not be in requirements.txt — its wheel is hosted on an "
+        "internal URL (customer-assets.emergentagent.com) that is unreachable "
+        "in public CI, breaking the Endpoint Signature Lint job."
+    )
+
+
 def test_defusedxml_pinned_for_scorm_imports():
     """SCORM parsing imports defusedxml at module import time, so CI needs it pinned."""
     requirements_by_name = _requirements_by_name()
