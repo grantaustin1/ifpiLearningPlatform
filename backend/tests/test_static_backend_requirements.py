@@ -60,6 +60,25 @@ def test_reportlab_pin_compatibility():
     assert version in SpecifierSet(XHTML2PDF_0_2_17_REPORTLAB_SPEC)
 
 
+def test_no_url_based_requirements():
+    """Packages pinned via external URLs (e.g. `pkg @ https://...`) are
+    unavailable on PyPI, can conflict with other pinned packages, and may
+    become unreachable.  All dependencies must be resolvable through the
+    standard index."""
+    raw = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(
+        encoding="utf-8"
+    )
+    url_lines = [
+        line.strip()
+        for line in raw.splitlines()
+        if line.strip() and not line.strip().startswith("#") and " @ " in line
+    ]
+    assert url_lines == [], (
+        "requirements.txt must not contain URL-pinned packages — "
+        f"offending lines: {url_lines}"
+    )
+
+
 def test_emergentintegrations_not_in_requirements():
     """emergentintegrations caused CI failures (missing from PyPI, external wheel).
     It must never re-enter requirements.txt."""
