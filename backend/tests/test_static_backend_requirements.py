@@ -11,6 +11,8 @@ SVGLIB_2_0_2_REPORTLAB_SPEC = ">=4.4.3"
 # Mirrors the currently published xhtml2pdf==0.2.17 package metadata requirement.
 XHTML2PDF_0_2_17_REPORTLAB_SPEC = ">=4.0.4,<5"
 DEFUSEDXML_REQUIRED_VERSION = "0.7.1"
+# Mirrors the currently published googleapis-common-protos==1.74.0 package metadata requirement.
+GOOGLEAPIS_COMMON_PROTOS_1_74_0_PROTOBUF_SPEC = ">=4.25.8,<8.0.0"
 
 
 def _requirements_by_name():
@@ -84,4 +86,22 @@ def test_defusedxml_pinned_for_scorm_imports():
         (str(spec)[2:] for spec in defusedxml_req.specifier if str(spec).startswith("==")),
         None,
     )
+
     assert pinned_version == DEFUSEDXML_REQUIRED_VERSION
+
+
+def test_googleapis_common_protos_pin_compatibility():
+    requirements_by_name = _requirements_by_name()
+
+    assert "googleapis-common-protos" in requirements_by_name
+    assert "protobuf" in requirements_by_name
+
+    protobuf_req = requirements_by_name["protobuf"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in protobuf_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version is not None, "protobuf must be pinned with == in requirements.txt"
+    assert Version(pinned_version) in SpecifierSet(
+        GOOGLEAPIS_COMMON_PROTOS_1_74_0_PROTOBUF_SPEC
+    )
