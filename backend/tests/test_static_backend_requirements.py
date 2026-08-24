@@ -129,3 +129,25 @@ def test_googleapis_common_protos_pin_compatibility():
     assert Version(pinned_version) in SpecifierSet(
         GOOGLEAPIS_COMMON_PROTOS_1_75_0_PROTOBUF_SPEC
     )
+
+
+# Mirrors motor==3.7.1 declared pymongo requirement.
+# If motor is upgraded, this spec should be reviewed/updated.
+MOTOR_3_7_1_PYMONGO_SPEC = ">=4.9,<5.0"
+
+
+def test_pymongo_satisfies_motor_constraint():
+    requirements_by_name = _requirements_by_name()
+
+    assert "pymongo" in requirements_by_name, "pymongo must be pinned in requirements.txt"
+    assert "motor" in requirements_by_name, "motor must be pinned in requirements.txt"
+
+    pymongo_req = requirements_by_name["pymongo"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in pymongo_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version is not None, "pymongo must be pinned with == in requirements.txt"
+    assert Version(pinned_version) in SpecifierSet(
+        MOTOR_3_7_1_PYMONGO_SPEC
+    ), f"pymongo=={pinned_version} does not satisfy motor==3.7.1's constraint {MOTOR_3_7_1_PYMONGO_SPEC}"
