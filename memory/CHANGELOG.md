@@ -2256,3 +2256,8 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - sw.js v2: shell cache (index.html network-first fallback), learn-API cache (network-first, cache fallback for /api/courses, /api/learn, /api/organization, /api/learning-paths, /api/auth/me), static assets stale-while-revalidate, all other /api GETs get clean 503 JSON offline. Verified via Playwright offline reload: /learn/297 renders slides fully offline. CRA dev-overlay errors offline are dev-mode only (absent in prod build).
 - services/progress_digest_service.py: weekly learner progress digest (pathway % bars, in-progress courses, courses completed this week). Idempotent via 6-day outbox lookback per user (template='progress_digest'). Skips .local/migration emails and users with nothing in progress. Scheduled Mon 09:30 UTC as 'learner_progress_digest' in outbox_worker. Verified: queued 2 digests, second run queued 0.
 - Deployment agent scan: PASS, no blockers. User to press Deploy on platform.
+
+## 2026-08-30 — Simulated Device Check + Course Player Mobile Drawer
+- Simulated phone (375x667) and tablet (768x1024) across courses, learning-paths, pathways, leaderboard, certificates, course player, sidebar drawer. Tablet: all clean. Phone: everything clean EXCEPT the course player's internal w-72 slide list which crushed content.
+- Fixed LearnPage: slide list is now a mobile drawer (ListOrdered toggle data-testid='learn-nav-toggle', backdrop 'learn-nav-backdrop', close 'learn-nav-close'); slide picks auto-close drawer; header truncates title; slide content px-4 on mobile. md+ unchanged (static aside).
+- Verified via Playwright at 375px: no horizontal scroll, drawer open/pick/close all work. Build OK.

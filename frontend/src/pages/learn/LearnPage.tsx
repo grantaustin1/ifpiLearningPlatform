@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from 'lib/api'
 import { safeHtml } from 'lib/sanitize'
-import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, ClipboardList, Star, Pencil, ListOrdered, X } from 'lucide-react'
 import { toast } from 'sonner'
 import CommentsPanel from 'components/CommentsPanel'
 import { AITutorPanel } from 'components/AITutorPanel'
@@ -23,6 +23,7 @@ export default function LearnPage() {
   const [ratingBusy, setRatingBusy] = useState(false)
   const [reviewText, setReviewText] = useState('')
   const [reviewSaved, setReviewSaved] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
@@ -120,9 +121,20 @@ export default function LearnPage() {
 
   return (
     <div className="flex h-screen bg-slate-50" data-testid="learn-page">
-      <aside className="w-72 border-r bg-white overflow-y-auto">
+      {navOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setNavOpen(false)} data-testid="learn-nav-backdrop" />
+      )}
+      <aside className={`w-72 border-r bg-white overflow-y-auto flex-shrink-0
+        fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-in-out md:static md:translate-x-0
+        ${navOpen ? 'translate-x-0' : '-translate-x-full'}`} data-testid="learn-slide-nav">
         <div className="p-4 border-b">
-          <h2 className="font-semibold text-slate-900 text-sm">{course.title}</h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="font-semibold text-slate-900 text-sm">{course.title}</h2>
+            <button onClick={() => setNavOpen(false)} data-testid="learn-nav-close"
+              className="md:hidden text-slate-400 hover:text-slate-600 p-1 -mr-1 -mt-1">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
           <div className="mt-2 h-1.5 bg-slate-100 rounded-full"><div className="h-1.5 bg-indigo-600 rounded-full" style={{ width: `${progress}%` }} /></div>
           <p className="text-xs text-slate-500 mt-1">{Math.round(progress)}% complete</p>
           <button onClick={() => nav(`/learn/${courseId}/flashcards`)}
@@ -133,7 +145,7 @@ export default function LearnPage() {
         </div>
         <nav className="p-2">
           {course.slides.map((s: any, i: number) => (
-            <button key={s.id} onClick={() => setCurrent(i)} data-testid={`slide-nav-${i}`}
+            <button key={s.id} onClick={() => { setCurrent(i); setNavOpen(false) }} data-testid={`slide-nav-${i}`}
               className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm mb-0.5 ${i === current ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50'}`}>
               <span className="w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center text-xs">
                 {completed.has(i) ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : i + 1}
@@ -144,9 +156,14 @@ export default function LearnPage() {
         </nav>
       </aside>
 
-      <div className="flex-1 flex flex-col">
-        <div className="bg-white border-b px-5 py-3 text-sm font-medium text-slate-700 flex items-center">
-          <span>{course.title} <span className="text-slate-400 ml-2">{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span></span>
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="bg-white border-b px-4 sm:px-5 py-3 text-sm font-medium text-slate-700 flex items-center gap-3">
+          <button onClick={() => setNavOpen(true)} data-testid="learn-nav-toggle"
+            title="Show course contents"
+            className="md:hidden flex-shrink-0 text-slate-500 hover:text-slate-800 p-1.5 -ml-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <ListOrdered className="h-5 w-5" />
+          </button>
+          <span className="truncate">{course.title} <span className="text-slate-400 ml-2 whitespace-nowrap">{Math.min(current + 1, course.slides.length)} / {course.slides.length}</span></span>
           {isStaff && (
             <button onClick={() => nav(`/courses/${courseId}/edit`)} data-testid="learn-edit-course-btn"
               title="Open this course in the editor to change slides, pictures and layout"
@@ -164,7 +181,7 @@ export default function LearnPage() {
         )}
         <div className="flex-1 overflow-y-auto">
           {slide ? (
-            <div className="max-w-3xl mx-auto px-6 py-10" data-testid="learn-slide-content">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10" data-testid="learn-slide-content">
               <div className="flex items-start gap-3 mb-6">
                 <h1 className="text-2xl font-bold text-slate-900 font-display flex-1">{slide.title}</h1>
                 {isStaff && (
