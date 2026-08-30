@@ -28,7 +28,6 @@ Design constraints:
 """
 from __future__ import annotations
 
-import contextvars
 import logging
 import time
 import traceback
@@ -39,17 +38,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from core.request_context import (  # noqa: F401 — re-exported for back-compat
+    _correlation_id_var, get_correlation_id,
+)
+
 logger = logging.getLogger("ifpi.middleware")
-
-# Context var holds the correlation ID for the current request. Handlers
-# can read it via `get_correlation_id()` — useful for logging inside
-# services without threading the request through every call.
-_correlation_id_var: contextvars.ContextVar[Optional[str]] = \
-    contextvars.ContextVar("correlation_id", default=None)
-
-
-def get_correlation_id() -> Optional[str]:
-    return _correlation_id_var.get()
 
 
 # Iter 38 — request-summary logger + n+1 threshold. Threshold is

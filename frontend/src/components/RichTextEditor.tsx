@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bold, Italic, Underline, List, ListOrdered, RemoveFormatting, Code, Palette, Type, ChevronDown, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
+import { safeHtml } from 'lib/sanitize'
 
 const SIZES: [string, string, string][] = [
   ['small', 'Small', '0.85em'],
@@ -25,7 +26,9 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
   const [showSizes, setShowSizes] = useState(false)
 
   useEffect(() => {
-    if (!htmlMode && ref.current) ref.current.innerHTML = latest.current || ''
+    // Sanitize before injecting — stored content should already be clean,
+    // but the editor must never be an XSS amplifier for legacy rows.
+    if (!htmlMode && ref.current) ref.current.innerHTML = safeHtml(latest.current)
   }, [htmlMode])
 
   const emit = () => {

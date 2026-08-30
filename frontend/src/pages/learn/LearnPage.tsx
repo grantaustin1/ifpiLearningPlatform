@@ -38,7 +38,7 @@ export default function LearnPage() {
       try {
         const er = await api.post(`/courses/${courseId}/enroll`)
         resumeAt = er.data?.last_slide_index || 0
-      } catch { /* may already be enrolled */ }
+      } catch (e) { console.warn('Enroll call failed (may already be enrolled)', e) }
       try {
         const r = await api.get(`/courses/${courseId}`)
         setCourse(r.data)
@@ -54,7 +54,9 @@ export default function LearnPage() {
         setLoadError(true)
       }
     })()
-  }, [courseId])
+    // searchParams intentionally omitted: the deep-link slide index is only
+    // honoured on initial course load, not on every param change.
+  }, [courseId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {

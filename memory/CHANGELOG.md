@@ -2269,3 +2269,17 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 ## 2026-08-30 (later 2) — Page-Turn Slide Transition
 - LearnPage: slide content keyed by index with direction-aware CSS page-turn animation (perspective + rotateY + translateX, 0.38s). Forward = page-turn-fwd (origin left), back = page-turn-back (origin right). prefers-reduced-motion disables it. Verified via Playwright: correct animationName both directions, build OK.
 - NOTE: earlier deploy was dispatched BEFORE this change — a fresh deploy is needed to ship the page-turn effect live.
+
+## 2026-08-30 (later 3) — Code Review Fixes Applied
+FIXED:
+- Circular import: new core/request_context.py owns the correlation-id contextvar; middleware re-exports get_correlation_id (back-compat for server.py/slow_query_logger); query_counter now imports it top-level — no lazy imports, no cycle.
+- Pickle RCE: core/cache.py payloads now HMAC-SHA256 signed (key derived from jwt_secret); verify-before-unpickle, tamper => cache miss. Verified roundtrip + tamper rejection.
+- RichTextEditor: innerHTML load now wrapped in safeHtml (DOMPurify).
+- Stale-closure flag: LearnPage load effect documented intentional searchParams omission (mount-only deep-link).
+- Empty catches now console.warn: TakeExamPage, LearnPage, MindMapPage x2, ResearchPage.
+- Index-as-key fixed where stable keys exist: TakeExamPage options (q.id-i), CoursesPage AI slides (order_index), UsersPage bulk results (email-i), ImportsPage courses/paths/errors (title/path-i).
+- Hardcoded creds -> env-overridable: scripts/setup_uat.py, tests/test_iteration55, test_iteration56 (UAT_*/QA_* env vars with documented fallbacks).
+- Removed unused locals/imports in test_iteration56.
+FALSE POSITIVES (no change needed): sanitize.ts + SubscriptionModal already DOMPurify-based; LearnPage 327/341 receive pre-sanitized html; TakeExamPage/Flashcards/AttendanceModal hook deps already correct; pyflakes found 0 undefined names (claimed 39).
+DEFERRED (documented): localStorage->httpOnly cookie auth migration (auth architecture change, cookie infra partially exists via CSRF middleware — needs dedicated pass); high-complexity refactors (register_all, middleware dispatch, api_tokens, alembic baseline — migrations must never be edited); ExamsPage editable option lists keep index keys (correct for editable inputs w/o stable ids); CSP already present via SecurityHeadersMiddleware.
+Verified: backend health 200, login OK, courses/paths/auth-me 200, RTE loads sanitized content in editor, yarn build OK, pyflakes clean.

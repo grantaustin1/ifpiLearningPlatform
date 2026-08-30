@@ -428,8 +428,8 @@ function AIBuilderModal({ onClose, onApplied }: { onClose: () => void; onApplied
                 <p className="text-xs text-emerald-600 mt-0.5">{result.slides.length} slides{result.questions?.length ? ` + ${result.questions.length} questions` : ''}</p>
               </div>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {result.slides.map((s: any, i: number) => (
-                  <div key={i} className="bg-slate-50 rounded-lg p-3">
+                {result.slides.map((s: any) => (
+                  <div key={s.order_index} className="bg-slate-50 rounded-lg p-3">
                     <p className="text-sm font-medium text-slate-800">{s.order_index}. {s.title}</p>
                   </div>
                 ))}

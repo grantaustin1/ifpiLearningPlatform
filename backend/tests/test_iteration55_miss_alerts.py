@@ -8,10 +8,10 @@ import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 
-ADMIN_EMAIL = "qa-admin@ifpi.org"
-ADMIN_PASSWORD = "QaAdmin!2026"
-LEARNER_EMAIL = "learner@ifpi.org"
-LEARNER_PASSWORD = "learner123"
+ADMIN_EMAIL = os.environ.get("QA_ADMIN_EMAIL", "qa-admin@ifpi.org")
+ADMIN_PASSWORD = os.environ.get("QA_ADMIN_PASSWORD", "QaAdmin!2026")
+LEARNER_EMAIL = os.environ.get("QA_LEARNER_EMAIL", "learner@ifpi.org")
+LEARNER_PASSWORD = os.environ.get("QA_LEARNER_PASSWORD", "learner123")
 
 
 def _login(email, password):

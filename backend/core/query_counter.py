@@ -30,6 +30,8 @@ from typing import Any
 
 from sqlalchemy import event
 
+from core.request_context import get_correlation_id
+
 # Keyed on correlation_id. Bounded — we clear entries in
 # reset_query_count() when a request finishes. The lock is required
 # because SQLAlchemy events fire from the threadpool while the
@@ -42,7 +44,6 @@ _MAX_LIVE_REQUESTS = 10_000
 def reset_query_count() -> None:
     """Call at request start. Initializes the counter for the current
     correlation_id."""
-    from core.middleware import get_correlation_id
     cid = get_correlation_id()
     if not cid:
         return
@@ -56,7 +57,6 @@ def reset_query_count() -> None:
 
 def get_query_count() -> int:
     """Return count for the current correlation_id, or 0."""
-    from core.middleware import get_correlation_id
     cid = get_correlation_id()
     if not cid:
         return 0
@@ -66,7 +66,6 @@ def get_query_count() -> int:
 
 def drop_query_count() -> None:
     """Call after logging the request summary — releases the entry."""
-    from core.middleware import get_correlation_id
     cid = get_correlation_id()
     if not cid:
         return
@@ -89,7 +88,6 @@ def install(engine: Any) -> None:
     @event.listens_for(engine, "before_cursor_execute")
     def _count(conn, cursor, statement, params, context, executemany):
         try:
-            from core.middleware import get_correlation_id
             cid = get_correlation_id()
             if cid:
                 _increment(cid)

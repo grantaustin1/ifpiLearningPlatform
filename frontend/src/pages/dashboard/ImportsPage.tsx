@@ -179,7 +179,7 @@ export default function ImportsPage() {
                         <div className="font-semibold text-slate-700 mb-1">Courses ({j.results.courses.length})</div>
                         <ul className="space-y-0.5 ml-3">
                           {j.results.courses.map((c: any, i: number) => (
-                            <li key={i} className="text-slate-600">
+                            <li key={`${c.title}-${i}`} className="text-slate-600">
                               <span className="text-emerald-600">✓</span> {c.title}
                               <span className="text-slate-400 ml-2 font-mono">{c.slides} slides · {c.exams} exams</span>
                             </li>
@@ -192,7 +192,7 @@ export default function ImportsPage() {
                         <div className="font-semibold text-slate-700 mb-1">Learning paths ({j.results.paths.length})</div>
                         <ul className="space-y-0.5 ml-3">
                           {j.results.paths.map((p: any, i: number) => (
-                            <li key={i} className="text-slate-600">
+                            <li key={`${p.title}-${i}`} className="text-slate-600">
                               <span className="text-emerald-600">✓</span> {p.title}
                             </li>
                           ))}
@@ -204,7 +204,7 @@ export default function ImportsPage() {
                         <div className="font-semibold text-rose-700 mb-1">Errors ({j.results.errors.length})</div>
                         <ul className="space-y-0.5 ml-3">
                           {j.results.errors.map((e: any, i: number) => (
-                            <li key={i} className="text-rose-700 font-mono break-all">
+                            <li key={`${e.path}-${i}`} className="text-rose-700 font-mono break-all">
                               [{e.kind}] {e.path}: {e.error}
                             </li>
                           ))}

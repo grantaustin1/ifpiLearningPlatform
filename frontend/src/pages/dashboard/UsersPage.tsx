@@ -309,7 +309,7 @@ function BulkInviteModal({ onClose, onDone }: { onClose: () => void, onDone: () 
           {results && (
             <div className="mt-5 border border-slate-200 rounded-xl divide-y max-h-64 overflow-y-auto" data-testid="bulk-results">
               {results.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <div key={`${r.email}-${i}`} className="flex items-center gap-2 px-3 py-2 text-sm">
                   {r.status === 'queued' ? <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" /> : <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />}
                   <span className="font-mono text-xs flex-1 truncate">{r.email}</span>
                   <span className={`text-xs ${r.status === 'queued' ? 'text-emerald-700' : 'text-amber-700'}`}>{r.status}</span>

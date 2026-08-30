@@ -8,18 +8,16 @@ import os
 import io
 import csv
 import time
-import copy
-import datetime as dt
 import requests
 import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 EXAM_ID = 4
 
-ADMIN_EMAIL = "qa-admin@ifpi.org"
-ADMIN_PASSWORD = "QaAdmin!2026"
-LEARNER_EMAIL = "learner@ifpi.org"
-LEARNER_PASSWORD = "learner123"
+ADMIN_EMAIL = os.environ.get("QA_ADMIN_EMAIL", "qa-admin@ifpi.org")
+ADMIN_PASSWORD = os.environ.get("QA_ADMIN_PASSWORD", "QaAdmin!2026")
+LEARNER_EMAIL = os.environ.get("QA_LEARNER_EMAIL", "learner@ifpi.org")
+LEARNER_PASSWORD = os.environ.get("QA_LEARNER_PASSWORD", "learner123")
 
 
 def _login(email, password):
@@ -176,7 +174,6 @@ class TestPhase1b_AdminCSV:
             csv_miss_rate = int(csv_row[7])
             csv_top_wrong = csv_row[8]
             csv_top_wrong_ct = int(csv_row[9]) if csv_row[9] else 0
-            csv_correct_ans = csv_row[10]
 
             if csv_answered != jq.get("answered", 0):
                 mismatches.append(f"row {i+1} answered: csv={csv_answered} json={jq.get('answered')}")
@@ -226,10 +223,7 @@ class TestPhase3a_AttemptExhaustionAndReset:
 
         # Verify learner can now submit a fresh attempt
         r = requests.get(f"{BASE_URL}/api/exams/{EXAM_ID}", headers=_h(learner_token), timeout=30)
-        qs = r.json()["questions"]
         # answer everything correctly to confirm allowed (won't affect miss rate for correct answers)
-        # Use a MINIMAL trivial submit — all option 0 — just to check the block is lifted.
-        answers = {str(q["id"]): ("0" if (q.get("type") or q.get("question_type","")).upper() == "MULTIPLE_CHOICE" else "true") for q in qs}
         # DON'T actually submit here — that would consume an attempt. Instead re-check GET /attempts.
         r = requests.get(f"{BASE_URL}/api/exams/{EXAM_ID}/attempts", headers=_h(learner_token), timeout=30)
         print(f"[3a.3] learner GET attempts after reset -> {r.status_code} body[:200]={r.text[:200]!r}")

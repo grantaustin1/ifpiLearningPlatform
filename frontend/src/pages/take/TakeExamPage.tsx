@@ -37,7 +37,7 @@ export default function TakeExamPage() {
           await api.post(`/courses/${exam.course_id}/complete`)
           setCertIssued(true)
           toast.success('Course complete! Certificate issued.')
-        } catch { /* completion is best-effort here */ }
+        } catch (e) { console.warn('Best-effort course completion failed', e) }
       }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Submission failed'); setPhase('taking')
@@ -136,7 +136,7 @@ export default function TakeExamPage() {
           {q.question_type === 'MULTIPLE_CHOICE' && (
             <div className="space-y-3">
               {(q.options || []).map((opt: string, i: number) => (
-                <button key={i} onClick={() => setAnswers(a => ({ ...a, [q.id]: String(i) }))}
+                <button key={`${q.id}-${i}`} onClick={() => setAnswers(a => ({ ...a, [q.id]: String(i) }))}
                   data-testid={`option-${i}`}
                   className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm break-words transition-all ${answers[q.id] === String(i) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' : 'border-slate-200 hover:border-slate-300'}`}>
                   <span className="font-semibold mr-2">{String.fromCharCode(65 + i)}.</span>{opt}

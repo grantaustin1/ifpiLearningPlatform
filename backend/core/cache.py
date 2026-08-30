@@ -2,12 +2,16 @@
 
 In-process by default (zero infrastructure); switches to Redis automatically
 when REDIS_URL is set, so the same call sites scale horizontally later.
-Values must be pickleable. Never cache anything correctness-critical
-(learner progress, entitlements) — only read-heavy aggregates + auth lookups
-with short TTLs and explicit invalidation on writes.
+Values must be pickleable. Payloads are HMAC-signed (key derived from
+JWT_SECRET) and verified before unpickling, so a compromised Redis can't
+smuggle a pickle-RCE payload into the app. Never cache anything
+correctness-critical (learner progress, entitlements) — only read-heavy
+aggregates + auth lookups with short TTLs and explicit invalidation on writes.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import pickle
 import threading
@@ -85,14 +89,40 @@ class _RedisBackend:
 
 _backend = _RedisBackend(_REDIS_URL) if _REDIS_URL else _MemoryBackend()
 
+# ── Signed serialization — defends against pickle RCE if the cache
+# store (Redis) is ever compromised. Blob layout: 32-byte HMAC-SHA256
+# digest || pickle payload. Verification failure = cache miss.
+_SIG_LEN = 32
+
+
+def _sign_key() -> bytes:
+    from core.config import settings
+    return hashlib.sha256(f"cache-sign:{settings.jwt_secret}".encode()).digest()
+
+
+def _serialize(value: Any) -> bytes:
+    payload = pickle.dumps(value)
+    sig = hmac.new(_sign_key(), payload, hashlib.sha256).digest()
+    return sig + payload
+
+
+def _deserialize(blob: bytes) -> Any:
+    if len(blob) <= _SIG_LEN:
+        return None
+    sig, payload = blob[:_SIG_LEN], blob[_SIG_LEN:]
+    expected = hmac.new(_sign_key(), payload, hashlib.sha256).digest()
+    if not hmac.compare_digest(sig, expected):
+        return None  # tampered or legacy-format entry — treat as miss
+    return pickle.loads(payload)
+
 
 def cache_get(key: str) -> Any:
     blob = _backend.get(key)
-    return pickle.loads(blob) if blob is not None else None
+    return _deserialize(blob) if blob is not None else None
 
 
 def cache_set(key: str, value: Any, ttl: int) -> None:
-    _backend.set(key, pickle.dumps(value), ttl)
+    _backend.set(key, _serialize(value), ttl)
 
 
 def cache_delete(key: str) -> None:

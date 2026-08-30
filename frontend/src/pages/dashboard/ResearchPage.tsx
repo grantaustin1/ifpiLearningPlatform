@@ -49,6 +49,7 @@ export default function ResearchPage() {
       } catch (e) {
         // Poll may fail transiently (network flap, backend restart) —
         // continue the loop so we retry on the next tick.
+        console.warn('Research poll failed transiently, retrying', e)
       }
     }
     setActivePolls(p => ({ ...p, [id]: false }))

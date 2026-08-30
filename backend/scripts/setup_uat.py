@@ -6,6 +6,7 @@ Undo: bash /app/scripts/reset_uat.sh   (restores the pre-UAT DB snapshot)
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,10 +20,10 @@ from models import LifecycleStage, Organization, Person, User, UserRole
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("setup_uat")
 
-UAT_ADMIN_EMAIL = "uat-admin@ifpi.org"
-UAT_ADMIN_PASSWORD = "UatAdmin!2026"
-UAT_LEARNER_EMAIL = "uat-learner@ifpi.org"
-UAT_LEARNER_PASSWORD = "UatLearner!2026"
+UAT_ADMIN_EMAIL = os.environ.get("UAT_ADMIN_EMAIL", "uat-admin@ifpi.org")
+UAT_ADMIN_PASSWORD = os.environ.get("UAT_ADMIN_PASSWORD", "UatAdmin!2026")
+UAT_LEARNER_EMAIL = os.environ.get("UAT_LEARNER_EMAIL", "uat-learner@ifpi.org")
+UAT_LEARNER_PASSWORD = os.environ.get("UAT_LEARNER_PASSWORD", "UatLearner!2026")
 
 
 def _ensure_user(db, org, email, password, name, role):

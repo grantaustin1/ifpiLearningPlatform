@@ -94,7 +94,7 @@ export default function MindMapPage() {
         setHasSaved(true); setDirty(false)
         return true
       }
-    } catch { /* fall through */ }
+    } catch (e) { console.warn('Mind map fetch fell through', e) }
     return false
   }, [cid, applyGraph])
 
@@ -153,7 +153,7 @@ export default function MindMapPage() {
             thumbnail_svg = btoa(unescape(encodeURIComponent(raw)))
           }
         }
-      } catch { /* thumbnail is best-effort */ }
+      } catch (e) { console.warn('Thumbnail generation failed (best-effort)', e) }
 
       await api.put(`/authoring/mindmap/${cid}/layout`, {
         graph: map, positions, thumbnail_svg,
