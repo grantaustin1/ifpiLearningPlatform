@@ -263,9 +263,8 @@ export default function CourseEditPage() {
             <a
               href={`${(import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_BACKEND_URL || ''}/api/authoring/pptx/${course.id}`}
               onClick={(e) => {
-                // Attach auth token as query fallback isn't safe; fetch + blob download instead.
+                // Cookie-authed fetch + blob download (no token in JS).
                 e.preventDefault()
-                const tok = localStorage.getItem('ifpi_access_token') || ''
                 api.get(`/authoring/pptx/${course.id}`, { responseType: 'blob' }).then(r => {
                   const url = URL.createObjectURL(r.data)
                   const a = document.createElement('a')
@@ -274,7 +273,6 @@ export default function CourseEditPage() {
                   a.click()
                   URL.revokeObjectURL(url)
                 }).catch(() => toast.error('PPTX export failed'))
-                void tok
               }}
               data-testid="pptx-download-btn"
               className="inline-flex items-center gap-1.5 text-xs border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium cursor-pointer">

@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 69 — Cookie Auth Migration regression pass. Verified cookie-only login (no body token), HttpOnly on ifpi_auth_token/ifpi_refresh_token, readable ifpi_csrf, /auth/me via cookie, CSRF 403 without header / 200 with header, refresh cookie rotation, logout Max-Age=0 deletion + subsequent /me 401, Bearer regression via x-return-token: true (body token + CSRF-exempt mutation), protected GET breadth across /api/courses, /api/learning-paths, /api/leaderboard. Frontend E2E on 1440x900: learner login → /courses, welcome-tour dismissible via data-testid welcome-tour-skip, cookies set correctly (HttpOnly enforced, csrf readable), localStorage contains ONLY ifpi_session_hint + ifpi_tour_done_v1_* (no JWT/token), /learn/297 auto-enroll fired without any CSRF 403 (backend returned 412 'already enrolled' — treated as OK by app), navigation to /learning-paths and /leaderboard works, page reload preserves session, sidebar Sign out → /login and /courses redirects to /login post-logout. Admin login → /courses/297/edit → Save fired ~14 mutating PUT/POST requests (course + slides) all 200, zero 403 CSRF errors, admin localStorage also clean. All backend tests (13/13) and both frontend flows PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter69_cookie_auth.py",
+    "/app/test_reports/pytest/iter69_cookie_auth.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Cookie mode is correctly gated via should_include_token_in_body() in auth/cookies.py — returns False when AUTH_COOKIE_MODE=on. Response body access_token is null in cookie mode (verified via curl and via requests without conftest header patching).",
+    "Test-only affordance x-return-token: true is doubly guarded (ALLOW_TEST_TOKEN_HEADER=true AND non-production) — safe.",
+    "CSRF middleware EXEMPT_PREFIXES correctly excludes /api/auth/login and /api/auth/refresh but requires CSRF on /api/auth/logout — validated (403 without header, 200 with header).",
+    "Bearer requests correctly CSRF-exempt (Authorization: bearer prefix short-circuit in middleware line ~411).",
+    "Editor Save flow issues ~14 sequential mutating requests — consider batching to one PATCH per save to reduce request count, but not a correctness bug.",
+    "Enroll auto-call on /learn/:id returns 412 when already enrolled; the frontend logs it as a warning. Consider 409 Conflict or 200 idempotent for cleaner UX/log surface (minor, pre-existing, unrelated to this iteration).",
+    "conftest.py auto-injects X-Return-Token: true on all requests.Session() calls — this hid the token-in-body assertion until _skip_x_return_token=True was set. Any future 'pure-cookie' regression test MUST opt out via _skip_x_return_token=True AND _skip_csrf_autoinject=True (for negative-CSRF tests). Documented inline in test_iter69_cookie_auth.py."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter69_cookie_auth.py"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100%"},
+  "test_credentials": "uat-learner@ifpi.org / UatLearner!2026 ; uat-admin@ifpi.org / UatAdmin!2026",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cookie auth migration is fully in place and green in preview. When writing new backend tests for cookie flows, remember conftest.py auto-injects X-Return-Token on requests.Session() unless you set session._skip_x_return_token=True; also set session._skip_csrf_autoinject=True when testing negative CSRF cases (missing header returns 403). Frontend localStorage on logged-in users only holds ifpi_session_hint + ifpi_tour_done_v1_<userid> — no JWTs.",
+  "rca of the issue": "No production issue found. Two initial test failures were tooling-side: (1) conftest.py auto-injected X-Return-Token: true triggering server to return body token (masqueraded as a leak); fixed by session._skip_x_return_token=True. (2) same conftest auto-mirrored ifpi_csrf into X-CSRF-Token on unsafe methods for _skip_x_return_token sessions, defeating the negative-CSRF test; fixed with session._skip_csrf_autoinject=True."
+}

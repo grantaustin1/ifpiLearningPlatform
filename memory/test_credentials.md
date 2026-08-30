@@ -62,3 +62,7 @@ to route through ERP360's lite-billing module.
 - Roles: ADMIN, org: ifpi-main. Created 2026-08-06 because the seeded
   admin@ifpi.org intentionally has must_change_password=True (asserted
   by test_iteration32_sprint) which blocks quick UI logins.
+
+## Auth mode (since 2026-08-30)
+- AUTH_COOKIE_MODE=on: login body has NO access_token; auth via httpOnly cookies (ifpi_auth_token/ifpi_refresh_token) + CSRF header (mirror ifpi_csrf cookie into X-CSRF-Token on mutations).
+- For curl/scripts: use cookie jar (-c/-b), or get a Bearer token by adding header "x-return-token: true" to login (works in preview only, ALLOW_TEST_TOKEN_HEADER=true).

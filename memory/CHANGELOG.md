@@ -2283,3 +2283,10 @@ FIXED:
 FALSE POSITIVES (no change needed): sanitize.ts + SubscriptionModal already DOMPurify-based; LearnPage 327/341 receive pre-sanitized html; TakeExamPage/Flashcards/AttendanceModal hook deps already correct; pyflakes found 0 undefined names (claimed 39).
 DEFERRED (documented): localStorage->httpOnly cookie auth migration (auth architecture change, cookie infra partially exists via CSRF middleware — needs dedicated pass); high-complexity refactors (register_all, middleware dispatch, api_tokens, alembic baseline — migrations must never be edited); ExamsPage editable option lists keep index keys (correct for editable inputs w/o stable ids); CSP already present via SecurityHeadersMiddleware.
 Verified: backend health 200, login OK, courses/paths/auth-me 200, RTE loads sanitized content in editor, yarn build OK, pyflakes clean.
+
+## 2026-08-30 (later 4) — Cookie-Only Auth Migration + Deploy
+- Flipped AUTH_COOKIE_MODE dual->on in backend/.env (+ AUTH_COOKIE_SECURE=true). Sessions now httpOnly-cookie-only: login/register/invite/campaign-signup bodies omit access_token; CSRF double-submit enforced (CSRF_ENABLED=true was already set). Bearer auth unchanged for API tokens; dev affordance x-return-token gated by ALLOW_TEST_TOKEN_HEADER=true (preview only; double-locked off when ENVIRONMENT=production).
+- Removed dead localStorage token read in CourseEditPage PPTX download.
+- integration_expert consulted (JWT/cookie auth playbook) — existing infra already matched best practice; flip only.
+- Testing agent iteration_69: 100% pass backend (13/13) + frontend E2E (login, session persist on reload, CSRF-stamped mutations incl. editor save x14, logout redirect, localStorage token-free). Test file: tests/test_iter69_cookie_auth.py (note conftest auto-injects X-Return-Token unless session._skip_x_return_token=True).
+- Deploy dispatched with the full bundle (mobile + PWA + offline + digests + hardening + cookie auth).
