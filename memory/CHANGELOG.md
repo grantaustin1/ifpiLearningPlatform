@@ -2265,3 +2265,7 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 ## 2026-08-30 (later) — Swipe Navigation + Deploy Dispatched
 - LearnPage: touch swipe left/right switches slides (60px threshold, horizontal-dominant only, ignores gestures starting on buttons/inputs/media, swipe-left never auto-completes on last slide). data-testid='learn-swipe-area'. Verified via synthetic TouchEvents at 375px: 2.1 -> 2.2 -> back to 2.1 PASS. Build OK.
 - Deploy dispatched to Emergent deployment pipeline (queued).
+
+## 2026-08-30 (later 2) — Page-Turn Slide Transition
+- LearnPage: slide content keyed by index with direction-aware CSS page-turn animation (perspective + rotateY + translateX, 0.38s). Forward = page-turn-fwd (origin left), back = page-turn-back (origin right). prefers-reduced-motion disables it. Verified via Playwright: correct animationName both directions, build OK.
+- NOTE: earlier deploy was dispatched BEFORE this change — a fresh deploy is needed to ship the page-turn effect live.

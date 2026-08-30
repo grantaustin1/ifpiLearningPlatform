@@ -39,3 +39,18 @@
     pointer-events: none;
   }
 }
+
+/* Page-turn transition between course slides */
+@keyframes page-turn-fwd {
+  from { opacity: 0; transform: perspective(1200px) translateX(32px) rotateY(-7deg); }
+  to   { opacity: 1; transform: perspective(1200px) translateX(0) rotateY(0deg); }
+}
+@keyframes page-turn-back {
+  from { opacity: 0; transform: perspective(1200px) translateX(-32px) rotateY(7deg); }
+  to   { opacity: 1; transform: perspective(1200px) translateX(0) rotateY(0deg); }
+}
+.page-turn-fwd  { animation: page-turn-fwd 0.38s cubic-bezier(0.22, 1, 0.36, 1); transform-origin: left center; will-change: transform, opacity; }
+.page-turn-back { animation: page-turn-back 0.38s cubic-bezier(0.22, 1, 0.36, 1); transform-origin: right center; will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) {
+  .page-turn-fwd, .page-turn-back { animation: none; }
+}

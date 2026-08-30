@@ -25,6 +25,9 @@ export default function LearnPage() {
   const [reviewSaved, setReviewSaved] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const touchRef = useRef<{ x: number; y: number } | null>(null)
+  const prevIndexRef = useRef(0)
+  const turnDir = current >= prevIndexRef.current ? 'page-turn-fwd' : 'page-turn-back'
+  useEffect(() => { prevIndexRef.current = current }, [current])
   const [finishing, setFinishing] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
@@ -199,7 +202,7 @@ export default function LearnPage() {
         )}
         <div className="flex-1 overflow-y-auto" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="learn-swipe-area">
           {slide ? (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10" data-testid="learn-slide-content">
+            <div key={current} className={`max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 ${turnDir}`} data-testid="learn-slide-content">
               <div className="flex items-start gap-3 mb-6">
                 <h1 className="text-2xl font-bold text-slate-900 font-display flex-1">{slide.title}</h1>
                 {isStaff && (
