@@ -24,6 +24,7 @@ export default function LearnPage() {
   const [reviewText, setReviewText] = useState('')
   const [reviewSaved, setReviewSaved] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
+  const touchRef = useRef<{ x: number; y: number } | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
@@ -119,6 +120,23 @@ export default function LearnPage() {
     } else { setCurrent(current + 1) }
   }
 
+  // Swipe left/right between slides (mobile). Ignores swipes that start on
+  // interactive/media elements and vertical-dominant gestures (scrolling).
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.target as HTMLElement
+    if (t.closest('button, input, textarea, a, iframe, video, audio')) { touchRef.current = null; return }
+    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchRef.current || !slide) return
+    const dx = e.changedTouches[0].clientX - touchRef.current.x
+    const dy = e.changedTouches[0].clientY - touchRef.current.y
+    touchRef.current = null
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return
+    if (dx < 0 && !isLast) next()
+    else if (dx > 0 && current > 0) setCurrent(current - 1)
+  }
+
   return (
     <div className="flex h-screen bg-slate-50" data-testid="learn-page">
       {navOpen && (
@@ -179,7 +197,7 @@ export default function LearnPage() {
             <span>This course ends with an exam — pass <strong>{course.exam_title || 'the course exam'}</strong> to earn your certificate.</span>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="learn-swipe-area">
           {slide ? (
             <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10" data-testid="learn-slide-content">
               <div className="flex items-start gap-3 mb-6">

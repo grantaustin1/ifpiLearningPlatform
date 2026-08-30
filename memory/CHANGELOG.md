@@ -2261,3 +2261,7 @@ None significant. The codebase intentionally mirrors ERP360 conventions so futur
 - Simulated phone (375x667) and tablet (768x1024) across courses, learning-paths, pathways, leaderboard, certificates, course player, sidebar drawer. Tablet: all clean. Phone: everything clean EXCEPT the course player's internal w-72 slide list which crushed content.
 - Fixed LearnPage: slide list is now a mobile drawer (ListOrdered toggle data-testid='learn-nav-toggle', backdrop 'learn-nav-backdrop', close 'learn-nav-close'); slide picks auto-close drawer; header truncates title; slide content px-4 on mobile. md+ unchanged (static aside).
 - Verified via Playwright at 375px: no horizontal scroll, drawer open/pick/close all work. Build OK.
+
+## 2026-08-30 (later) — Swipe Navigation + Deploy Dispatched
+- LearnPage: touch swipe left/right switches slides (60px threshold, horizontal-dominant only, ignores gestures starting on buttons/inputs/media, swipe-left never auto-completes on last slide). data-testid='learn-swipe-area'. Verified via synthetic TouchEvents at 375px: 2.1 -> 2.2 -> back to 2.1 PASS. Build OK.
+- Deploy dispatched to Emergent deployment pipeline (queued).
