@@ -85,3 +85,26 @@ def test_defusedxml_pinned_for_scorm_imports():
         None,
     )
     assert pinned_version == DEFUSEDXML_REQUIRED_VERSION
+
+
+def test_googleapis_common_protos_compatible_with_pinned_protobuf():
+    """Keep googleapis-common-protos on a release compatible with protobuf==5.29.6."""
+    requirements_by_name = _requirements_by_name()
+
+    assert "protobuf" in requirements_by_name
+    assert "googleapis-common-protos" in requirements_by_name
+
+    protobuf_req = requirements_by_name["protobuf"]
+    googleapis_req = requirements_by_name["googleapis-common-protos"]
+
+    protobuf_version = next(
+        (str(spec)[2:] for spec in protobuf_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    googleapis_version = next(
+        (str(spec)[2:] for spec in googleapis_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+
+    assert protobuf_version == "5.29.6"
+    assert googleapis_version == "1.75.0"
