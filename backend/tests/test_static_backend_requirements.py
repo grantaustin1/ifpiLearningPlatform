@@ -60,6 +60,57 @@ def test_reportlab_pin_compatibility():
     assert version in SpecifierSet(XHTML2PDF_0_2_17_REPORTLAB_SPEC)
 
 
+def test_googleapis_common_protos_compatible_with_protobuf5():
+    requirements_by_name = _requirements_by_name()
+
+    assert "googleapis-common-protos" in requirements_by_name
+    assert "protobuf" in requirements_by_name
+
+    googleapis_req = requirements_by_name["googleapis-common-protos"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in googleapis_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert Version(pinned_version) in SpecifierSet(">=1.75.0,<1.75.1"), (
+        "googleapis-common-protos must remain on the protobuf-5-compatible release "
+        "that matches the pinned protobuf==5.29.6"
+    )
+
+
+def test_pymongo_satisfies_motor_constraint():
+    requirements_by_name = _requirements_by_name()
+
+    assert "motor" in requirements_by_name
+    assert "pymongo" in requirements_by_name
+
+    pymongo_req = requirements_by_name["pymongo"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in pymongo_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version is not None, "pymongo must be pinned with == in requirements.txt"
+    assert Version(pinned_version) in SpecifierSet(">=4.9,<5.0")
+
+
+def test_no_url_based_requirements():
+    requirements_file = Path(__file__).resolve().parents[1] / "requirements.txt"
+    for raw_line in requirements_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        assert " @ " not in line and "@ https://" not in line, (
+            f"URL-based requirement is not allowed in requirements.txt: {line}"
+        )
+
+
+def test_litellm_not_in_requirements():
+    requirements_by_name = _requirements_by_name()
+    assert "litellm" not in requirements_by_name, (
+        "litellm must not be in requirements.txt — its public wheel is unavailable and "
+        "it breaks CI installs"
+    )
+
+
 def test_emergentintegrations_not_in_requirements():
     """emergentintegrations caused CI failures (missing from PyPI, external wheel).
     It must never re-enter requirements.txt."""
