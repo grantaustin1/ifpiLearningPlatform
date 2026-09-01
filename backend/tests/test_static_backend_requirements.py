@@ -11,6 +11,7 @@ SVGLIB_2_0_2_REPORTLAB_SPEC = ">=4.4.3"
 # Mirrors the currently published xhtml2pdf==0.2.17 package metadata requirement.
 XHTML2PDF_0_2_17_REPORTLAB_SPEC = ">=4.0.4,<5"
 DEFUSEDXML_REQUIRED_VERSION = "0.7.1"
+FASTAPI_PINNED_VERSION = "0.115.5"
 FASTAPI_0_115_5_STARLETTE_SPEC = ">=0.40.0,<0.42.0"
 
 
@@ -122,7 +123,7 @@ def test_fastapi_starlette_pin_compatibility():
         None,
     )
 
-    assert fastapi_pinned_version == "0.115.5", (
+    assert fastapi_pinned_version == FASTAPI_PINNED_VERSION, (
         "Backend CI expects FastAPI to remain pinned to 0.115.5 unless the "
         "Starlette pin and compatibility guard are updated together."
     )
