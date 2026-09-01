@@ -87,11 +87,18 @@ def test_no_url_based_requirements():
 
 
 def test_fastapi_starlette_pin_compatibility():
-    """FastAPI 0.141.1 requires Starlette >=0.46.0; keep the pin aligned to avoid CI install conflicts."""
+    """FastAPI 0.141.1 requires Starlette >=0.46.0; keep the lock aligned to avoid CI install conflicts."""
     requirements_by_name = _requirements_by_name()
 
     assert "fastapi" in requirements_by_name
     assert "starlette" in requirements_by_name
+
+    fastapi_req = requirements_by_name["fastapi"]
+    fastapi_version = next(
+        (str(spec)[2:] for spec in fastapi_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert fastapi_version is not None, "fastapi must be pinned with == in requirements.txt"
 
     starlette_req = requirements_by_name["starlette"]
     starlette_version = next(
