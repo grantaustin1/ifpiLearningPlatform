@@ -86,6 +86,22 @@ def test_no_url_based_requirements():
         )
 
 
+def test_fastapi_starlette_pin_compatibility():
+    """FastAPI 0.141.1 requires Starlette >=0.46.0; keep the pin aligned to avoid CI install conflicts."""
+    requirements_by_name = _requirements_by_name()
+
+    assert "fastapi" in requirements_by_name
+    assert "starlette" in requirements_by_name
+
+    starlette_req = requirements_by_name["starlette"]
+    starlette_version = next(
+        (str(spec)[2:] for spec in starlette_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert starlette_version is not None, "starlette must be pinned with == in requirements.txt"
+    assert Version(starlette_version) >= Version("0.46.0")
+
+
 def test_defusedxml_pinned_for_scorm_imports():
     """SCORM parsing imports defusedxml at module import time, so CI needs it pinned."""
     requirements_by_name = _requirements_by_name()
