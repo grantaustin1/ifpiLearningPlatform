@@ -11,6 +11,7 @@ SVGLIB_2_0_2_REPORTLAB_SPEC = ">=4.4.3"
 # Mirrors the currently published xhtml2pdf==0.2.17 package metadata requirement.
 XHTML2PDF_0_2_17_REPORTLAB_SPEC = ">=4.0.4,<5"
 DEFUSEDXML_REQUIRED_VERSION = "0.7.1"
+FASTAPI_0_115_5_STARLETTE_SPEC = ">=0.40.0,<0.42.0"
 
 
 def _requirements_by_name():
@@ -101,3 +102,33 @@ def test_defusedxml_pinned_for_scorm_imports():
         None,
     )
     assert pinned_version == DEFUSEDXML_REQUIRED_VERSION
+
+
+def test_fastapi_starlette_pin_compatibility():
+    requirements_by_name = _requirements_by_name()
+
+    assert "fastapi" in requirements_by_name
+    assert "starlette" in requirements_by_name
+
+    fastapi_req = requirements_by_name["fastapi"]
+    starlette_req = requirements_by_name["starlette"]
+
+    fastapi_pinned_version = next(
+        (str(spec)[2:] for spec in fastapi_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    starlette_pinned_version = next(
+        (str(spec)[2:] for spec in starlette_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+
+    assert fastapi_pinned_version == "0.115.5", (
+        "Backend CI expects FastAPI to remain pinned to 0.115.5 unless the "
+        "Starlette pin and compatibility guard are updated together."
+    )
+    assert starlette_pinned_version is not None, (
+        "starlette must be pinned with == in requirements.txt"
+    )
+    assert Version(starlette_pinned_version) in SpecifierSet(
+        FASTAPI_0_115_5_STARLETTE_SPEC
+    )
