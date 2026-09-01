@@ -60,6 +60,33 @@ def test_reportlab_pin_compatibility():
     assert version in SpecifierSet(XHTML2PDF_0_2_17_REPORTLAB_SPEC)
 
 
+FASTAPI_0_115_5_STARLETTE_SPEC = ">=0.40.0,<0.42.0"
+
+
+def test_fastapi_starlette_pin_compatibility():
+    requirements_by_name = _requirements_by_name()
+
+    assert "fastapi" in requirements_by_name
+    assert "starlette" in requirements_by_name
+
+    fastapi_req = requirements_by_name["fastapi"]
+    starlette_req = requirements_by_name["starlette"]
+
+    fastapi_version = next(
+        (str(spec)[2:] for spec in fastapi_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    starlette_version = next(
+        (str(spec)[2:] for spec in starlette_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+
+    assert fastapi_version is not None, "fastapi must be pinned with == in requirements.txt"
+    assert starlette_version is not None, "starlette must be pinned with == in requirements.txt"
+    assert Version(fastapi_version) == Version("0.115.5")
+    assert Version(starlette_version) in SpecifierSet(FASTAPI_0_115_5_STARLETTE_SPEC)
+
+
 def test_emergentintegrations_not_in_requirements():
     """emergentintegrations caused CI failures (missing from PyPI, external wheel).
     It must never re-enter requirements.txt."""
