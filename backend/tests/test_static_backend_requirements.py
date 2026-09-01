@@ -86,6 +86,50 @@ def test_no_url_based_requirements():
         )
 
 
+def test_fastapi_starlette_pin_compatibility():
+    requirements_by_name = _requirements_by_name()
+
+    assert "fastapi" in requirements_by_name
+    assert "starlette" in requirements_by_name
+
+    starlette_req = requirements_by_name["starlette"]
+    pinned_version = next(
+        (str(spec)[2:] for spec in starlette_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    assert pinned_version is not None, "starlette must be pinned with == in requirements.txt"
+    assert Version(pinned_version) in SpecifierSet(">=0.46.0")
+
+
+def test_litellm_not_in_requirements():
+    requirements_by_name = _requirements_by_name()
+    assert "litellm" not in requirements_by_name, (
+        "litellm must not be in requirements.txt — it conflicts with openai==1.99.9 and breaks CI dependency resolution."
+    )
+
+
+def test_pydantic_core_matches_pydantic_pin():
+    requirements_by_name = _requirements_by_name()
+
+    assert "pydantic" in requirements_by_name
+    assert "pydantic_core" in requirements_by_name
+
+    pydantic_req = requirements_by_name["pydantic"]
+    pydantic_core_req = requirements_by_name["pydantic_core"]
+
+    pydantic_version = next(
+        (str(spec)[2:] for spec in pydantic_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+    pydantic_core_version = next(
+        (str(spec)[2:] for spec in pydantic_core_req.specifier if str(spec).startswith("==")),
+        None,
+    )
+
+    assert pydantic_version == "2.10.3"
+    assert pydantic_core_version == "2.27.1"
+
+
 def test_defusedxml_pinned_for_scorm_imports():
     """SCORM parsing imports defusedxml at module import time, so CI needs it pinned."""
     requirements_by_name = _requirements_by_name()
