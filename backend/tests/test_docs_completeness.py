@@ -35,6 +35,7 @@ EXEMPT_ROUTE_PREFIXES = (
     "/api/version",
     "/api/openapi",
     "/api/redoc",
+    "/api/docs",
 )
 
 # Router files exempt from the "must be indexed" rule.
@@ -97,18 +98,30 @@ def test_every_api_route_mentioned_in_a_manual():
             combined += p.read_text(encoding="utf-8") + "\n"
 
     missing = []
-    for route in app.routes:
-        path = getattr(route, "path", "") or ""
-        if not path.startswith("/api"):
-            continue
-        if path.startswith(EXEMPT_ROUTE_PREFIXES):
-            continue
-        methods = getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}
-        if not methods:
-            continue
-        # Match either exact backticked path or path segment
-        if path not in combined:
-            missing.append(path)
+    # FastAPI >=0.141 wraps included routers in _IncludedRouter objects that
+    # hide child routes from app.routes.  Use the OpenAPI path map instead.
+    try:
+        spec = app.openapi()
+        for path in sorted(spec.get("paths", {}).keys()):
+            if not path.startswith("/api"):
+                continue
+            if path.startswith(EXEMPT_ROUTE_PREFIXES):
+                continue
+            if path not in combined:
+                missing.append(path)
+    except Exception:
+        # Fallback to legacy route iteration (works on older FastAPI)
+        for route in app.routes:
+            path = getattr(route, "path", "") or ""
+            if not path.startswith("/api"):
+                continue
+            if path.startswith(EXEMPT_ROUTE_PREFIXES):
+                continue
+            methods = getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}
+            if not methods:
+                continue
+            if path not in combined:
+                missing.append(path)
 
     # Deduplicate
     missing = sorted(set(missing))

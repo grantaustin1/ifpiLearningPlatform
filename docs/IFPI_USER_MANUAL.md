@@ -608,330 +608,328 @@ Full OpenAPI at `/docs`. The full route table is regenerated automatically:
 <!-- AUTO:BEGIN api_routes -->
 | Endpoint | Verb | Purpose |
 |---|---|---|
-| `/api` | GET |  |
-| `/api/academies` | GET | List all academies with optional search (name/slug), status filter, and sort. |
-| `/api/academies` | POST |  |
-| `/api/admin/affiliate/codes` | GET |  |
-| `/api/admin/affiliate/codes` | POST |  |
-| `/api/admin/affiliate/codes/{code_id}` | PATCH |  |
-| `/api/admin/affiliate/earnings` | GET | Aggregate earnings by status. Cents-based to avoid float drift. |
-| `/api/admin/affiliate/referrals` | GET | Referrals attributed to codes I own. |
-| `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST |  |
-| `/api/admin/analytics` | GET |  |
-| `/api/admin/analytics/enrollments-weekly` | GET | Enrolments or completions per ISO week (Iter 43/44 dashboard chart). |
-| `/api/admin/api-tokens` | GET |  |
-| `/api/admin/api-tokens` | POST |  |
-| `/api/admin/api-tokens/analytics/spend` | GET | Per-day $ spend across all AI providers for the last `days` days. |
-| `/api/admin/api-tokens/analytics/usage` | GET | Return per-day request counts for the org over the last `days` days, |
-| `/api/admin/api-tokens/{token_id}` | DELETE |  |
-| `/api/admin/api-tokens/{token_id}/revoke` | POST |  |
-| `/api/admin/audit-digest` | GET | LLM-generated plain-English summary of the last N days of admin activity. |
-| `/api/admin/audit-log` | GET |  |
-| `/api/admin/campaign-links` | GET |  |
-| `/api/admin/campaign-links` | POST |  |
-| `/api/admin/campaign-links/{link_id}` | DELETE |  |
-| `/api/admin/campaign-links/{link_id}` | PATCH |  |
-| `/api/admin/campaign-links/{link_id}/attribution` | GET |  |
-| `/api/admin/campaign-links/{link_id}/qr` | GET | Printable QR PNG pointing at the public join URL. |
-| `/api/admin/cert-preview` | POST | Render a SAMPLE certificate PDF using the supplied branding — no DB writes. |
-| `/api/admin/cohorts` | GET | Distinct cohort labels with learner counts. |
-| `/api/admin/course-dropoff/{course_id}` | GET | Iter 26 — Per-slide unique-viewers + drop-off %. For each slide |
-| `/api/admin/dashboard/docs-engagement` | GET | Iter 33c — Docs engagement tile for the Owner dashboard. |
-| `/api/admin/dashboard/members-needing-action` | GET |  |
-| `/api/admin/docs` | GET | Return catalog of downloadable documents with metadata. |
-| `/api/admin/docs/{slug}/pdf` | GET | Stream a rendered PDF of the requested document. |
-| `/api/admin/docs/{slug}/raw` | GET | Return the raw markdown source (with AUTO-BLOCK markers). |
-| `/api/admin/email/send-test` | POST | Queue a test email and dispatch it synchronously so the admin |
-| `/api/admin/email/transport-status` | GET | Report which delivery transports are active for THIS org, in |
-| `/api/admin/entitlements/user/{user_id}` | GET | List every paid course in the caller's org + whether the target |
-| `/api/admin/entitlements/user/{user_id}/course/{course_id}` | GET | One user, one course — the "why can't they enroll?" answer. |
-| `/api/admin/feature-flags/{flag_key}` | PUT |  |
-| `/api/admin/feedback` | GET | All feedback for the caller's org, newest first. |
-| `/api/admin/feedback/{feedback_id}/status` | POST | Flip a feedback item between NEW and REVIEWED. |
-| `/api/admin/imports` | GET |  |
-| `/api/admin/imports/run` | POST | Kick off a bulk import. Returns immediately with the new ImportJob row; |
-| `/api/admin/imports/upload-zip` | POST | Drag-and-drop a content-tree ZIP. We extract it to a temp staging |
-| `/api/admin/imports/{job_id}` | GET |  |
-| `/api/admin/imports/{job_id}/retry` | POST | Re-run a FAILED / PARTIAL import against the same staging directory — |
-| `/api/admin/imports/{job_id}/rollback` | POST | Undo an import job — deletes every course / learning path it created. |
-| `/api/admin/invitations` | GET |  |
-| `/api/admin/invitations` | POST |  |
-| `/api/admin/invitations/bulk` | POST | Issue up to 500 invitations in one call. Each row returns its own |
-| `/api/admin/invitations/{invitation_id}` | DELETE |  |
-| `/api/admin/kiosk/settings` | PUT |  |
-| `/api/admin/leaderboard.csv` | GET |  |
-| `/api/admin/marketplace-funnel` | GET | Iter 25 — Cross-course marketplace funnel roll-up for the current |
-| `/api/admin/marketplace-funnel/{course_id}` | GET |  |
-| `/api/admin/onboarding/checklist` | GET |  |
-| `/api/admin/organizations` | GET | List every org in the deployment (super-admin only — regular |
-| `/api/admin/organizations/{org_id}/integrations/erp360` | GET |  |
-| `/api/admin/organizations/{org_id}/integrations/erp360` | PATCH | Merge-update the org's ERP360 integration config. Only the |
-| `/api/admin/outbox` | GET |  |
-| `/api/admin/outbox/stats` | GET |  |
-| `/api/admin/outbox/{message_id}/retry` | POST | Reset a FAILED or DEAD_LETTER message back to QUEUED so the worker |
-| `/api/admin/query-builder/build` | POST |  |
-| `/api/admin/reports/cohort-stats` | GET | Completion / exam-score / time-to-graduation for a cohort. |
-| `/api/admin/scheduled-reports` | GET |  |
-| `/api/admin/scheduled-reports` | POST |  |
-| `/api/admin/scheduled-reports/{report_id}` | DELETE |  |
-| `/api/admin/scheduled-reports/{report_id}` | PUT |  |
-| `/api/admin/scheduled-reports/{report_id}/run-now` | POST |  |
-| `/api/admin/scorm` | GET |  |
-| `/api/admin/scorm/upload` | POST | Upload a SCORM package. We extract it under SCORM_ROOT, parse the |
-| `/api/admin/storage/info` | GET | Return the currently active storage backend + a probe result so admins |
-| `/api/admin/terms` | GET |  |
-| `/api/admin/terms` | POST |  |
-| `/api/admin/terms/acceptances` | GET |  |
-| `/api/admin/users` | GET |  |
-| `/api/admin/users/{user_id}/2fa/disable` | POST |  |
-| `/api/admin/webhooks` | GET |  |
-| `/api/admin/webhooks` | POST |  |
-| `/api/admin/webhooks/deliveries` | GET | Recent WebhookDelivery rows across ALL subscriptions in the |
-| `/api/admin/webhooks/{sub_id}` | DELETE |  |
-| `/api/admin/webhooks/{sub_id}` | PUT |  |
-| `/api/admin/webhooks/{sub_id}/deliveries` | GET |  |
-| `/api/admin/webhooks/{sub_id}/test` | POST | Fires a `webhook.test` event with a tiny payload so admins can confirm |
-| `/api/affiliate/lookup/{code}` | GET | Public — thin preview so signup forms can show |
-| `/api/ai/course-builder` | POST |  |
-| `/api/auth/2fa/challenge` | POST | Public — accepts {challenge_id, code} and returns the standard |
-| `/api/auth/2fa/disable` | POST |  |
-| `/api/auth/2fa/setup` | POST |  |
-| `/api/auth/2fa/setup-init` | POST | Return a fresh secret + QR. Nothing is persisted here — the |
-| `/api/auth/2fa/status` | GET |  |
-| `/api/auth/_test/reset-rate-limit` | POST |  |
-| `/api/auth/change-password` | POST | Self-service password change. Verifies the old password, sets the |
-| `/api/auth/forgot-password` | POST | Emails a single-use reset link if the address matches an active |
-| `/api/auth/login` | POST |  |
-| `/api/auth/logout` | POST |  |
-| `/api/auth/me` | DELETE | Step 2 of self-deletion. Consumes the emailed code + anonymises |
-| `/api/auth/me` | GET |  |
-| `/api/auth/me/delete-request` | POST | Step 1 of self-deletion. Emails a 6-digit confirmation code that |
-| `/api/auth/me/export` | GET | GDPR Right to Data Portability. Returns a JSON bundle of every |
-| `/api/auth/refresh` | POST |  |
-| `/api/auth/register` | POST |  |
-| `/api/auth/resend-verification` | POST | Re-issue + email a verification link. Rate-limited (2/hr per |
-| `/api/auth/reset-password` | POST | Consume a reset token + set a new password. On success, logs the |
-| `/api/auth/sso-exchange` | POST | Inbound SSO from ERP360. Supports two response modes: |
-| `/api/auth/sso-status` | GET | Public endpoint — the login page calls this on mount to decide whether |
-| `/api/auth/verify-email` | POST | Consume an email-verification token. Called by the /verify-email/:token |
-| `/api/authoring/budget` | GET |  |
-| `/api/authoring/budget` | PUT |  |
-| `/api/authoring/flashcards/bulk-save` | POST | Persist a reviewed batch. Overwrites nothing — creates fresh rows. |
-| `/api/authoring/flashcards/by-course/{course_id}` | GET |  |
-| `/api/authoring/flashcards/generate` | POST | Preview AI-generated flashcards. Does NOT persist — the client shows a |
-| `/api/authoring/flashcards/{card_id}` | DELETE |  |
-| `/api/authoring/flashcards/{card_id}` | PATCH |  |
-| `/api/authoring/mindmap/{course_id}` | POST |  |
-| `/api/authoring/mindmap/{course_id}/layout` | DELETE |  |
-| `/api/authoring/mindmap/{course_id}/layout` | GET |  |
-| `/api/authoring/mindmap/{course_id}/layout` | PUT |  |
-| `/api/authoring/narration/generate` | POST |  |
-| `/api/authoring/narration/languages` | GET | Static list of supported TTS languages — surfaced in the picker. |
-| `/api/authoring/narration/{slide_id}` | DELETE |  |
-| `/api/authoring/pptx/{course_id}` | GET |  |
-| `/api/authoring/redaction/preview` | POST | Small utility endpoint: shows staff exactly what PII gets stripped |
-| `/api/authoring/research` | GET | List recent research jobs for the org's history view. |
-| `/api/authoring/research/start` | POST | Kick off a deep research job. Returns immediately with the AIJob id. |
-| `/api/authoring/research/{job_id}` | GET |  |
-| `/api/authoring/sources` | GET |  |
-| `/api/authoring/sources` | POST | Upload a source. Two modes: |
-| `/api/authoring/sources/search` | POST |  |
-| `/api/authoring/sources/{doc_id}` | DELETE |  |
-| `/api/authoring/status` | GET | Landing endpoint that the frontend hits when a staff user opens the |
-| `/api/authoring/tutor/ask` | POST |  |
-| `/api/authoring/video/generate` | POST | Kick off a Sora 2 job. Returns 202 with the AIJob id — poll |
-| `/api/authoring/video/history` | GET |  |
-| `/api/authoring/video/preview` | POST | Show the estimated cost + remaining budget BEFORE firing a Sora |
-| `/api/authoring/video/{job_id}` | GET |  |
-| `/api/authoring/visuals/generate` | POST | Generates a PNG infographic. If `slide_id + attach_to_slide` are set, |
-| `/api/badge-tiers` | GET |  |
-| `/api/badge-tiers` | POST |  |
-| `/api/badge-tiers/reorder` | PATCH |  |
-| `/api/badge-tiers/{tier_id}` | DELETE |  |
-| `/api/badge-tiers/{tier_id}` | PATCH |  |
-| `/api/billing/subscribe` | POST |  |
-| `/api/billing/subscriptions` | GET |  |
-| `/api/billing/webhook` | POST | Receives ERP360 billing webhooks. Verified via X-Signature header. |
-| `/api/branding/public` | GET | Fetch org branding by slug (query param). If no slug is passed, we |
-| `/api/catalog` | GET |  |
-| `/api/catalog/organizations` | GET | Iter 27 — Cross-tenant marketplace search: list opted-in |
-| `/api/catalog/{course_id}` | GET | Public course detail — shown on marketplace product page. |
-| `/api/catalog/{course_id}/reviews` | GET | Best written reviews for a public course — highest stars first, |
-| `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Iter 26 — Fire once per (slide, learner, day) from the course |
-| `/api/catalog/{course_id}/track-view` | POST |  |
-| `/api/certificates` | GET |  |
-| `/api/certificates/admin-export.csv` | GET |  |
-| `/api/certificates/admin-list` | GET |  |
-| `/api/certificates/bulk-email` | POST |  |
-| `/api/certificates/bulk-revoke` | POST |  |
-| `/api/certificates/bulk-unrevoke` | POST |  |
-| `/api/certificates/bulk-zip` | POST |  |
-| `/api/certificates/transcript` | GET | Generate a branded PDF transcript for the calling user. |
-| `/api/certificates/transcript.json` | GET | Iter 50 — JSON payload behind the printable transcript page. |
-| `/api/certificates/verify/{code}` | GET |  |
-| `/api/certificates/verify/{code}/og-image.png` | GET |  |
-| `/api/certificates/verify/{code}/og-image.svg` | GET |  |
-| `/api/certificates/{cert_id}/pdf` | GET |  |
-| `/api/certificates/{cert_id}/revocation-history` | GET |  |
-| `/api/certificates/{cert_id}/revoke` | POST |  |
-| `/api/certificates/{cert_id}/unrevoke` | POST |  |
-| `/api/courses` | GET |  |
-| `/api/courses` | POST |  |
-| `/api/courses/reorder` | PATCH | Body: {"course_ids": [id1, id2, ...]} — sets display_order to the |
-| `/api/courses/{course_id}` | DELETE |  |
-| `/api/courses/{course_id}` | GET |  |
-| `/api/courses/{course_id}` | PATCH |  |
-| `/api/courses/{course_id}/archive` | POST | Safe alternative to deletion — blocked while learners are busy. |
-| `/api/courses/{course_id}/complete` | POST |  |
-| `/api/courses/{course_id}/duplicate` | POST | Deep-clone a course (with all slides) as a new DRAFT. |
-| `/api/courses/{course_id}/enroll` | POST |  |
-| `/api/courses/{course_id}/prerequisites` | GET |  |
-| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE |  |
-| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST |  |
-| `/api/courses/{course_id}/progress` | POST | Remember the learner's position so they resume across devices. |
-| `/api/courses/{course_id}/publish` | POST | Explicit publish action — course must have at least one slide. |
-| `/api/courses/{course_id}/rating` | GET | Average + count + the caller's own rating for a course. |
-| `/api/courses/{course_id}/rating` | POST | Rate a course you have COMPLETED (1-5 stars, upsert). Iter 44. |
-| `/api/courses/{course_id}/reviews` | GET | All written reviews for a course (incl. hidden) — admin moderation view. Iter 47. |
-| `/api/courses/{course_id}/reviews/{rating_id}/reply` | POST | Post/update a public academy reply under a learner review. |
-| `/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden` | POST | Hide/unhide a written review from the public course page. Iter 47. |
-| `/api/courses/{course_id}/slides` | POST |  |
-| `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder slides. Declared BEFORE /slides/{slide_id} to avoid path collision. |
-| `/api/courses/{course_id}/slides/{slide_id}` | DELETE |  |
-| `/api/courses/{course_id}/slides/{slide_id}` | PATCH |  |
-| `/api/courses/{course_id}/slides/{slide_id}/versions` | GET |  |
-| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET |  |
-| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST |  |
-| `/api/courses/{course_id}/toggle-featured` | POST | Flip the marketplace 'Featured' flag on a course (Iter 42). |
-| `/api/courses/{course_id}/unarchive` | POST | Restore an archived course back to DRAFT (re-publish separately). |
-| `/api/courses/{course_id}/unpublish` | POST |  |
-| `/api/docs` | GET |  |
-| `/api/enrollments` | GET |  |
-| `/api/erp360/sync/status` | GET | Public probe. Returns whether IFPI is ready to receive ERP360 |
-| `/api/erp360/sync/test-ping` | POST | Round-trip verification. Currently a stub — synthetic outbound |
-| `/api/erp360/webhooks/user` | POST | Receive `user.role_changed` and `user.deactivated` events from ERP360. |
-| `/api/exams` | GET |  |
-| `/api/exams` | POST |  |
-| `/api/exams/ai-generate-questions` | POST | Generate exam questions from a course's slide content using the |
-| `/api/exams/{exam_id}` | DELETE |  |
-| `/api/exams/{exam_id}` | GET |  |
-| `/api/exams/{exam_id}` | PATCH |  |
-| `/api/exams/{exam_id}/attempts` | GET | Per-learner attempt summary for an exam (admin/instructor). |
-| `/api/exams/{exam_id}/attempts` | POST |  |
-| `/api/exams/{exam_id}/attempts/reset` | POST | Wipe a learner's attempts for one exam so they can retake it. |
-| `/api/exams/{exam_id}/question-insights` | GET | Per-question correct/miss rates across all attempts, so admins can |
-| `/api/exams/{exam_id}/question-insights.csv` | GET | Same data as /question-insights, as a CSV for curriculum reviews. |
-| `/api/exams/{exam_id}/questions` | PUT | mode='replace' (default) wipes & sets. mode='append' adds to existing. |
-| `/api/exams/{exam_id}/questions/{question_id}` | PATCH | Edit one question in place — unlike PUT /questions (replace), this |
-| `/api/feature-flags` | GET |  |
-| `/api/feedback` | POST | Log an in-app feedback item (bug report, idea, other). |
-| `/api/feedback/screenshot` | POST | Store a feedback screenshot; returns the URL to attach on submit. |
-| `/api/gamification/leaderboard` | GET |  |
-| `/api/gamification/learning-streak` | GET | Iter 26 — Consecutive-day learning streak. A day counts when the |
-| `/api/gamification/me` | GET |  |
-| `/api/gamification/preferences` | GET | Iter 31 — per-user gamification preferences. |
-| `/api/gamification/preferences` | PATCH | Iter 31 — toggle weekly streak digest opt-in/out. |
-| `/api/gamification/streak-leaderboard` | GET | Iter 28 — Org-wide "top streaks this week" leaderboard. |
-| `/api/health` | GET |  |
-| `/api/invitations/{token}` | GET |  |
-| `/api/invitations/{token}/accept` | POST |  |
-| `/api/join/{slug}` | GET |  |
-| `/api/join/{slug}/signup` | POST |  |
-| `/api/kiosk/settings` | GET |  |
-| `/api/kiosk/unlock` | POST |  |
-| `/api/leads` | POST | Public endpoint for partner sites / marketing pages to drop a lead in. |
-| `/api/leads/embed.js` | GET | Self-contained JS widget that partner sites drop on their page. |
-| `/api/learn/flashcards/courses/{course_id}/due` | GET | Return the learner's due-today queue for a course. Mixes: |
-| `/api/learn/flashcards/courses/{course_id}/stats` | GET |  |
-| `/api/learn/flashcards/streak` | GET | Learner's current + longest flashcard streak. Computed from |
-| `/api/learn/flashcards/{card_id}/review` | POST |  |
-| `/api/learning-paths` | GET |  |
-| `/api/learning-paths` | POST |  |
-| `/api/learning-paths/{path_id}` | DELETE |  |
-| `/api/learning-paths/{path_id}` | GET |  |
-| `/api/learning-paths/{path_id}` | PATCH |  |
-| `/api/learning-paths/{path_id}/enroll` | POST |  |
-| `/api/learning-paths/{path_id}/items` | POST |  |
-| `/api/learning-paths/{path_id}/items/reorder` | PATCH | Accepts {"item_ids": [id1, id2, ...]}. |
-| `/api/learning-paths/{path_id}/items/{course_id}` | DELETE |  |
-| `/api/learning-paths/{path_id}/publish` | POST |  |
-| `/api/live-sessions` | GET |  |
-| `/api/live-sessions` | POST |  |
-| `/api/live-sessions/subscribe-url` | POST | Return a URL the caller can hand to their calendar app. The URL |
-| `/api/live-sessions/subscribe-url/qr` | GET | Iter 25 — Return an SVG QR code encoding the current user's |
-| `/api/live-sessions/subscribe-url/rotate` | POST | Iter 25 — Bump the org's subscription_secret_version. Every |
-| `/api/live-sessions/subscribe/{token}.ics` | GET | Iter 24 — Persistent calendar subscription. Token authenticates |
-| `/api/live-sessions/upcoming` | GET | List sessions the current user can RSVP to: their cohort (or |
-| `/api/live-sessions/{session_id}` | DELETE |  |
-| `/api/live-sessions/{session_id}` | GET |  |
-| `/api/live-sessions/{session_id}` | PATCH |  |
-| `/api/live-sessions/{session_id}/cancel` | POST | Iter 24 — Cancel a single occurrence (RRULE EXDATE semantics). |
-| `/api/live-sessions/{session_id}/ics` | GET |  |
-| `/api/live-sessions/{session_id}/mark-attendance` | POST |  |
-| `/api/live-sessions/{session_id}/rsvp` | POST | RSVP to a single session (default) OR the whole series when |
-| `/api/live-sessions/{session_id}/uncancel` | POST |  |
-| `/api/notifications` | GET |  |
-| `/api/notifications/read-all` | PATCH |  |
-| `/api/openapi.json` | GET |  |
-| `/api/organization` | GET |  |
-| `/api/organization` | PATCH |  |
-| `/api/organization/apply-theme/{slug}` | POST | Copy a preset's branding values onto the caller's organization. |
-| `/api/organization/cohort-digest/send-now` | POST | Manual trigger — queues the weekly cohort digest immediately for this |
-| `/api/organization/cohort-settings` | PUT |  |
-| `/api/organization/cohort-settings/test-webhook` | POST | Send a sample celebration message to verify the configured webhook. |
-| `/api/organization/nurture-settings` | PUT |  |
-| `/api/organization/nurture-settings/run-now` | POST |  |
-| `/api/organization/smtp` | GET | Returns the SMTP config minus the password. Password is write-only. |
-| `/api/organization/smtp` | PUT |  |
-| `/api/organization/smtp/test` | POST | Send a test email immediately (synchronous, NOT via the outbox). |
-| `/api/organization/themes` | GET | Built-in presets + this org's custom presets (marked `custom: true`). |
-| `/api/organization/themes` | POST | Create a custom theme preset for the caller's organization. |
-| `/api/organization/themes/{preset_id}` | DELETE | Delete a custom theme preset. Orgs currently using it keep their |
-| `/api/organization/themes/{preset_id}` | PUT | Update a custom theme preset (org-scoped). |
-| `/api/pathways/admin/completions` | GET |  |
-| `/api/pathways/admin/completions.csv` | GET |  |
-| `/api/pathways/admin/rpl` | POST |  |
-| `/api/pathways/admin/rpl/{user_id}/{course_id}` | DELETE |  |
-| `/api/pathways/map` | GET |  |
-| `/api/payments/v1/checkout/session` | POST | Create a Stripe Checkout Session for the target course. |
-| `/api/payments/v1/checkout/status/{session_id}` | GET | Poll Stripe for the payment status of a checkout session and |
-| `/api/portal/{slug}` | GET | Public landing data for an academy. Powers /a/<slug> on the frontend. |
-| `/api/public/catalog` | GET | List PUBLISHED courses in the caller's org. Read-only, no PII. |
-| `/api/public/certificates/verify/{code}` | GET | Anonymous verification. Rate-limited to 30/min per IP (Redis |
-| `/api/public/guides/{filename}` | GET | Anonymous download of the platform user-guide PDFs. |
-| `/api/rich-text/sanitize` | POST | Server-side HTML sanitizer for the rich-text editor preview. |
-| `/api/scorm/files/{package_id}/{rel_path:path}` | GET | Serve a file from an extracted SCORM package. Path-traversal safe. |
-| `/api/scorm/runtime.js` | GET | Serve the IFPI SCORM runtime bridge as a static JS payload. |
-| `/api/seo/certificates/share/{code}` | GET | Iter 28 — Public shareable brag-card for a certificate. |
-| `/api/seo/courses/share/{course_id}` | GET | Iter 48 — Public shareable link for a marketplace course. |
-| `/api/seo/robots.txt` | GET |  |
-| `/api/seo/sitemap-{org_id}.xml` | GET |  |
-| `/api/seo/sitemap.xml` | GET |  |
-| `/api/slides/{slide_id}/comments` | GET |  |
-| `/api/slides/{slide_id}/comments` | POST |  |
-| `/api/slides/{slide_id}/comments/{comment_id}` | DELETE |  |
-| `/api/terms/accept` | POST |  |
-| `/api/terms/current` | GET |  |
-| `/api/tutor/ask` | POST |  |
-| `/api/tutor/save-as-flashcard` | POST |  |
-| `/api/tutor/sessions` | GET |  |
-| `/api/tutor/sessions/{session_id}` | GET |  |
-| `/api/tutor/sessions/{session_id}/archive` | POST |  |
-| `/api/uploads/bulk-media` | POST | Multi-file upload. Each file is independently stored. Failed files |
-| `/api/uploads/cover-library` | GET | Curated course-cover photo gallery (Iter 43). Files are placed by |
-| `/api/uploads/files/{path:path}` | GET | Serve a previously-uploaded file (local disk or object-store cache). |
-| `/api/uploads/image` | POST | Accepts logo / signature image. Delegates to the configured storage |
-| `/api/uploads/media` | POST | Single-file upload for video/audio/PDF/image. If `course_id` is set, |
+| `/api` | GET | Root |
+| `/api/academies` | GET | List Academies |
+| `/api/academies` | POST | Create Academy |
+| `/api/admin/affiliate/codes` | GET | List Codes |
+| `/api/admin/affiliate/codes` | POST | Create Code |
+| `/api/admin/affiliate/codes/{code_id}` | PATCH | Update Code |
+| `/api/admin/affiliate/earnings` | GET | Earnings |
+| `/api/admin/affiliate/referrals` | GET | List Referrals |
+| `/api/admin/affiliate/referrals/{referral_id}/mark-credited` | POST | Mark Credited |
+| `/api/admin/analytics` | GET | Analytics |
+| `/api/admin/analytics/enrollments-weekly` | GET | Enrollments Weekly |
+| `/api/admin/api-tokens` | GET | List Tokens |
+| `/api/admin/api-tokens` | POST | Create Token |
+| `/api/admin/api-tokens/analytics/spend` | GET | Ai Spend Analytics |
+| `/api/admin/api-tokens/analytics/usage` | GET | Token Usage Analytics |
+| `/api/admin/api-tokens/{token_id}` | DELETE | Delete Token |
+| `/api/admin/api-tokens/{token_id}/revoke` | POST | Revoke Token |
+| `/api/admin/audit-digest` | GET | Audit Digest |
+| `/api/admin/audit-log` | GET | List Audit |
+| `/api/admin/campaign-links` | GET | List Campaign Links |
+| `/api/admin/campaign-links` | POST | Create Campaign Link |
+| `/api/admin/campaign-links/{link_id}` | DELETE | Delete Campaign Link |
+| `/api/admin/campaign-links/{link_id}` | PATCH | Toggle Campaign Link |
+| `/api/admin/campaign-links/{link_id}/attribution` | GET | Campaign Attribution |
+| `/api/admin/campaign-links/{link_id}/qr` | GET | Campaign Qr |
+| `/api/admin/cert-preview` | POST | Preview Cert |
+| `/api/admin/cohorts` | GET | List Cohorts |
+| `/api/admin/course-dropoff/{course_id}` | GET | Course Dropoff |
+| `/api/admin/dashboard/docs-engagement` | GET | Docs Engagement |
+| `/api/admin/dashboard/members-needing-action` | GET | Members Needing Action |
+| `/api/admin/docs` | GET | List Docs |
+| `/api/admin/docs/{slug}/pdf` | GET | Download Pdf |
+| `/api/admin/docs/{slug}/raw` | GET | Download Raw |
+| `/api/admin/email/send-test` | POST | Send Test Email |
+| `/api/admin/email/transport-status` | GET | Transport Status |
+| `/api/admin/entitlements/user/{user_id}` | GET | List User Entitlements |
+| `/api/admin/entitlements/user/{user_id}/course/{course_id}` | GET | Get Single Entitlement |
+| `/api/admin/feature-flags/{flag_key}` | PUT | Set Feature Flag |
+| `/api/admin/feedback` | GET | List Feedback |
+| `/api/admin/feedback/{feedback_id}/status` | POST | Set Feedback Status |
+| `/api/admin/imports` | GET | List Jobs |
+| `/api/admin/imports/run` | POST | Run Import |
+| `/api/admin/imports/upload-zip` | POST | Upload Zip And Run |
+| `/api/admin/imports/{job_id}` | GET | Get Job |
+| `/api/admin/imports/{job_id}/retry` | POST | Retry Import |
+| `/api/admin/imports/{job_id}/rollback` | POST | Rollback Import |
+| `/api/admin/invitations` | GET | List Invitations |
+| `/api/admin/invitations` | POST | Create Invitation |
+| `/api/admin/invitations/bulk` | POST | Bulk Invite |
+| `/api/admin/invitations/{invitation_id}` | DELETE | Revoke Invitation |
+| `/api/admin/kiosk/settings` | PUT | Update Kiosk Settings |
+| `/api/admin/leaderboard.csv` | GET | Leaderboard Csv |
+| `/api/admin/marketplace-funnel` | GET | Marketplace Funnel Rollup |
+| `/api/admin/marketplace-funnel/{course_id}` | GET | Marketplace Funnel |
+| `/api/admin/onboarding/checklist` | GET | Onboarding Checklist |
+| `/api/admin/organizations` | GET | List Organizations |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | GET | Get Erp360 Integration |
+| `/api/admin/organizations/{org_id}/integrations/erp360` | PATCH | Patch Erp360 Integration |
+| `/api/admin/outbox` | GET | List Outbox |
+| `/api/admin/outbox/stats` | GET | Outbox Stats |
+| `/api/admin/outbox/{message_id}/retry` | POST | Retry Outbox |
+| `/api/admin/query-builder/build` | POST | Build Query |
+| `/api/admin/reports/cohort-stats` | GET | Cohort Stats |
+| `/api/admin/scheduled-reports` | GET | List Scheduled |
+| `/api/admin/scheduled-reports` | POST | Create Scheduled |
+| `/api/admin/scheduled-reports/{report_id}` | DELETE | Delete Scheduled |
+| `/api/admin/scheduled-reports/{report_id}` | PUT | Update Scheduled |
+| `/api/admin/scheduled-reports/{report_id}/run-now` | POST | Run Now |
+| `/api/admin/scorm` | GET | List Scorm Packages |
+| `/api/admin/scorm/upload` | POST | Upload Scorm |
+| `/api/admin/storage/info` | GET | Storage Info |
+| `/api/admin/terms` | GET | List Terms |
+| `/api/admin/terms` | POST | Publish Terms |
+| `/api/admin/terms/acceptances` | GET | List Acceptances |
+| `/api/admin/users` | GET | List Users |
+| `/api/admin/users/{user_id}/2fa/disable` | POST | Admin Disable |
+| `/api/admin/webhooks` | GET | List Subscriptions |
+| `/api/admin/webhooks` | POST | Create Subscription |
+| `/api/admin/webhooks/deliveries` | GET | List All Deliveries |
+| `/api/admin/webhooks/{sub_id}` | DELETE | Delete Subscription |
+| `/api/admin/webhooks/{sub_id}` | PUT | Update Subscription |
+| `/api/admin/webhooks/{sub_id}/deliveries` | GET | List Deliveries |
+| `/api/admin/webhooks/{sub_id}/test` | POST | Test Subscription |
+| `/api/affiliate/lookup/{code}` | GET | Lookup |
+| `/api/ai/course-builder` | POST | Ai Course Builder |
+| `/api/auth/2fa/challenge` | POST | Challenge |
+| `/api/auth/2fa/disable` | POST | Disable |
+| `/api/auth/2fa/setup` | POST | Setup |
+| `/api/auth/2fa/setup-init` | POST | Setup Init |
+| `/api/auth/2fa/status` | GET | Totp Status |
+| `/api/auth/_test/reset-rate-limit` | POST | Test Reset Rate Limit |
+| `/api/auth/change-password` | POST | Change Password |
+| `/api/auth/forgot-password` | POST | Forgot Password |
+| `/api/auth/login` | POST | Login |
+| `/api/auth/logout` | POST | Logout |
+| `/api/auth/me` | DELETE | Confirm Account Deletion |
+| `/api/auth/me` | GET | Me |
+| `/api/auth/me/delete-request` | POST | Request Account Deletion |
+| `/api/auth/me/export` | GET | Export My Data |
+| `/api/auth/refresh` | POST | Refresh |
+| `/api/auth/register` | POST | Register |
+| `/api/auth/resend-verification` | POST | Resend Verification |
+| `/api/auth/reset-password` | POST | Reset Password |
+| `/api/auth/sso-exchange` | POST | Sso Exchange |
+| `/api/auth/sso-status` | GET | Sso Status |
+| `/api/auth/verify-email` | POST | Verify Email |
+| `/api/authoring/budget` | GET | Get Budget |
+| `/api/authoring/budget` | PUT | Update Budget |
+| `/api/authoring/flashcards/bulk-save` | POST | Bulk Save Flashcards |
+| `/api/authoring/flashcards/by-course/{course_id}` | GET | List By Course |
+| `/api/authoring/flashcards/generate` | POST | Generate Flashcards |
+| `/api/authoring/flashcards/{card_id}` | DELETE | Delete Card |
+| `/api/authoring/flashcards/{card_id}` | PATCH | Update Card |
+| `/api/authoring/mindmap/{course_id}` | POST | Generate Mindmap |
+| `/api/authoring/mindmap/{course_id}/layout` | DELETE | Clear Mindmap Layout |
+| `/api/authoring/mindmap/{course_id}/layout` | GET | Load Mindmap Layout |
+| `/api/authoring/mindmap/{course_id}/layout` | PUT | Save Mindmap Layout |
+| `/api/authoring/narration/generate` | POST | Generate Narration |
+| `/api/authoring/narration/languages` | GET | Narration Languages |
+| `/api/authoring/narration/{slide_id}` | DELETE | Clear Narration |
+| `/api/authoring/pptx/{course_id}` | GET | Export Course Pptx |
+| `/api/authoring/redaction/preview` | POST | Redaction Preview |
+| `/api/authoring/research` | GET | List Research Jobs |
+| `/api/authoring/research/start` | POST | Research Start |
+| `/api/authoring/research/{job_id}` | GET | Research Status |
+| `/api/authoring/sources` | GET | List Sources |
+| `/api/authoring/sources` | POST | Upload Source |
+| `/api/authoring/sources/search` | POST | Semantic Search |
+| `/api/authoring/sources/{doc_id}` | DELETE | Delete Source |
+| `/api/authoring/status` | GET | Authoring Status |
+| `/api/authoring/tutor/ask` | POST | Tutor Ask |
+| `/api/authoring/video/generate` | POST | Start Video Generation |
+| `/api/authoring/video/history` | GET | Video History |
+| `/api/authoring/video/preview` | POST | Video Cost Preview |
+| `/api/authoring/video/{job_id}` | GET | Video Status |
+| `/api/authoring/visuals/generate` | POST | Generate Visual |
+| `/api/badge-tiers` | GET | List Tiers |
+| `/api/badge-tiers` | POST | Create Tier |
+| `/api/badge-tiers/reorder` | PATCH | Reorder Tiers |
+| `/api/badge-tiers/{tier_id}` | DELETE | Delete Tier |
+| `/api/badge-tiers/{tier_id}` | PATCH | Update Tier |
+| `/api/billing/subscribe` | POST | Subscribe |
+| `/api/billing/subscriptions` | GET | My Subscriptions |
+| `/api/billing/webhook` | POST | Billing Webhook |
+| `/api/branding/public` | GET | Public Branding |
+| `/api/catalog` | GET | Catalog |
+| `/api/catalog/organizations` | GET | Catalog Organizations |
+| `/api/catalog/{course_id}` | GET | Catalog Detail |
+| `/api/catalog/{course_id}/reviews` | GET | Catalog Reviews |
+| `/api/catalog/{course_id}/slides/{slide_id}/track-view` | POST | Track Slide View |
+| `/api/catalog/{course_id}/track-view` | POST | Track View |
+| `/api/certificates` | GET | My Certificates |
+| `/api/certificates/admin-export.csv` | GET | Admin Export Certificates Csv |
+| `/api/certificates/admin-list` | GET | Admin List Certificates |
+| `/api/certificates/bulk-email` | POST | Bulk Email Certificates |
+| `/api/certificates/bulk-revoke` | POST | Bulk Revoke Certificates |
+| `/api/certificates/bulk-unrevoke` | POST | Bulk Unrevoke Certificates |
+| `/api/certificates/bulk-zip` | POST | Bulk Zip Certificates |
+| `/api/certificates/transcript` | GET | My Transcript |
+| `/api/certificates/transcript.json` | GET | My Transcript Json |
+| `/api/certificates/verify/{code}` | GET | Verify Certificate |
+| `/api/certificates/verify/{code}/og-image.png` | GET | Certificate Og Image Png |
+| `/api/certificates/verify/{code}/og-image.svg` | GET | Certificate Og Image |
+| `/api/certificates/{cert_id}/pdf` | GET | Download Certificate Pdf |
+| `/api/certificates/{cert_id}/revocation-history` | GET | Cert Revocation History |
+| `/api/certificates/{cert_id}/revoke` | POST | Revoke Certificate |
+| `/api/certificates/{cert_id}/unrevoke` | POST | Unrevoke Certificate |
+| `/api/courses` | GET | List Courses |
+| `/api/courses` | POST | Create Course |
+| `/api/courses/reorder` | PATCH | Reorder Catalog |
+| `/api/courses/{course_id}` | DELETE | Delete Course |
+| `/api/courses/{course_id}` | GET | Get Course |
+| `/api/courses/{course_id}` | PATCH | Update Course |
+| `/api/courses/{course_id}/archive` | POST | Archive Course |
+| `/api/courses/{course_id}/complete` | POST | Complete Course |
+| `/api/courses/{course_id}/duplicate` | POST | Duplicate Course |
+| `/api/courses/{course_id}/enroll` | POST | Enroll |
+| `/api/courses/{course_id}/prerequisites` | GET | List Prerequisites |
+| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | DELETE | Remove Prerequisite |
+| `/api/courses/{course_id}/prerequisites/{prereq_course_id}` | POST | Add Prerequisite |
+| `/api/courses/{course_id}/progress` | POST | Save Slide Progress |
+| `/api/courses/{course_id}/publish` | POST | Publish Course |
+| `/api/courses/{course_id}/rating` | GET | Get Course Rating |
+| `/api/courses/{course_id}/rating` | POST | Rate Course |
+| `/api/courses/{course_id}/reviews` | GET | List Course Reviews |
+| `/api/courses/{course_id}/reviews/{rating_id}/reply` | POST | Reply To Review |
+| `/api/courses/{course_id}/reviews/{rating_id}/toggle-hidden` | POST | Toggle Review Hidden |
+| `/api/courses/{course_id}/slides` | POST | Add Slide |
+| `/api/courses/{course_id}/slides/reorder` | PATCH | Reorder Slides Early |
+| `/api/courses/{course_id}/slides/{slide_id}` | DELETE | Delete Slide |
+| `/api/courses/{course_id}/slides/{slide_id}` | PATCH | Update Slide |
+| `/api/courses/{course_id}/slides/{slide_id}/versions` | GET | List Slide Versions |
+| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}` | GET | Get Slide Version |
+| `/api/courses/{course_id}/slides/{slide_id}/versions/{version_number}/restore` | POST | Restore Slide Version |
+| `/api/courses/{course_id}/toggle-featured` | POST | Toggle Featured |
+| `/api/courses/{course_id}/unarchive` | POST | Unarchive Course |
+| `/api/courses/{course_id}/unpublish` | POST | Unpublish Course |
+| `/api/enrollments` | GET | My Enrollments |
+| `/api/erp360/sync/status` | GET | Erp360 Sync Status |
+| `/api/erp360/sync/test-ping` | POST | Erp360 Sync Test Ping |
+| `/api/erp360/webhooks/user` | POST | Erp360 Webhook User |
+| `/api/exams` | GET | List Exams |
+| `/api/exams` | POST | Create Exam |
+| `/api/exams/ai-generate-questions` | POST | Ai Generate Questions |
+| `/api/exams/{exam_id}` | DELETE | Delete Exam |
+| `/api/exams/{exam_id}` | GET | Get Exam |
+| `/api/exams/{exam_id}` | PATCH | Update Exam |
+| `/api/exams/{exam_id}/attempts` | GET | List Exam Attempts |
+| `/api/exams/{exam_id}/attempts` | POST | Submit Attempt |
+| `/api/exams/{exam_id}/attempts/reset` | POST | Reset Exam Attempts |
+| `/api/exams/{exam_id}/question-insights` | GET | Exam Question Insights |
+| `/api/exams/{exam_id}/question-insights.csv` | GET | Exam Question Insights Csv |
+| `/api/exams/{exam_id}/questions` | PUT | Replace Questions |
+| `/api/exams/{exam_id}/questions/{question_id}` | PATCH | Update Question |
+| `/api/feature-flags` | GET | Get Feature Flags |
+| `/api/feedback` | POST | Submit Feedback |
+| `/api/feedback/screenshot` | POST | Upload Feedback Screenshot |
+| `/api/gamification/leaderboard` | GET | Leaderboard |
+| `/api/gamification/learning-streak` | GET | Learning Streak |
+| `/api/gamification/me` | GET | My Gamification |
+| `/api/gamification/preferences` | GET | Get Gamification Preferences |
+| `/api/gamification/preferences` | PATCH | Update Gamification Preferences |
+| `/api/gamification/streak-leaderboard` | GET | Streak Leaderboard |
+| `/api/health` | GET | Health |
+| `/api/invitations/{token}` | GET | Lookup Invitation |
+| `/api/invitations/{token}/accept` | POST | Accept Invitation |
+| `/api/join/{slug}` | GET | Lookup Campaign |
+| `/api/join/{slug}/signup` | POST | Campaign Signup |
+| `/api/kiosk/settings` | GET | Get Kiosk Settings |
+| `/api/kiosk/unlock` | POST | Kiosk Unlock |
+| `/api/leads` | POST | Capture Lead |
+| `/api/leads/embed.js` | GET | Embed Widget |
+| `/api/learn/flashcards/courses/{course_id}/due` | GET | Due Flashcards |
+| `/api/learn/flashcards/courses/{course_id}/stats` | GET | Flashcard Stats |
+| `/api/learn/flashcards/streak` | GET | Flashcard Streak |
+| `/api/learn/flashcards/{card_id}/review` | POST | Review Flashcard |
+| `/api/learning-paths` | GET | List Paths |
+| `/api/learning-paths` | POST | Create Path |
+| `/api/learning-paths/{path_id}` | DELETE | Delete Path |
+| `/api/learning-paths/{path_id}` | GET | Get Path |
+| `/api/learning-paths/{path_id}` | PATCH | Update Path |
+| `/api/learning-paths/{path_id}/enroll` | POST | Enroll In Path |
+| `/api/learning-paths/{path_id}/items` | POST | Add Item |
+| `/api/learning-paths/{path_id}/items/reorder` | PATCH | Reorder Path Items |
+| `/api/learning-paths/{path_id}/items/{course_id}` | DELETE | Remove Item |
+| `/api/learning-paths/{path_id}/publish` | POST | Publish Path |
+| `/api/live-sessions` | GET | List Sessions |
+| `/api/live-sessions` | POST | Create Session |
+| `/api/live-sessions/subscribe-url` | POST | Create Subscription Url |
+| `/api/live-sessions/subscribe-url/qr` | GET | Subscribe Url Qr |
+| `/api/live-sessions/subscribe-url/rotate` | POST | Rotate Subscription Secret |
+| `/api/live-sessions/subscribe/{token}.ics` | GET | Subscribe Ics |
+| `/api/live-sessions/upcoming` | GET | List Upcoming For Learner |
+| `/api/live-sessions/{session_id}` | DELETE | Delete Session |
+| `/api/live-sessions/{session_id}` | GET | Get Session |
+| `/api/live-sessions/{session_id}` | PATCH | Update Session |
+| `/api/live-sessions/{session_id}/cancel` | POST | Cancel Occurrence |
+| `/api/live-sessions/{session_id}/ics` | GET | Download Ics |
+| `/api/live-sessions/{session_id}/mark-attendance` | POST | Mark Attendance |
+| `/api/live-sessions/{session_id}/rsvp` | POST | Toggle Rsvp |
+| `/api/live-sessions/{session_id}/uncancel` | POST | Uncancel Occurrence |
+| `/api/notifications` | GET | List Notifications |
+| `/api/notifications/read-all` | PATCH | Mark All Read |
+| `/api/organization` | GET | Get Org |
+| `/api/organization` | PATCH | Update Org |
+| `/api/organization/apply-theme/{slug}` | POST | Apply Theme Preset |
+| `/api/organization/cohort-digest/send-now` | POST | Send Cohort Digest Now |
+| `/api/organization/cohort-settings` | PUT | Update Cohort Settings |
+| `/api/organization/cohort-settings/test-webhook` | POST | Test Cohort Webhook |
+| `/api/organization/nurture-settings` | PUT | Update Nurture Settings |
+| `/api/organization/nurture-settings/run-now` | POST | Run Nurture Now |
+| `/api/organization/smtp` | GET | Get Smtp Config |
+| `/api/organization/smtp` | PUT | Update Smtp Config |
+| `/api/organization/smtp/test` | POST | Test Smtp Send |
+| `/api/organization/themes` | GET | List Theme Presets |
+| `/api/organization/themes` | POST | Create Custom Theme |
+| `/api/organization/themes/{preset_id}` | DELETE | Delete Custom Theme |
+| `/api/organization/themes/{preset_id}` | PUT | Update Custom Theme |
+| `/api/pathways/admin/completions` | GET | Get Admin Completions |
+| `/api/pathways/admin/completions.csv` | GET | Export Admin Completions Csv |
+| `/api/pathways/admin/rpl` | POST | Post Grant Rpl |
+| `/api/pathways/admin/rpl/{user_id}/{course_id}` | DELETE | Delete Rpl |
+| `/api/pathways/map` | GET | Get Pathway Map |
+| `/api/payments/v1/checkout/session` | POST | Create Checkout Session |
+| `/api/payments/v1/checkout/status/{session_id}` | GET | Get Checkout Status |
+| `/api/portal/{slug}` | GET | Get Portal |
+| `/api/public/catalog` | GET | Public Catalog |
+| `/api/public/certificates/verify/{code}` | GET | Verify Certificate |
+| `/api/public/guides/{filename}` | GET | Download User Guide |
+| `/api/rich-text/sanitize` | POST | Sanitize Html Payload |
+| `/api/scorm/files/{package_id}/{rel_path}` | GET | Serve Scorm File |
+| `/api/scorm/runtime.js` | GET | Scorm Runtime Shim |
+| `/api/seo/certificates/share/{code}` | GET | Cert Share |
+| `/api/seo/courses/share/{course_id}` | GET | Course Share |
+| `/api/seo/robots.txt` | GET | Robots Txt |
+| `/api/seo/sitemap-{org_id}.xml` | GET | Sitemap Org |
+| `/api/seo/sitemap.xml` | GET | Sitemap Root |
+| `/api/slides/{slide_id}/comments` | GET | List Comments |
+| `/api/slides/{slide_id}/comments` | POST | Add Comment |
+| `/api/slides/{slide_id}/comments/{comment_id}` | DELETE | Delete Comment |
+| `/api/terms/accept` | POST | Accept Terms |
+| `/api/terms/current` | GET | Get Current Terms |
+| `/api/tutor/ask` | POST | Ask |
+| `/api/tutor/save-as-flashcard` | POST | Save As Flashcard |
+| `/api/tutor/sessions` | GET | List Sessions |
+| `/api/tutor/sessions/{session_id}` | GET | Get Session |
+| `/api/tutor/sessions/{session_id}/archive` | POST | Archive Session |
+| `/api/uploads/bulk-media` | POST | Upload Bulk Media |
+| `/api/uploads/cover-library` | GET | Cover Library |
+| `/api/uploads/files/{path}` | GET | Serve Upload |
+| `/api/uploads/image` | POST | Upload Image |
+| `/api/uploads/media` | POST | Upload Media |
 | `/api/v2/catalog` | GET | Public course catalog (enveloped) |
 | `/api/v2/courses` | GET | List courses visible to the caller |
 | `/api/v2/courses/{course_id}` | GET | Course detail with slides |
 | `/api/v2/enrollments` | GET | Caller's enrollments with progress |
 | `/api/v2/health` | GET | Service health (enveloped) |
-| `/api/webhook/stripe` | POST | Stripe webhook receiver. Idempotent — the poll path and the |
-| `/api/xapi/statements` | GET |  |
-| `/api/xapi/statements` | POST |  |
+| `/api/webhook/stripe` | POST | Stripe Webhook |
+| `/api/xapi/statements` | GET | List Statements |
+| `/api/xapi/statements` | POST | Receive Statement |
 
-_Total: **322** registered API endpoints._
+_Total: **320** registered API endpoints._
 <!-- AUTO:END api_routes -->
 
 Highlights (curated):
@@ -966,65 +964,58 @@ Highlights (curated):
 Injected on every response by `core/middleware.py::SecurityHeadersMiddleware`:
 
 - `Content-Security-Policy` — locked to self + integrated third-parties (Sentry, Tavily)
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- `Strict-Transport-Security` — 1-year max-age, includeSubDomains
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — minimal surface (no camera, no microphone, no geolocation unless explicitly required by a feature)
+
+## 14.2 Rate limiting
+
+| Route | Window | Max | Per |
+|---|---|---|---|
+| Login | 1 min | 5 | email |
+| Login | 1 hour | 10 | email |
+| Signup | 1 hour | 3 | IP |
+| Forgot password | 1 hour | 3 | email |
+| Verify-email resend | 1 hour | 2 | user |
+| Certificate verify | 1 min | 30 | IP |
+| Public catalogue | 1 min | 60 | IP |
+
+All implemented via Redis-backed `slowapi.Limiter` in `backend/server.py`.
+
+## 14.3 Audit logging
+
+Every mutation (POST / PUT / PATCH / DELETE) is logged to `audit_logs` with:
+- actor user_id + role
+- route + method
+- request body (PII redacted)
+- timestamp
+- 3-year retention
+
+Admins can query via `/api/admin/audit-log` or request an LLM-generated digest at `/api/admin/audit-digest`.
+
+## 14.4 Error handling
+
+Unhandled exceptions are caught by `core/middleware.py::CatchAllExceptionsMiddleware`:
+- 500s → Sentry notification + generic "Something went wrong" JSON (no stack trace in production)
+- 422s → Pydantic validation detail (safe fields only)
+- 401/403 → Consistent `{ detail: "..." }` shape
+
+## 14.5 Frontend CSP & security
+
+`frontend/public/_headers` (deployed by Netlify / Vercel / Nginx):
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: same-origin`
-- `Permissions-Policy: camera=(), microphone=(self), geolocation=()`
+- `Referrer-Policy: strict-origin-when-cross-origin`
 
-## 14.2 Sentry + correlation IDs
-- Backend + frontend both initialise `sentry-sdk`. Trace sample-rate `0.2` in prod.
-- Every request receives an `X-Correlation-ID` (generated or forwarded). Frontend Axios interceptor echoes it back so stack traces link across tiers.
-- Add a DSN via `SENTRY_DSN` (backend) and `REACT_APP_SENTRY_DSN` (frontend). No DSN = Sentry silently no-ops.
-
-## 14.3 Rate limiting
-See § 10.8 for the endpoint table. Redis-backed (`RATE_LIMIT_REDIS_URL`) with in-memory fallback for dev.
-
-## 14.4 Audit log
-Every mutating admin action + every sensitive read (cert download, doc preview, GDPR export) writes to the `audit_logs` table. Immutable, retained 3 years, viewable at `/dashboard/audit`. Export via `GET /api/admin/audit-log?format=csv`.
-
-## 14.5 Deployment fail-closed check
-`python backend/scripts/deploy_precheck.py` runs at container startup and refuses to boot if:
-- `ENVIRONMENT` unset (assumed prod)
-- Dev secrets present (`JWT_SECRET=changeme`, `SEED_ADMIN_PASSWORD=admin123`, …)
-- Mongo config detected (IFPI is PostgreSQL-only)
-- CORS wildcard in prod
-- `STORAGE_BACKEND=local` in prod
-
-## 14.6 Locked-out rescue tool
-`python backend/scripts/reset_admin_password.py --email <owner>` prints a random 20-char password and re-sets `must_change_password=true`. Idempotent seed script guarantees no user's password is ever overwritten by a redeploy.
+React build also strips `console.log` in production via `drop_console: true` in `vite.config.ts`.
 
 ---
 
-# 15. Documentation Library (in-app) {#15-docs-library}
+# 15. Where to Find These Manuals in the App {#15-docs-library}
 
-**Where to find these manuals inside IFPI:**
+Every IFPI deployment ships the manuals as markdown inside `/app/docs/`. They are also rendered as HTML at `frontend/public/docs/IFPI_Master_Manual.html` (auto-generated by `build_docs.py --html`).
 
-> `Dashboard → Organization Settings → Documents` (ADMIN+ only).
+Admins can open the in-app docs viewer from the sidebar: **Docs Library**. Learners and instructors see a read-only version.
 
-The tab (see `frontend/src/pages/dashboard/OrganizationDocumentsTab.tsx`) lists every manual with:
-- Live line count, size, last-modified timestamp
-- **Inline preview** — click a row to render the PDF in an iframe below (no download friction)
-- **Download PDF** — server-rendered from the source markdown via `xhtml2pdf`, cached 1 h
-- **Download Markdown** — raw source for import into Notion / Confluence
-- Every preview and download is written to the audit log so admins can measure engagement.
-
-**Catalog served by `/api/admin/docs`:**
-
-| Slug | Title | Audience |
-|---|---|---|
-| `setup-manual` | IFPI Setup Manual | Owner, Super Admin |
-| `user-manual` | IFPI User Manual | All roles |
-| `integration-matrix` | IFPI ↔ ERP360 Integration Matrix | Platform Ops, Owner |
-| `assessment` | IFPI vs ERP360 Comparative Assessment | Owner, Platform Ops |
-
-**Endpoints (all `requires_admin`):**
-- `GET /api/admin/docs` — manifest
-- `GET /api/admin/docs/{slug}/pdf?preview=true|false` — streamed PDF
-- `GET /api/admin/docs/{slug}/raw` — raw markdown
-
-Manuals stay in sync with the codebase: AUTO-BLOCK sections (route index, model index, role matrix) are regenerated by `python backend/scripts/build_docs.py`. Human-written prose outside those markers is preserved.
-
----
-
-*Regenerate this manual whenever routers or models change: `python /app/backend/scripts/build_docs.py`.*
+If you're reading this on GitHub, the source lives at `docs/IFPI_USER_MANUAL.md` (this file) and `docs/IFPI_SETUP_MANUAL.md`.

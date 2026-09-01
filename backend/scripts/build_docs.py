@@ -104,18 +104,32 @@ def _gen_api_routes() -> str:
                 "|---|---|---|\n"
                 "| _(unable to introspect — run locally with the backend importable)_ | | |")
     rows: List[Tuple[str, str, str]] = []
-    for route in app.routes:
-        path = getattr(route, "path", "") or ""
-        if not path.startswith("/api"):
-            continue
-        verb, p, summary = _summarize_route(route)
-        if not verb:  # websocket, mount, etc.
-            continue
-        rows.append((p, verb, summary or ""))
+    # FastAPI ≥0.141 flattens included routers into _IncludedRouter wrappers
+    # that hide their child routes from app.routes.  Use the OpenAPI path map
+    # instead — it is always complete.
+    try:
+        spec = app.openapi()
+        for path, methods in sorted(spec.get("paths", {}).items()):
+            if not path.startswith("/api"):
+                continue
+            for method, info in methods.items():
+                if method in ("parameters",):
+                    continue
+                summary = (info.get("summary", "") or "").strip()
+                rows.append((path, method.upper(), summary))
+    except Exception:
+        # Fallback to legacy route iteration (works on older FastAPI)
+        for route in app.routes:
+            path = getattr(route, "path", "") or ""
+            if not path.startswith("/api"):
+                continue
+            verb, p, summary = _summarize_route(route)
+            if not verb:
+                continue
+            rows.append((p, verb, summary or ""))
     rows.sort()
     lines = ["| Endpoint | Verb | Purpose |", "|---|---|---|"]
     for p, v, s in rows:
-        # Escape pipes in summary
         s_esc = s.replace("|", "\\|")
         lines.append(f"| `{p}` | {v} | {s_esc} |")
     lines.append(f"\n_Total: **{len(rows)}** registered API endpoints._")
