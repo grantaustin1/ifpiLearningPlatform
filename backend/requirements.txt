@@ -92,7 +92,7 @@ markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mccabe==0.7.0
 mdurl==0.1.2
-motor==3.7.1
+motor==3.3.1
 msgpack==1.2.1
 multidict==6.7.1
 mypy==2.1.0
@@ -170,7 +170,7 @@ slowapi==0.1.10
 sniffio==1.3.1
 soupsieve==2.9.2
 SQLAlchemy==2.0.36
-starlette==1.6.0
+starlette==0.41.3
 stevedore==5.9.0
 stripe==14.4.1
 svglib==2.0.2
