@@ -70,6 +70,22 @@ def test_emergentintegrations_not_in_requirements():
     )
 
 
+def test_no_url_based_requirements():
+    """URL-based requirements referencing internal asset servers are not installable in
+    standard CI runners and must not appear in requirements.txt."""
+    requirements_text = (
+        Path(__file__).resolve().parents[1] / "requirements.txt"
+    ).read_text(encoding="utf-8")
+    for raw_line in requirements_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        assert " @ http://" not in line and " @ https://" not in line, (
+            f"URL-based requirement found in requirements.txt: {line!r} — "
+            "use only PyPI packages so CI can install dependencies reliably."
+        )
+
+
 def test_defusedxml_pinned_for_scorm_imports():
     """SCORM parsing imports defusedxml at module import time, so CI needs it pinned."""
     requirements_by_name = _requirements_by_name()
