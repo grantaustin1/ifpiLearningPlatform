@@ -161,7 +161,7 @@ rpds-py==2026.5.1
 rsa==4.9.1
 s3transfer==0.18.0
 s5cmd==0.2.0
-sentry-sdk==2.19.2
+sentry-sdk==2.68.1
 shellingham==1.5.4
 simple-websocket==1.1.0
 six==1.17.0
